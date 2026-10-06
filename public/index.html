@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#143d32"><meta name="description" content="Build a life, find your people, and grow a career in Palm City.">
+  <title>Celebrity Life · Palm City</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div id="loading" class="loading"><div class="brand-mark">✦</div><h1>Celebrity Life</h1><p>Making room for your next chapter…</p></div>
+  <div id="app" hidden>
+    <aside class="rail"><a class="brand" href="/" aria-label="Celebrity Life home">✦</a><nav id="navigation" aria-label="Game panels"></nav><div class="rail-bottom"><span class="live-dot"></span><span>LIVE</span></div></aside>
+    <main>
+      <header class="topbar"><div><span class="eyebrow">PALM CITY</span><h1>Celebrity Life<span class="tiny-star">✦</span></h1></div><div class="top-stats" id="topStats"></div></header>
+      <div class="workspace">
+        <section class="city-column"><div class="page-heading"><div><span class="eyebrow" id="locationEyebrow">YOUR NEIGHBOURHOOD</span><h2 id="locationTitle">Your apartment</h2><p id="locationSubtitle">A little room for big dreams</p></div><button class="quiet" id="mapButton">↗ Explore city</button></div>
+          <div class="world-card"><canvas id="world" aria-label="3D city scene. Click the ground to walk; use the object buttons below to interact." tabindex="0"></canvas><div class="world-weather">☀ <span>28° · A good day to begin</span></div><div class="world-instruction">Click to walk <span>·</span> Select an object to interact</div><button class="camera-button" id="cameraButton" aria-label="Rotate camera">⟳</button><div id="worldLabel" class="world-label"></div></div>
+          <div id="objects" class="object-strip"></div>
+          <section class="activity-card" id="activityCard"></section>
+          <section class="feed-card"><div class="section-label"><h3>Your story, so far</h3><span>RECENT MOMENTS</span></div><div id="feed"></div></section>
+        </section>
+        <aside class="dashboard"><section class="profile-card" id="profileCard"></section><section class="needs-card" id="needsCard"></section><section class="skills-card" id="skillsCard"></section><div class="little-note"><span>✧</span><p>Every big name starts somewhere.<br>Make your next move count.</p></div></aside>
+      </div>
+      <footer><span>PALM CITY · YOUR LIFE, YOUR PACE</span><button class="text-button" id="motionButton">Motion on</button><span id="connection">Saved to your city</span></footer>
+    </main>
+  </div>
+  <div id="modal" class="modal-shell" hidden><div class="modal-backdrop"></div><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><button id="closeModal" class="modal-close" aria-label="Close dialog">×</button><div id="modalContent"></div></section></div>
+  <div id="toast" role="status" aria-live="polite" hidden></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
