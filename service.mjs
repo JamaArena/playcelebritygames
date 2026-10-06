@@ -2,8 +2,8 @@ import { randomBytes, createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame } from './game.mjs';
 import { CAREERS, BALANCE, clamp } from './public/content.js';
-export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);";
-export function createGameService(db,{secureCookies=false}={}) {
+export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);";
+export function createGameService(db,{secureCookies=false,sendEmail=null}={}) {
 db.exec(schema);
 const read=db.prepare('SELECT * FROM players WHERE id=?');
 const save=db.prepare('UPDATE players SET state=? WHERE id=?');
@@ -69,7 +69,8 @@ const TOWN_PLAYER_LIMIT=120;
 const roomFor=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
 function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<20_000};}
 function snapshot(playerId,s,now){
-  if(!s)return {state:null,serverNow:now};
+  const account=accountOf(playerId);
+  if(!s)return {state:null,serverNow:now,account};
   const players=db.prepare('SELECT id,state FROM players WHERE id!=?').all(playerId).flatMap(row=>{const p=JSON.parse(row.state);return p?[publicProfile(row.id,p)]:[];}).filter(p=>!s.blocks.includes(p.id));
   const scenePlayers=players.filter(p=>p.sceneRoom===roomFor(playerId,s)&&p.online&&!load(p.id)?.blocks.includes(playerId));
   // Everyone online in a public place, wherever they are in town; homes stay private. Capped per response.
@@ -80,7 +81,7 @@ function snapshot(playerId,s,now){
   const agreements=db.prepare('SELECT * FROM agreements').all().map(r=>JSON.parse(r.state)).filter(a=>a.participants.includes(playerId)&&['pending','running'].includes(a.status));
   const visiting=s.visiting?load(s.visiting):null;
   const battles=battlesFor(playerId,s,now);
-  return {state:view(s,now),playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture,home:visiting.home||null}:null,season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
+  return {state:view(s,now),account,playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture,home:visiting.home||null}:null,season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
 }
 // Turn-based team battles between real players. Stats come from career skills, energy and fame.
 // Winners gain fame; losers lose the same stake (never below zero). Each fighter spends one charge.
@@ -173,6 +174,56 @@ function battlesFor(playerId,s,now){
   const names=ids=>ids.map(p=>({id:p,name:load(p)?.name||'Player'}));
   return rows.filter(b=>b.teams.flat().includes(playerId)?(b.status!=='done'&&b.status!=='cancelled')||now-(b.endedAt||b.createdAt)<5*60_000:b.status==='open'&&b.location===s?.location)
     .map(b=>({...b,teamNames:b.teams.map(names),stake:BATTLE.stakes[b.mode]}));
+}
+// Accounts: email + one-time code, no passwords. A code proves the email; the account then owns this
+// browser's character (or the one already linked to that email when logging in on a new device).
+const CODE_TTL=10*60_000,CODE_RESEND=60_000,CODE_ATTEMPTS=5;
+const cleanEmail=v=>String(v||'').trim().toLowerCase(),validEmail=v=>/^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,24}$/.test(v);
+function accountOf(playerId){const a=db.prepare('SELECT email,username,name FROM accounts WHERE player_id=?').get(playerId);return a?{username:a.username,name:a.name,email:a.email.replace(/^(.).*(@.*)$/,'$1•••$2')}:null;}
+async function authAction(playerId,token,input,now,res){
+  if(input.type==='sendCode'){
+    const email=cleanEmail(input.email),purpose=input.purpose==='login'?'login':'signup';fail(validEmail(email),'Enter a valid email address.');
+    const previous=db.prepare('SELECT sent FROM codes WHERE email=?').get(email);fail(!previous||now-previous.sent>=CODE_RESEND,'A code was just sent. Wait a minute before asking for another.');
+    let payload={};
+    if(purpose==='signup'){
+      const username=String(input.username||'').trim().replace(/^@/,'').toLowerCase(),name=String(input.name||'').trim().slice(0,40);
+      fail(name.length>=2,'Enter your name.');fail(/^[a-z0-9_]{3,20}$/.test(username),'Usernames use 3–20 letters, numbers or underscores.');fail(input.adult===true,'Confirm that you are 18 or older.');
+      fail(!db.prepare('SELECT 1 FROM accounts WHERE email=?').get(email),'That email already has an account. Log in instead.');
+      fail(!db.prepare('SELECT 1 FROM accounts WHERE username=?').get(username),'That username is taken.');
+      fail(!db.prepare('SELECT 1 FROM accounts WHERE player_id=?').get(playerId),'This browser is already signed in. Log out first.');
+      payload={username,name};
+    }
+    const exists=purpose==='login'?db.prepare('SELECT 1 FROM accounts WHERE email=?').get(email):true;
+    const code=String(randomBytes(4).readUInt32BE(0)%1_000_000).padStart(6,'0');
+    db.prepare('INSERT INTO codes VALUES(?,?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,purpose=excluded.purpose,payload=excluded.payload,expires=excluded.expires,attempts=0,sent=excluded.sent').run(email,hash(email+':'+code),purpose,JSON.stringify(payload),now+CODE_TTL,0,now);
+    // Login never reveals whether an email is registered; unknown emails simply receive nothing.
+    if(exists){fail(sendEmail,'Email sign-in isn’t set up on this server yet.');await sendEmail({to:email,subject:`Your Celebrity Games code: ${code}`,text:`Your Celebrity Games code is ${code}. It expires in 10 minutes. If you didn't ask for it, ignore this email.`,code});}
+    return [200,{sent:true,email}];
+  }
+  if(input.type==='verifyCode'){
+    const email=cleanEmail(input.email),row=db.prepare('SELECT * FROM codes WHERE email=?').get(email);
+    fail(row&&row.expires>now&&row.attempts<CODE_ATTEMPTS,'That code has expired. Ask for a new one.');
+    if(row.code_hash!==hash(email+':'+String(input.code||'').trim())){db.prepare('UPDATE codes SET attempts=attempts+1 WHERE email=?').run(email);throw new GameError('That code isn’t right. Check your email and try again.');}
+    db.prepare('DELETE FROM codes WHERE email=?').run(email);
+    if(row.purpose==='signup'){
+      const {username,name}=JSON.parse(row.payload);fail(!db.prepare('SELECT 1 FROM accounts WHERE username=? OR email=?').get(username,email),'That username or email was just taken.');
+      db.prepare('INSERT INTO accounts VALUES(?,?,?,?,?)').run(playerId,email,username,name,now);return [200,{account:accountOf(playerId)}];
+    }
+    const account=db.prepare('SELECT player_id FROM accounts WHERE email=?').get(email);fail(account,'That code has expired. Ask for a new one.');
+    const session=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(hash(session),account.player_id,now);
+    res.setHeader('Set-Cookie',`celebrity=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000${secureCookies?'; Secure':''}`);return [200,{account:accountOf(account.player_id)}];
+  }
+  if(input.type==='logout'){
+    fail(accountOf(playerId),'You are not signed in.');
+    if(token){db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hash(token));db.prepare('UPDATE players SET token_hash=? WHERE token_hash=?').run(hash(randomBytes(32).toString('hex')),hash(token));}
+    res.setHeader('Set-Cookie',`celebrity=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secureCookies?'; Secure':''}`);return [200,{loggedOut:true}];
+  }
+  if(input.type==='newLife'){
+    fail(accountOf(playerId),'Sign in to start a new life.');fail(input.confirm==='NEW LIFE','Type NEW LIFE to confirm.');
+    const s=load(playerId);if(s?.battle)throw new GameError('Finish your battle first.');
+    db.prepare('UPDATE players SET state=? WHERE id=?').run('null',playerId);return [200,{reset:true}];
+  }
+  throw new GameError('Unknown account action.');
 }
 function social(playerId,s,input,now){
   if(String(input.type).startsWith('battle'))return battleAction(playerId,s,input,now);
@@ -269,9 +320,10 @@ try {
         fail(req.headers['content-type']?.startsWith('application/json'),'Use JSON for game actions.');
       }
       const token=String(req.headers.cookie||'').match(/(?:^|;\s*)celebrity=([a-f0-9]{64})/)?.[1];
-      let row=token?db.prepare('SELECT * FROM players WHERE token_hash=?').get(hash(token)):null;
+      let row=token?db.prepare('SELECT * FROM players WHERE token_hash=?').get(hash(token))||db.prepare('SELECT players.* FROM sessions JOIN players ON players.id=sessions.player_id WHERE sessions.token_hash=?').get(hash(token)):null;
       if(!row){const session=randomBytes(32).toString('hex'),playerId=id();db.prepare('INSERT INTO players VALUES(?,?,?,?)').run(playerId,'null',hash(session),clock());row=read.get(playerId);res.setHeader('Set-Cookie',`celebrity=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000${secureCookies?'; Secure':''}`);}
       const playerId=row.id,now=clock();settleSeasons(now);
+      if(req.method==='POST'&&url.pathname==='/api/auth'){json(...await authAction(playerId,token,await body(req),now,res));}
       if(req.method==='GET'&&url.pathname==='/api/state') {
         const s=load(playerId);if(s){reconcile(s,now);captureEligibility(s,now);persist(playerId,s);}json(200,snapshot(playerId,s,now));
       }
