@@ -79,14 +79,14 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   const aFinal=(await a.call()).data.state,bFinal=(await b.call()).data.state;assert.equal(aFinal.active,null);assert.equal(bFinal.active,null);
   assert.equal(aFinal.outputs[0].id,bFinal.outputs[0].id);assert.deepEqual(aFinal.outputs[0].credits,['River','Sky']);
   const totalAudience=aFinal.outputs[0].gain+bFinal.outputs[0].gain,totalPayout=aFinal.outputs[0].payout+bFinal.outputs[0].payout;
-  assert.equal(totalAudience,aFinal.outputs[0].quality);assert.equal(totalPayout,Math.floor(50*aFinal.outputs[0].quality/100));
+  assert.equal(totalAudience,100*aFinal.outputs[0].quality);assert.equal(totalPayout,Math.floor(50*aFinal.outputs[0].quality/100));
   assert.equal((await b.call({type:'finish',activityId:bActivity})).status,400);assert.equal((await b.call()).data.state.money,bFinal.money);
-  fixture(aId,s=>{s.careers.musician.audience=200;});await a.call();
+  fixture(aId,s=>{s.careers.musician.audience=20000;});await a.call();
   database.prepare('UPDATE seasons SET ends=? WHERE id=1').run(Date.now()+1);
   // The first post-cutoff request freezes and settles before any new action.
   await new Promise(resolve=>setTimeout(resolve,5));const settled=(await a.call()).data;
   assert.equal(settled.season.id,2);assert.equal(settled.state.awards.filter(award=>award.id.startsWith('season:1')).length,1);
-  const audienceAfter=settled.state.careers.musician.audience;await a.call();assert.equal((await a.call()).data.state.careers.musician.audience,audienceAfter);
+  const fameAfter=settled.state.fame;assert.ok(fameAfter>=100,'the season award adds fame');await a.call();assert.equal((await a.call()).data.state.fame,fameAfter);
   assert.equal((await fetch(base+'/../server.mjs')).status,404);
   assert.match((await fetch(base+'/')).headers.get('content-security-policy'),/frame-ancestors 'none'/);
 });

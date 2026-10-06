@@ -14,8 +14,11 @@ export function createCharacter(input, now) {
   requireRule(text(input.name).length >= 2, 'Use a name of at least two characters.');
   requireRule(input.career !== 'adult' || input.adult === true, 'Confirm that your character is an adult.');
   const position = ['striker', 'midfielder', 'defender'].includes(input.position) ? input.position : 'midfielder';
-  return {version:1, name:text(input.name,30), color: /^#[\da-f]{6}$/i.test(input.color) ? input.color : '#d49872', hair: input.hair === 'short' ? 'short' : 'curls', position, technique: input.technique === 'instrument' ? 'instrument' : 'vocals', career:input.career, careers:{[input.career]:newCareer(input.career,input.origin)}, location:'home', position3d:{x:0,z:1}, needs:Object.fromEntries(Object.keys(B.decay).map(n=>[n,80])), lastSeen:now, money:500, charges:10, refillAnchor:null, active:null, recovery:null, inventory:{food:{quantity:3}, bed:{level:1}, shower:{level:1}, toilet:{level:1}}, furniture:[], outputs:[], events:[], learningEvents:[], awards:[], results:[], friends:[], blocks:[], invitations:[], equipped:{}, seasonStart:now, appearance:{}, collaborations:[]};
+  return {version:2, name:text(input.name,30), color: /^#[\da-f]{6}$/i.test(input.color) ? input.color : '#d49872', hair: input.hair === 'short' ? 'short' : 'curls', position, technique: input.technique === 'instrument' ? 'instrument' : 'vocals', career:input.career, careers:{[input.career]:newCareer(input.career,input.origin)}, location:'home', position3d:{x:0,z:1}, fame:0, needs:Object.fromEntries(Object.keys(B.decay).map(n=>[n,80])), lastSeen:now, money:500, charges:10, refillAnchor:null, active:null, recovery:null, inventory:{food:{quantity:3}, bed:{level:1}, shower:{level:1}, toilet:{level:1}}, furniture:[], outputs:[], events:[], learningEvents:[], awards:[], results:[], friends:[], blocks:[], invitations:[], equipped:{}, seasonStart:now, appearance:{}, collaborations:[]};
 }
+// Fame is one character-wide total earned from reach in any career. Battles can also move it.
+export const fameFor = reach => Math.floor(reach * B.famePerReach);
+export function addFame(s, amount) { s.fame = Math.max(0, (s.fame || 0) + amount); }
 export function log(s, message, now) { s.events.unshift({id:id(),message,at:now}); s.events = s.events.slice(0,100); }
 export function refill(s, now) {
   if (s.charges >= B.capacity) { s.charges=B.capacity; s.refillAnchor=null; return; }
@@ -36,11 +39,10 @@ export function learn(s, careerKey, skill, points, eventId) {
 export function evaluate(s, key=s.career) {
   const c=s.careers[key], def=CAREERS[key];
   const average=Object.values(c.skills).reduce((a,b)=>a+b.level,0)/def.skills.length;
-  const audience=def.family==='tech'?Math.floor(c.audience*c.engagement/100):c.audience;
-  B.tiers.forEach(([,fans,level],i)=>{if(audience>=fans&&average>=level)c.tier=Math.max(c.tier,i);});
+  B.tiers.forEach(([,fame,level],i)=>{if((s.fame||0)>=fame&&average>=level)c.tier=Math.max(c.tier,i);});
   for (const threshold of B.milestones) {
-    const awardId=`milestone:${key}:${threshold}`;
-    if(c.audience>=threshold&&!s.awards.some(a=>a.id===awardId))s.awards.push({id:awardId,name:`${threshold.toLocaleString()} ${def.audience}`,career:key,at:s.lastSeen});
+    const awardId=`milestone:fame:${threshold}`;
+    if((s.fame||0)>=threshold&&!s.awards.some(a=>a.id===awardId))s.awards.push({id:awardId,name:`${threshold.toLocaleString()} fame`,career:key,at:s.lastSeen});
   }
 }
 function discovery(c,def) {
@@ -51,6 +53,8 @@ export function opportunities(s) {
   return {trial:discovery(c,def), launch:s.outputs.some(o=>o.career===s.career&&o.kind==='build'&&!o.released), affiliation:c.offer};
 }
 export function reconcile(s, now) {
+  // Saves from before fame points: rescale reach to the new venue sizes and derive fame once.
+  if((s.version||1)<2){let reach=0;for(const c of Object.values(s.careers)){c.audience*=100;reach+=c.audience;}s.fame=(s.fame||0)+fameFor(reach);for(const o of s.outputs)o.gain*=100;s.version=2;}
   refill(s,now);
   // Only heartbeat gaps <= 20 seconds count as active. Offline needs never decay.
   const dt=Math.max(0,now-s.lastSeen);
@@ -182,13 +186,13 @@ function settle(s,a,now) {
     win=a.tennis.winner===0?'Win':'Loss';a.playerScore=a.tennis.sets[0];a.opponentScore=a.tennis.sets[1];
   }
   const qualifies=!['trial','build'].includes(a.kind);
-  let gain=qualifies?Math.floor(B.reaches[a.tier]*quality/100/(1+c.audience/100000)*(win==='Win'?1.25:1)):0;
+  let gain=qualifies?Math.floor(B.reaches[a.tier]*quality/100*(win==='Win'?1.25:1)):0;
   let gross=qualifies?Math.floor(B.fees[a.tier]*quality/100):0;
   const contract=c.affiliation;
   if(qualifies&&contract)gross=contract.fee;
   const payout=Math.floor(gross*(1-(contract?.share||0))*a.moneyShare);
   gain=Math.floor(gain*a.audienceShare);
-  s.money+=payout;c.audience+=gain;c.completed++;
+  const fame=fameFor(gain);s.money+=payout;c.audience+=gain;addFame(s,fame);c.completed++;
   if(qualifies)c.engagement=clamp(c.engagement+(quality-50)/10);
   if(contract&&qualifies)c.reputation=clamp(c.reputation+(quality>=60?2:-2));
   if(a.career==='hacker')c.exposure=a.exposure;
@@ -200,10 +204,10 @@ function settle(s,a,now) {
     }
     else c.failedTrialAt=c.practices;
   }
-  const output={id:a.id,career:a.career,kind:a.kind,title:a.title,genre:a.genre,quality,released:a.kind!=='build',at:now,credits:[s.name,...(a.collaborator?[NPCS.find(n=>n.id===a.collaborator).name]:[])],gain,payout,tier:a.tier};
+  const output={id:a.id,career:a.career,kind:a.kind,title:a.title,genre:a.genre,quality,released:a.kind!=='build',at:now,credits:[s.name,...(a.collaborator?[NPCS.find(n=>n.id===a.collaborator).name]:[])],gain,fame,payout,tier:a.tier};
   s.outputs.unshift(output);s.results.unshift({...output,win,score:sport(a.career)?`${a.playerScore}–${a.opponentScore}`:null,learning:a.outcomes.length*5});
   if(contract&&qualifies)contract.delivered++;
-  s.active=null;evaluate(s,a.career);log(s,`${a.title} completed · quality ${quality} · +${gain} ${def.audience} · +${payout} coins.`,now);
+  s.active=null;evaluate(s,a.career);log(s,`${a.title} completed · quality ${quality} · ${gain.toLocaleString('en-US')} ${def.audience} · +${fame} fame · +${payout} coins.`,now);
 }
 export function act(s,input,now,rng=Math.random) {
   reconcile(s,now);

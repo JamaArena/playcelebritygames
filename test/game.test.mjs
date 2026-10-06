@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createCharacter, act, reconcile, refill, learn, shot, shootingProbability, generalProbability, choices, view, tennisPoint, tennisScore } from '../game.mjs';
+import { createCharacter, act, reconcile, refill, learn, shot, shootingProbability, generalProbability, choices, view, tennisPoint, tennisScore, evaluate } from '../game.mjs';
 import { BALANCE as B, CAREERS, effort } from '../public/content.js';
 import { worldObjects } from '../public/world.js';
 import { walkable } from '../public/content.js';
@@ -74,9 +74,9 @@ test('commentary pauses prevent early decisions and final settlement',()=>{
   assert.throws(()=>act(s,{type:'decision',activityId:a.id,beat:0,choice:0},T+1),/Commentary/);
   assert.throws(()=>act(s,{type:'finish',activityId:a.id},T+1),/Complete every/);assert.equal(s.charges,9);
 });
-test('published output settles money and audience once; retries cannot release again',()=>{
-  const s=make('musician');go(s);const activity=complete(s);assert.equal(s.outputs.length,1);assert.equal(s.outputs[0].released,true);assert.equal(s.outputs[0].quality,60);assert.equal(s.money,530);assert.equal(s.careers.musician.audience,60);
-  assert.throws(()=>act(s,{type:'finish',activityId:activity},T+300_000),/No activity/);assert.equal(s.money,530);assert.equal(s.careers.musician.audience,60);
+test('published output settles money, reach and fame once; retries cannot release again',()=>{
+  const s=make('musician');go(s);const activity=complete(s);assert.equal(s.outputs.length,1);assert.equal(s.outputs[0].released,true);assert.equal(s.outputs[0].quality,60);assert.equal(s.money,530);assert.equal(s.careers.musician.audience,6000);assert.equal(s.fame,6);assert.equal(s.outputs[0].fame,6);
+  assert.throws(()=>act(s,{type:'finish',activityId:activity},T+300_000),/No activity/);assert.equal(s.money,530);assert.equal(s.careers.musician.audience,6000);assert.equal(s.fame,6);
 });
 test('maximum football skill improves distance-sensitive accuracy without guaranteeing goals',()=>{
   assert.ok(Math.abs(shootingProbability(6,24,0,0,0)-.396)<1e-12);
@@ -108,7 +108,7 @@ test('build and launch consume separate charges and cannot launch a product twic
   assert.throws(()=>act(s,{type:'start',kind:'launch',productId:product.id},a.readyAt),/unreleased/);assert.equal(s.charges,8);
 });
 test('milestone awards are permanent once-only entitlements',()=>{
-  const s=make('musician');go(s);complete(s);complete(s);assert.equal(s.awards.filter(a=>a.id==='milestone:musician:100').length,1);
+  const s=make('musician');go(s);s.fame=95;complete(s);complete(s);assert.ok(s.fame>=100);assert.equal(s.awards.filter(a=>a.id==='milestone:fame:100').length,1);
 });
 test('connected trials create explicit contracts, independent trial discovery requires effort',()=>{
   const s=make('musician',1);go(s);complete(s,'trial');assert.ok(s.careers.musician.offer);assert.equal(s.careers.musician.audience,0);
@@ -140,4 +140,12 @@ test('every career completes its own sequence and saves its credited output',()=
     const s=make(key);go(s);complete(s,['founder','web3'].includes(key)?'build':'produce');
     assert.equal(s.active,null,key);assert.equal(s.outputs.length,1,key);assert.deepEqual(s.outputs[0].credits,['River'],key);assert.equal(s.charges,9,key);
   }
+});
+
+test('fame is shared across careers, sets tiers, and older saves convert once',()=>{
+  const s=make('musician');s.fame=1000;for(const skill of Object.values(s.careers.musician.skills))skill.level=4;evaluate(s,'musician');assert.equal(s.careers.musician.tier,2);
+  assert.ok(s.awards.some(a=>a.id==='milestone:fame:1000'));
+  act(s,{type:'switch',career:'football'},T);assert.equal(s.fame,1000);
+  const old=make('musician');old.version=1;delete old.fame;old.careers.musician.audience=80;reconcile(old,T);
+  assert.equal(old.careers.musician.audience,8000);assert.equal(old.fame,8);reconcile(old,T+1000);assert.equal(old.fame,8);
 });

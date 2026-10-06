@@ -4,11 +4,12 @@ export const BALANCE = {
   recovery: { hunger: [40, 60_000], energy: [60, 300_000], fun: [30, 120_000], social: [30, 120_000], hygiene: [50, 60_000], bladder: [80, 30_000] },
   decay: { hunger: 12, energy: 8, fun: 6, social: 6, hygiene: 8, bladder: 15 },
   activityMs: 120_000, sportMs: 300_000, upgradeMs: 30 * 60_000,
-  reaches: [100, 500, 2000, 10000], fees: [50, 250, 1000, 5000],
+  // Reach per output (views, streams, fans cheering, users) before quality; 1,000 reach = 1 fame point.
+  reaches: [10_000, 100_000, 1_000_000, 10_000_000], famePerReach: 1 / 1000, seasonMinReach: 10_000, fees: [50, 250, 1000, 5000],
   tiers: [['Newcomer', 0, 1], ['Emerging', 100, 2], ['Established', 1000, 4], ['Star', 10000, 6], ['Icon', 100000, 8]],
   milestones: [100, 1000, 10000, 100000], seasonMs: 28 * 86400_000,
 };
-const career = (name, icon, family, skills, origins, location, output, beats, focus = skills[0]) => ({name, icon, family, skills, origins, location, output, beats, focus, audience: family === 'tech' ? 'users' : family === 'creator' ? 'subscribers' : 'fans'});
+const career = (name, icon, family, skills, origins, location, output, beats, focus = skills[0]) => ({name, icon, family, skills, origins, location, output, beats, focus, audience: family === 'tech' ? 'users' : family === 'music' ? 'streams' : family === 'sport' ? 'fans cheering' : 'views'});
 export const CAREERS = {
   football: career('Footballer', '⚽', 'sport', ['passing', 'dribbling', 'shooting', 'defending'], ['Street footballer', 'Academy prodigy'], 'sports', 'Match', ['Find space behind the defence.', 'A defender closes down your passing lane.', 'The ball breaks near your penalty area.', 'You have a clear view of goal.', 'Track the runner on the flank.', 'One final attack could change the game.'], 'passing'),
   musician: career('Musician', '♫', 'music', ['technique', 'songwriting', 'production', 'stage presence'], ['Street musician', 'Childhood prodigy'], 'studio', 'Song', ['Find the melody that makes this song yours.', 'The vocal passage reaches beyond your planned range.', 'Choose the final arrangement and mix.']),

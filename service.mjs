@@ -1,6 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { createCharacter, act, reconcile, view, log, evaluate, GameError, id } from './game.mjs';
+import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame } from './game.mjs';
 import { CAREERS, BALANCE, clamp } from './public/content.js';
 export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);";
 export function createGameService(db,{secureCookies=false}={}) {
@@ -26,7 +26,7 @@ function settleSeasons(now) {
       if(!p.state)continue;
       for(const [key,c] of Object.entries(p.state.careers)) {
         const outputs=p.state.outputs.filter(o=>o.career===key&&o.released&&o.at>=current.starts&&o.at<current.ends&&!['trial','build'].includes(o.kind));
-        if(c.audience<100||!outputs.length)continue;
+        if(c.audience<BALANCE.seasonMinReach||!outputs.length)continue;
         // Capture the tier when eligibility is first attained, not at settlement.
         const eligibility=p.state.seasonEligibility?.[`${current.id}:${key}`];
         if(!eligibility)continue;
@@ -44,7 +44,7 @@ function settleSeasons(now) {
         const entitlement=`season:${current.id}:${category}`,s=winner.player.state;
         if(s.awards.some(a=>a.id===entitlement))continue;
         s.awards.push({id:entitlement,name:`Season ${current.id} · ${CAREERS[winner.career].name} award`,career:winner.career,at:current.ends,score:winner.score});
-        s.careers[winner.career].audience+=100;log(s,`Season ${current.id} award: +100 ${CAREERS[winner.career].audience}.`,current.ends);
+        addFame(s,100);log(s,`Season ${current.id} award: +100 fame.`,current.ends);
       }
     }
     db.prepare('UPDATE seasons SET settled=1 WHERE id=?').run(current.id);
@@ -60,14 +60,14 @@ function captureEligibility(s,now){
   for(const [key,c] of Object.entries(s.careers)) {
     const ek=`${current.id}:${key}`;
     if(s.seasonBaselines[ek]===undefined)s.seasonBaselines[ek]=Math.floor(c.audience*c.engagement/100);
-    if(!s.seasonEligibility[ek]&&c.audience>=100&&s.outputs.some(o=>o.career===key&&o.released&&o.at>=current.starts&&o.at<current.ends&&!['trial','build'].includes(o.kind))) {
+    if(!s.seasonEligibility[ek]&&c.audience>=BALANCE.seasonMinReach&&s.outputs.some(o=>o.career===key&&o.released&&o.at>=current.starts&&o.at<current.ends&&!['trial','build'].includes(o.kind))) {
       s.seasonEligibility[ek]={tier:c.tier,at:now,startActive:s.seasonBaselines[ek]};
     }
   }
 }
 const TOWN_PLAYER_LIMIT=120;
 const roomFor=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
-function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<20_000};}
+function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<20_000};}
 function snapshot(playerId,s,now){
   if(!s)return {state:null,serverNow:now};
   const players=db.prepare('SELECT id,state FROM players WHERE id!=?').all(playerId).flatMap(row=>{const p=JSON.parse(row.state);return p?[publicProfile(row.id,p)]:[];}).filter(p=>!s.blocks.includes(p.id));
@@ -141,16 +141,16 @@ function collaborativeFinish(playerId,s,input,now) {
   const quality=Math.round(states.flatMap(ps=>ps.active.outcomes).reduce((n,o)=>n+o.score,0)/states.flatMap(ps=>ps.active.outcomes).length);
   const host=states[0],hc=host.careers[a.career],tier=Math.min(hc.tier,3);
   const gross=hc.affiliation?hc.affiliation.fee:Math.floor(BALANCE.fees[tier]*quality/100);
-  const gain=Math.floor(BALANCE.reaches[tier]*quality/100/(1+hc.audience/100000));
+  const gain=Math.floor(BALANCE.reaches[tier]*quality/100);
   let allocatedMoney=0,allocatedAudience=0;
   for(let i=0;i<states.length;i++){
     const ps=states[i],c=ps.careers[a.career];
     const payout=i===states.length-1?gross-allocatedMoney:Math.floor(gross*a.moneyShares[i]);
     const audience=i===states.length-1?gain-allocatedAudience:Math.floor(gain*a.audienceShares[i]);allocatedMoney+=payout;allocatedAudience+=audience;
-    const net=Math.floor(payout*(1-(c.affiliation?.share||0)));ps.money+=net;c.audience+=audience;c.completed++;c.engagement=clamp(c.engagement+(quality-50)/10);
-    const output={id:a.id,title:a.title,career:a.career,kind:'collaboration',quality,released:true,credits:states.map(p=>p.name),gain:audience,payout:net,at:now,tier};
+    const net=Math.floor(payout*(1-(c.affiliation?.share||0)));ps.money+=net;c.audience+=audience;const fame=fameFor(audience);addFame(ps,fame);c.completed++;c.engagement=clamp(c.engagement+(quality-50)/10);
+    const output={id:a.id,title:a.title,career:a.career,kind:'collaboration',quality,released:true,credits:states.map(p=>p.name),gain:audience,fame,payout:net,at:now,tier};
     ps.outputs.unshift(output);ps.results.unshift({...output,learning:ps.active.outcomes.length*5});ps.active=null;
-    evaluate(ps,a.career);captureEligibility(ps,now);log(ps,`Collaboration completed: +${net} coins and +${audience} ${CAREERS[a.career].audience}.`,now);
+    evaluate(ps,a.career);captureEligibility(ps,now);log(ps,`Collaboration completed: +${net} coins · ${audience.toLocaleString('en-US')} ${CAREERS[a.career].audience} · +${fame} fame.`,now);
     if(a.participants[i]!==playerId)persist(a.participants[i],ps);
   }
   a.status='completed';a.quality=quality;db.prepare('UPDATE agreements SET state=? WHERE id=?').run(JSON.stringify(a),a.id);return true;
