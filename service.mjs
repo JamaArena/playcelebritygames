@@ -65,14 +65,16 @@ function captureEligibility(s,now){
     }
   }
 }
-function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,career:s.career,location:s.location,position3d:s.position3d,audience:s.careers[s.career].audience,tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<20_000};}
+const roomFor=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
+function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<20_000};}
 function snapshot(playerId,s,now){
   if(!s)return {state:null,serverNow:now};
   const players=db.prepare('SELECT id,state FROM players WHERE id!=?').all(playerId).flatMap(row=>{const p=JSON.parse(row.state);return p?[publicProfile(row.id,p)]:[];}).filter(p=>!s.blocks.includes(p.id));
-  const messages=db.prepare('SELECT * FROM messages WHERE (location=? AND recipient IS NULL) OR recipient=? OR (sender=? AND recipient IS NOT NULL) ORDER BY at DESC LIMIT 50').all(s.location,playerId,playerId).filter(m=>!s.blocks.includes(m.sender)).reverse().map(m=>({...m,name:load(m.sender)?.name||'Visitor'}));
+  const scenePlayers=players.filter(p=>p.sceneRoom===roomFor(playerId,s)&&p.online&&!load(p.id)?.blocks.includes(playerId));
+  const messages=db.prepare('SELECT * FROM messages WHERE (location=? AND recipient IS NULL) OR recipient=? OR (sender=? AND recipient IS NOT NULL) ORDER BY at DESC LIMIT 50').all(roomFor(playerId,s),playerId,playerId).filter(m=>!s.blocks.includes(m.sender)).reverse().map(m=>({...m,name:load(m.sender)?.name||'Visitor'}));
   const agreements=db.prepare('SELECT * FROM agreements').all().map(r=>JSON.parse(r.state)).filter(a=>a.participants.includes(playerId)&&['pending','running'].includes(a.status));
   const visiting=s.visiting?load(s.visiting):null;
-  return {state:view(s,now),playerId,players,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture}:null,season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
+  return {state:view(s,now),playerId,players,scenePlayers,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture}:null,season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
 }
 function social(playerId,s,input,now){
   switch(input.type) {
@@ -80,14 +82,14 @@ function social(playerId,s,input,now){
       const body=String(input.body||'').trim();fail(body.length>0&&body.length<=300,'Use a message of 1–300 characters.');
       const previous=db.prepare('SELECT at FROM messages WHERE sender=? ORDER BY at DESC LIMIT 1').get(playerId);fail(!previous||now-previous.at>=1000,'Wait a moment before sending again.');
       if(input.recipient){const target=load(input.recipient);fail(target&&!target.blocks.includes(playerId)&&!s.blocks.includes(input.recipient),'Direct contact is unavailable.');fail(s.friends.includes(input.recipient),'Add this person as a friend first.');}
-      db.prepare('INSERT INTO messages VALUES(?,?,?,?,?,?)').run(id(),playerId,s.location,input.recipient||null,body,now);break;
+      db.prepare('INSERT INTO messages VALUES(?,?,?,?,?,?)').run(id(),playerId,roomFor(playerId,s),input.recipient||null,body,now);break;
     }
     case 'friend':{const target=load(input.playerId);fail(target&&input.playerId!==playerId&&!target.blocks.includes(playerId),'That player is unavailable.');if(!s.friends.includes(input.playerId))s.friends.push(input.playerId);break;}
     case 'block':fail(input.playerId!==playerId&&load(input.playerId),'Unknown player.');if(!s.blocks.includes(input.playerId))s.blocks.push(input.playerId);s.friends=s.friends.filter(p=>p!==input.playerId);break;
     case 'unblock':s.blocks=s.blocks.filter(p=>p!==input.playerId);break;
     case 'report':fail(db.prepare('SELECT id FROM messages WHERE id=?').get(input.messageId),'Message not found.');db.prepare('INSERT INTO reports VALUES(?,?,?,?)').run(id(),playerId,input.messageId,now);break;
     case 'invite':{const target=load(input.playerId);fail(target&&s.friends.includes(input.playerId)&&!target.blocks.includes(playerId),'Invite an available friend.');target.invitations=target.invitations.filter(i=>i.from!==playerId);target.invitations.push({from:playerId,name:s.name,expiresAt:now+86400_000});persist(input.playerId,target);break;}
-    case 'visit':{const target=load(input.playerId);fail(target&&s.invitations.some(i=>i.from===input.playerId&&i.expiresAt>=now),'An accepted home invitation is required.');fail(!s.active&&!s.recovery,'Finish your activity first.');s.visiting=input.playerId;s.location='home';break;}
+    case 'visit':{const target=load(input.playerId);fail(target&&!target.blocks.includes(playerId)&&!s.blocks.includes(input.playerId)&&s.invitations.some(i=>i.from===input.playerId&&i.expiresAt>=now),'An accepted home invitation is required.');fail(!s.active&&!s.recovery,'Finish your activity first.');s.visiting=input.playerId;s.location='home';break;}
     case 'leaveVisit':s.visiting=null;s.location='plaza';break;
     case 'collabInvite': {
       const target=load(input.playerId);fail(target&&target.career===s.career&&!target.blocks.includes(playerId),'Choose an available player in your career.');
