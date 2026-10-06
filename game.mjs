@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, NPCS, NPC_TALK, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, CAREERS, ITEMS, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -60,6 +60,7 @@ export function reconcile(s, now) {
   // Heartbeats arrive every 20 seconds; gaps up to 30 seconds count as active. Offline needs never decay.
   const dt=Math.max(0,now-s.lastSeen);
   if(dt<=30_000)for(const [need,rate] of Object.entries(B.decay))s.needs[need]=clamp(s.needs[need]-rate*dt/3600_000);
+  mishaps(s,now);
   s.lastSeen=now;
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
     item.level=item.upgrade.target; item.upgrade=null; log(s,`${ITEMS[key].name} reached level ${item.level}.`,now);
@@ -75,6 +76,17 @@ export function reconcile(s, now) {
   }
 }
 // Needs fill up while you do something; you can stop any time and keep what you gained.
+// A critically low need makes the character do something embarrassing: fame drops and it's in the news.
+// One mishap at a time, a couple of minutes apart, so several low needs don't pile on at once.
+export function mishaps(s,now){
+  s.mishapAt??={};if(now-(s.mishap?.at||0)<MISHAP.gapMs)return;
+  for(const [need,m] of Object.entries(MISHAPS)){
+    if(s.needs[need]>MISHAP.at||s.recovery?.need===need||now-(s.mishapAt[need]||0)<MISHAP.cooldownMs)continue;
+    const lost=Math.min(s.fame||0,Math.max(MISHAP.minFame,Math.round((s.fame||0)*m.fame)));
+    addFame(s,-lost);s.mishapAt[need]=now;for(const [k,v] of Object.entries(m.set))s.needs[k]=v;
+    s.mishap={id:id(),need,at:now,lost};log(s,`${m.icon} ${m.title}. ${m.text} −${lost.toLocaleString('en-US')} fame.`,now);return;
+  }
+}
 export function finishRecovery(s,now){
   const r=s.recovery,start=r.startedAt??r.endsAt-B.recovery[r.need][1],share=Math.max(0,Math.min(1,(now-start)/(r.endsAt-start)));
   s.needs[r.need]=clamp(s.needs[r.need]+B.recovery[r.need][0]*share);s.recovery=null;

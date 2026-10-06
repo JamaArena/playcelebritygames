@@ -150,6 +150,17 @@ export const HAIR_COLORS = {black: '#1d1714', brown: '#5a3a26', auburn: '#8a3b22
 export const BUILDS = {slim: {name: 'Slim', w: .86, hip: .92}, average: {name: 'Average', w: 1, hip: 1}, athletic: {name: 'Athletic', w: 1.08, hip: .98, shoulders: 1.18}, curvy: {name: 'Curvy', w: 1.04, hip: 1.25}, heavy: {name: 'Heavy', w: 1.3, hip: 1.25}};
 export const HEIGHTS = {short: {name: 'Short', h: .9}, average: {name: 'Average', h: 1}, tall: {name: 'Tall', h: 1.1}};
 export const pick = (table, value, fallback) => Object.hasOwn(table, value) ? value : fallback;
+// When a need runs critically low the character does something embarrassing in public: fans catch it
+// and fame drops. Each need can only cause one mishap per cooldown, and some mishaps reset the need.
+export const MISHAP = {at: 5, cooldownMs: 10 * 60_000, gapMs: 2 * 60_000, minFame: 10};
+export const MISHAPS = {
+  bladder: {icon: '💦', title: 'You peed on yourself', text: 'Fans caught it on camera and roasted you online.', fame: .03, set: {bladder: 100, hygiene: 10}},
+  hunger: {icon: '😵', title: 'You fainted from hunger', text: 'In public, too. Blogs are calling it a “diva hunger strike”.', fame: .02, set: {hunger: 20}},
+  energy: {icon: '💤', title: 'You fell asleep standing up', text: 'Right in the middle of a conversation. Fans turned it into a meme.', fame: .02, set: {energy: 15}},
+  hygiene: {icon: '🤢', title: 'Your body odour cleared the room', text: 'A fan’s post went viral: “smells like failure”.', fame: .02, set: {}},
+  fun: {icon: '📱', title: 'You posted a cringe 3am rant', text: 'Bored out of your mind, you went live. Fans unfollowed in droves.', fame: .015, set: {fun: 20}},
+  social: {icon: '🪴', title: 'You livestreamed a chat with your houseplant', text: 'Lonely and talking to a fern. Fans are worried about you.', fame: .015, set: {social: 15}},
+};
 export const NPC_TALK = {social: 10, cooldownMs: 45_000, lines: ['Big things are coming for you, I can feel it.', 'Saw your last post. You’re getting better!', 'This city never sleeps, eh?', 'Keep practising. People are starting to notice.', 'Have you been to Palm Motors? Those cars, ehn!', 'Don’t forget to rest. Burnout is real.', 'You know who you should meet? Everybody!', 'Fame is a marathon, not a sprint.']};
 // Key NPCs always look the same so players recognise them; background people get random looks.
 export const NPCS = [

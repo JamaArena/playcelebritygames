@@ -4,7 +4,7 @@ import { createCharacter, act, reconcile, refill, learn, finishRecovery, shot, s
 import { BALANCE as B, CAREERS, effort, tripMs } from '../public/content.js';
 import { worldObjects } from '../public/world.js';
 import { walkable } from '../public/content.js';
-const T=1_000_000;
+const T=1_000_000,MISHAP_AT=5;
 const make=(career='football',origin=0)=>createCharacter({name:'River',career,origin,adult:true},T);
 // Trips take real time; tests about other rules arrive immediately.
 const arrive=s=>{if(s.trip){s.location=s.trip.to;s.position3d={x:0,z:1};s.trip=null;}};
@@ -212,4 +212,14 @@ test('looks come from fixed choices; anything else falls back safely',()=>{
   assert.deepEqual([s.color,s.hair,s.hairColor,s.build,s.height],['#4b2e20','locs','auburn','curvy','tall']);
   const odd=createCharacter({name:'Odd',career:'actor',origin:0,color:'#00ff00',hair:'toString',hairColor:'__proto__',build:'giant',height:'huge'},T);
   assert.deepEqual([odd.color,odd.hair,odd.hairColor,odd.build,odd.height],['#c98d64','curls','black','average','average']);
+});
+test('a critically low need causes one embarrassing mishap that costs fame',()=>{
+  const s=make();s.fame=1000;s.needs.bladder=3;s.needs.hygiene=60;s.lastSeen=T;reconcile(s,T+1000);
+  assert.equal(s.mishap.need,'bladder');assert.equal(s.mishap.lost,30);assert.equal(s.fame,970);
+  assert.equal(s.needs.bladder,100,'you emptied your bladder…');assert.equal(s.needs.hygiene,10,'…all over yourself');
+  assert.match(s.events[0].message,/peed on yourself/);
+  s.needs.hunger=2;s.needs.bladder=1;s.lastSeen=T+60_000;reconcile(s,T+61_000);assert.equal(s.mishap.need,'bladder','one mishap at a time');
+  s.lastSeen=T+200_000;reconcile(s,T+201_000);
+  assert.equal(s.mishap.need,'hunger','bladder is on cooldown, hunger is not');assert.equal(s.needs.hunger,20);assert.ok(s.needs.bladder<MISHAP_AT,'bladder stays low while on cooldown');
+  const poor=make();poor.fame=0;poor.needs.fun=0;poor.lastSeen=T;reconcile(poor,T+1000);assert.equal(poor.fame,0,'fame never goes negative');
 });
