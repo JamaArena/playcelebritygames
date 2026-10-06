@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createCharacter, act, reconcile, refill, learn, finishRecovery, shot, shootingProbability, generalProbability, choices, view, tennisPoint, tennisScore, evaluate } from '../game.mjs';
+import { lifeEvents, createCharacter, act, reconcile, refill, learn, finishRecovery, shot, shootingProbability, generalProbability, choices, view, tennisPoint, tennisScore, evaluate } from '../game.mjs';
 import { BALANCE as B, CAREERS, effort, tripMs } from '../public/content.js';
 import { worldObjects } from '../public/world.js';
 import { walkable } from '../public/content.js';
@@ -185,7 +185,7 @@ test('a sponsored ride drives along the roads for a distance-based time; homes s
   assert.ok(tripMs('home','plaza')<walk,'short walks are shorter');
   assert.throws(()=>act(s,{type:'start',kind:'practice',skill:'passing'},T+1000),/on the road/);
   act(s,{type:'travel',location:'tech'},s.trip.arrives);assert.equal(s.location,'tech');assert.equal(s.trip,null);
-  s.ride='scooter';const back=T+200_000;act(s,{type:'travel',location:'home'},back);assert.equal(s.trip.arrives-back,tripMs('tech','home','scooter'));
+  s.ride='scooter';const back=T+200_000;act(s,{type:'travel',location:'home'},back);let drive=tripMs('tech','home','scooter');if(s.trip.delays.includes('rain'))drive=Math.round(drive*1.2);if(s.trip.delays.includes('go-slow'))drive=Math.round(drive*1.4);assert.equal(s.trip.arrives-back,drive);
   reconcile(s,s.trip.arrives);assert.equal(s.location,'home');
   act(s,{type:'recover',need:'energy'},T+500_000);assert.equal(s.recovery.endsAt-s.recovery.startedAt,Math.round(B.recovery.energy[1]*.8));
   const walker=make('football');act(walker,{type:'travel',location:'tech'},T);assert.equal(walker.trip.ride,null);assert.equal(walker.trip.arrives-T,walk,'walking is slowest');
@@ -267,4 +267,14 @@ test('pets: adopt at the plaza, care at home, and a happy pet gives its perk',()
 test('home upgrades work without placing: a king-size bed makes sleep faster',()=>{
   const s=make();s.fame=5000;s.location='home';act(s,{type:'recover',need:'energy'},T);const plain=s.recovery.endsAt-T;act(s,{type:'cancel'},T);
   s.inventory.kingBed={level:1};act(s,{type:'recover',need:'energy'},T+1);assert.equal(s.recovery.endsAt-(T+1),Math.round(plain*.8));
+});
+test('life events: none at first, then one every few minutes; power cuts stop appliances unless you own a generator',()=>{
+  const s=make();s.fame=1000;s.location='home';lifeEvents(s,T,()=>0);assert.equal(s.lifeEvent,undefined,'the first few minutes are quiet');
+  // A roll of 0.999 picks the last eligible event at home: the power cut.
+  lifeEvents(s,s.nextEventAt,()=>.999);assert.equal(s.lifeEvent.kind,'powerCut');assert.ok(s.powerCut.until>s.lifeEvent.at);
+  s.inventory.gamingConsole={level:1};s.furniture.push({item:'gamingConsole',x:0,z:-1});
+  assert.throws(()=>act(s,{type:'useItem',item:'gamingConsole'},s.lifeEvent.at+1000),/NEPA/);
+  s.inventory.generator={level:1};act(s,{type:'useItem',item:'gamingConsole'},s.lifeEvent.at+1000);assert.equal(s.recovery.item,'gamingConsole');
+  // A roll of 0 picks the first: a lucky break worth at least 50 fame.
+  s.recovery=null;s.location='plaza';lifeEvents(s,s.nextEventAt,()=>0);assert.equal(s.lifeEvent.kind,'luckyBreak');assert.equal(s.fame,1050);
 });

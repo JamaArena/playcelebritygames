@@ -4,7 +4,7 @@
 // Meshes are pooled and re-placed each frame, so nothing is rebuilt while playing.
 import * as T from './vendor/three.min.js';
 import { World, worldObjects } from './world.js';
-import { BUILDS, HEIGHTS, WEAR } from './content.js';
+import { BUILDS, HEIGHTS, WEAR, weatherAt, festivalAt, upgradesFor } from './content.js';
 
 const UNIT_BOX = new T.BoxGeometry(1, 1, 1), UNIT_BALL = new T.SphereGeometry(.5, 24, 16), UNIT_ROD = new T.CylinderGeometry(.5, .5, 1, 18);
 const capsules = new Map();
@@ -287,6 +287,8 @@ export class World3D extends World {
     // The open city (street, trips, map) is static: it is built once into instanced batches, one per
     // shape and colour, and rebuilt only when the place, day/night or neighbours change. Fog hides the edge.
     this.city = new T.Group(); this.scene3.add(this.city); this.fog = new T.Fog('#d6e6f2', 80, 260);
+    // Rain: a few hundred streaks re-placed each frame around the camera's focus.
+    this.rain = new T.InstancedMesh(UNIT_BOX, new T.MeshBasicMaterial({ color: '#d5e3f0', transparent: true, opacity: .55 }), 320); this.rain.frustumCulled = false; this.scene3.add(this.rain);
     this.boxes = new Pool(this.world3, () => { const m = new T.Mesh(UNIT_BOX, mat('#fff')); m.castShadow = true; m.receiveShadow = true; return m; });
     this.balls = new Pool(this.world3, () => { const m = new T.Mesh(UNIT_BALL, mat('#fff')); m.castShadow = true; m.receiveShadow = true; return m; });
     this.figures = new Pool(this.world3, () => new Figure()); this.toilets = new Pool(this.world3, makeToilet);
@@ -327,6 +329,12 @@ export class World3D extends World {
     const f = this.figures.next(); o = { hair: '#2b211c', style: 'curls', outfit: '#8ea9a4', pants: '#34435e', shoes: '#f4f1ea', gait: this.gait, ...o };
     f.apply(x, z, skin, o, performance.now() / 1000, this.reduced);
   }
+  paintRain() {
+    const on = this.weather === 'rain'; this.rain.visible = on; if (!on) return;
+    const t = this.reduced ? 0 : performance.now() / 1000, f = this.focusPoint, span = this.interior() ? 22 : 40, m = new T.Matrix4(), q = new T.Quaternion(), v = new T.Vector3(), sc = new T.Vector3(.02, .5, .02);
+    for (let i = 0; i < 320; i++) { const a = Math.sin(i * 12.9898) * 43758.5453, b = Math.sin(i * 78.233) * 12543.11, x = f.x + ((a - Math.floor(a)) - .5) * span, z = f.z + ((b - Math.floor(b)) - .5) * span, y = 14 - ((t * 14 + i * 1.7) % 14); this.rain.setMatrixAt(i, m.compose(v.set(x, y, z), q, sc)); }
+    this.rain.instanceMatrix.needsUpdate = true;
+  }
   // On your street the camera follows you; zooming out eases it over to the city overview.
   focus() {
     const base = super.focus(); if (this.location !== 'street' || this.state?.trip || !this.player) return base;
@@ -352,7 +360,15 @@ export class World3D extends World {
     this.hemi.intensity = .55 * k + .08; this.sun.intensity = 2.4 * k; this.fill.intensity = .45 * k + .1; this.lamp.intensity = day.dark * 6; this.scene3.environmentIntensity = .55 * k + .12;
     this.fill.position.set(this.focusPoint.x - 8, 6, this.focusPoint.z - 6);
     this.sun.position.set(this.focusPoint.x + 7, 13, this.focusPoint.z + 9); this.sun.target.position.set(this.focusPoint.x, 0, this.focusPoint.z); this.sun.target.updateMatrixWorld();
-    const sky = day.night ? '#24324d' : '#d6e6f2'; this.scene3.background = new T.Color(sky); this.fog.color.set(sky);
+    // Weather: rain darkens the sky; harmattan brings a dusty haze. A power cut at home dims the room.
+    const weather = weatherAt(Date.now()), outside = !this.interior();
+    const sky = weather === 'rain' ? (day.night ? '#1c2434' : '#9ba8b5') : weather === 'harmattan' ? (day.night ? '#2e2a2a' : '#e2d3b2') : day.night ? '#24324d' : '#d6e6f2';
+    this.scene3.background = new T.Color(sky); this.fog.color.set(sky);
+    this.fog.near = weather === 'harmattan' ? 25 : weather === 'rain' ? 45 : 80; this.fog.far = weather === 'harmattan' ? 120 : weather === 'rain' ? 180 : 260;
+    if (weather !== 'clear') { this.sun.intensity *= weather === 'rain' ? .45 : .75; this.hemi.intensity *= weather === 'rain' ? .85 : 1; }
+    const blackout = this.location === 'home' && !this.visitedHome && this.state.powerCut?.until > Date.now() + (this.serverOffset || 0) && !upgradesFor(this.state).generator;
+    if (blackout) { this.hemi.intensity *= .5; this.scene3.environmentIntensity *= .35; this.lamp.intensity = 0; this.fill.intensity *= .4; }
+    this.weather = weather; void outside;
     // Shadows follow the camera: tight indoors, wider (and softer) across the city.
     const reach = this.interior() ? 11 : 28, cam = this.sun.shadow.camera;
     if (cam.right !== reach) { Object.assign(cam, { left: -reach, right: reach, top: reach, bottom: -reach, far: 90 }); cam.updateProjectionMatrix(); this.sun.shadow.normalBias = reach > 11 ? .08 : .02; this.sun.shadow.bias = reach > 11 ? -.001 : -.0004; }
@@ -369,10 +385,11 @@ export class World3D extends World {
     const day = this.daylight(); this.light(day);
     const inside = this.interior();
     this.island.visible = inside; this.city.visible = !inside; this.scene3.fog = inside ? null : this.fog;
-    if (!inside) { const key = [this.location, day.night, this.ownersKey, this.state.home, !!this.state.trip].join('|'); if (key !== this.cityKey) { this.cityKey = key; this.buildCity(day.night); } }
+    if (!inside) { const key = [this.location, day.night, this.ownersKey, this.state.home, !!this.state.trip, festivalAt(Date.now())].join('|'); if (key !== this.cityKey) { this.cityKey = key; this.buildCity(day.night); } }
     for (const p of [this.boxes, this.balls, this.figures, this.toilets]) p.begin();
     this.meshes = []; if (!inside) this.townLife(); this.scene();
     for (const p of [this.boxes, this.balls, this.figures, this.toilets]) p.end();
+    this.paintRain();
     this.renderer.render(this.scene3, this.camera);
     // Labels, bubbles and rings stay crisp on the 2D layer above the 3D view.
     const ctx = this.ctx; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, r.width, r.height);

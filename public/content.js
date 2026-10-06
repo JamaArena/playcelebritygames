@@ -186,6 +186,39 @@ export function upgradesFor(s) {
   for (const key of Object.keys(s?.inventory || {})) { const up = ITEMS[key]?.upgrade; if (up) for (const [k, v] of Object.entries(up)) totals[k] = typeof v === 'number' ? (totals[k] || 0) + v : v; }
   return totals;
 }
+// Weather and seasons follow real time, the same for everyone. Weather changes every two hours.
+const mixHash = n => Math.imul((n + 7) | 0, 2654435761) >>> 0;
+export function weatherAt(now) {
+  const slot = Math.floor(now / 7_200_000), month = new Date(now).getUTCMonth(), roll = mixHash(slot) % 100;
+  if (roll < 22) return 'rain';
+  if ([10, 11, 0, 1].includes(month) && roll < 70) return 'harmattan';
+  return 'clear';
+}
+// Festive seasons: Independence week (1–7 October), Detty December, Christmas and New Year.
+export function festivalAt(now) {
+  const d = new Date(now), m = d.getUTCMonth(), day = d.getUTCDate();
+  if (m === 9 && day <= 7) return 'independence';
+  if (m === 11 && day >= 20) return 'christmas';
+  if (m === 11) return 'detty';
+  if (m === 0 && day <= 3) return 'newyear';
+  return null;
+}
+// Go-slow: some minutes the roads jam and drives take longer.
+export const goSlowAt = now => mixHash(Math.floor(now / 60_000) + 991) % 100 < 18;
+// Random life moments while you play, a few minutes apart. Fame is [share of your fame, minimum].
+export const LIFE_EVENT = {firstMs: 4 * 60_000, gapMs: [5 * 60_000, 9 * 60_000], powerCutMs: 3 * 60_000};
+export const LIFE_EVENTS = {
+  luckyBreak: {icon: '🌟', title: 'Lucky break', text: 'A producer shared your latest post. New fans are pouring in.', fame: [.02, 50], weight: 2},
+  fanGift: {icon: '🎁', title: 'A fan sent you a gift', text: 'A tin of chin-chin and a handwritten note. Sweet!', needs: {fun: 10, hunger: 10}, weight: 3},
+  sneeze: {icon: '🤧', title: 'You sneezed on a live stream', text: 'Harmless, but it is now a meme with its own remix.', fame: [.005, 10], weight: 2},
+  slip: {icon: '🍌', title: 'You slipped and fell', text: 'Right in front of a fan’s camera. Ouch, and the internet saw it.', fame: [-.01, -10], needs: {fun: -10}, weight: 2, where: 'out'},
+  wrongName: {icon: '😬', title: 'You called someone the wrong name', text: 'They smiled, but it was awkward for everyone.', needs: {social: -12}, weight: 2},
+  wardrobe: {icon: '👔', title: 'Wardrobe malfunction', text: 'A button popped at the worst moment. Fans had jokes.', fame: [-.01, -10], needs: {fun: -5}, weight: 1, where: 'out'},
+  lyrics: {icon: '🎤', title: 'You forgot the lyrics', text: 'Mid-song and live. The crowd sang it for you, at least.', fame: [-.01, -10], weight: 2, family: 'music', where: 'out'},
+  powerCut: {icon: '💡', title: 'NEPA took light', text: 'Power cut! No TV, gaming or appliances until it comes back.', weight: 3, where: 'home'},
+};
+// Home items that need electricity during a power cut (unless you own a generator).
+export const POWERED = ['gamingConsole', 'soundSystem', 'coffeeMachine', 'microwave', 'washingMachine', 'ringLight', 'studioMic'];
 // The kitchen menu. Each dish fills hunger over `ms` and may lift other needs; some unlock with fame.
 export const FOODS = {
   jollof: {name: 'Jollof rice', icon: '🍛', hunger: 60, ms: 90_000, extra: {fun: 5}},

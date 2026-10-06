@@ -1,6 +1,6 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, upgradesFor, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
+import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 // On the sofa you face the room; watching TV you sit at the end and turn toward the screen.
@@ -293,7 +293,7 @@ export class World {
   }
   house(h,x,z,night){
     const win=night?'#ffdc8f':'#b9d8e4',f=h.facing;
-    this.shadowRect(x,z,h.w,h.d,h.h);this.box(x,z,h.w,h.d,h.h,h.wall);
+    this.shadowRect(x,z,h.w,h.d,h.h);this.box(x,z,h.w,h.d,h.h,h.wall);this.festive(x,z,h.w,h.d,h.h);
     if(this.zoom<.4){this.box(x,z,h.w+.35,h.d+.35,.5,h.roof,h.h);return;}
     this.box(x,z,h.w+.35,h.d+.35,.22,h.roof,h.h);this.box(x,z,h.w*.72,h.d*.72,.32,shade(h.roof,1.07),h.h+.22);this.box(x,z,h.w*.38,h.d*.38,.28,shade(h.roof,1.14),h.h+.54);
     this.box(x+h.w*.25,z-h.d*.15,.35,.35,.7,'#b9a998',h.h+.3);
@@ -302,7 +302,7 @@ export class World {
     this.floor(x,z+f*(h.d/2+1),.9,2,'#e6dcc6',.01);if(h.garden)this.round(x-f*h.w*.45,z+f*(h.d/2+.6),.7,.7,.55,'#86b98a');
   }
   tower(t,x,z,night){
-    this.shadowRect(x,z,t.w,t.d,t.h);this.box(x,z,t.w,t.d,t.h,t.tone);this.box(x,z,t.w+.2,t.d+.2,.35,shade(t.tone,.8),t.h);
+    this.shadowRect(x,z,t.w,t.d,t.h);this.box(x,z,t.w,t.d,t.h,t.tone);this.festive(x,z,t.w,t.d,t.h);this.box(x,z,t.w+.2,t.d+.2,.35,shade(t.tone,.8),t.h);
     const f=this.facades(),bands=Math.floor((t.h-1)/1.1);
     if(this.zoom<.4){const g=night?'#4a5d74':'#a9cadb';this.box(x,z+f.z*(t.d/2+.03),t.w*.86,.05,t.h-1.4,g,.8);this.box(x+f.x*(t.w/2+.03),z,.05,t.d*.86,t.h-1.4,g,.8);return;}
     for(let b=0;b<bands;b++){const y=.9+b*1.1,lit=n=>night&&(b*7+n*3+t.seed)%5<3,glass=n=>lit(n)?'#ffd98a':night?'#3a4c63':'#9ec3d6';
@@ -344,6 +344,15 @@ export class World {
       if(block.kind==='homes'&&!far)this.tree(x,z,.75);
     }
     if(!far){for(let x=-70;x<=70;x+=5)if(this.onScreen(ox+x,oz+10.7,2))this.palm(ox+x,oz+10.7);}
+    // Street lamps along the main roads; their heads glow after dark.
+    if(!far)for(const z of [8,-8,-24,-40,-56])for(let x=-68;x<=68;x+=12){const lz=oz+z+2.3;if(!this.onScreen(ox+x,lz,2))continue;this.round(ox+x,lz,.1,.1,2.6,'#5b6168');this.box(ox+x,lz-.25,.18,.6,.08,'#5b6168',2.55);this.box(ox+x,lz-.5,.32,.32,.12,night?'#ffe9a8':'#d9dcd6',2.45);}
+  }
+  // Festive decorations for the season: bunting on rooftops (green and white for Independence week,
+  // colourful string lights for December and New Year).
+  festive(x,z,w,d,h){
+    const season=festivalAt(Date.now());if(!season)return;
+    const tones=season==='independence'?['#008751','#ffffff']:['#d23b4b','#f2c230','#2fae6b','#2b7fd6'];
+    for(let i=0;i<8;i++){const f=i/7,tone=tones[i%tones.length];this.box(x-w/2+f*w,z+d/2+.05,.22,.04,.28,tone,h+.12);this.box(x-w/2+f*w,z-d/2-.05,.22,.04,.28,tone,h+.12);}
   }
   // Moving parts of the city (waves, cars, pedestrians) are redrawn every frame on top of the cached town.
   townLife(){
@@ -387,7 +396,9 @@ export class World {
       if(style.art){if(Math.cos(this.angle)>0){this.box(.5,-5.23,1.3,.04,.85,'#f6f1e6',1.35);this.box(.5,-5.21,1.1,.04,.65,style.art[0],1.45);}if(Math.sin(this.angle)>0){this.box(-5.23,1.5,.04,1.5,.9,'#f6f1e6',1.35);this.box(-5.21,1.5,.04,1.3,.7,style.art[1],1.45);}}
       if(style.rug)this.floor(-2.2,1.5,3,2.4,style.rug,.012);
       this.box(-5.2,-2.5,.14,2.5,1.1,this.windowOpen?'#abe3c9':'#bce4fa',.8);this.box(-5.08,-2.5,.12,.06,1.1,'#ffffff',.8);
-      const up=this.visitedHome?{}:upgradesFor(this.state),owns=key=>!this.visitedHome&&this.state.inventory?.[key];
+      const up=this.visitedHome?{}:upgradesFor(this.state),owns=key=>!this.visitedHome&&this.state.inventory?.[key],season=festivalAt(Date.now());
+      if(season==='independence'&&Math.cos(this.angle)>0)for(const [i,tone] of ['#008751','#ffffff','#008751'].entries())this.box(-1.4+i*.4,-5.22,.4,.04,.75,tone,1.35);
+      else if(season&&Math.cos(this.angle)>0)for(let i=0;i<14;i++)this.round(-4.6+i*.7,-5.2,.12,.12,.12,['#d23b4b','#f2c230','#2fae6b','#2b7fd6'][i%4],2.15-Math.sin(i/13*Math.PI)*.25);
       if(owns('curtains'))for(const dz of [-1.45,1.45])this.box(-5.12,-2.5+dz,.08,.5,1.9,'#5b3a6b',.35);
       if(owns('generator')){this.box(-6.6,2.8,.9,.6,.62,'#3d6a3a');this.box(-6.6,2.8,.7,.42,.08,'#2b2b2b',.62);}
       if(owns('ac')){this.box(-5.2,3.2,.2,1.1,.34,'#f2f2f0',1.95);this.box(-5.09,3.2,.02,.9,.04,'#c9ccc8',2.0);}
@@ -474,6 +485,7 @@ export class World {
     if(hasCanvas&&!island)this.stamp(this.layers.front);
     this.canvas.dataset.perf=`${this.meshes.length} meshes · scene ${(t1-t0).toFixed(1)}ms · paint ${(performance.now()-t1).toFixed(1)}ms`;
     if(light.dark){ctx.fillStyle=`rgba(24,34,72,${light.dark*.3})`;ctx.fillRect(0,0,r.width,r.height);}
+    if(weatherAt(Date.now())==='rain'){const t=this.reduced?0:performance.now()/400;ctx.strokeStyle='rgba(210,225,240,.45)';ctx.lineWidth=1;ctx.beginPath();for(let i=0;i<90;i++){const x=(i*97+t*40)%r.width,y=(i*53+t*160)%r.height;ctx.moveTo(x,y);ctx.lineTo(x-4,y+14);}ctx.stroke();}
     this.paintRoutine();
     this.paintLabels();
     if(!island)this.paintPins();
