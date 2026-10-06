@@ -1,4 +1,4 @@
-# Celebrity Life
+# Celebrity Games
 
 A playable browser life simulation set in Palm City, implemented from the supplied **Celebrity Life Game Mechanics Specification**, dated 6 October 2026.
 

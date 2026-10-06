@@ -22,7 +22,8 @@ test('all 15 career definitions have two valid starts and four skills',()=>{
   }
 });
 test('football is outfield only; switching retains one shared charge bar and history',()=>{
-  const s=createCharacter({name:'River',career:'football',origin:0,position:'goalkeeper'},T);assert.equal(s.position,'midfielder');
+  const s=createCharacter({name:'River',career:'football',origin:0,position:'goalkeeper'},T);assert.equal(s.position,undefined,'a footballer is a footballer');assert.equal(s.ride,null,'a humble start walks');
+  assert.equal(createCharacter({name:'Rich',career:'football',origin:1},T).ride,'hatchback','the best start comes with a car');
   s.charges=3;s.refillAnchor=T;learn(s,'football','shooting',38,'one');act(s,{type:'switch',career:'musician'},T+100);
   assert.equal(s.charges,3);assert.equal(s.refillAnchor,T);assert.equal(s.careers.football.skills.shooting.level,2);assert.equal(s.fame,0);
   act(s,{type:'switch',career:'football'},T+200);assert.equal(s.careers.football.origin,0);
@@ -167,13 +168,21 @@ test('fame unlocks free sponsorships at Palm Motors, once, without spending fame
 test('a sponsored ride drives along the roads for a distance-based time; homes speed up recovery',()=>{
   const s=make('football');s.vip={hypercar:{at:T},villa:{at:T}};s.ride='hypercar';s.home='villa';
   act(s,{type:'travel',location:'tech'},T);
-  assert.equal(s.location,'home');assert.equal(s.trip.to,'tech');const scooter=tripMs('home','tech','scooter');assert.ok(scooter>180_000&&scooter<240_000,'home to tech is about 3.6 blocks');assert.equal(s.trip.arrives-T,Math.round(scooter*.5),'the hypercar halves the time');
+  assert.equal(s.location,'home');assert.equal(s.trip.to,'tech');const walk=tripMs('home','tech');assert.ok(walk>60_000&&walk<=90_000,'walking across town takes at most 1:30');for(const a of ['home','street','plaza','studio','sports','creator','tech'])for(const b of ['plaza','studio','sports','creator','tech'])assert.ok(tripMs(a,b)<=90_000);assert.equal(s.trip.arrives-T,tripMs('home','tech','hypercar'));assert.ok(tripMs('home','tech','hypercar')<walk*.4,'cars are much faster');
+  assert.ok(tripMs('home','plaza')<walk,'short walks are shorter');
   assert.throws(()=>act(s,{type:'start',kind:'practice',skill:'passing'},T+1000),/on the road/);
   act(s,{type:'travel',location:'tech'},s.trip.arrives);assert.equal(s.location,'tech');assert.equal(s.trip,null);
   s.ride='scooter';const back=T+200_000;act(s,{type:'travel',location:'home'},back);assert.equal(s.trip.arrives-back,tripMs('tech','home','scooter'));
   reconcile(s,s.trip.arrives);assert.equal(s.location,'home');
   act(s,{type:'recover',need:'energy'},T+500_000);assert.equal(s.recovery.endsAt-s.recovery.startedAt,Math.round(B.recovery.energy[1]*.8));
-  const walker=make('football');act(walker,{type:'travel',location:'tech'},T);assert.equal(walker.trip.ride,null);assert.equal(walker.trip.arrives-T,Math.round(scooter*1.6),'walking is slowest');
+  const walker=make('football');act(walker,{type:'travel',location:'tech'},T);assert.equal(walker.trip.ride,null);assert.equal(walker.trip.arrives-T,walk,'walking is slowest');
   const local=make('football');act(local,{type:'travel',location:'street'},T);assert.equal(local.location,'street','home and its street are next door');assert.deepEqual(local.position3d,{x:0,z:6.2});
   assert.throws(()=>act(local,{type:'move',x:0,z:2},T),/blocked/);act(local,{type:'move',x:3,z:6.5},T);act(local,{type:'travel',location:'home'},T);assert.equal(local.location,'home');
+});
+
+test('phones upgrade with fame anywhere, for free',()=>{
+  const s=make('musician');assert.equal(s.phone,'basic');
+  assert.throws(()=>act(s,{type:'phoneUpgrade',item:'gold'},T),/50,000 fame/);
+  s.fame=5000;act(s,{type:'phoneUpgrade',item:'pro'},T);assert.equal(s.phone,'pro');assert.equal(s.fame,5000);
+  act(s,{type:'phoneUpgrade',item:'basic'},T);assert.equal(s.phone,'basic');
 });

@@ -78,3 +78,63 @@ html,body,#app{height:100%;height:100dvh;overflow:hidden}.rail{background:#153d3
 .battle-result.loss{background:#f8e5e2;color:#9a3b30}
 .battle-log{margin-top:14px;display:grid;gap:4px;font-size:11px;color:#5d6d5f;max-height:160px;overflow:auto}
 @media(max-width:620px){.battle-teams{grid-template-columns:1fr}.versus{text-align:center}}
+
+/* Character creation steps, look preview and career umbrellas. */
+.steps{display:flex;gap:8px;margin:4px 0 16px}
+.step{flex:1;padding:8px 10px;border-radius:12px;background:#eef2e8;color:#6a7d6c;font-size:11px;font-weight:600;text-align:center}
+.step.on{background:#153d32;color:#fff}
+.look-preview{position:relative;width:84px;height:120px;margin:0 auto 12px;--skin:#c88f69}
+.look-head{position:absolute;left:22px;top:6px;width:40px;height:44px;border-radius:50%;background:var(--skin);box-shadow:inset -5px -6px 0 #0000001a}
+.look-head::before{content:'';position:absolute;inset:-6px -4px 22px;border-radius:50% 50% 40% 40%;background:#2b211c}
+.look-preview[data-hair=curls] .look-head::before{inset:-10px -9px 20px;border-radius:50%;background:radial-gradient(circle at 20% 60%,#2b211c 30%,transparent 31%),radial-gradient(circle at 80% 60%,#2b211c 30%,transparent 31%),radial-gradient(circle at 50% 35%,#2b211c 45%,transparent 46%)}
+.look-body{position:absolute;left:16px;top:54px;width:52px;height:60px;border-radius:18px 18px 10px 10px;background:#8ea9a4}
+.swatches{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.swatch{width:30px;height:30px;border-radius:50%;background:var(--c);border:2px solid #fff;box-shadow:0 0 0 1px #d6dccf;padding:0}
+.swatch.on{box-shadow:0 0 0 3px #2f7a55}
+.swatches input[type=color]{width:34px;height:30px;padding:0;border-radius:8px}
+.choice-row{display:flex;gap:8px}
+.choice{flex:1;padding:10px;border-radius:12px;background:#f3f6ef;border:1px solid #dbe4d2}
+.choice.on{background:#e3f0df;border-color:#2f7a55;font-weight:600}
+.umbrella{display:block;margin:14px 0 8px}
+.career-pick{display:grid;gap:3px;margin:12px 0;padding:10px 12px;border-radius:12px;background:#f3f6ef}
+.career-pick small{color:#6a7d6c}
+/* First-time explainer card. */
+.tip-card{position:fixed;z-index:60;left:50%;top:16px;transform:translateX(-50%);width:min(420px,calc(100vw - 32px));display:grid;gap:8px;padding:16px 18px;border-radius:18px;background:#fffef7;border:1px solid #dbe4d2;box-shadow:0 18px 50px #12302533;animation:tip-in .25s ease-out}
+.tip-card strong{font-size:15px;color:#153d32}
+.tip-card p{margin:0;font-size:12px;line-height:1.5;color:#46594b}
+.tip-card .primary{justify-self:end}
+@keyframes tip-in{from{opacity:0;transform:translate(-50%,-10px)}}
+@media(prefers-reduced-motion:reduce){.tip-card{animation:none}}
+
+/* The phone replaces the side/bottom menu and the extra buttons. */
+#app .rail,.page-heading .actions,.objects-toggle{display:none!important}
+#app main{margin-left:0!important}
+@media(max-width:620px){#app main{padding-bottom:16px!important}}
+.phone-widget{display:flex;align-items:center;gap:12px;padding:8px 14px 8px 8px;border-radius:18px;background:#fffef7;border:1px solid #dbe4d2;box-shadow:0 8px 24px #23412f1f;color:#22392d}
+.phone-widget:hover{border-color:var(--phone)}
+.phone-mini{position:relative;display:grid;place-items:center;width:34px;height:44px;border-radius:9px;background:var(--phone);font-size:16px;box-shadow:inset 0 0 0 3px #ffffff30}
+.phone-mini i,.app i{position:absolute;top:-6px;right:-6px;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#d9534f;color:#fff;font:700 10px/18px Segoe UI;font-style:normal}
+.phone-line{display:grid;gap:1px;text-align:left}
+.phone-line strong{font-size:13px}
+.phone-line small{font-size:9px;color:#6a7d6c}
+@media(max-width:620px){.phone-widget{gap:8px;padding:6px 10px 6px 6px}.phone-mini{width:28px;height:36px}.phone-line strong{font-size:11px}}
+#modal.as-phone .modal{width:min(380px,calc(100vw - 32px));padding:0;background:transparent;box-shadow:none}
+#modal.as-phone .modal-close{top:14px;right:18px;z-index:2;color:#fff}
+.phone-device{position:relative;padding:14px 14px 22px;border-radius:38px;background:var(--phone);box-shadow:0 30px 70px #0b1f1666}
+.phone-device>*:not(.phone-notch){position:relative}
+.phone-notch{position:absolute;top:14px;left:50%;width:90px;height:20px;margin-left:-45px;border-radius:0 0 14px 14px;background:#111;z-index:1}
+.phone-status,.phone-hello,.phone-card,.app-grid{background:var(--screen)}
+.phone-status{display:flex;justify-content:space-between;padding:8px 16px 6px;border-radius:26px 26px 0 0;font-size:10px;font-weight:600;color:#3b4a42}
+.phone-hello{display:grid;gap:2px;padding:14px 18px 8px}
+.phone-hello strong{font:700 20px Georgia,serif;color:#153d32}
+.phone-hello small{font-size:11px;color:#6a7d6c}
+.phone-card{padding:6px 18px;font-size:11px;color:#3b4a42}
+.app-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px 6px;padding:16px 12px 26px;border-radius:0 0 26px 26px}
+.app{position:relative;display:grid;justify-items:center;gap:6px;padding:0;background:transparent}
+.app span{display:grid;place-items:center;width:52px;height:52px;border-radius:16px;background:#fff;font-size:24px;box-shadow:0 4px 12px #23412f22}
+.app small{font-size:10px;color:#22392d}
+.app:hover span,.app:focus-visible span{transform:translateY(-2px);box-shadow:0 8px 18px #23412f33}
+.phone-back{margin-bottom:10px;padding:6px 12px;border-radius:14px;background:#eef2e8;font-size:12px}
+.tips-list{display:grid;gap:10px}
+.tip-item{padding:12px 14px;border-radius:14px;background:#f6f8f2;border:1px solid #e3e9dc}
+.tip-item p{margin:4px 0 0;font-size:12px;line-height:1.5;color:#46594b}

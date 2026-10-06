@@ -1,6 +1,6 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { NPCS, CAREERS, LOCATIONS, TOWN, SPONSORSHIPS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
+import { NPCS, CAREERS, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 export const worldObjects = (location,furniture=[]) => ({
@@ -67,7 +67,7 @@ export class World {
         else if(!this.gesture.multi){const g=this.gesture;if(Math.hypot(event.clientX-g.startX,event.clientY-g.startY)>6)g.dragged=true;if(g.dragged&&this.scale){const s=this.scale,c=Math.cos(this.angle),sn=Math.sin(this.angle),dx=(event.clientX-previous.x)/s,dy=(event.clientY-previous.y)/(s*this.pitch);this.pan.x-=dx*c+dy*sn;this.pan.z-=-dx*sn+dy*c;this.panned=true;}}
         this.canvas.classList.toggle('dragging',this.gesture.dragged);this.draw();return;
       }
-      const r=canvas.getBoundingClientRect();if(this.placement){const point=this.unproject(event.clientX-r.left,event.clientY-r.top);this.placement.x=Math.round(point.x);this.placement.z=Math.round(point.z);}const near=list=>list?.find(p=>Math.hypot(p.screen.x-event.clientX+r.left,p.screen.y-event.clientY+r.top)<24);this.hover=event.pointerType==='mouse'?near(this.pins)||near(this.peopleHits)||near(this.houseHits)||this.hits?.find(o=>Math.hypot(o.screen.x-event.clientX+r.left,o.screen.y-event.clientY+r.top)<35):null;this.draw();
+      const r=canvas.getBoundingClientRect();if(this.placement){const point=this.unproject(event.clientX-r.left,event.clientY-r.top);this.placement.x=Math.round(point.x);this.placement.z=Math.round(point.z);}const near=list=>list?.find(p=>Math.hypot(p.screen.x-event.clientX+r.left,p.screen.y-event.clientY+r.top)<24);this.hover=event.pointerType==='mouse'?near(this.pins)||near(this.peopleHits)||near(this.houseHits)||this.hits?.find(o=>Math.hypot(o.screen.x-event.clientX+r.left,o.screen.y-event.clientY+r.top)<(this.hitRadius||24)):null;this.draw();
     });
     const endPointer=(event,cancelled=false)=>{if(!this.pointers.has(event.pointerId))return;const tap=this.pointers.size===1&&!this.gesture.dragged&&!this.gesture.multi&&!cancelled;this.pointers.delete(event.pointerId);if(!this.pointers.size){this.canvas.classList.remove('dragging');this.gesture=null;this.pinchDistance=0;}if(tap)this.click(event);};
     canvas.addEventListener('pointerup',event=>endPointer(event));canvas.addEventListener('pointercancel',event=>endPointer(event,true));
@@ -122,7 +122,7 @@ export class World {
   }
   // Zooming out drifts the camera from the current lot toward the town centre (0,-8).
   tripWalker(trip,p,serverNow,skin,look){this.human(p.x,p.z,skin,{...look,walk:true,heading:p.heading,gait:(serverNow-trip.departs)/1000*5});}
-  tripPosition(trip,serverNow){const points=route(trip.from,trip.to),p=along(points,(serverNow-trip.departs)/(trip.arrives-trip.departs)),here=TOWN[this.location]||TOWN.home;return {...p,x:p.x-here.x,z:p.z-here.z};}
+  tripPosition(trip,serverNow){const points=route(trip.from,trip.to,trip.ride?'drive':'walk'),p=along(points,(serverNow-trip.departs)/(trip.arrives-trip.departs)),here=TOWN[this.location]||TOWN.home;return {...p,x:p.x-here.x,z:p.z-here.z};}
   focus(){if(this.state?.trip){const p=this.tripPosition(this.state.trip,Date.now()+(this.serverOffset||0)),f=this.focusBase();return {x:p.x+f.x*.3,z:p.z+f.z*.3};}return this.focusBase();}
   focusBase(){const here=TOWN[this.location]||TOWN.home,t=this.interior()?0:Math.max(0,Math.min(1,(.9-this.zoom)/.65)),pan=this.pan||{x:0,z:0};return {x:-here.x*t+pan.x,z:(-14-here.z)*t+pan.z};}
   // Home is its own screen: an island with the house on it. Trips always show the open city.
@@ -221,11 +221,12 @@ export class World {
   showroomRide(){const claimed=this.state?.vip||{};return Object.keys(SPONSORSHIPS).find(k=>SPONSORSHIPS[k].kind==='ride'&&!claimed[k])||'hypercar';}
   // Sponsored rides: each model has its own silhouette. along is the axis the car points down.
   ride(key,x,z,along='x'){
-    const deal=SPONSORSHIPS[key];if(!deal)return;const c=deal.color,X=(l,w)=>along==='x'?[l,w]:[w,l];
+    const deal=RIDES[key];if(!deal)return;const c=deal.color,X=(l,w)=>along==='x'?[l,w]:[w,l];
     const body=(l,w,h,y,tone)=>{const [bw,bd]=X(l,w);this.box(x,z,bw,bd,h,tone,y);};
     const wheels=(span,track)=>{for(const a of [-1,1])for(const b of [-1,1]){const [dx,dz]=X(a*span,b*track);this.round(x+dx,z+dz,.3,.3,.3,'#1d1f22',0);}};
     if(key==='scooter'){body(1,.3,.25,.25,c);body(.25,.25,.7,.45,'#2b2f36');wheels(.4,.02);return;}
     if(key==='suv'){wheels(.7,.45);body(2.1,1.05,.6,.15,c);body(1.5,.95,.5,.75,'#2b3440');body(2.12,1.07,.05,.5,shade(c,1.4));return;}
+    if(key==='hatchback'){wheels(.62,.42);body(1.8,.95,.5,.15,c);body(1.1,.85,.42,.65,'#2b3440');body(1.82,.97,.05,.45,shade(c,1.3));return;}
     if(key==='coupe'){wheels(.68,.42);body(2,1,.4,.12,c);body(1,.85,.3,.52,'#2b2f36');const [sx,sz]=X(-.95,0);this.box(x+sx,z+sz,...X(.12,.9),.08,'#1d1f22',.6);return;}
     wheels(.75,.46);body(2.3,1.12,.34,.1,c);body(2.32,.3,.02,.44,shade(c,1.35));body(.95,.86,.24,.44,'#14161a');const [wx,wz]=X(-1.05,0);this.box(x+wx,z+wz,...X(.18,1.05),.06,'#14161a',.66);for(const s of [-1,1]){const [px,pz]=X(-1.05,s*.35);this.box(x+px,z+pz,.08,.08,.22,'#14161a',.44);}
   }
@@ -377,7 +378,8 @@ export class World {
     this.paintSpeech();
 
     if(this.moving){const t=this.project(this.target.x,.03,this.target.z);ctx.strokeStyle='#fff8';ctx.lineWidth=1.3;ctx.beginPath();ctx.ellipse(t.x,t.y,7,3.5,0,0,Math.PI*2);ctx.stroke();}
-    this.hits=worldObjects(this.location,this.visitedHome?.furniture||this.state.furniture).map(object=>({...object,screen:this.project(object.vx??object.x,.8,object.vz??object.z)}));
+    this.hits=worldObjects(this.location,this.visitedHome?.furniture||this.state.furniture).map(object=>({...object,screen:this.project(object.vx??object.x,.6,object.vz??object.z)}));
+    this.hitRadius=Math.max(14,Math.min(30,this.scale*.42));
     ctx.font='600 10px Segoe UI';for(const o of this.hits.filter(o=>o.name===this.hover?.name)){const p=o.screen;const width=ctx.measureText(o.name).width+14;ctx.fillStyle='#fff9';ctx.beginPath();ctx.roundRect(p.x-width/2,p.y+13,width,17,8);ctx.fill();ctx.fillStyle='#49614f';ctx.fillText(o.name,p.x,p.y+25);}
   }
   // Local chat appears as a speech bubble over the speaker for a few seconds.
@@ -437,7 +439,8 @@ export class World {
     const person=this.peopleHits?.find(p=>Math.hypot(p.screen.x-x,p.screen.y-y)<22);if(person){this.onObject({person:person.player,name:person.player.name,screen:person.screen});return;}
     const home=this.houseHits?.find(h=>Math.hypot(h.screen.x-x,h.screen.y-y)<26);if(home){this.onObject({house:home.house,name:`${home.house.name}’s home`,screen:home.screen});return;}
     const choice=this.choiceTargets?.find(o=>Math.hypot(o.screen.x-x,o.screen.y-y)<30);if(choice){this.onObject({decision:choice.index});return;}
-    const object=[...this.hits].sort((a,b)=>Math.hypot(a.screen.x-x,a.screen.y-y)-Math.hypot(b.screen.x-x,b.screen.y-y)).find(o=>Math.abs(o.screen.x-x)<45&&Math.abs(o.screen.y+12-y)<38);
+    // Only a tap on the object itself opens it; anywhere else is a walk.
+    const object=[...this.hits].sort((a,b)=>Math.hypot(a.screen.x-x,a.screen.y-y)-Math.hypot(b.screen.x-x,b.screen.y-y)).find(o=>Math.hypot(o.screen.x-x,o.screen.y-y)<this.hitRadius);
     if(object){this.onObject(object);return;}
     this.onGround?.();const point=this.unproject(x,y),here=TOWN[this.location]||TOWN.home,lot=lotAt(point.x+here.x,point.z+here.z);
     if(lot&&lot!==this.location){this.onObject({travel:lot});return;}
