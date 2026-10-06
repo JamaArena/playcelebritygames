@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, CAREERS, ITEMS, FOODS, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -56,6 +56,8 @@ export function reconcile(s, now) {
   if((s.version||1)<2){let reach=0;for(const c of Object.values(s.careers)){c.audience*=100;reach+=c.audience;}s.fame=(s.fame||0)+fameFor(reach);for(const o of s.outputs)o.gain*=100;s.version=2;}
   // Coins were removed: drop balances and groceries; contracts now boost reach instead of paying fees.
   if(s.version<3){delete s.money;delete s.inventory.food;for(const c of Object.values(s.careers))for(const deal of [c.affiliation,c.offer])if(deal){deal.boost=B.contractBoost;delete deal.fee;delete deal.share;}s.version=3;}
+  // The Fraudster career was retired: those players continue as developers, keeping fame and history.
+  if(s.careers?.hacker){delete s.careers.hacker;if(s.career==='hacker'){s.career=Object.keys(s.careers)[0]||'developer';s.careers[s.career]??=newCareer(s.career,0);}if(s.active?.career==='hacker')s.active=null;log(s,'The Fraudster career has been retired. You continue as a '+CAREERS[s.career].name.toLowerCase()+'.',now);}
   refill(s,now);
   // Heartbeats arrive every 20 seconds; gaps up to 30 seconds count as active. Offline needs never decay.
   const dt=Math.max(0,now-s.lastSeen);
@@ -88,10 +90,10 @@ export function mishaps(s,now){
   }
 }
 export function finishRecovery(s,now){
-  const r=s.recovery,start=r.startedAt??r.endsAt-B.recovery[r.need][1],share=Math.max(0,Math.min(1,(now-start)/(r.endsAt-start)));
-  s.needs[r.need]=clamp(s.needs[r.need]+B.recovery[r.need][0]*share);s.recovery=null;
+  const r=s.recovery,start=r.startedAt??r.endsAt-B.recovery[r.need][1],share=Math.max(0,Math.min(1,(now-start)/(r.endsAt-start))),amount=r.amount??B.recovery[r.need][0];
+  s.needs[r.need]=clamp(s.needs[r.need]+amount*share);for(const [k,v] of Object.entries(r.extra||{}))s.needs[k]=clamp(s.needs[k]+v*share);s.recovery=null;
   if(r.watch){watchInsights(s,r,now);if(r.watch.given)s.watchLearnAt=now;}
-  log(s,share>=1?`${r.label} completed.`:`${r.label}: stopped early, +${Math.round(B.recovery[r.need][0]*share)} ${r.need}.`,now);
+  log(s,share>=1?`${r.label} completed.`:`${r.label}: stopped early, +${Math.round(amount*share)} ${r.need}.`,now);
 }
 // Insights land while you watch: due = 1 at 10s, +1 every 30s after, capped at WATCH_MAX.
 export function watchInsights(s,r,now){
@@ -160,7 +162,6 @@ export function choices(s) {
     ['Reproduce the bug first','Trace the failing path','Refactor the affected module'],['Apply a focused repair','Add regression coverage','Rebuild the component'],['Explain a smaller scope','Deliver with documented tests','Propose a broader release']][i%3] : a.career==='adult'?[
     ['Sign the standard contract','Negotiate a bigger cut','Hold out for top billing'],['Keep it classy and teasing','Turn up the heat','Go bold and leave them breathless'],['Reschedule and keep it professional','Rework the scene with the crew','Improvise a sizzling solo set']][i%3] : ['Use a proven approach','Commit to your own approach','Try an ambitious approach'];
   const list=labels.map((label,j)=>({label,skill,risk:['safe','balanced','risky'][j],action:'general'}));
-  if(a.career==='hacker')list.push({label:'Stop the operation',skill:'risk judgement',risk:'safe',action:'stop'});
   return list;
 }
 export function view(s,now) {
@@ -183,7 +184,6 @@ function start(s,input,now,rng) {
   if(kind==='trial')requireRule(discovery(c,def),'Complete three local activities and reach level 2 in your focus skill, or practise after a failed trial.');
   if(['build','launch'].includes(kind))requireRule(['founder','web3'].includes(key),'Only founders and Web3 builders own launchable products.');
   if(['founder','web3'].includes(key))requireRule(!['produce','live','collab'].includes(kind),'Build a product, then launch it.');
-  if(key==='hacker'&&kind!=='practice')requireRule(c.exposure<60,'Exposure is too high. Complete a practice session to cool down.');
   const product=kind==='launch'?s.outputs.find(o=>o.id===input.productId&&o.career===key&&o.kind==='build'&&!o.released):null;
   if(kind==='launch')requireRule(product,'Select an unreleased product.');
   if(kind==='collab')requireRule(NPCS.some(n=>n.id===input.npc),'Choose an NPC collaborator.');
@@ -220,7 +220,6 @@ function settle(s,a,now) {
   const fame=fameFor(gain);c.audience+=gain;addFame(s,fame);c.completed++;
   if(qualifies)c.engagement=clamp(c.engagement+(quality-50)/10);
   if(contract&&qualifies)c.reputation=clamp(c.reputation+(quality>=60?2:-2));
-  if(a.career==='hacker')c.exposure=a.exposure;
   if(a.kind==='trial') {
     if(quality>=60){
       const pool=def.family==='sport'?['Palm City Club','Harbour Athletic','Emerald United']:def.family==='music'?['Emerald Records','Palm Sound','Horizon Music']:def.family==='tech'?['Horizon Ventures','Palm Innovation','City Builders']:['City Talent Agency','Emerald Talent','Horizon Studio'];
@@ -252,7 +251,6 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(input.activityId===a.id&&input.beat===a.beat,'That decision has already been resolved.');
       requireRule(now>=a.readyAt,'Commentary is still running.');
       const choice=choices(s)[input.choice];requireRule(choice,'Choose a valid action.');
-      if(choice.action==='stop'){s.careers[a.career].exposure=a.exposure;s.active=null;log(s,'Operation stopped. No reach or fame.',now);break;}
       const scene=beat(s,a),c=s.careers[a.career],fatigue=(100-s.needs.energy)/100;
       let skill=c.skills[choice.skill].level;
       if(choice.action==='signature')skill=(skill+c.skills.stamina.level)/2;
@@ -283,7 +281,6 @@ export function act(s,input,now,rng=Math.random) {
       }
       a.engagement=clamp(a.engagement+(outcome.success?15:-10));
       if(choice.skill==='production')a.stability=clamp(a.stability+(outcome.success?15:-15));
-      if(a.career==='hacker'){a.exposure+=(!outcome.success?25:0)+(choice.risk==='risky'?10:0);if(a.exposure>=100){c.exposure=a.exposure;c.reputation=clamp(c.reputation-10);s.active=null;log(s,'Operation failed at 100 exposure. No reach or fame.',now);break;}}
       a.beat++;a.readyAt=now+a.interval;a.status=a.beat>=a.totalBeats?'finishing':'commentary';
       evaluate(s,a.career);break;
     }
@@ -303,7 +300,19 @@ export function act(s,input,now,rng=Math.random) {
       const rest=s.location==='home'&&!s.visiting?SPONSORSHIPS[s.home]?.rest??1:1;
       const family=CAREERS[s.career].family,watching=input.watch&&input.need==='fun'&&s.location==='home';
       const watch=watching?{learn:s.watchLearnAt==null||now-s.watchLearnAt>=WATCH_COOLDOWN,given:0,seed:Math.floor(Math.random()*12)}:null;
+      // A dish from the kitchen menu: its own amount, time and side effects.
+      const food=input.need==='hunger'&&input.food!=null?FOODS[input.food]:null;
+      if(input.food!=null){requireRule(food,'That dish is not on the menu.');requireRule(s.location==='home','Cook at home.');requireRule((s.fame||0)>=(food.fame||0),`${food.name} unlocks at ${(food.fame||0).toLocaleString('en-US')} fame.`);}
+      if(food){s.recovery={id:id(),need:'hunger',label:`Eating ${food.name.toLowerCase()}`,startedAt:now,endsAt:now+Math.round(food.ms*rest),amount:food.hunger,extra:food.extra||{},food:input.food};break;}
       s.recovery={id:id(),need:input.need,label:watching?WATCH[family].label:labels[input.need],startedAt:now,endsAt:now+Math.round((watching?WATCH_SESSION:B.recovery[input.need][1])*rest),watch};break;
+    }
+    case 'useItem': {
+      // Use a placed home item: it fills a need over time like the built-in objects.
+      const def=ITEMS[input.item],use=def?.use;requireRule(use,'That item has no use.');
+      requireRule(!s.active&&!s.recovery,'Finish or cancel your activity first.');
+      requireRule(s.location==='home'&&!s.visiting,'Use your items at home.');
+      requireRule(s.inventory[input.item]&&s.furniture.some(f=>f.item===input.item),'Place that item at home first.');
+      s.recovery={id:id(),need:use.need,label:use.verb,startedAt:now,endsAt:now+use.ms,amount:use.amount,extra:use.extra||{},item:input.item};break;
     }
     case 'buy': {
       const item=ITEMS[input.item];requireRule(item,'Unknown item.');requireRule(s.location==='plaza','Visit Palm plaza to shop.');

@@ -1,6 +1,6 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { NPCS, CAREERS, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
+import { NPCS, CAREERS, ITEMS, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 // On the sofa you face the room; watching TV you sit at the end and turn toward the screen.
@@ -59,7 +59,10 @@ export const worldObjects = (location,furniture=[]) => ({
     {name:'Bedroom plant',icon:'❀',x:3.6,z:-1.2,vx:4.35,vz:-1.2,verb:'Water plant'},
     {name:'Work desk',icon:'⌘',x:.5,z:-3.1,vx:.5,vz:-4.2,action:'practice'},
     {name:'Front door',icon:'🚪',x:-4.6,z:3.6,vx:-5.1,vz:3.6,action:'exit'},
-    ...furniture.map((f,i)=>({name:`${f.item==='chair'?'Chair':'Display table'} ${i+1}`,icon:'◇',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:f.item==='chair'?'Sit':'Admire display',pose:f.item==='chair'?'sit':null}))
+    ...furniture.map((f,i)=>{const def=ITEMS[f.item]||{},use=def.use;
+      if(f.item==='chair')return {name:`Chair ${i+1}`,icon:'♙',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Sit',pose:'sit'};
+      if(use)return {name:def.name,icon:use.icon,x:f.x,z:f.z+.75,vx:f.x,vz:f.z,verb:use.verb,item:f.item,useItem:true,amount:use.amount,useNeed:use.need};
+      return {name:f.item==='trophyShelf'?'Display table':def.name||'Display table',icon:'◇',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Admire',pose:null};})
   ],
   sports:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:'Training pitch',icon:'⚽',x:0,z:-1,action:'practice'},{name:'Clubhouse',icon:'⌂',x:-3,z:-2.1,action:'career'},{name:'Scout Kai',icon:'☺',x:3.4,z:2,action:'phone'}],
   studio:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:'Recording desk',icon:'♫',x:-3.2,z:-2.3,action:'career'},{name:'Rehearsal stage',icon:'♬',x:2.5,z:-2,action:'practice'},{name:'Producer Nova',icon:'☺',x:2.5,z:2,action:'phone'}],
@@ -389,7 +392,7 @@ export class World {
       this.box(.5,-4.2,1.2,.75,.8,'#c4b08b');this.box(.5,-4.2,1.3,.8,.07,'#f5f0df',.8);this.box(.5,-4.4,.7,.08,.5,'#405c55',.87);this.box(.5,-4.1,.65,.35,.03,'#819087',.88);
       if(Math.sin(this.angle)>0){this.box(-5.25,3.6,.08,1.15,2,'#6b4a35');this.box(-5.2,3.6,.04,.95,1.75,'#7d5841',.08);this.round(-5.17,3.2,.06,.06,.06,'#d4af37',1);}
       if(style.chandelier){this.round(-1.7,1.5,.05,.05,.6,'#8a7a5a',2.05);this.round(-1.7,1.5,.7,.7,.3,style.chandelier,1.85);}
-      for(const f of (this.visitedHome?.furniture||this.state.furniture)){if(f.item==='chair')this.chair(f.x,f.z);else{this.box(f.x,f.z,.85,.45,.8,'#c8b08d');this.round(f.x,f.z,.3,.3,.35,'#edbf77',.8);}}
+      for(const f of (this.visitedHome?.furniture||this.state.furniture))this.furnitureModel(f.item,f.x,f.z);
     }else if(l==='sports'){
       this.floor(0,0,11,11,'#b7c6a0');this.floor(0,0,6.3,8.4,'#7fa788');
       for(let z=-4;z<4;z++)this.floor(0,z+.5,6.2,.96,z%2?'#86ad8d':'#7ca584',.01);
@@ -421,15 +424,17 @@ export class World {
       this.ride(this.showroomRide(),3.3,3.9,'x');
       this.plant(-4.1,4,1.8);this.plant(0,-4.4,1.5);this.plant(-4.8,-.1);
     }
-    if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.item,p.x,p.z);this.floor(p.x,p.z,.9,.9,valid?'#87bc9c':'#d79c8c',.025);if(p.item==='chair')this.chair(p.x,p.z);else this.box(p.x,p.z,.85,.45,.8,valid?'#abc8a0':'#d0a18d');}
+    if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.item,p.x,p.z);this.floor(p.x,p.z,.9,.9,valid?'#87bc9c':'#d79c8c',.025);this.furnitureModel(p.item,p.x,p.z);}
     if(this.interior()&&l!=='home')this.paintCrowd(l);
     const npc=NPCS.find(n=>n.location===l);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone'),nx=obj?.x||2.5,nz=obj?.z||2,talking=this.npcTalkUntil>performance.now();this.human(nx,nz,npc.look.skin,{...this.look(npc.career),...this.body({hair:npc.look.hair,hairColor:npc.look.hairColor,build:npc.look.build,height:npc.look.height}),pose:talking?'gesture':null,heading:talking?Math.atan2(this.player.x-nx,this.player.z-nz):0});}
     this.paintPeople();
-    const mishap=this.freshMishap(),need=this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=(mishap&&!need?MISHAP_POSES[mishap.need]:null)||({energy:'sleep',fun:this.pose?.kind==='sit'?'sit':'tv',hygiene:'shower',bladder:'toilet',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
-    const pos=need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
+    // Using a placed home item: stand in front of it (or sit on it) in that item's pose.
+    const using=this.state.recovery?.item&&!this.visitedHome,usedDef=using&&ITEMS[this.state.recovery.item]?.use,usedSpot=using&&this.state.furniture.find(f=>f.item===this.state.recovery.item);
+    const mishap=this.freshMishap(),need=using?null:this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=(usedDef?usedDef.pose||'watch':null)||(mishap&&!need?MISHAP_POSES[mishap.need]:null)||({energy:'sleep',fun:this.pose?.kind==='sit'?'sit':'tv',hygiene:'shower',bladder:'toilet',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
+    const pos=usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
     if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride){this.ride(this.state.trip.ride,p.x,p.z,p.axis);this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),...this.body(this.state)});this.actor={x:p.x,z:p.z,pose:null};}return;}
     if(this.state.ride){if(this.interior())this.ride(this.state.ride,-2.5,7.4,'x');else this.ride(this.state.ride,-7.1,2.6,'z');}
-    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),...this.body(this.state),walk:this.moving,pose,heading:pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
+    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),...this.body(this.state),walk:this.moving,pose,seat:usedDef?.seat,heading:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
     this.actor={...pos,pose};
     // Mishap props: a growing puddle, or stink clouds drifting up.
     if(mishap?.need==='bladder'&&!need){const r=Math.min(1,mishap.age/2500);this.round(pos.x,pos.z+.15,.25+.75*r,.2+.6*r,.008,'#e3cc45',.004);}
@@ -467,6 +472,29 @@ export class World {
   say(id,text){this.speech??=new Map();this.speech.set(id,{text:String(text).slice(0,70),until:performance.now()+6500});this.draw();}
   // A toilet facing into the room: pedestal, bowl, seat with water, raised lid and a cistern behind.
   toilet(x,z){this.round(x,z+.05,.36,.46,.3,'#efede4');this.round(x,z,.6,.78,.16,'#fbfaf3',.28);this.round(x,z,.6,.78,.04,'#ffffff',.44);this.round(x,z+.02,.36,.5,.02,'#a9cfd6',.465);this.box(x,z+.36,.52,.05,.5,'#ffffff',.48);this.box(x,z+.5,.66,.24,.6,'#f7f6ec',.3);this.box(x,z+.5,.7,.28,.05,'#ffffff',.9);this.round(x,z+.5,.1,.1,.03,'#c9ccc8',.95);}
+  // Placeable home items, built from simple shapes; each faces +z, where you stand to use it.
+  furnitureModel(item,x,z){
+    const t=this.reduced?0:performance.now()/1000,night=this.daylight().night;
+    switch(item){
+      case 'chair':this.chair(x,z);return;
+      case 'ankaraRug':this.floor(x,z,1.6,1.1,'#d9573f',.012);this.floor(x,z,1.3,.8,'#f2b33d',.014);this.floor(x,z,.9,.45,'#2d6e9e',.016);for(const s of [-1,1])this.floor(x+s*.55,z,.12,.6,'#2d6e9e',.016);return;
+      case 'floorLamp':this.round(x,z,.36,.36,.05,'#3b3b3b');this.round(x,z,.05,.05,1.5,'#3b3b3b',.05);this.round(x,z,.46,.46,.34,night?'#ffe6a8':'#efe6d2',1.48);return;
+      case 'plants':this.plant(x-.22,z-.05,.95);this.plant(x+.25,z+.12,.7);return;
+      case 'mirror':this.box(x,z-.15,.62,.08,1.75,'#c9a46a',.03);this.box(x,z-.1,.52,.02,1.6,'#d8eaf0',.1);this.box(x,z-.32,.08,.3,.08,'#c9a46a');return;
+      case 'beanBag':this.round(x,z,.9,.9,.42,'#d1694f');this.round(x,z-.28,.8,.42,.62,'#c45e46',.08);return;
+      case 'bookshelf':{this.box(x,z-.18,.95,.36,1.85,'#8b6a4c');const tones=['#b23a48','#2f6fb3','#e0b45e','#3d8a6a','#7b4fa3','#e07a5f'];for(const [r,y] of [.42,.88,1.34].entries()){this.box(x,z-.02,.85,.32,.04,'#a98763',y);for(let i=0;i<6;i++)this.box(x-.33+i*.13,z-.05,.09,.24,.32-((i+r)%3)*.04,tones[(i+r*2)%6],y+.04);}return;}
+      case 'microwave':this.box(x,z-.1,.85,.55,.85,'#e7e1d3');this.box(x,z-.1,.9,.6,.05,'#c9b99c',.85);this.box(x,z-.14,.55,.38,.32,'#d9d9d9',.9);this.box(x-.06,z+.06,.34,.02,.24,'#2b3440',.94);return;
+      case 'coffeeMachine':this.box(x,z-.1,.85,.55,.85,'#e7e1d3');this.box(x,z-.1,.9,.6,.05,'#c9b99c',.85);this.box(x,z-.16,.32,.28,.42,'#3b3b3b',.9);this.round(x,z+.02,.1,.1,.11,'#ffffff',.9);return;
+      case 'washingMachine':this.box(x,z-.1,.66,.62,.86,'#f2f2f0');this.round(x,z+.22,.42,.03,.42,'#8fb2c4',.22);this.box(x,z-.1,.6,.5,.04,'#dcdcda',.86);return;
+      case 'dressingTable':this.box(x,z-.2,.95,.45,.74,'#e8dccb');this.box(x,z-.4,.75,.04,.65,'#d8eaf0',.82);this.box(x,z-.42,.85,.06,.75,'#cdb89c',.76);this.round(x-.3,z-.15,.08,.08,.14,'#d9a7b4',.74);this.round(x+.28,z-.12,.07,.07,.1,'#f0d27a',.74);this.round(x,z+.42,.42,.42,.46,'#d9a7b4');return;
+      case 'gamingConsole':this.box(x,z-.3,1.1,.38,.42,'#3a3f4a');this.box(x,z-.38,1.05,.06,.62,'#14171c',.42);this.box(x,z-.35,.95,.02,.52,night?'#4d7fd6':'#2c4a7a',.47);this.box(x+.32,z-.18,.26,.18,.06,'#e8e8e8',.42);this.round(x,z+.45,.62,.62,.18,'#5b6fa8');return;
+      case 'soundSystem':for(const s of [-1,1]){this.box(x+s*.36,z-.12,.36,.36,1.05,'#2b2b2b');this.round(x+s*.36,z+.07,.24,.02,.24,'#55595f',.2);this.round(x+s*.36,z+.07,.14,.02,.14,'#55595f',.72);}this.box(x,z-.12,.32,.3,.18,'#3b3f46');return;
+      case 'aquarium':this.box(x,z-.12,1,.46,.7,'#4a3b2e');this.box(x,z-.12,.96,.42,.55,'#9fd3e0',.7);this.box(x,z-.12,1,.46,.04,'#3b3b3b',1.25);for(let i=0;i<3;i++){const fx=x+Math.sin(t*.8+i*2.1)*.32,fy=.85+i*.12;this.round(fx,z-.1+i*.05,.1,.05,.05,['#f39c3d','#f2d23d','#d23b4b'][i],fy);}this.round(x+.3,z-.15,.12,.12,.18,'#5aa36b',.7);return;
+      case 'treadmill':this.box(x,z,.72,1.4,.16,'#2f3237');this.box(x,z,.56,1.25,.02,'#1b1d20',.16);for(const s of [-1,1])this.box(x+s*.33,z-.62,.06,.06,1.1,'#3a3d43');this.box(x,z-.62,.66,.22,.08,'#4b5059',1.1);return;
+      case 'weights':this.box(x,z,.42,1.15,.42,'#2f3237');this.box(x,z,.44,1.1,.08,'#7a2433',.42);for(const s of [-1,1]){this.box(x+s*.38,z-.52,.06,.06,1.12,'#55595f');this.round(x+s*.48,z-.52,.08,.34,.34,'#1d1f22',.88);}this.box(x,z-.52,1.1,.04,.04,'#b9bcc2',1.05);return;
+      default:this.box(x,z,.85,.45,.8,'#c8b08d');this.round(x,z,.3,.3,.35,'#edbf77',.8);
+    }
+  }
   // A mishap plays out for a few seconds once the player has been told about it: a silly pose, a line,
   // and props like a puddle. The app starts it with playMishap() so it isn't hidden behind the popup.
   freshMishap(){
