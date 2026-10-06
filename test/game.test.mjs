@@ -278,3 +278,14 @@ test('life events: none at first, then one every few minutes; power cuts stop ap
   // A roll of 0 picks the first: a lucky break worth at least 50 fame.
   s.recovery=null;s.location='plaza';lifeEvents(s,s.nextEventAt,()=>0);assert.equal(s.lifeEvent.kind,'luckyBreak');assert.equal(s.fame,1050);
 });
+test('travel choices, tuning, the yacht and gadgets',()=>{
+  const s=make();s.fame=100_000;
+  act(s,{type:'travelMode',mode:'okada'},T);act(s,{type:'travel',location:'tech'},T);assert.equal(s.trip.ride,'okada');assert.ok(!s.trip.delays.includes('go-slow'),'okadas dodge go-slow');
+  arrive(s);s.phone='basic';assert.throws(()=>act(s,{type:'travel',location:'home',mode:'taxi'},T+300_000),/smartphone/);
+  s.vip={helicopter:{at:T},yacht:{at:T}};s.ride='helicopter';act(s,{type:'travel',location:'home',mode:'own'},T+300_000);assert.equal(s.trip.ride,'helicopter');assert.ok(!s.trip.delays.includes('rain'));
+  arrive(s);s.location='plaza';s.ride='coupe';act(s,{type:'tune'},T+400_000);assert.equal(s.tune.coupe,1);
+  s.location='street';act(s,{type:'yachtParty'},T+400_000);assert.equal(s.recovery.extra.social,30);reconcile(s,s.recovery.endsAt+1);
+  // Gadgets work anywhere; a laptop lets tech careers practise away from their venue.
+  s.inventory.vrHeadset={level:1};s.location='plaza';act(s,{type:'useItem',item:'vrHeadset'},T+600_000);assert.equal(s.recovery.item,'vrHeadset');
+  const dev=make('developer');dev.inventory.laptop={level:1};dev.location='plaza';act(dev,{type:'start',kind:'practice',skill:'coding'},T);assert.equal(dev.active.kind,'practice');
+});

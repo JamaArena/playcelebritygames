@@ -67,6 +67,11 @@ export const ITEMS = {
   aquarium: {name: 'Aquarium', fame: 600, description: 'Calming fish to watch.', furniture: true, use: {verb: 'Watch the fish', icon: '🐠', need: 'fun', amount: 12, ms: 20_000, pose: null}},
   treadmill: {name: 'Treadmill', fame: 800, description: 'Run at home: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Run', icon: '🏃', need: 'fun', amount: 20, ms: 40_000, pose: 'sport', onItem: true, extra: {energy: -10, hygiene: -15}}},
   // Upgrades: claim them once and they work in the background (no placing needed).
+  // Gadgets you carry: they work anywhere (not on a trip).
+  laptop: {name: 'Laptop', fame: 300, description: 'Tech careers can practise anywhere.', gadget: true},
+  dslr: {name: 'DSLR camera', fame: 600, description: 'Take pro photos anywhere: social, and a little fame when you post.', gadget: true, use: {verb: 'Take photos', icon: '📷', need: 'social', amount: 10, ms: 20_000, pose: 'photo', post: true}},
+  drone: {name: 'Drone camera', fame: 800, description: 'Creators earn 5% more fame from their work.', gadget: true},
+  vrHeadset: {name: 'VR headset', fame: 1200, description: 'A big fun boost, anywhere.', gadget: true, use: {verb: 'Play VR', icon: '🥽', need: 'fun', amount: 45, ms: 40_000, pose: 'vr'}},
   curtains: {name: 'Blackout curtains', fame: 90, description: 'Darker nights at home: sleep 10% faster.', upgrade: {sleep: 10}},
   generator: {name: 'Generator', fame: 350, description: 'Keeps your lights and fridge on during power cuts.', upgrade: {generator: true}},
   sectional: {name: 'L-shaped sectional sofa', fame: 450, description: 'A bigger sofa: relaxing at home gives +15 more fun.', upgrade: {sofa: 15}},
@@ -237,6 +242,11 @@ export const SPONSORSHIPS = {
   designer: {name: 'Designer look', sponsor: 'Maison Palme', fame: 500, kind: 'style', icon: '🕶️', color: '#1f1f24', description: 'A tailored black-and-gold outfit for red carpets.'},
   coupe: {name: 'Rossa sports coupé', sponsor: 'Rossa Motori', fame: 5_000, kind: 'ride', icon: '🏎️', color: '#c9302c', description: 'Low, loud and very red.'},
   suv: {name: 'Atlas luxury SUV', sponsor: 'Atlas Autos', fame: 20_000, kind: 'ride', icon: '🚙', color: '#23262f', description: 'Tinted windows for when the paparazzi find you.'},
+  bicycle: {name: 'City bicycle', sponsor: 'Palm Cycles', fame: 20, kind: 'ride', icon: '🚲', color: '#e05a47', description: 'Free, healthy and never stuck in traffic.'},
+  motorbike: {name: 'Kinetic sports motorbike', sponsor: 'Kinetic Moto', fame: 1_500, kind: 'ride', icon: '🏍️', color: '#2b2d42', description: 'Fast, nimble, and it slips through go-slow.'},
+  limo: {name: 'Royal limousine', sponsor: 'Royal Limousines', fame: 50_000, kind: 'ride', icon: '🚘', color: '#111111', description: 'Arrive in style: fans notice, and you earn a little fame when you pull up.'},
+  yacht: {name: 'Lagoon yacht', sponsor: 'Lagoon Marine', fame: 75_000, kind: 'yacht', icon: '🛥️', color: '#f2f2f0', description: 'Moored by your street. Throw yacht parties on the lagoon.'},
+  helicopter: {name: 'SkyPalm helicopter', sponsor: 'SkyPalm Aviation', fame: 250_000, kind: 'ride', icon: '🚁', color: '#d4af37', description: 'Fly straight over the city. No roads, no traffic, no rain delays.'},
   hypercar: {name: 'Vitesse hypercar', sponsor: 'Vitesse', fame: 100_000, kind: 'ride', icon: '🏁', color: '#1d4fa8', description: 'A hand-built hypercar for Icons only. A sponsorship deal, free to claim.'},
   townhouse: {name: 'Palm Heights townhouse', sponsor: 'Palm Realty', fame: 2_000, kind: 'home', icon: '🏡', color: '#b86b52', rest: .9, description: 'Warm wood floors and art on the walls. Home recovery 10% faster.'},
   villa: {name: 'Lagoon villa', sponsor: 'Coastline Estates', fame: 25_000, kind: 'home', icon: '🏝️', color: '#3a8fa8', rest: .8, description: 'Marble, sea light and a statement chandelier. Home recovery 20% faster.'},
@@ -246,12 +256,25 @@ export const SPONSORSHIPS = {
 // BALANCE.walkCapMs; every ride is a fraction of the walking time. Home and its street are next door.
 // Walkers keep to the sidewalk; cars drive in a lane.
 // Walking is the slowest way around; the street outside your door shares your home's lot.
-export const RIDE_SPEED = {walk: 1, scooter: .75, hatchback: .65, suv: .55, coupe: .5, hypercar: .35};
+export const RIDE_SPEED = {walk: 1, bicycle: .85, scooter: .75, keke: .75, danfo: .7, hatchback: .65, taxi: .6, suv: .55, okada: .55, coupe: .5, motorbike: .5, limo: .5, hypercar: .35, helicopter: .15};
+// Public transport anyone can take. Ride-hailing is booked with a smartphone.
+export const TRANSIT = {
+  danfo: {name: 'Danfo bus', icon: '🚌', color: '#f2c230', note: 'Cheap and cheerful, a bit slower.'},
+  keke: {name: 'Keke', icon: '🛺', color: '#f2c230', note: 'Handy for short hops.'},
+  okada: {name: 'Okada', icon: '🏍️', color: '#b23a48', note: 'Fastest through go-slow traffic.'},
+  taxi: {name: 'Ride-hailing', icon: '🚕', color: '#2fae6b', note: 'Booked on your smartphone.'},
+};
+// Rides that dodge go-slow traffic, or rain delays.
+export const NO_JAM = ['walk', 'bicycle', 'okada', 'motorbike', 'helicopter'], NO_RAIN = ['helicopter'];
+// Tuning at Palm Motors: each level makes trips in your own ride a little shorter.
+export const TUNING = [{fame: 1_000, cut: 5}, {fame: 5_000, cut: 10}, {fame: 20_000, cut: 15}];
 // Best-start characters begin with a family car; sponsored rides come from fame.
 export const STARTER_RIDE = 'hatchback';
 export const LOT = location => location === 'street' ? 'home' : location;
 export const arrivalSpot = location => location === 'street' ? {x: 0, z: 6.2} : {x: 0, z: 1};
 export function route(from, to, mode = 'walk') {
+  // Helicopters fly straight from door to door.
+  if (mode === 'fly') { const door = (key, lot) => LOT(key) === 'home' ? {x: lot.x, z: lot.z + 6.2} : {x: lot.x, z: lot.z}; return [door(from, TOWN[LOT(from)]), door(to, TOWN[LOT(to)])]; }
   // Homes are entered and left by the front door on the street; venues are walked into.
   const edge = mode === 'walk' ? 1.9 : .75, a = TOWN[LOT(from)], b = TOWN[LOT(to)], road = lot => lot.z + 8 - edge, door = (key, lot) => LOT(key) === 'home' ? {x: lot.x, z: lot.z + 6.2} : {x: lot.x, z: lot.z};
   const points = [door(from, a), {x: a.x, z: road(a)}];

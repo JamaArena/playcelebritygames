@@ -1,10 +1,12 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
+import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 // On the sofa you face the room; watching TV you sit at the end and turn toward the screen.
 const SOFA_TV_FACE=.55;
+// Rides where you can see the rider.
+const OPEN_RIDES=['bicycle','motorbike','okada','scooter'];
 // Where the parrot's perch stands at home.
 const PERCH=[3.4,-1.6];
 // The 2D view approximates emotes with its existing poses.
@@ -171,7 +173,7 @@ export class World {
   }
   // Zooming out drifts the camera from the current lot toward the town centre (0,-8).
   tripWalker(trip,p,serverNow,skin,look){this.human(p.x,p.z,skin,{...look,walk:true,heading:p.heading,gait:(serverNow-trip.departs)/1000*5});}
-  tripPosition(trip,serverNow){const points=route(trip.from,trip.to,trip.ride?'drive':'walk'),p=along(points,(serverNow-trip.departs)/(trip.arrives-trip.departs)),here=TOWN[this.location]||TOWN.home;return {...p,x:p.x-here.x,z:p.z-here.z};}
+  tripPosition(trip,serverNow){const points=route(trip.from,trip.to,trip.ride==='helicopter'?'fly':trip.ride?'drive':'walk'),p=along(points,(serverNow-trip.departs)/(trip.arrives-trip.departs)),here=TOWN[this.location]||TOWN.home;return {...p,x:p.x-here.x,z:p.z-here.z};}
   focus(){if(this.state?.trip){const p=this.tripPosition(this.state.trip,Date.now()+(this.serverOffset||0)),f=this.focusBase();return {x:p.x+f.x*.3,z:p.z+f.z*.3};}return this.focusBase();}
   focusBase(){const here=TOWN[this.location]||TOWN.home,t=this.interior()?0:Math.max(0,Math.min(1,(.9-this.zoom)/.65)),pan=this.pan||{x:0,z:0};return {x:-here.x*t+pan.x,z:(-14-here.z)*t+pan.z};}
   // Home is its own screen: an island with the house on it. Trips always show the open city.
@@ -311,8 +313,18 @@ export class World {
   }
   showroomRide(){const claimed=this.state?.vip||{};return Object.keys(SPONSORSHIPS).find(k=>SPONSORSHIPS[k].kind==='ride'&&!claimed[k])||'hypercar';}
   // Sponsored rides: each model has its own silhouette. along is the axis the car points down.
-  ride(key,x,z,along='x'){
-    const deal=RIDES[key];if(!deal)return;const c=deal.color,X=(l,w)=>along==='x'?[l,w]:[w,l];
+  ride(key,x,z,along='x',lift=0){
+    const deal=RIDES[key]||TRANSIT[key];if(!deal)return;const c=deal.color,X=(l,w)=>along==='x'?[l,w]:[w,l],at=(f,side=0)=>along==='x'?[x+f,z+side]:[x+side,z+f];
+    const part=(f,side,l,w,h,y,tone)=>{const [px,pz]=at(f,side),[bw,bd]=X(l,w);this.box(px,pz,bw,bd,h,tone,y+lift);};
+    const disc=(f,side,size,thick,y,tone)=>{const [px,pz]=at(f,side),[bw,bd]=X(size,thick);this.round(px,pz,bw,bd,size,tone,y+lift);};
+    // Two-wheelers, the keke, the danfo, taxis, the limousine and the helicopter.
+    if(key==='bicycle'){for(const f of [-.45,.45])disc(f,0,.55,.06,0,'#1d1f22');part(0,0,.9,.06,.06,.42,c);part(-.15,0,.06,.06,.4,.3,c);part(-.2,0,.25,.12,.05,.72,'#2b2b2b');part(.42,0,.06,.45,.05,.85,'#2b2b2b');return;}
+    if(key==='motorbike'||key==='okada'){for(const f of [-.55,.55])disc(f,0,.5,.14,0,'#1d1f22');part(0,0,1.15,.3,.32,.32,c);part(.15,0,.4,.32,.22,.6,shade(c,1.3));part(-.25,0,.5,.3,.08,.66,'#1d1f22');part(.55,0,.08,.55,.06,.85,'#2b2b2b');return;}
+    if(key==='keke'){disc(.6,0,.4,.12,0,'#1d1f22');for(const s of [-.4,.4])disc(-.45,s,.4,.12,0,'#1d1f22');part(0,0,1.35,.9,.55,.22,c);part(0,0,1.2,.95,.06,1.25,'#2b2b2b');for(const s of [-.42,.42])part(.45,s,.05,.05,.5,.78,'#2b2b2b');part(0,0,1.36,.92,.06,.5,'#2fae6b');return;}
+    if(key==='danfo'){wheels(.95,.52);part(0,0,2.7,1.2,1.05,.2,c);part(0,0,2.72,1.22,.07,.55,'#1d1f22');part(0,0,2.72,1.22,.07,.78,'#1d1f22');part(.1,0,2.1,1.22,.32,.86,'#2b3440');part(0,0,2.7,1.2,.08,1.25,shade(c,.85));return;}
+    if(key==='taxi'){wheels(.62,.42);part(0,0,1.8,.95,.5,.15,c);part(0,0,1.1,.85,.42,.65,'#2b3440');part(0,0,1.82,.97,.08,.45,'#f2f2f0');part(0,0,.4,.25,.12,1.07,'#f2c230');return;}
+    if(key==='limo'){wheels(1.25,.48);part(0,0,3.3,1.08,.48,.12,c);part(-.1,0,2.5,.98,.36,.6,'#14161a');part(0,0,3.32,1.1,.04,.45,'#c9ccc8');return;}
+    if(key==='helicopter'){const spin=(performance.now()/90|0)%2;this.round(x,z,1.6,1.1,1.05,c,.3+lift);part(-1.2,0,1.5,.16,.16,.75,c);part(-1.9,0,.12,.1,.5,.7,shade(c,.8));part(.35,0,.6,.9,.5,.55,'#2b3440');for(const s of [-.42,.42])part(0,s,1.6,.07,.06,0,'#2b2b2b');this.box(x,z,spin?3.4:.12,spin?.12:3.4,.04,'#2b2b2b',1.38+lift);this.round(x,z,.12,.12,.12,'#2b2b2b',1.3+lift);return;}
     const body=(l,w,h,y,tone)=>{const [bw,bd]=X(l,w);this.box(x,z,bw,bd,h,tone,y);};
     const wheels=(span,track)=>{for(const a of [-1,1])for(const b of [-1,1]){const [dx,dz]=X(a*span,b*track);this.round(x+dx,z+dz,.3,.3,.3,'#1d1f22',0);}};
     if(key==='scooter'){body(1,.3,.25,.25,c);body(.25,.25,.7,.45,'#2b2f36');wheels(.4,.02);return;}
@@ -344,9 +356,12 @@ export class World {
       if(block.kind==='homes'&&!far)this.tree(x,z,.75);
     }
     if(!far){for(let x=-70;x<=70;x+=5)if(this.onScreen(ox+x,oz+10.7,2))this.palm(ox+x,oz+10.7);}
+    if(this.state?.vip?.yacht)this.yacht(ox+TOWN.home.x+5,oz+TOWN.home.z+14.5);
     // Street lamps along the main roads; their heads glow after dark.
     if(!far)for(const z of [8,-8,-24,-40,-56])for(let x=-68;x<=68;x+=12){const lz=oz+z+2.3;if(!this.onScreen(ox+x,lz,2))continue;this.round(ox+x,lz,.1,.1,2.6,'#5b6168');this.box(ox+x,lz-.25,.18,.6,.08,'#5b6168',2.55);this.box(ox+x,lz-.5,.32,.32,.12,night?'#ffe9a8':'#d9dcd6',2.45);}
   }
+  // Your yacht, moored on the lagoon off your street.
+  yacht(x,z){this.box(x,z,4.4,1.5,.55,'#ffffff',.05);this.box(x+2.5,z,.8,1,.55,'#ffffff',.05);this.box(x,z,4.4,1.52,.06,'#1d4fa8',.3);this.box(x-.2,z,2.2,1.05,.65,'#f2f2f0',.6);this.box(x-.2,z,2.25,1.08,.18,'#2b3440',.85);this.box(x+.4,z,4.2,1.3,.03,'#c9a46a',.6);this.round(x-1.2,z,.08,.08,1.4,'#c9ccc8',1.25);}
   // Festive decorations for the season: bunting on rooftops (green and white for Independence week,
   // colourful string lights for December and New Year).
   festive(x,z,w,d,h){
@@ -457,11 +472,12 @@ export class World {
     this.paintPeople();
     // Using a placed home item: stand in front of it (or sit on it) in that item's pose.
     const using=this.state.recovery?.item&&!this.visitedHome,usedDef=using&&ITEMS[this.state.recovery.item]?.use,usedSpot=using&&this.state.furniture.find(f=>f.item===this.state.recovery.item);
-    let mishap=this.freshMishap(),need=using?null:this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=(usedDef?usedDef.pose||'watch':null)||(mishap&&!need?MISHAP_POSES[mishap.need]:null)||({energy:'sleep',fun:this.pose?.kind==='sit'?'sit':'tv',hygiene:'shower',bladder:'toilet',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
+    let mishap=this.freshMishap(),need=using?null:this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=(usedDef?usedDef.pose||'watch':null)||(mishap&&!need?MISHAP_POSES[mishap.need]:null)||({energy:'sleep',fun:this.state.recovery?.yacht?'dance':this.pose?.kind==='sit'?'sit':'tv',hygiene:'shower',bladder:'toilet',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
     const emote=this.emote&&performance.now()<this.emote.until&&!this.moving&&!this.state.recovery&&!this.state.active?this.emote.kind:null;
     if(emote&&!using)pose=emote;
-    const pos=usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
-    if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride){this.ride(this.state.trip.ride,p.x,p.z,p.axis);this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state)});this.actor={x:p.x,z:p.z,pose:null};}return;}
+    if(this.state.recovery?.yacht){pose='dance';}
+    const pos=this.state.recovery?.yacht?{x:4,z:7.1}:usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
+    if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride){this.ride(this.state.trip.ride,p.x,p.z,p.axis,this.state.trip.ride==='helicopter'?6:0);if(OPEN_RIDES.includes(this.state.trip.ride))this.human(p.x,p.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),pose:'sit',seat:.7,heading:p.heading});this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state)});this.actor={x:p.x,z:p.z,pose:null};}return;}
     if(this.state.ride){if(this.interior())this.ride(this.state.ride,-2.5,7.4,'x');else this.ride(this.state.ride,-7.1,2.6,'z');}
     const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),walk:this.moving,pose,seat:usedDef?.seat,heading:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
     this.actor={...pos,pose};
@@ -584,7 +600,7 @@ export class World {
   inTrainingZone(x,z){const zone=TRAINING_ZONES[this.location];return !!zone&&x>zone[0]&&x<zone[1]&&z>zone[2]&&z<zone[3];}
   paintPeople(){
     const here=TOWN[this.location]||TOWN.home;
-    const clear=this.training();for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride)this.ride(p.trip.ride,t.x,t.z,t.axis);else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1)||(clear&&this.inTrainingZone(x,z)))continue;const emoting=p.emote&&!p.moving&&Date.now()+this.serverOffset-p.emote.at<(EMOTES[p.emote.kind]?.ms||0)?p.emote.kind:null;this.human(x,z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait,pose:emoting});}
+    const clear=this.training();for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride){this.ride(p.trip.ride,t.x,t.z,t.axis,p.trip.ride==='helicopter'?6:0);if(OPEN_RIDES.includes(p.trip.ride))this.human(t.x,t.z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),pose:'sit',seat:.7,heading:t.heading});}else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1)||(clear&&this.inTrainingZone(x,z)))continue;const emoting=p.emote&&!p.moving&&Date.now()+this.serverOffset-p.emote.at<(EMOTES[p.emote.kind]?.ms||0)?p.emote.kind:null;this.human(x,z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait,pose:emoting});}
   }
   // The home screen: a soft sky and a round lawn under the house, like a dollhouse on a table.
   paintIsland(light){const ctx=this.ctx,g=ctx.createLinearGradient(0,0,0,this.height);g.addColorStop(0,light.night?'#24324d':'#cfe3f4');g.addColorStop(1,light.night?'#3b4a66':'#eef5f9');ctx.fillStyle=g;ctx.fillRect(0,0,this.width,this.height);
