@@ -66,6 +66,22 @@ export const ITEMS = {
   soundSystem: {name: 'Sound system', fame: 500, description: 'Turn it up and dance.', furniture: true, use: {verb: 'Dance', icon: '🔊', need: 'fun', amount: 35, ms: 45_000, pose: 'perform', extra: {energy: -5}}},
   aquarium: {name: 'Aquarium', fame: 600, description: 'Calming fish to watch.', furniture: true, use: {verb: 'Watch the fish', icon: '🐠', need: 'fun', amount: 12, ms: 20_000, pose: null}},
   treadmill: {name: 'Treadmill', fame: 800, description: 'Run at home: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Run', icon: '🏃', need: 'fun', amount: 20, ms: 40_000, pose: 'sport', onItem: true, extra: {energy: -10, hygiene: -15}}},
+  // Upgrades: claim them once and they work in the background (no placing needed).
+  curtains: {name: 'Blackout curtains', fame: 90, description: 'Darker nights at home: sleep 10% faster.', upgrade: {sleep: 10}},
+  generator: {name: 'Generator', fame: 350, description: 'Keeps your lights and fridge on during power cuts.', upgrade: {generator: true}},
+  sectional: {name: 'L-shaped sectional sofa', fame: 450, description: 'A bigger sofa: relaxing at home gives +15 more fun.', upgrade: {sofa: 15}},
+  kingBed: {name: 'King-size bed', fame: 700, description: 'A bigger bed: sleep 20% faster.', upgrade: {sleep: 20}},
+  ac: {name: 'Air conditioner', fame: 900, description: 'Cool rooms: sleep 15% faster, and hygiene drains 10% slower at home.', upgrade: {sleep: 15, hygiene: 10}},
+  smartTv: {name: 'Bigger smart TV', fame: 1200, description: 'Watching your career on TV teaches up to 2 more insights.', upgrade: {insights: 2}},
+  // More home items to place and use. `learn` trains your focus skill if your career is in that family.
+  wallArt: {name: 'Wall art', fame: 70, description: 'A framed canvas on a stand.', furniture: true},
+  barStools: {name: 'Kitchen bar stools', fame: 110, description: 'Perch at the counter.', furniture: true, use: {verb: 'Sit at the bar', icon: '🪑', need: 'fun', amount: 8, ms: 20_000, pose: 'sit', seat: .62, onItem: true}},
+  balconySet: {name: 'Balcony chairs', fame: 260, description: 'Two chairs and a little table for slow afternoons.', furniture: true, use: {verb: 'Relax outside', icon: '☀', need: 'fun', amount: 18, ms: 30_000, pose: 'sit', seat: .46, onItem: true}},
+  ringLight: {name: 'Ring light & camera', fame: 350, description: 'Film clips at home. Creators train as they film.', furniture: true, use: {verb: 'Film a clip', icon: '💡', need: 'social', amount: 15, ms: 30_000, pose: 'perform', learn: {family: 'creator', points: 4}}},
+  piano: {name: 'Keyboard piano', fame: 650, description: 'Play for fun. Musicians train as they play.', furniture: true, use: {verb: 'Play piano', icon: '🎹', need: 'fun', amount: 25, ms: 40_000, pose: 'work', seat: .5, learn: {family: 'music', points: 4}}},
+  bathtub: {name: 'Bathtub', fame: 700, description: 'Slower than a shower, but relaxing.', furniture: true, use: {verb: 'Take a bath', icon: '🛁', need: 'hygiene', amount: 60, ms: 60_000, pose: 'sitFloor', onItem: true, extra: {fun: 10}}},
+  studioMic: {name: 'Home studio mic', fame: 800, description: 'Record at home. Musicians train as they record.', furniture: true, use: {verb: 'Record vocals', icon: '🎙️', need: 'fun', amount: 15, ms: 40_000, pose: 'perform', learn: {family: 'music', points: 6}}},
+  trophyCabinet: {name: 'Trophy cabinet', fame: 1500, description: 'Shows off the awards you have won.', furniture: true, use: {verb: 'Admire your trophies', icon: '🏆', need: 'fun', amount: 10, ms: 10_000, pose: null}},
   weights: {name: 'Weight bench', fame: 1000, description: 'Lift weights: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Lift weights', icon: '🏋️', need: 'fun', amount: 20, ms: 40_000, pose: 'sport', extra: {energy: -10, hygiene: -15}}},
 };
 // The wardrobe: clothes and accessories by slot. Each unlocks with fame (claimed free at Palm Boutique,
@@ -151,6 +167,25 @@ export const EMOTES = {
 };
 // Quick reactions in local chat.
 export const REACTIONS = ['👍', '😂', '🔥', '❤️', '👏', '😮'];
+// Pets: adopt one at Palm plaza. Keep them fed and happy and they give you a perk.
+export const PETS = {
+  cat: {name: 'Cat', fame: 200, icon: '🐈', perk: ['social', 10], note: 'Naps with you. Social drains slower.'},
+  dog: {name: 'Dog', fame: 300, icon: '🐕', perk: ['fun', 15], note: 'Follows you everywhere. Fun drains slower.'},
+  parrot: {name: 'Parrot', fame: 600, icon: '🦜', perk: ['chat', 2], note: 'Repeats what you say. More social from chats.'},
+};
+export const PET_CARE = {decay: {food: 10, joy: 8}, feed: 40, play: 30, cuddle: 12, happy: 30};
+// Everything that adjusts the rules for a character: worn perks, a happy pet and home upgrades.
+export function perksFor(s) {
+  const totals = wearPerks(s?.wear), pet = s?.pet && PETS[s.pet.kind];
+  if (pet && s.pet.food > PET_CARE.happy && s.pet.joy > PET_CARE.happy) totals[pet.perk[0]] = Math.min((totals[pet.perk[0]] || 0) + pet.perk[1], PERKS[pet.perk[0]].cap);
+  return totals;
+}
+// Home upgrades a character owns, added together ({sleep, sofa, hygiene, insights, generator}).
+export function upgradesFor(s) {
+  const totals = {};
+  for (const key of Object.keys(s?.inventory || {})) { const up = ITEMS[key]?.upgrade; if (up) for (const [k, v] of Object.entries(up)) totals[k] = typeof v === 'number' ? (totals[k] || 0) + v : v; }
+  return totals;
+}
 // The kitchen menu. Each dish fills hunger over `ms` and may lift other needs; some unlock with fame.
 export const FOODS = {
   jollof: {name: 'Jollof rice', icon: '🍛', hunger: 60, ms: 90_000, extra: {fun: 5}},
