@@ -12,7 +12,7 @@ const button=(label,action,attrs='',style='secondary')=>`<button class="${style}
 const careerOptions=(selected)=>Object.entries(CAREERS).map(([key,def])=>`<option value="${key}" ${key===selected?'selected':''}>${escape(def.name)}</option>`).join('');
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,5500);}
 function showModal(page,html,closable=true){
-  if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;$('#modalContent').innerHTML=(closable&&!['phoneHome','create'].includes(page)?button('‹ Phone','backToPhone','','phone-back'):'')+html;$('#modal').classList.toggle('as-phone',page==='phoneHome');
+  if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;$('#modalContent').innerHTML=(closable&&!['phoneHome','create','welcome','auth','newLife','logoutConfirm'].includes(page)?button('‹ Phone','backToPhone','','phone-back'):'')+html;$('#modal').classList.toggle('as-phone',page==='phoneHome');
   const title=$('#modalContent h2');if(title)title.id='modalTitle';
   setTimeout(()=>$('#modalContent input, #modalContent button, #closeModal')?.focus(),0);
 }
@@ -43,7 +43,8 @@ function notice(data,own){
 }
 function receive(data,own=false){notice(data,own);snapshot=data;state=data.state;offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();
   $('#loading').hidden=true;
-  if(!state){if(modalPage!=='create')creation();return;}
+  if(!state){if(!data.account){if(modalPage!=='auth')authScreen('signup');}else if(modalPage!=='create')creation(data.account);return;}
+  if(!welcomed){welcomed=true;setTimeout(()=>welcome(data),0);}
   $('#app').hidden=false;render();if(modalPage==='phone'&&phoneTab==='local'&&$('#chatLog'))$('#chatLog').innerHTML=chatMessages();if(modalPage==='battle'&&!own)battleView();world.update(state,data.scenePlayers||[],data.visitedHome,data.townPlayers||[],data.players||[],state.friends);
 }
 async function send(input,{keepModal=false,quiet=false}={}){
@@ -62,7 +63,7 @@ async function send(input,{keepModal=false,quiet=false}={}){
   finally{busy=false;}
 }
 
-function closeTray(){ $('#objectTray').hidden=true;$('#pieMenu').hidden=true;world.placement=null; }
+function closeTray(){ if(world.overview){world.overview=false;world.flyTo(1);}$('#objectTray').hidden=true;$('#pieMenu').hidden=true;world.placement=null; }
 // Sims-style pie menu: the object's name in the centre, its interactions fanned around it.
 function pie(object,options){
   $('#objectTray').hidden=true;
@@ -92,8 +93,9 @@ const world=new World($('#world'),position=>{closeTray();send({type:'move',...po
   if(object.action==='shop'){pie(object,[['◇ Browse shop','page','data-page="shop"'],['↗ Go here','goObject']]);return;}
   if(object.action==='exit'){pie(object,[['🚪 Go outside','travel','data-location="street"']]);return;}
   if(object.action==='enter'){pie(object,[['🏠 Go inside','travel','data-location="home"']]);return;}
+  if(object.action==='leave'){pie(object,[['🗺️ Open the map','app','data-app="map"'],['🏠 Go home','travel','data-location="home"']]);return;}
   if(object.action==='vip'){pie(object,[['🏁 Sponsorship deals','page','data-page="vip"'],['↗ Go here','goObject']]);return;}
-  if(object.action==='phone'){pie(object,[['♡ Chat','quickSocial'],['♧ Contacts','page','data-page="phone"'],['↗ Go here','goObject']]);return;}
+  if(object.action==='phone'){pie(object,[['💬 Chat <small>+10 Social</small>','talkNpc'],['♧ Contacts','page','data-page="phone"'],['↗ Go here','goObject']]);return;}
   const watch=object.name==='Television'&&!state.visiting?[[`📺 ${escape(WATCH[def.family].title)} <small>learn a little</small>`,'watchObject']]:[];
   pie(object,[...watch,[`${object.icon} ${escape(object.verb||'Use')}${object.need?` <small>+${B.recovery[object.need][0]} ${escape(needs[object.need][0])}, stop any time</small>`:''}`,'useObject'],['↗ Go here','goObject']]);
 });
@@ -108,7 +110,7 @@ async function startAtObject(input){
 }
 let tripTimer;
 function render(){
-  if(!modalPage||modalPage!=='create')tip(state.location==='home'?'home':'city');
+  if(!modalPage||modalPage!=='create')tip(state.location==='home'?'home':state.location==='street'||state.trip?'city':'venue');
   clearTimeout(tripTimer);if(state.trip)tripTimer=setTimeout(()=>refresh(),Math.max(500,state.trip.arrives-now()+400));
   const c=state.careers[state.career],def=CAREERS[state.career],location=LOCATIONS[state.location];
   $('#navigation').innerHTML=[['city','⌂','Home'],['career','✧','Career'],['phone','♧','Social'],['inventory','◇','My home'],['profile','♙','Profile']].map(([page,icon,label])=>`<button class="nav-button ${page==='city'?'active':''}" data-action="${page==='city'?(state.visiting?'leaveVisit':'travel'):'page'}" data-location="home" data-page="${page}"><span>${icon}</span>${label}</button>`).join('');
@@ -148,9 +150,31 @@ function renderActivity(){
 async function chooseDecision(index){const a=state.active;if(!a)return;const chosen=a.choices[index];const data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});if(data&&motion)world.respond(chosen.action,data.state.active?.outcomes.at(-1)?.success);}
 // Character creation is two steps: your look, then your career. The starting story is drawn at random.
 const SKINS=['#f1d0b5','#e0b08c','#c88f69','#a46a4a','#7d5642','#5a3a2a'];
-function creation(){
+// Accounts, like Lagos Life: create an account or log in with an emailed one-time code. No passwords.
+let welcomed=false,authStep={tab:'signup',email:''};
+async function auth(input){const response=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Something went wrong. Try again.');return data;}
+function authScreen(tab=authStep.tab,error=''){
+  authStep.tab=tab;const signup=tab==='signup',codeStep=tab==='code';
+  showModal('auth',`<div class="auth"><div class="auth-brand"><span>✦</span><strong>Celebrity Games</strong><i>18+</i></div><p class="auth-lede">Live your celebrity story with real people.</p>
+  ${codeStep?`<form id="codeForm" class="auth-form">${authStep.fallback?`<p class="auth-note">Email codes aren’t switched on yet, so use <strong>123456</strong>.</p>`:`<p>We sent a 6-digit code to <strong>${escape(authStep.email)}</strong>.</p>`}<div class="field"><label for="code">Code</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="\\d{6}" maxlength="6" required placeholder="123456"></div>${error?`<p class="auth-error">${escape(error)}</p>`:''}<button class="primary wide" type="submit">Verify &amp; continue</button><div class="auth-links">${button('Resend code','authResend','','text-button')}${button('Use a different email','authTab',`data-tab="${authStep.from||'signup'}"`,'text-button')}</div></form>`
+  :`<div class="auth-tabs">${button('Create account','authTab','data-tab="signup"',signup?'on':'')}${button('Log in','authTab','data-tab="login"',signup?'':'on')}</div><form id="authForm" class="auth-form"><input type="hidden" name="purpose" value="${tab}">
+  ${signup?`<div class="field"><label for="authName">Your name</label><input id="authName" name="name" placeholder="e.g. Tolu Adebayo" minlength="2" maxlength="40" required autocomplete="name"></div><div class="field"><label for="authUser">Username</label><div class="at-input"><span>@</span><input id="authUser" name="username" placeholder="tolu_eko" pattern="[A-Za-z0-9_]{3,20}" maxlength="20" required autocomplete="username"></div><small>Your celebrity name in Palm City. 3–20 letters, numbers or underscores.</small></div>`:''}
+  <div class="field"><label for="authEmail">Email</label><input id="authEmail" name="email" type="email" required autocomplete="email" placeholder="you@example.com" value="${escape(authStep.email)}"></div>
+  ${signup?'<label class="check"><input type="checkbox" name="adult" required> I’m 18 or older.</label>':''}${error?`<p class="auth-error">${escape(error)}</p>`:''}<button class="primary wide" type="submit">Send code</button><p class="empty">${signup?'We’ll email you a code. No password needed.':'We’ll email a code to the address on your account.'}</p></form>`}</div>`,false);
+}
+function welcome(data){
+  const a=data.account,s=data.state;if(!s||modalPage)return;
+  showModal('welcome',`<div class="welcome-card"><div class="welcome-who"><div class="avatar" style="background:${escape(s.color)}">${escape(s.name.slice(0,1).toUpperCase())}</div><div><strong>${a?'@'+escape(a.username):escape(s.name)}</strong><small>${new Date().toLocaleDateString([],{weekday:'long',day:'numeric',month:'short'})} · ✦ ${fmt(s.fame||0)} fame</small></div></div>
+  ${button('Continue','closeWelcome','','primary wide')}${a?button('New life','newLife','','secondary wide'):button('Save my character to an account','authTab','data-tab="signup"','secondary wide')}<div class="welcome-foot"><span>${a?`Signed in as <strong>@${escape(a.username)}</strong>`:'Playing as a guest on this browser'}</span>${a?button('Log out','logout','','text-button'):button('Log in','authTab','data-tab="login"','text-button')}</div></div>`);
+}
+function confirmLogout(){
+  // Guests have no account to return to, so logging out deletes their character.
+  if(!snapshot.account){showModal('logoutConfirm',`<span class="eyebrow">GUEST</span><h2>Log out and start afresh?</h2><p class="modal-intro">You’re playing as a guest. Logging out <strong>permanently deletes ${escape(state.name)}</strong>, with all fame, skills and possessions. Save your character to an account first if you want to keep it.</p><div class="actions">${button('Save my character','authTab','data-tab="signup"','primary')}${button('Delete and log out','logoutGuest','','quiet')}</div>`);return;}
+  showModal('logoutConfirm',`<span class="eyebrow">ACCOUNT</span><h2>Log out?</h2><p class="modal-intro">You’re signed in as <strong>@${escape(snapshot.account.username)}</strong>. Your character stays safe on your account; log in with your email to play again on any device.</p><div class="actions">${button('Log out','logout','','primary')}${button('Stay signed in','closeWelcome')}</div>`);}
+function newLife(){showModal('newLife',`<span class="eyebrow">NEW LIFE</span><h2>Start over?</h2><p class="modal-intro">Your character, skills, fame and possessions are erased for good. Your account and username stay.</p><form id="newLifeForm"><div class="field"><label for="confirmLife">Type NEW LIFE to confirm</label><input id="confirmLife" name="confirm" autocomplete="off" required></div><button class="primary wide" type="submit">Erase and start a new life</button></form>`);}
+function creation(account=snapshot?.account){
   showModal('create',`<div class="creation-hero"><span class="eyebrow">WELCOME TO PALM CITY</span><h2>A little life.<br>A lot of possibility.</h2><p>Find your craft, make your people, and turn everyday moments into a life worth remembering.</p></div><form id="createForm"><div class="steps"><span class="step on">1 · Your look</span><span class="step" id="stepTwoLabel">2 · Your career</span></div>
-  <section id="stepLook"><div class="look-preview" id="lookPreview"><span class="look-head"></span><span class="look-body"></span></div><div class="field"><label for="name">What should we call you?</label><input id="name" name="name" placeholder="Your character’s name" minlength="2" maxlength="30" required autocomplete="nickname"></div>
+  <section id="stepLook"><div class="look-preview" id="lookPreview"><span class="look-head"></span><span class="look-body"></span></div><div class="field"><label for="name">What should we call you?</label><input id="name" name="name" placeholder="Your character’s name" minlength="2" maxlength="30" required autocomplete="nickname" value="${escape(account?.username||'')}"></div>
   <div class="field"><label>Skin tone</label><div class="swatches">${SKINS.map((c,i)=>`<button type="button" class="swatch ${i===2?'on':''}" style="--c:${c}" data-action="pickSkin" data-color="${c}" aria-label="Skin tone ${i+1}"></button>`).join('')}<input id="color" name="color" type="color" value="${SKINS[2]}" aria-label="Custom skin tone"></div></div>
   <div class="field"><label>Hair</label><div class="choice-row"><button type="button" class="choice on" data-action="pickHair" data-hair="curls">Soft curls</button><button type="button" class="choice" data-action="pickHair" data-hair="short">Short crop</button></div><input type="hidden" id="hair" name="hair" value="curls"></div>
   <button class="primary wide" type="button" data-action="creationNext">Next: choose your career ↗</button></section>
@@ -164,7 +188,7 @@ function updateCreationCareer(key){
   document.querySelectorAll('.career-option').forEach(b=>b.classList.toggle('selected',b.dataset.career===key));
   $('#careerExtras').innerHTML=`<div class="career-pick"><strong>${def.icon} ${escape(def.name)}</strong><small>${escape(def.umbrella)} · stories: ${def.origins.map(escape).join(' or ')}</small></div>`+(key==='musician'?'<div class="field"><label for="technique">Primary technique</label><select id="technique" name="technique"><option value="vocals">Vocals</option><option value="instrument">Instrument</option></select></div>':key==='adult'?'<label class="check"><input type="checkbox" name="adult" required> 18+ career. My character and everyone in their projects are adults. Expect flirty, suggestive themes; nothing explicit is shown.</label>':key==='hacker'?'<p class="empty">Fraudster schemes are fictional and abstract: no real methods, victims or instructions.</p>':'');
 }
-function map(){if(state.location!=='home')world.flyTo(.22);showTray('↗ Palm City','<div class="city-tiles">'+Object.entries(LOCATIONS).map(([key,l])=>button('<span>'+(TOWN[key]?.pin||'🚪')+'</span>'+escape(l.name),'travel','data-location="'+key+'"','city-tile')).join('')+'</div><small>Tap a pin on the map or a place here to head over.</small>');}
+function map(){world.overview=true;world.flyTo(.22);showTray('↗ Palm City','<div class="city-tiles">'+Object.entries(LOCATIONS).map(([key,l])=>button('<span>'+(TOWN[key]?.pin||'🚪')+'</span>'+escape(l.name),'travel','data-location="'+key+'"','city-tile')).join('')+'</div><small>Tap a pin on the map or a place here to head over.</small>');}
 function practice(){const def=CAREERS[state.career];if(state.location==='home'&&!state.inventory.gear){showTray('✧ Practise','<div class="tray-options">'+button('↗ Go to venue','travel','data-location="'+def.location+'"','primary')+button('◇ Buy home equipment','travel','data-location="plaza"')+'</div>');return;}showTray('✧ Practise','<div class="tray-options skills-options">'+def.skills.map(skill=>button(escape(skill)+' <small>Lv '+state.careers[state.career].skills[skill].level+'</small>','startPractice','data-skill="'+escape(skill)+'"')).join('')+'</div><small>ϟ 1 · 3:00 · +7 XP</small>');}
 function prepare(kind){const def=CAREERS[state.career];kind??=['founder','web3'].includes(state.career)?'build':'produce';if(kind==='launch'||kind==='collab'){prepareDetails(kind);return;}showTray(def.icon+' '+def.output,'<div class="tray-options">'+button('▶ Start · ϟ 1','quickStart','data-kind="'+kind+'"','primary')+button('Options','prepareDetails','data-kind="'+kind+'"')+'</div><small>'+duration(def.family==='sport'?B.sportMs:B.activityMs)+' · '+(def.family==='sport'?6:3)+' choices</small>');}
 function prepareDetails(kind){
@@ -187,7 +211,7 @@ function inventory(){
 }
 function upgrade(item){const owned=state.inventory[item],cost=effort(owned.level,100),ready=(state.fame||0)>=cost,time=effort(owned.level,B.upgradeMs);showModal('upgrade',`<span class="eyebrow">A BETTER TOOL</span><h2>${ITEMS[item].name}</h2><p class="modal-intro">Level ${owned.level} → ${owned.level+1}</p><div class="notice">Needs ✦ ${fmt(cost)} fame (not spent) · ${duration(time)} minutes · no materials needed · no career charge.<br>Production quality bonus rises to +${owned.level*5}. Your current tool remains usable. This upgrade completes offline, applies once, and cannot be cancelled after starting. Maximum level 10.</div>${(ready?button('Start timed upgrade','upgrade',`data-item="${item}"`,'primary'):button(`🔒 ${fmt(cost-(state.fame||0))} fame to go`,'noop','disabled'))}`);}
 async function placement(item){closeModal();if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;}showTray('Place '+ITEMS[item].name,'<small class="placement-hint">Tap a floor tile · green fits, red is blocked.</small>');world.placement={item,x:0,z:0};world.draw();}
-function profile(){const season=snapshot.season;showModal('profile',`<span class="eyebrow">YOUR STORY</span><h2>${escape(state.name)}</h2><p class="modal-intro">${CAREERS[state.career].name} · ${state.outputs.length} career moments · ${state.awards.length} permanent awards</p><h3>Milestones & recognition</h3><div class="badge-list">${state.awards.map(a=>`<span class="badge">✦ ${escape(a.name)}</span>`).join('')||'<p class="empty">Audience milestones at 100, 1,000, 10,000 and 100,000. Keep creating.</p>'}</div><h3>Season ${season.id}</h3><div class="notice">${new Date(season.starts).toLocaleDateString()} – ${new Date(season.ends).toLocaleDateString()}<br>Eligibility: a qualifying output this season and 10,000 lifetime reach in that career. Categories compare the same career and locked eligibility tier. Score: 40% engaged reach gained, 35% mean quality, 25% engagement; components normalised within each category. Tie break: quality, then engagement. Winners receive a permanent award and 100 fame once.</div><h3>Career history</h3>${outputs(state.outputs)}<h3 style="margin-top:20px">Saved character</h3><p class="empty">Character ID: ${snapshot.playerId}. This server saves your progress in SQLite. Your browser’s secure session cookie identifies your character. This edition does not provide cross-device account recovery.</p>`);}
+function profile(){const season=snapshot.season;showModal('profile',`<span class="eyebrow">YOUR STORY</span><h2>${escape(state.name)}</h2><p class="modal-intro">${CAREERS[state.career].name} · ${state.outputs.length} career moments · ${state.awards.length} permanent awards</p><h3>Milestones & recognition</h3><div class="badge-list">${state.awards.map(a=>`<span class="badge">✦ ${escape(a.name)}</span>`).join('')||'<p class="empty">Audience milestones at 100, 1,000, 10,000 and 100,000. Keep creating.</p>'}</div><h3>Season ${season.id}</h3><div class="notice">${new Date(season.starts).toLocaleDateString()} – ${new Date(season.ends).toLocaleDateString()}<br>Eligibility: a qualifying output this season and 10,000 lifetime reach in that career. Categories compare the same career and locked eligibility tier. Score: 40% engaged reach gained, 35% mean quality, 25% engagement; components normalised within each category. Tie break: quality, then engagement. Winners receive a permanent award and 100 fame once.</div><h3>Career history</h3>${outputs(state.outputs)}<h3 style="margin-top:20px">Account</h3>${snapshot.account?`<p class="empty">Signed in as <strong>@${escape(snapshot.account.username)}</strong> · ${escape(snapshot.account.email)}. Log in with the same email on any device to play this character.</p><div class="actions">${button('Log out','logout')}${button('New life','newLife','','quiet')}</div>`:`<p class="empty">You’re playing as a guest on this browser. Create an account to keep this character on any device.</p>${button('Save my character','authTab','data-tab="signup"','primary')}`}`);}
 function phone(tab='local'){
   phoneTab=tab;let html=`<span class="eyebrow">YOUR PEOPLE</span><h2>A city feels better together.</h2><p class="modal-intro">Players are people on this server. NPC contacts provide company when you play solo.</p><div class="tabs">${[['local','Local chat'],['people','People'],['battles','Battles'],['collabs','Collaborations']].map(([key,label])=>button(label,'phoneTab',`data-tab="${key}"`,key===tab?'active':'')).join('')}</div>`;
   if(tab==='local')html+=`<h3>${LOCATIONS[state.location].name} · local chat</h3><div class="chat-log" id="chatLog">${chatMessages()}</div><form id="chatForm" class="chat-form"><input class="chat-input" name="body" maxlength="300" required placeholder="Say hello to your neighbourhood…" aria-label="Local chat message"><button class="primary" type="submit">Send</button></form><p class="empty">Chat is local to your current location. It earns no fame or learning.</p>`;
@@ -237,6 +261,7 @@ function openBattle(id){battleId=id;battleView();}
 // First-time explainers: each screen explains itself once per browser.
 const TIPS={
   home:['🏠 Your home','Tap furniture to use it: the bed restores energy, the fridge hunger, the shower hygiene, the sofa fun. Need bars sit on the left. The front door takes you out to your street.'],
+  venue:['📍 Inside a place','Each place you enter stands on its own. Drag to look around, tap things to use them, and tap people to say hi or challenge them. To go somewhere else, use the Exit or the Map app on your phone.'],
   city:['🏙️ Out in Palm City','Tap the ground to walk. Tap a pin to head somewhere (walking takes up to 1:30, a car is faster). Tap people to say hi, add friends or challenge them to a battle.'],
   career:['✦ Your career','Practise to level skills, then play activities: every choice you make shapes the quality. Good work earns reach (views, streams, fans) and fame. Each major activity uses 1 of your 10 charges.'],
   phone:['💬 Social','Chat with people nearby, add friends, message them, open 1v1, 3v3 or 5v5 battles, and collaborate.'],
@@ -255,6 +280,8 @@ function closeTip(){tipQueue.shift();showTip();}
 function alerts(){const me=snapshot.playerId;return state.invitations.filter(i=>i.expiresAt>now()).length+(snapshot.battles||[]).filter(b=>b.invited===me&&b.status==='open').length;}
 function phoneWidget(){const model=PHONES[state.phone]||PHONES.basic,count=alerts();
   return `<button class="phone-widget skin-${PHONES[state.phone]?state.phone:'basic'}" data-action="openPhone" style="--phone:${model.color}" aria-label="Open your phone${count?`, ${count} alerts`:''}"><span class="phone-mini">📱${count?`<i>${count}</i>`:''}</span><span class="phone-line"><strong>✦ ${fmt(state.fame||0)}</strong><small>fame · ${B.tiers[state.careers[state.career].tier][0]}</small></span><span class="phone-line"><strong>ϟ ${state.charges}/10</strong><small id="chargeRefill">${state.refillAnchor===null?'charged':`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></span></button>`;}
+// The last app depends on who you are: Log out for accounts, Account for guests.
+const accountApp=()=>['logout','🚪','Log out'];
 const APPS=[['map','🗺️','Map'],['career','✦','Career'],['phone','💬','Social'],['battles','⚔','Battles'],['inventory','🏠','My stuff'],['shop','🛍️','Market'],['vip','🏁','Palm Motors'],['profile','♙','Profile'],['life','♡','My life'],['nearby','◇','Nearby'],['tips','💡','Tips'],['upgrade','📲','Upgrade']];
 // Each phone tier has its own look and feel; cheaper phones lag and sometimes hang (only ever a delay).
 function phoneModel(){const key=PHONES[state.phone]?state.phone:'basic';return {key,...PHONES[key]};}
@@ -262,11 +289,11 @@ function phoneHome(){
   const model=phoneModel(),online=snapshot.players.filter(p=>p.online&&state.friends.includes(p.id)).length,next=Object.values(SPONSORSHIPS).filter(d=>d.fame>(state.fame||0)).sort((x,y)=>x.fame-y.fame)[0];
   const time=new Date(),clockText=time.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),dateText=time.toLocaleDateString([],{weekday:'long',day:'numeric',month:'short'});
   const widgets=[model.key==='pro'||model.key==='gold'?`<div class="phone-clock"><strong>${clockText}</strong><small>${dateText}</small></div>`:'',model.key!=='basic'?`<div class="phone-card">👥 ${online} friend${online===1?'':'s'} online</div>`:'',['pro','gold'].includes(model.key)&&next?`<div class="phone-card">🔓 Next: ${next.icon} ${escape(next.name)} at ${fmt(next.fame)} fame</div>`:'',model.nag&&Math.random()<model.nag?`<div class="phone-nag">⚠ Storage almost full. Delete some photos?</div>`:''].join('');
-  const dock=['phone','career','map','tips'],apps=['pro','gold'].includes(model.key)?APPS.filter(([k])=>!dock.includes(k)):APPS,icon=([key,icon,label])=>`<button class="app" data-action="app" data-app="${key}"><span>${icon}</span><small>${model.key==='basic'&&label.length>8?label.slice(0,7)+'…':label}${key==='phone'&&alerts()?` <i>${alerts()}</i>`:''}</small></button>`;
+  const dock=['phone','career','map','tips'],apps=[...(['pro','gold'].includes(model.key)?APPS.filter(([k])=>!dock.includes(k)):APPS),accountApp()],icon=([key,icon,label])=>`<button class="app" data-action="app" data-app="${key}"><span>${icon}</span><small>${model.key==='basic'&&label.length>8?label.slice(0,7)+'…':label}${key==='phone'&&alerts()?` <i>${alerts()}</i>`:''}</small></button>`;
   showModal('phoneHome',`<div class="phone-device skin-${model.key}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen"><div class="phone-status"><span>${model.key==='basic'?time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false}):clockText}</span><span>${model.network} ${'▂▄▆█'.slice(0,model.key==='basic'?2:model.key==='smart'?3:4)}</span><span>${model.battery}% ${model.battery<30?'🪫':'🔋'}</span></div>${['pro','gold'].includes(model.key)?'':`<div class="phone-hello"><strong>${escape(state.name)}</strong><small>✦ ${fmt(state.fame||0)} fame · ${escape(LOCATIONS[state.location].name)}</small></div>`}${widgets}<div class="app-grid">${apps.map(icon).join('')}</div>${['pro','gold'].includes(model.key)?`<div class="phone-dock">${APPS.filter(([k])=>dock.includes(k)).map(icon).join('')}</div>`:''}<div class="phone-overlay" id="phoneOverlay" hidden></div></div></div>`);
 }
 const APP_NAMES=Object.fromEntries(APPS.map(([key,,label])=>[key,label]));
-function launch(key){({map,phone:()=>phone('local'),battles:()=>phone('battles'),career,inventory,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,upgrade:phoneStore}[key]||phoneHome)();}
+function launch(key){if(key==='logout'){confirmLogout();return;}({map,phone:()=>phone('local'),battles:()=>phone('battles'),career,inventory,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,upgrade:phoneStore}[key]||phoneHome)();}
 // Budget phones make you wait, and now and then the app hangs. You can always wait or close it.
 function openApp(key){
   const model=phoneModel(),overlay=$('#phoneOverlay'),delay=model.lag[0]+Math.random()*(model.lag[1]-model.lag[0]);
@@ -296,6 +323,8 @@ document.addEventListener('click',async event=>{
     case 'closeTray':closeTray();break;
     case 'toggleObjects':$('#objects').hidden=!$('#objects').hidden;break;
     case 'quickSocial':closeTray();await send({type:'recover',need:'social'});break;
+    case 'talkNpc':{const object=selectedObject,npc=NPCS.find(n=>n.location===state.location);closeTray();if(!object||!npc)break;
+      world.approach(object,()=>whenIdle(async()=>{const data=await send({type:'talk',npc:npc.id});if(data?.state.lastTalk)world.talkTo(object,data.state.lastTalk.line);}));break;}
     case 'quickStart':await startAtObject({kind:d.kind});break;
     case 'prepareDetails':closeTray();prepareDetails(d.kind);break;
     case 'lifePanel':showModal('life',`<span class="eyebrow">YOUR DAILY LIFE</span><h2>How you're doing</h2>${$('#profileCard').innerHTML}<hr>${$('#needsCard').innerHTML}<hr>${$('#skillsCard').innerHTML}<hr><h3>Recent moments</h3>${$('#feed').innerHTML}`);break;
@@ -306,6 +335,12 @@ document.addEventListener('click',async event=>{
     case 'creationNext':if(!$('#name').reportValidity())break;$('#stepLook').hidden=true;$('#stepCareer').hidden=false;$('#stepTwoLabel').classList.add('on');break;
     case 'creationBack':$('#stepLook').hidden=false;$('#stepCareer').hidden=true;$('#stepTwoLabel').classList.remove('on');break;
     case 'closeTip':closeTip();break;
+    case 'authTab':authStep.from=d.tab;authScreen(d.tab);break;
+    case 'authResend':try{await auth({type:'sendCode',purpose:authStep.purpose,email:authStep.email,...authStep.extra});authScreen('code','A new code is on its way.');}catch(e){authScreen('code',e.message);}break;
+    case 'closeWelcome':closeModal();break;
+    case 'newLife':newLife();break;
+    case 'logout':try{await auth({type:'logout'});}catch(e){toast(e.message);break;}location.reload();break;
+    case 'logoutGuest':try{await auth({type:'logout',deleteGuest:true});}catch(e){toast(e.message);break;}location.reload();break;
     case 'getUp':await send({type:'cancel'});break;
     case 'travel':await send({type:'travel',location:d.location});break;
     case 'object':world.walkToObject(d.name);break;
@@ -363,6 +398,10 @@ document.addEventListener('click',async event=>{
 });
 document.addEventListener('submit',async event=>{
   event.preventDefault();const form=event.target,values=Object.fromEntries(new FormData(form));
+  if(form.id==='authForm'){const purpose=values.purpose,extra=purpose==='signup'?{name:values.name,username:values.username,adult:values.adult==='on'}:{};authStep={...authStep,purpose,email:values.email.trim(),extra,from:purpose};
+    try{const sent=await auth({type:'sendCode',purpose,email:values.email,...extra});authStep.fallback=!!sent.fallback;authScreen('code');}catch(e){authScreen(purpose,e.message);}}
+  if(form.id==='codeForm'){try{await auth({type:'verifyCode',email:authStep.email,code:values.code});modalPage=null;$('#modal').hidden=true;welcomed=true;await refresh();toast('You’re signed in.');}catch(e){authScreen('code',e.message);}}
+  if(form.id==='newLifeForm'){try{await auth({type:'newLife',confirm:values.confirm.trim()});}catch(e){toast(e.message);return;}location.reload();}
   if(form.id==='createForm'){values.adult=values.adult==='on';const data=await send({type:'create',...values});if(data){modalPage=null;$('#modal').hidden=true;const c=data.state.careers[data.state.career];toast(c.origin===1?`🎲 Best start: ${CAREERS[data.state.career].origins[1]}. You have a family car 🚗`:`🎲 Humble start: ${CAREERS[data.state.career].origins[0]}. You'll walk for now. Fame buys rides.`);}}
   if(form.id==='prepareForm')await send({type:'start',...values});
   if(form.id==='switchForm')await send({type:'switch',...values,adult:values.adult==='on'});

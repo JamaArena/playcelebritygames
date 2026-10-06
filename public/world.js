@@ -24,12 +24,12 @@ export const worldObjects = (location,furniture=[]) => ({
     {name:'Front door',icon:'🚪',x:-4.6,z:3.6,vx:-5.1,vz:3.6,action:'exit'},
     ...furniture.map((f,i)=>({name:`${f.item==='chair'?'Chair':'Display table'} ${i+1}`,icon:'◇',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:f.item==='chair'?'Sit':'Admire display',pose:f.item==='chair'?'sit':null}))
   ],
-  sports:[{name:'Training pitch',icon:'⚽',x:0,z:-1,action:'practice'},{name:'Clubhouse',icon:'⌂',x:-3,z:-2.1,action:'career'},{name:'Scout Kai',icon:'☺',x:3.4,z:2,action:'phone'}],
-  studio:[{name:'Recording desk',icon:'♫',x:-3.2,z:-2.3,action:'career'},{name:'Rehearsal stage',icon:'♬',x:2.5,z:-2,action:'practice'},{name:'Producer Nova',icon:'☺',x:2.5,z:2,action:'phone'}],
-  creator:[{name:'Camera set',icon:'▷',x:-2,z:-1,action:'career'},{name:'Editing station',icon:'⌘',x:3,z:-2,action:'practice'},{name:'Lounge',icon:'▱',x:1,z:3,need:'social'}],
-  tech:[{name:'Project desk',icon:'⌘',x:-3.2,z:-2.3,action:'career'},{name:'Practice lab',icon:'⬡',x:2.5,z:-2,action:'practice'},{name:'Builder Ari',icon:'☺',x:2,z:2,action:'phone'}],
+  sports:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:'Training pitch',icon:'⚽',x:0,z:-1,action:'practice'},{name:'Clubhouse',icon:'⌂',x:-3,z:-2.1,action:'career'},{name:'Scout Kai',icon:'☺',x:3.4,z:2,action:'phone'}],
+  studio:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:'Recording desk',icon:'♫',x:-3.2,z:-2.3,action:'career'},{name:'Rehearsal stage',icon:'♬',x:2.5,z:-2,action:'practice'},{name:'Producer Nova',icon:'☺',x:2.5,z:2,action:'phone'}],
+  creator:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:'Camera set',icon:'▷',x:-2,z:-1,action:'career'},{name:'Editing station',icon:'⌘',x:3,z:-2,action:'practice'},{name:'Lounge',icon:'▱',x:1,z:3,need:'social'}],
+  tech:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:'Project desk',icon:'⌘',x:-3.2,z:-2.3,action:'career'},{name:'Practice lab',icon:'⬡',x:2.5,z:-2,action:'practice'},{name:'Builder Ari',icon:'☺',x:2,z:2,action:'phone'}],
   street:[{name:'Front door',icon:'🚪',x:0,z:5.9,action:'enter'}],
-  plaza:[{name:'City shop',icon:'◇',x:-3,z:-1.7,action:'shop'},{name:'Palm Motors',icon:'🏁',x:3.3,z:2.75,action:'vip'},{name:'Café',icon:'♨',x:3,z:-1.7,need:'social'},{name:'Park bench',icon:'▱',x:-2.5,z:1.6,need:'fun'},{name:'Creator Mika',icon:'☺',x:2.5,z:2.6,action:'phone'}],
+  plaza:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:'City shop',icon:'◇',x:-3,z:-1.7,action:'shop'},{name:'Palm Motors',icon:'🏁',x:3.3,z:2.75,action:'vip'},{name:'Café',icon:'♨',x:3,z:-1.7,need:'social'},{name:'Park bench',icon:'▱',x:-2.5,z:1.6,need:'fun'},{name:'Creator Mika',icon:'☺',x:2.5,z:2.6,action:'phone'}],
 }[location]||[]);
 const shades=new Map(),shade=(hex,factor)=>{const key=hex+factor;let out=shades.get(key);if(!out){const value=parseInt(hex.slice(1),16),c=v=>Math.min(255,Math.round(v*factor));out=`rgb(${c(value>>16)},${c((value>>8)&255)},${c(value&255)})`;shades.set(key,out);}return out;};
 const SKIN_TONES=['#8d5a3f','#c88f69','#6b4532','#b07a58','#e0b08c','#7d5642','#a46a4a'],CAR_TONES=['#d9534f','#f0ad4e','#3d7ea6','#f5f3ee','#3b4a42','#7a5ea8','#2f8f6b'];
@@ -64,7 +64,7 @@ export class World {
       const previous=this.pointers.get(event.pointerId);
       if(previous){this.pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
         if(this.pointers.size>1){const distance=this.pointerDistance();if(this.pinchDistance>0)this.setZoom(this.zoom*distance/this.pinchDistance);this.pinchDistance=distance;}
-        else if(!this.gesture.multi){const g=this.gesture;if(Math.hypot(event.clientX-g.startX,event.clientY-g.startY)>6)g.dragged=true;if(g.dragged&&this.scale){const s=this.scale,c=Math.cos(this.angle),sn=Math.sin(this.angle),dx=(event.clientX-previous.x)/s,dy=(event.clientY-previous.y)/(s*this.pitch);this.pan.x-=dx*c+dy*sn;this.pan.z-=-dx*sn+dy*c;this.panned=true;}}
+        else if(!this.gesture.multi){const g=this.gesture;if(Math.hypot(event.clientX-g.startX,event.clientY-g.startY)>6)g.dragged=true;if(g.dragged){this.angleGoal=null;this.angle+=(event.clientX-previous.x)*.009;this.tilt(this.pitch+(event.clientY-previous.y)*.002);}}
         this.canvas.classList.toggle('dragging',this.gesture.dragged);this.draw();return;
       }
       const r=canvas.getBoundingClientRect();if(this.placement){const point=this.unproject(event.clientX-r.left,event.clientY-r.top);this.placement.x=Math.round(point.x);this.placement.z=Math.round(point.z);}const near=list=>list?.find(p=>Math.hypot(p.screen.x-event.clientX+r.left,p.screen.y-event.clientY+r.top)<24);this.hover=event.pointerType==='mouse'?near(this.pins)||near(this.peopleHits)||near(this.houseHits)||this.hits?.find(o=>Math.hypot(o.screen.x-event.clientX+r.left,o.screen.y-event.clientY+r.top)<(this.hitRadius||24)):null;this.draw();
@@ -93,8 +93,10 @@ export class World {
     if(this.location!==state.location){this.player={...state.position3d};this.target={...this.player};this.moving=false;this.pending=null;this.pose=null;if(this.location&&this.zoom<.9)this.flyTo(1);this.pan={x:0,z:0};}
     this.serverOffset=state.serverNow-Date.now();this.state=state;this.location=state.location;this.players=players;this.visitedHome=visitedHome;this.draw();
   }
-  setView(index){this.view=index%VIEWS.length;const v=VIEWS[this.view];this.angle=v.angle;this.pitch=v.pitch;this.lift=v.lift;this.draw();return v.name;}
-  rotate(){return this.setView(this.view+1);}
+  // Tilting up flattens heights toward a top view.
+  tilt(pitch){this.pitch=Math.min(.93,Math.max(.3,pitch));this.lift=this.pitch<=.6?1:1-(this.pitch-.6)/.33*.6;}
+  setView(index){this.view=index%VIEWS.length;const v=VIEWS[this.view];this.angle=v.angle;this.tilt(v.pitch);this.draw();return v.name;}
+  rotate(){this.angleGoal=(this.angleGoal??this.angle)+Math.PI/2;return 'Quarter turn';}
   pointerDistance(){const [a,b]=[...this.pointers.values()];return a&&b?Math.hypot(a.x-b.x,a.y-b.y):0;}
   setZoom(value){this.zoomGoal=null;this.zoom=clampZoom(value);this.draw();}
   resetCamera(){this.zoomGoal=null;this.zoom=1;this.pan={x:0,z:0};this.setView(0);}
@@ -126,7 +128,8 @@ export class World {
   focus(){if(this.state?.trip){const p=this.tripPosition(this.state.trip,Date.now()+(this.serverOffset||0)),f=this.focusBase();return {x:p.x+f.x*.3,z:p.z+f.z*.3};}return this.focusBase();}
   focusBase(){const here=TOWN[this.location]||TOWN.home,t=this.interior()?0:Math.max(0,Math.min(1,(.9-this.zoom)/.65)),pan=this.pan||{x:0,z:0};return {x:-here.x*t+pan.x,z:(-14-here.z)*t+pan.z};}
   // Home is its own screen: an island with the house on it. Trips always show the open city.
-  interior(){return this.location==='home'&&!this.state?.trip;}
+  // Every place you enter is its own screen; the open city shows on your street, on trips and on the map.
+  interior(){return this.location!=='street'&&!this.state?.trip&&!this.overview;}
   project(x,y,z){const f=this.focusPoint||{x:0,z:0};return projectPoint(x-f.x,y,z-f.z,this);}
   unproject(x,y){const f=this.focusPoint||{x:0,z:0},p=groundPoint(x,y,this);return {x:p.x+f.x,z:p.z+f.z};}
   polygon(points,color,stroke){const ctx=this.ctx;ctx.beginPath();points.forEach((p,i)=>{const q=this.project(...p);i?ctx.lineTo(q.x,q.y):ctx.moveTo(q.x,q.y);});ctx.closePath();ctx.fillStyle=color;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=.6;ctx.stroke();}}
@@ -164,6 +167,9 @@ export class World {
   plant(x,z,size=1){this.round(x,z,.4,.4,.42,'#cfb398');this.round(x,z,.07,.07,.7,'#699a7d',.35);for(const [dx,dz,dy] of [[-.2,0,.7],[.2,.1,.9],[0,-.1,1.12]])this.round(x+dx*size,z+dz,.45*size,.4,.4*size,'#87c4a0',dy);}
   limb(a,b,width,color){this.meshes.push({a,b,width,color,limb:true,y:Math.min(a[1],b[1]),depth:((a[0]+b[0])*Math.sin(this.angle)+(a[2]+b[2])*Math.cos(this.angle))/2});}
   // A stylised Sims-like figure: career outfit, hairstyle, shaded face and a soft contact shadow.
+  // Cutaway walls: the two walls on the far side stand full height; walls facing the camera drop to stubs.
+  walls(h,toneZ,toneX,edge=5.35,t=.18){const c=Math.cos(this.angle),s=Math.sin(this.angle),stub=.18;
+    this.box(0,-edge,11,t,c>0?h:stub,toneZ);this.box(0,edge,11,t,c<0?h:stub,toneZ);this.box(-edge,0,t,11,s>0?h:stub,toneX);this.box(edge,0,t,11,s<0?h:stub,toneX);}
   human(x,z,skin,{hair='#2b211c',style='curls',outfit='#8ea9a4',pants='#34435e',shoes='#f4f1ea',walk=false,pose=null,heading=0,gait=this.gait,smile=1}={}){
     const ctx=this.ctx;
     if(pose!=='sleep'){const p=this.project(x,0,z);ctx.fillStyle='#1d2b2433';ctx.beginPath();ctx.ellipse(p.x,p.y,this.scale*.3,this.scale*.3*this.pitch,0,0,Math.PI*2);ctx.fill();}
@@ -174,7 +180,7 @@ export class World {
     const segment=(a,b,width,tone)=>this.limb(point(...a),point(...b),width,tone);
     for(const side of [-1,1]){const stride=phase*side*.24,knee=seated?[side*.12,.5,.36]:[side*.12,.43+bob,stride*.55],foot=seated?[side*.12,.09,.42]:[side*.12,.08+Math.max(0,phase*side)*.1,stride];
       segment([side*.12,hip,0],knee,.16,pants);segment(knee,foot,.13,shade(pants,.92));ball(foot[0],foot[1]-.05,foot[2]+.06,.19,.3,.12,shoes);ball(foot[0],foot[1]-.09,foot[2]+.06,.2,.31,.04,shade(shoes,.7));
-      const using=['work','cook','perform','water','chat'].includes(pose),swing=using?.3+(this.reduced?0:Math.sin(time*5+side)*.05):seated?.16:-stride*.8,shoulder=[side*.25,hip+.5,0],elbow=[side*.29,hip+.22,swing*.5],hand=[side*.26,using?hip+.28:hip-.03,swing];
+      const using=['work','cook','perform','water','chat'].includes(pose),talking=pose==='gesture',wave=this.reduced?0:Math.sin(time*7+side*1.9),swing=talking?.28+wave*.14:using?.3+(this.reduced?0:Math.sin(time*5+side)*.05):seated?.16:-stride*.8,shoulder=[side*.25,hip+.5,0],elbow=[side*(talking?.33:.29),hip+(talking?.3:.22),swing*.5],hand=[side*(talking?.3+wave*.05:.26),talking?hip+.42+Math.max(0,wave)*.18:using?hip+.28:hip-.03,swing];
       segment(shoulder,elbow,.13,outfit);segment(elbow,hand,.095,skin);ball(hand[0],hand[1]-.035,hand[2],.11,.11,.12,skin);
     }
     ball(0,hip-.08,0,.38,.27,.24,pants);ball(0,hip+.08,0,.34,.23,.36,outfit);ball(0,hip+.32,0,.5,.28,.26,outfit);ball(0,hip+.47,0,.48,.25,.1,shade(outfit,1.08));
@@ -291,7 +297,7 @@ export class World {
 
       const style=HOME_STYLES[(this.visitedHome?this.visitedHome.home:this.state.home)||'apartment']||HOME_STYLES.apartment;
       for(let x=-5;x<=5;x++)for(let z=-5;z<=5;z++)this.floor(x,z,.99,.99,(x+z)%2?style.floor[1]:style.floor[0]);
-      this.box(0,-5.35,11,.18,Math.cos(this.angle)>0?2.4:.18,style.walls[0]);this.box(-5.35,0,.18,11,Math.sin(this.angle)>0?2.4:.18,style.walls[1]);
+      this.walls(2.4,style.walls[0],style.walls[1],5.35,.18);
       if(style.trim){if(Math.cos(this.angle)>0)this.box(0,-5.26,11,.06,.1,style.trim,2.3);if(Math.sin(this.angle)>0)this.box(-5.26,0,.06,11,.1,style.trim,2.3);}
       if(style.art){if(Math.cos(this.angle)>0){this.box(.5,-5.23,1.3,.04,.85,'#f6f1e6',1.35);this.box(.5,-5.21,1.1,.04,.65,style.art[0],1.45);}if(Math.sin(this.angle)>0){this.box(-5.23,1.5,.04,1.5,.9,'#f6f1e6',1.35);this.box(-5.21,1.5,.04,1.3,.7,style.art[1],1.45);}}
       if(style.rug)this.floor(-2.2,1.5,3,2.4,style.rug,.012);
@@ -325,7 +331,7 @@ export class World {
     }else if(['studio','creator','tech'].includes(l)){
       const colors={studio:['#dacac2','#b5a3c5'],creator:['#ded0bd','#d4a38c'],tech:['#cbd8d3','#83acb2']},[floor,accent]=colors[l];
       for(let x=-5;x<=5;x++)for(let z=-5;z<=5;z++)this.floor(x,z,.99,.99,(x+z)%2?floor:shade(floor,1.025));
-      this.box(0,-5.3,11,.2,2.5,'#ece8df');this.box(-5.3,0,.2,11,2.5,'#e6e6d9');
+      this.walls(2.5,'#ece8df','#e6e6d9',5.3,.2);
       this.box(-2.2,-3.3,3.5,1.3,.83,'#c0a784');this.box(-2.2,-3.3,3.6,1.35,.1,'#efe7d6',.83);
       for(let x=-3.3;x<=-1;x+=1.2){this.box(x,-3.5,.8,.15,.55,'#456052',1);this.box(x,-3.25,.7,.35,.05,'#87958a',.94);}
       this.box(-2.2,-1.9,.6,.6,.45,accent);this.box(-2.2,-2.1,.6,.15,.8,accent);
@@ -346,13 +352,14 @@ export class World {
       this.plant(-4.1,4,1.8);this.plant(0,-4.4,1.5);this.plant(-4.8,-.1);
     }
     if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.item,p.x,p.z);this.floor(p.x,p.z,.9,.9,valid?'#87bc9c':'#d79c8c',.025);if(p.item==='chair')this.chair(p.x,p.z);else this.box(p.x,p.z,.85,.45,.8,valid?'#abc8a0':'#d0a18d');}
-    const npc=NPCS.find(n=>n.location===l);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone');this.human(obj?.x||2.5,obj?.z||2,'#bd8b68',{...this.look(npc.career),style:'short'});}
+    if(this.interior()&&l!=='home')this.paintCrowd(l);
+    const npc=NPCS.find(n=>n.location===l);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone'),nx=obj?.x||2.5,nz=obj?.z||2,talking=this.npcTalkUntil>performance.now();this.human(nx,nz,'#bd8b68',{...this.look(npc.career),style:'short',pose:talking?'gesture':null,heading:talking?Math.atan2(this.player.x-nx,this.player.z-nz):0});}
     this.paintPeople();
     const need=this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=({energy:'sleep',fun:'tv',hygiene:'shower',bladder:'sit',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
     const pos=need==='bladder'?{x:4.1,z:3.1}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:1.5}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
     if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride){this.ride(this.state.trip.ride,p.x,p.z,p.axis);this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),style:this.state.hair});this.actor={x:p.x,z:p.z,pose:null};}return;}
     if(this.state.ride){if(this.interior())this.ride(this.state.ride,-2.5,7.4,'x');else this.ride(this.state.ride,-7.1,2.6,'z');}
-    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),style:this.state.hair,walk:this.moving,pose,heading:pose?0:this.heading,smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
+    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),style:this.state.hair,walk:this.moving,pose,heading:pose==='gesture'?this.pose.heading:pose?0:this.heading,smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
     this.actor={...pos,pose};
   }
   draw(){
@@ -383,14 +390,25 @@ export class World {
     ctx.font='600 10px Segoe UI';for(const o of this.hits.filter(o=>o.name===this.hover?.name)){const p=o.screen;const width=ctx.measureText(o.name).width+14;ctx.fillStyle='#fff9';ctx.beginPath();ctx.roundRect(p.x-width/2,p.y+13,width,17,8);ctx.fill();ctx.fillStyle='#49614f';ctx.fillText(o.name,p.x,p.y+25);}
   }
   // Local chat appears as a speech bubble over the speaker for a few seconds.
+  // A short face-to-face chat: both gesture for a couple of seconds and the NPC's line pops up.
+  talkTo(object,line){const heading=Math.atan2(object.x-this.player.x,object.z-this.player.z);this.heading=heading;this.pose={kind:'gesture',x:this.player.x,z:this.player.z,heading,expires:performance.now()+2600};this.npcTalkUntil=performance.now()+2600;this.say('npc',line);}
   say(id,text){this.speech??=new Map();this.speech.set(id,{text:String(text).slice(0,70),until:performance.now()+6500});this.draw();}
   paintSpeech(){
     if(!this.speech?.size)return;const ctx=this.ctx,here=TOWN[this.location]||TOWN.home,now=performance.now();
     for(const [id,bubble] of this.speech){if(now>bubble.until){this.speech.delete(id);continue;}
-      const who=id==='me'?{x:this.actor.x,z:this.actor.z}:this.people?.get(id)&&!(this.interior()&&!this.people.get(id).scene)&&{x:this.people.get(id).x-here.x,z:this.people.get(id).z-here.z};if(!who||!this.onScreen(who.x,who.z,1))continue;
+      const npcSpot=id==='npc'&&worldObjects(this.location).find(o=>o.action==='phone'),who=id==='me'?{x:this.actor.x,z:this.actor.z}:npcSpot?{x:npcSpot.x,z:npcSpot.z}:this.people?.get(id)&&!(this.interior()&&!this.people.get(id).scene)&&{x:this.people.get(id).x-here.x,z:this.people.get(id).z-here.z};if(!who||!this.onScreen(who.x,who.z,1))continue;
       const p=this.project(who.x,2.2,who.z),y=p.y-(id==='me'?44:16);ctx.font='500 11px Segoe UI';const words=bubble.text.length>34?bubble.text.slice(0,33)+'…':bubble.text,w=Math.min(240,ctx.measureText(words).width+20),fade=Math.min(1,(bubble.until-now)/600);
       ctx.globalAlpha=fade;ctx.fillStyle='#ffffff';ctx.strokeStyle='#cfdccb';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(p.x-w/2,y-26,w,24,12);ctx.fill();ctx.stroke();
       ctx.beginPath();ctx.moveTo(p.x-6,y-3);ctx.lineTo(p.x,y+5);ctx.lineTo(p.x+6,y-3);ctx.closePath();ctx.fill();ctx.fillStyle='#22392d';ctx.textAlign='center';ctx.fillText(words,p.x,y-10);ctx.globalAlpha=1;}
+  }
+  // Ambient people walk loops inside venues so places feel alive. Purely visual and identical for everyone.
+  paintCrowd(l){
+    const loops={sports:[[2,-2.6],[-1.6,-2.6],[-1.6,2.4],[2,2.4]],plaza:[[-1.6,-1.2],[1.6,-1.2],[1.6,1],[-1.6,1]],studio:[[1,-.6],[3.6,.6],[3,3.6],[1.2,1.4]],creator:[[1,-.6],[3.6,.6],[3,3.6],[1.2,1.4]],tech:[[1,-.6],[3.6,.6],[3,3.6],[1.2,1.4]]}[l];if(!loops)return;
+    const careers={sports:['football','football','tennis'],plaza:['vlogger','musician','actor'],studio:['musician','actor','musician'],creator:['vlogger','streamer','skitmaker'],tech:['developer','founder','web3']}[l],t=this.reduced?0:performance.now()/1000;
+    const lengths=loops.map((p,i)=>{const q=loops[(i+1)%loops.length];return Math.hypot(q[0]-p[0],q[1]-p[1]);}),total=lengths.reduce((a,b)=>a+b,0);
+    for(let n=0;n<3;n++){let d=((t*(l==='sports'?1.8:.9)+n*total/3)%total),i=0;while(d>lengths[i]){d-=lengths[i];i++;}
+      const a=loops[i],b=loops[(i+1)%loops.length],f=d/lengths[i],x=a[0]+(b[0]-a[0])*f,z=a[1]+(b[1]-a[1])*f;
+      this.human(x,z,SKIN_TONES[(n*3+l.length)%SKIN_TONES.length],{...this.look(careers[n]),style:n%2?'short':'curls',walk:!this.reduced,heading:Math.atan2(b[0]-a[0],b[1]-a[1]),gait:t*(l==='sports'?9:6)+n});}
   }
   paintPeople(){
     const here=TOWN[this.location]||TOWN.home;
@@ -399,7 +417,8 @@ export class World {
   // The home screen: a soft sky and a round lawn under the house, like a dollhouse on a table.
   paintIsland(light){const ctx=this.ctx,g=ctx.createLinearGradient(0,0,0,this.height);g.addColorStop(0,light.night?'#24324d':'#cfe3f4');g.addColorStop(1,light.night?'#3b4a66':'#eef5f9');ctx.fillStyle=g;ctx.fillRect(0,0,this.width,this.height);
     const ring=(r,color,y=0)=>{const pts=[];for(let i=0;i<48;i++){const a=i/48*Math.PI*2;pts.push([Math.cos(a)*r,y,Math.sin(a)*r]);}this.polygon(pts,color);};
-    ring(10.6,light.night?'#55705a':'#b4c99c');ring(10,light.night?'#62806a':'#c6d8b0',.01);
+    const lawn={plaza:['#c9c29a','#ddd6b0'],sports:['#9fc08d','#b5d3a2'],studio:['#b9b3cf','#cfc9e2'],creator:['#d8b7a9','#ead0c4'],tech:['#a9c6cf','#c2dbe2']}[this.location]||['#b4c99c','#c6d8b0'];
+    ring(10.6,light.night?'#55705a':lawn[0]);ring(10,light.night?'#62806a':lawn[1],.01);
   }
   islandTrees(){for(const [x,z,s] of [[-7.6,4.6,1],[6.8,-6,1.2],[-6.6,-6.8,.9],[7.4,5.4,.8]])this.tree(x,z,s);}
   paintPins(){
@@ -443,7 +462,7 @@ export class World {
     const object=[...this.hits].sort((a,b)=>Math.hypot(a.screen.x-x,a.screen.y-y)-Math.hypot(b.screen.x-x,b.screen.y-y)).find(o=>Math.hypot(o.screen.x-x,o.screen.y-y)<this.hitRadius);
     if(object){this.onObject(object);return;}
     this.onGround?.();const point=this.unproject(x,y),here=TOWN[this.location]||TOWN.home,lot=lotAt(point.x+here.x,point.z+here.z);
-    if(lot&&lot!==this.location){this.onObject({travel:lot});return;}
+    if(lot&&lot!==this.location&&!this.interior()){this.onObject({travel:lot});return;}
     this.walk(point.x,point.z);
   }
   walk(x,z,callback){
@@ -474,10 +493,12 @@ export class World {
   }
   arrived(){this.moving=false;const cb=this.pending;this.pending=null;if(cb)cb();}
   frame(time){const dt=Math.min((time-this.last)/1000,.05);this.last=time;
-    if(this.pose?.expires&&time>this.pose.expires){this.pose=null;this.respond('water',true,'❀');}
+    if(this.pose?.expires&&time>this.pose.expires){const kind=this.pose.kind;this.pose=null;if(kind==='water')this.respond('water',true,'❀');}
+    if(this.npcTalkUntil&&time>this.npcTalkUntil)this.npcTalkUntil=null;
     if(this.moving){const dx=this.target.x-this.player.x,dz=this.target.z-this.player.z,d=Math.hypot(dx,dz),desired=this.waypoints.length?2.8:Math.min(2.8,Math.sqrt(14*d));this.speed+=Math.max(-7*dt,Math.min(7*dt,desired-this.speed));const step=Math.min(d,this.speed*dt);this.heading=turnToward(this.heading,Math.atan2(dx,dz),dt);this.gait+=step*8;
       if(d<.025||step>=d){this.player={...this.target};if(this.waypoints.length)this.target=this.waypoints.shift();else{this.speed=0;this.arrived();}}else{this.player.x+=dx/d*step;this.player.z+=dz/d*step;}this.draw();}
     for(const p of this.people?.values()||[]){const dx=p.tx-p.x,dz=p.tz-p.z,d=Math.hypot(dx,dz);if(d>12){p.x=p.tx;p.z=p.tz;p.moving=false;}else if(d>.03){const step=Math.min(d,2.6*dt);p.x+=dx/d*step;p.z+=dz/d*step;p.heading=turnToward(p.heading,Math.atan2(dx,dz),dt);p.gait+=step*8;p.moving=true;}else p.moving=false;}
+    if(this.angleGoal!=null){this.angle+=(this.angleGoal-this.angle)*Math.min(1,dt*7);if(Math.abs(this.angleGoal-this.angle)<.002){this.angle=this.angleGoal;this.angleGoal=null;}this.draw();}
     if(this.zoomGoal!=null){this.zoom+=(this.zoomGoal-this.zoom)*Math.min(1,dt*6);if(Math.abs(this.zoomGoal-this.zoom)<.004){this.zoom=this.zoomGoal;this.zoomGoal=null;}this.draw();}
     // Walkers, the plumbob and routines animate continuously unless motion is reduced.
     else if(!this.moving&&(!this.reduced||this.state?.trip||this.state?.active||this.state?.recovery||this.pose?.kind==='water'||this.effect)&&time-(this.lastDraw||0)>(this.zoom<.4?90:40)){this.draw();this.lastDraw=time;}

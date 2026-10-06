@@ -21,6 +21,9 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   function client(){let cookie='';return {async call(input,options={}){
     const response=await fetch(base+(input?'/api/action':'/api/state'),{method:input?'POST':'GET',headers:{...(input?{'Content-Type':'application/json'}:{}),...(cookie?{Cookie:cookie}:{}),...options.headers},...(input?{body:JSON.stringify({requestId:randomUUID(),...input})}:{})});
     const setCookie=response.headers.get('set-cookie');if(setCookie)cookie=setCookie.split(';')[0];return {status:response.status,data:await response.json()};
+  },async auth(input){
+    const response=await fetch(base+'/api/auth',{method:'POST',headers:{'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},body:JSON.stringify(input)});
+    const setCookie=response.headers.get('set-cookie');if(setCookie)cookie=setCookie.split(';')[0]||'';return {status:response.status,data:await response.json()};
   }};}
   const a=client(),b=client();
   // Walking takes minutes; tests about other rules fast-forward the trip.
@@ -106,6 +109,31 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   if(battle.winner===0){assert.equal(aEnd.fame,150);assert.equal(bEnd.fame,0,'fame never drops below zero');}else{assert.equal(bEnd.fame,80);assert.equal(aEnd.fame,50);}
   assert.equal(aEnd.battle,null);assert.equal(bEnd.battle,null);
   assert.equal((await a.call({type:'battleMove',battleId,move:'strike',target:bId})).status,400,'finished battles take no more moves');
+  // Accounts: email + one-time code (the local server logs codes), multi-device sign-in, logout, new life.
+  // The test server has no email key, so every code is the fallback 123456.
+  const tolu=client(),phone=client();
+  assert.equal((await tolu.auth({type:'sendCode',purpose:'signup',email:'Tolu@Example.com',name:'Tolu',username:'@Tolu_Eko',adult:false})).status,400,'18+ confirmation required');
+  assert.equal((await tolu.auth({type:'sendCode',purpose:'signup',email:'tolu@example.com',name:'Tolu',username:'tolu_eko',adult:true})).status,200);
+  const code='123456';
+  assert.equal((await tolu.auth({type:'verifyCode',email:'tolu@example.com',code:code==='000000'?'111111':'000000'})).status,400,'wrong codes are rejected');
+  const joined=await tolu.auth({type:'verifyCode',email:'tolu@example.com',code});assert.equal(joined.status,200);assert.equal(joined.data.account.username,'tolu_eko');
+  assert.equal((await tolu.auth({type:'verifyCode',email:'tolu@example.com',code})).status,400,'codes work once');
+  assert.equal((await tolu.call()).data.account.username,'tolu_eko');assert.equal((await tolu.call()).data.state,null);
+  await tolu.call({type:'create',name:'Tolu',career:'vlogger'});
+  assert.equal((await phone.auth({type:'sendCode',purpose:'signup',email:'other@example.com',name:'Other',username:'tolu_eko',adult:true})).status,400,'usernames are unique');
+  assert.equal((await phone.auth({type:'sendCode',purpose:'login',email:'nobody@example.com'})).status,200,'unknown emails get the same answer');
+  assert.equal((await phone.auth({type:'verifyCode',email:'nobody@example.com',code:'123456'})).status,400,'and cannot sign in');
+  const login=await phone.auth({type:'sendCode',purpose:'login',email:'tolu@example.com'});assert.equal(login.data.fallback,true,'the client is told to use the fallback code');
+  assert.equal((await phone.auth({type:'verifyCode',email:'tolu@example.com',code:'123456'})).status,200);
+  assert.equal((await phone.call()).data.state.name,'Tolu','the same character on a second device');
+  assert.equal((await phone.auth({type:'logout'})).status,200);assert.equal((await phone.call()).data.state,null,'logged out');
+  assert.equal((await tolu.call()).data.state.name,'Tolu','other devices stay signed in');
+  assert.equal((await tolu.auth({type:'newLife',confirm:'nope'})).status,400);
+  assert.equal((await tolu.auth({type:'newLife',confirm:'NEW LIFE'})).status,200);const fresh=(await tolu.call()).data;assert.equal(fresh.state,null);assert.equal(fresh.account.username,'tolu_eko','the account remains');
+  const guest=client();await guest.call({type:'create',name:'Guesty',career:'actor'});
+  assert.equal((await guest.auth({type:'logout'})).status,400,'guests must confirm');
+  assert.equal((await guest.auth({type:'logout',deleteGuest:true})).status,200);assert.equal((await guest.call()).data.state,null,'the guest starts afresh');
+  assert.ok(!(await a.call()).data.players.some(p=>p.name==='Guesty'),'the guest character is gone');
   assert.equal((await fetch(base+'/../server.mjs')).status,404);
   assert.match((await fetch(base+'/')).headers.get('content-security-policy'),/frame-ancestors 'none'/);
 });

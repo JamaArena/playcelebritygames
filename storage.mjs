@@ -4,13 +4,14 @@ import { schema, createGameService } from './service.mjs';
 const tables = {
   players: ['id'], requests: ['player_id', 'request_id'], messages: ['id'],
   reports: ['id'], seasons: ['id'], agreements: ['id'], battles: ['id'],
+  accounts: ['player_id'], codes: ['email'], sessions: ['token_hash'],
 };
 const numeric = new Set(['created', 'at', 'starts', 'ends', 'settled']);
 
 // A Postgres transaction owns the entire small city while the existing SQL rules
 // run against a request-local working copy. Only changed rows are written back.
 // This preserves multi-player atomicity without persisting any Lambda files.
-export async function handlePersistentRequest(pool, request) {
+export async function handlePersistentRequest(pool, request, options = {}) {
   const client = await pool.connect();
   const working = new DatabaseSync(':memory:');
   try {
@@ -31,7 +32,7 @@ export async function handlePersistentRequest(pool, request) {
         previous[table].set(keyFor(table, row), JSON.stringify(row));
       }
     }
-    const response = await createGameService(working, { secureCookies: true })(request);
+    const response = await createGameService(working, { secureCookies: true, ...options })(request);
     if (response.status >= 500) throw new Error('Game request failed before persistence.');
     let changed = false;
     for (const [table, keys] of Object.entries(tables)) {

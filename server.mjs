@@ -4,11 +4,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { createGameService } from './service.mjs';
+import { resendSender } from './email.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url));
 const data=process.env.DATA_DIR || path.join(root,'data');mkdirSync(data,{recursive:true});
 const db=new DatabaseSync(path.join(data,'celebrity.sqlite'));
-const handle=createGameService(db,{secureCookies:process.env.SECURE_COOKIE==='1'});
+const handle=createGameService(db,{secureCookies:process.env.SECURE_COOKIE==='1',sendEmail:resendSender(process.env.RESEND_API_KEY,process.env.EMAIL_FROM)});
 // Live channel: every successful action pings all connected browsers, which then fetch their own
 // authorised state. The ping carries no player data. Netlify keeps using polling instead.
 const listeners=new Set();
