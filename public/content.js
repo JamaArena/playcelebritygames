@@ -151,11 +151,13 @@ export const BUILDS = {slim: {name: 'Slim', w: .86, hip: .92}, average: {name: '
 export const HEIGHTS = {short: {name: 'Short', h: .9}, average: {name: 'Average', h: 1}, tall: {name: 'Tall', h: 1.1}};
 export const pick = (table, value, fallback) => Object.hasOwn(table, value) ? value : fallback;
 export const NPC_TALK = {social: 10, cooldownMs: 45_000, lines: ['Big things are coming for you, I can feel it.', 'Saw your last post. You’re getting better!', 'This city never sleeps, eh?', 'Keep practising. People are starting to notice.', 'Have you been to Palm Motors? Those cars, ehn!', 'Don’t forget to rest. Burnout is real.', 'You know who you should meet? Everybody!', 'Fame is a marathon, not a sprint.']};
+// Key NPCs always look the same so players recognise them; background people get random looks.
 export const NPCS = [
-  {id:'nova', name:'Nova', career:'musician', location:'studio', role:'Producer', color:'#b4a7d9'},
-  {id:'kai', name:'Kai', career:'football', location:'sports', role:'Scout', color:'#88bda5'},
-  {id:'mika', name:'Mika', career:'vlogger', location:'plaza', role:'Creator', color:'#e0a28f'},
-  {id:'ari', name:'Ari', career:'founder', location:'tech', role:'Builder', color:'#85b9ca'},
+  {id:'nova', name:'Nova', career:'musician', location:'studio', role:'Producer', color:'#b4a7d9', look:{skin:'#8d5b3d', hair:'locs', hairColor:'black', build:'average', height:'tall'}},
+  {id:'kai', name:'Kai', career:'football', location:'sports', role:'Scout', color:'#88bda5', look:{skin:'#c98d64', hair:'fade', hairColor:'black', build:'athletic', height:'average'}},
+  {id:'mika', name:'Mika', career:'vlogger', location:'plaza', role:'Creator', color:'#e0a28f', look:{skin:'#ecc3a2', hair:'bun', hairColor:'pink', build:'slim', height:'short'}},
+  {id:'ari', name:'Ari', career:'founder', location:'tech', role:'Builder', color:'#85b9ca', look:{skin:'#6e442e', hair:'short', hairColor:'black', build:'heavy', height:'average'}},
+  {id:'sola', name:'Sola', career:'actor', location:'creator', role:'Director', color:'#d4a373', look:{skin:'#ad7350', hair:'bald', hairColor:'black', build:'average', height:'tall'}},
 ];
 export const clamp = (value, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, value));
 export const effort = (level, base = 35) => level <= 4 ? base * level : 4 * base * 2 ** (level - 4);
