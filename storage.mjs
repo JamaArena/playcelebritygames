@@ -3,7 +3,7 @@ import { schema, createGameService } from './service.mjs';
 
 const tables = {
   players: ['id'], requests: ['player_id', 'request_id'], messages: ['id'],
-  reports: ['id'], seasons: ['id'], agreements: ['id'],
+  reports: ['id'], seasons: ['id'], agreements: ['id'], battles: ['id'],
 };
 const numeric = new Set(['created', 'at', 'starts', 'ends', 'settled']);
 

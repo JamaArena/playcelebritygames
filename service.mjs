@@ -2,7 +2,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame } from './game.mjs';
 import { CAREERS, BALANCE, clamp } from './public/content.js';
-export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);";
+export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);";
 export function createGameService(db,{secureCookies=false}={}) {
 db.exec(schema);
 const read=db.prepare('SELECT * FROM players WHERE id=?');
@@ -79,9 +79,103 @@ function snapshot(playerId,s,now){
   const messages=db.prepare('SELECT * FROM messages WHERE (location=? AND recipient IS NULL) OR recipient=? OR (sender=? AND recipient IS NOT NULL) ORDER BY at DESC LIMIT 50').all(roomFor(playerId,s),playerId,playerId).filter(m=>!s.blocks.includes(m.sender)).reverse().map(m=>({...m,name:load(m.sender)?.name||'Visitor'}));
   const agreements=db.prepare('SELECT * FROM agreements').all().map(r=>JSON.parse(r.state)).filter(a=>a.participants.includes(playerId)&&['pending','running'].includes(a.status));
   const visiting=s.visiting?load(s.visiting):null;
-  return {state:view(s,now),playerId,players,scenePlayers,townPlayers,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture}:null,season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
+  const battles=battlesFor(playerId,s,now);
+  return {state:view(s,now),playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture}:null,season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
+}
+// Turn-based team battles between real players. Stats come from career skills, energy and fame.
+// Winners gain fame; losers lose the same stake (never below zero). Each fighter spends one charge.
+const BATTLE={turnMs:30_000,stakes:{1:50,3:100,5:150},modes:[1,3,5]};
+const SIGNATURES={sport:'Power play',music:'Show-stopper riff',creator:'Viral moment',acting:'Scene stealer',tech:'Pitch-perfect demo',risk:'Smoke and mirrors'};
+const loadBattle=battleId=>{const row=db.prepare('SELECT state FROM battles WHERE id=?').get(battleId);return row?JSON.parse(row.state):null;};
+const saveBattle=b=>db.prepare('INSERT INTO battles VALUES(?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state').run(b.id,JSON.stringify(b));
+function fighterStats(ps){
+  const skills=Object.values(ps.careers[ps.career].skills).map(s=>s.level),best=Math.max(...skills),average=skills.reduce((a,b)=>a+b,0)/skills.length;
+  const max=Math.round(70+6*average+Math.min(10,Math.floor((ps.fame||0)/10_000)));
+  return {name:ps.name,career:ps.career,color:ps.color,hair:ps.hair,power:best,hp:max,max,fatigue:(100-ps.needs.energy)/100,guard:false,ko:false,signature:SIGNATURES[CAREERS[ps.career].family]||'Signature move'};
+}
+function battleLog(b,text,now){b.log.unshift({text,at:now});b.log=b.log.slice(0,30);}
+function nextTurn(b,now){
+  for(let n=0;n<b.order.length;n++){b.turn=(b.turn+1)%b.order.length;if(b.turn===0)b.round++;if(!b.fighters[b.order[b.turn]].ko)break;}
+  b.turnEndsAt=now+BATTLE.turnMs;b.fighters[b.order[b.turn]].guard=false;
+}
+function resolveMove(b,fighterId,move,targetId,now,rng=Math.random){
+  const f=b.fighters[fighterId],team=b.teams[0].includes(fighterId)?0:1;
+  if(move==='guard'){f.guard=true;f.hp=Math.min(f.max,f.hp+4);battleLog(b,`${f.name} guards and catches their breath.`,now);}
+  else if(move==='hype'){b.hype[team]=true;battleLog(b,`${f.name} hypes up the team. Next hit lands harder!`,now);}
+  else{
+    const target=b.fighters[targetId];fail(target&&!target.ko&&b.teams[1-team].includes(targetId),'Choose a standing opponent.');
+    const signature=move==='signature',p=signature?clamp(.5+.05*(f.power-6)-.1*f.fatigue,.1,.9):clamp(.88-.1*f.fatigue,.5,.95);
+    if(rng()<p){
+      let damage=signature?16+2.6*f.power:8+1.6*f.power+rng()*4;if(b.hype[team]){damage*=1.25;b.hype[team]=false;}if(target.guard)damage/=2;damage=Math.round(damage);
+      target.hp=Math.max(0,target.hp-damage);if(!target.hp)target.ko=true;
+      battleLog(b,`${f.name} ${signature?`unleashes ${f.signature}`:'strikes'}: ${damage} damage to ${target.name}${target.ko?' · knocked out!':''}`,now);
+    }else battleLog(b,`${f.name}${signature?`'s ${f.signature}`:''} misses ${target.name}.`,now);
+  }
+  const standing=[0,1].map(t=>b.teams[t].some(id=>!b.fighters[id].ko));
+  if(!standing[0]||!standing[1])finishBattle(b,standing[0]?0:1,now);else nextTurn(b,now);
+}
+function finishBattle(b,winner,now){
+  b.status='done';b.winner=winner;b.endedAt=now;const stake=BATTLE.stakes[b.mode];
+  for(const [t,team] of b.teams.entries())for(const pid of team){const ps=load(pid);if(!ps)continue;ps.battle=null;
+    const before=ps.fame||0;addFame(ps,t===winner?stake:-stake);const change=(ps.fame||0)-before;b.fighters[pid].fameChange=change;
+    if(t===winner)evaluate(ps,ps.career);
+    log(ps,`${b.mode}v${b.mode} battle ${t===winner?'won':'lost'}: ${change>=0?'+':''}${change} fame.`,now);persist(pid,ps);}
+  battleLog(b,`Team ${winner?'B':'A'} wins! ${stake} fame per fighter changes hands.`,now);
+}
+// Expired turns auto-guard so an absent player cannot stall everyone else.
+function tickBattle(b,now){let changed=false;for(let n=0;n<40&&b.status==='running'&&now>=b.turnEndsAt;n++){const at=b.turnEndsAt;resolveMove(b,b.order[b.turn],'guard',null,at);battleLog(b,'Time ran out, so they guarded automatically.',at);changed=true;}return changed;}
+function battleAction(playerId,s,input,now){
+  if(input.type==='battleCreate'){
+    const mode=Number(input.mode);fail(BATTLE.modes.includes(mode),'Choose 1v1, 3v3 or 5v5.');
+    fail(s.location!=='home'&&!s.visiting,'Battles happen in public places around town.');fail(!s.battle,'You are already in a battle.');fail(!s.active&&!s.recovery,'Finish your current activity first.');
+    let invited=null;if(input.opponent){const o=load(input.opponent);fail(o&&input.opponent!==playerId&&o.location===s.location&&!o.blocks.includes(playerId)&&!s.blocks.includes(input.opponent),'That player is not here to challenge.');fail(!o.battle,'That player is already battling.');invited=input.opponent;}
+    const b={id:id(),mode,location:s.location,host:playerId,invited,status:'open',teams:[[playerId],[]],fighters:{},order:[],turn:0,round:1,hype:[false,false],log:[],createdAt:now};
+    battleLog(b,`${s.name} opened a ${mode}v${mode} battle${invited?` and challenged ${load(invited).name}`:''}.`,now);s.battle=b.id;saveBattle(b);return true;
+  }
+  const b=loadBattle(input.battleId);fail(b,'Battle not found.');persist(playerId,s);tickBattle(b,now);Object.assign(s,load(playerId));
+  if(input.type==='battleJoin'){
+    const team=Number(input.team);fail(b.status==='open'&&[0,1].includes(team),'This battle is not taking fighters.');fail(!s.battle,'You are already in a battle.');
+    fail(s.location===b.location,'Go to the battle location to join.');fail(b.teams[team].length<b.mode,'That team is full.');
+    if(b.invited)fail(team===0||playerId===b.invited,'This challenge is for someone else.');
+    fail(!b.teams.flat().some(p=>load(p)?.blocks.includes(playerId)||s.blocks.includes(p)),'You cannot join this battle.');
+    b.teams[team].push(playerId);s.battle=b.id;battleLog(b,`${s.name} joins team ${team?'B':'A'}.`,now);
+  }
+  else if(input.type==='battleLeave'){
+    fail(b.teams.flat().includes(playerId),'You are not in this battle.');s.battle=null;
+    if(b.status==='open'){
+      if(playerId===b.host){b.status='cancelled';for(const p of b.teams.flat())if(p!==playerId){const ps=load(p);if(ps){ps.battle=null;persist(p,ps);}}battleLog(b,'The host called it off.',now);}
+      else{b.teams=b.teams.map(t=>t.filter(p=>p!==playerId));battleLog(b,`${s.name} left.`,now);}
+    }else if(b.status==='running'){
+      const f=b.fighters[playerId];f.hp=0;f.ko=true;battleLog(b,`${f.name} walks away and forfeits.`,now);
+      const standing=[0,1].map(t=>b.teams[t].some(id=>!b.fighters[id].ko));
+      if(!standing[0]||!standing[1]){persist(playerId,s);finishBattle(b,standing[0]?0:1,now);Object.assign(s,load(playerId));}else if(b.order[b.turn]===playerId)nextTurn(b,now);
+    }
+  }
+  else if(input.type==='battleStart'){
+    fail(b.status==='open'&&b.host===playerId,'Only the host starts an open battle.');fail(b.teams.every(t=>t.length===b.mode),`Both teams need ${b.mode} fighter${b.mode>1?'s':''}.`);
+    const states=Object.fromEntries(b.teams.flat().map(p=>[p,p===playerId?s:load(p)]));
+    for(const [p,ps] of Object.entries(states)){if(p!==playerId)reconcile(ps,now);fail(ps.location===b.location&&now-ps.lastSeen<20_000,`${ps.name} needs to be here and online.`);fail(ps.charges>0,`${ps.name} has no career charges left.`);fail(ps.needs.energy>=20,`${ps.name} is too tired to battle.`);fail(!ps.active&&!ps.recovery,`${ps.name} is busy with an activity.`);}
+    for(const [p,ps] of Object.entries(states)){ps.charges--;if(ps.refillAnchor===null)ps.refillAnchor=now;b.fighters[p]=fighterStats(ps);if(p!==playerId)persist(p,ps);}
+    b.order=[];for(let i=0;i<b.mode;i++)b.order.push(b.teams[0][i],b.teams[1][i]);
+    b.status='running';b.turn=0;b.turnEndsAt=now+BATTLE.turnMs;battleLog(b,`Fight! ${b.fighters[b.order[0]].name} moves first.`,now);
+  }
+  else if(input.type==='battleMove'){
+    fail(b.status==='running','This battle is not running.');fail(b.order[b.turn]===playerId,'Wait for your turn.');
+    fail(['strike','signature','guard','hype'].includes(input.move),'Choose a move.');
+    if(b.status==='running'){persist(playerId,s);resolveMove(b,playerId,input.move,input.target,now);Object.assign(s,load(playerId));}
+  }
+  else return false;
+  saveBattle(b);return true;
+}
+function battlesFor(playerId,s,now){
+  const rows=db.prepare('SELECT state FROM battles').all().map(r=>JSON.parse(r.state));
+  for(const b of rows)if(b.status==='running'&&b.teams.flat().includes(playerId)&&tickBattle(b,now))saveBattle(b);
+  const names=ids=>ids.map(p=>({id:p,name:load(p)?.name||'Player'}));
+  return rows.filter(b=>b.teams.flat().includes(playerId)?(b.status!=='done'&&b.status!=='cancelled')||now-(b.endedAt||b.createdAt)<5*60_000:b.status==='open'&&b.location===s?.location)
+    .map(b=>({...b,teamNames:b.teams.map(names),stake:BATTLE.stakes[b.mode]}));
 }
 function social(playerId,s,input,now){
+  if(String(input.type).startsWith('battle'))return battleAction(playerId,s,input,now);
   switch(input.type) {
     case 'chat': {
       const body=String(input.body||'').trim();fail(body.length>0&&body.length<=300,'Use a message of 1–300 characters.');
@@ -194,6 +288,7 @@ try {
             if(state.visiting)fail(['chat','recover','leaveVisit','move','report','block','friend'].includes(input.type),'Visitors can socialise but cannot modify a home or claim its rewards.');
             if(state.visiting&&input.type==='recover')fail(input.need==='social'||input.need==='fun','Only social activities are permitted while visiting.');
             if(state.active?.agreementId&&input.type==='cancel')throw new GameError('The collaboration host must cancel through the agreement.');
+            if(state.battle)fail(!['travel','start','recover','visit','switch'].includes(input.type),'You are in a battle. Finish or leave it first.');
             if(input.type==='finish'&&collaborativeFinish(playerId,state,input,now)){}
             else if(!social(playerId,state,input,now))act(state,input,now);
             if(input.type==='travel')state.visiting=null;

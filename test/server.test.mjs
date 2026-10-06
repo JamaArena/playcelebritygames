@@ -87,6 +87,23 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   await new Promise(resolve=>setTimeout(resolve,5));const settled=(await a.call()).data;
   assert.equal(settled.season.id,2);assert.equal(settled.state.awards.filter(award=>award.id.startsWith('season:1')).length,1);
   const fameAfter=settled.state.fame;assert.ok(fameAfter>=100,'the season award adds fame');await a.call();assert.equal((await a.call()).data.state.fame,fameAfter);
+  // 1v1 battle: challenge, accept, alternate turns until one side is knocked out; fame changes hands once.
+  fixture(aId,s=>{s.fame=100;s.needs.energy=90;s.charges=5;});fixture(bId,s=>{s.fame=30;s.needs.energy=90;s.charges=5;});
+  await a.call({type:'travel',location:'plaza'});await b.call({type:'travel',location:'plaza'});
+  const challenge=await a.call({type:'battleCreate',mode:1,opponent:bId});assert.equal(challenge.status,200);
+  const battleId=challenge.data.battles[0].id;assert.equal((await b.call()).data.battles[0].invited,bId);
+  assert.equal((await b.call({type:'travel',location:'studio'})).status,200,'not yet in the battle');await b.call({type:'travel',location:'plaza'});
+  assert.equal((await b.call({type:'battleJoin',battleId,team:1})).status,200);
+  assert.equal((await b.call({type:'travel',location:'studio'})).status,400,'fighters cannot wander off');
+  const started=await a.call({type:'battleStart',battleId});assert.equal(started.status,200);assert.equal(started.data.state.charges,4);
+  let battle=started.data.battles[0];assert.equal(battle.status,'running');
+  for(let n=0;n<80&&battle.status==='running';n++){const mover=battle.order[battle.turn]===aId?a:b,target=battle.order[battle.turn]===aId?bId:aId;
+    const turn=await mover.call({type:'battleMove',battleId,move:'signature',target});assert.equal(turn.status,200);battle=turn.data.battles.find(x=>x.id===battleId);}
+  assert.equal(battle.status,'done');
+  const aEnd=(await a.call()).data.state,bEnd=(await b.call()).data.state;
+  if(battle.winner===0){assert.equal(aEnd.fame,150);assert.equal(bEnd.fame,0,'fame never drops below zero');}else{assert.equal(bEnd.fame,80);assert.equal(aEnd.fame,50);}
+  assert.equal(aEnd.battle,null);assert.equal(bEnd.battle,null);
+  assert.equal((await a.call({type:'battleMove',battleId,move:'strike',target:bId})).status,400,'finished battles take no more moves');
   assert.equal((await fetch(base+'/../server.mjs')).status,404);
   assert.match((await fetch(base+'/')).headers.get('content-security-policy'),/frame-ancestors 'none'/);
 });
