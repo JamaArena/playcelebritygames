@@ -5,21 +5,24 @@ const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&
 const fmt=value=>Math.floor(value).toLocaleString();
 const duration=ms=>{const seconds=Math.max(0,Math.ceil(ms/1000));return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;};
 const needs={hunger:['Hunger','♨'],energy:['Energy','☾'],fun:['Fun','✧'],social:['Social','♡'],hygiene:['Hygiene','♧'],bladder:['Bladder','◡']};
-let lastUpdate=0,snapshot,state,busy=false,modalPage=null,previousFocus,toastTimer,offset=0,phoneTab='local',selectedObject;
+let lastUpdate=0,heartbeat,snapshot,state,busy=false,modalPage=null,previousFocus,toastTimer,offset=0,phoneTab='local',selectedObject;
 let motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;
 const now=()=>Date.now()+offset;
 const button=(label,action,attrs='',style='secondary')=>`<button class="${style}" data-action="${action}" ${attrs}>${label}</button>`;
 const careerOptions=(selected)=>Object.entries(CAREERS).map(([key,def])=>`<option value="${key}" ${key===selected?'selected':''}>${escape(def.name)}</option>`).join('');
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,5500);}
 function showModal(page,html,closable=true){
-  if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;$('#modalContent').innerHTML=(closable&&!['phoneHome','create','welcome','auth','newLife','logoutConfirm'].includes(page)?button('‹ Phone','backToPhone','','phone-back'):'')+html;$('#modal').classList.toggle('as-phone',page==='phoneHome');
+  if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;$('#modalContent').innerHTML=(closable&&!['phoneHome','create','welcome','auth','newLife','logoutConfirm','elsewhere'].includes(page)?button('‹ Phone','backToPhone','','phone-back'):'')+html;$('#modal').classList.toggle('as-phone',page==='phoneHome');
   const title=$('#modalContent h2');if(title)title.id='modalTitle';
   setTimeout(()=>$('#modalContent input, #modalContent button, #closeModal')?.focus(),0);
 }
 function closeModal(){if(modalPage==='create')return;$('#modal').hidden=true;modalPage=null;previousFocus?.focus();}
-async function refresh(){
-  if(busy)return;
-  try{const response=await fetch('/api/state');if(!response.ok)throw new Error('City connection unavailable.');receive(await response.json());$('#connection').textContent='Saved to your city';}
+// One device at a time: when another device is playing, this one pauses all requests until "Play here".
+let elsewhere=false;
+function playingElsewhere(){if(elsewhere)return;elsewhere=true;clearTimeout(heartbeat);showModal('elsewhere',`<div class="welcome-card"><span class="eyebrow">ONE DEVICE AT A TIME</span><h2>You’re playing on another device</h2><p class="modal-intro">Celebrity Games is open somewhere else right now. Play here to move the game to this device; the other one will pause.</p>${button('Play here','playHere','','primary wide')}</div>`,false);}
+async function refresh(takeover=false){
+  if(busy||(elsewhere&&!takeover))return;
+  try{const response=await fetch('/api/state'+(takeover?'?takeover=1':''));if(response.status===409){playingElsewhere();return;}if(!response.ok)throw new Error('City connection unavailable.');receive(await response.json());$('#connection').textContent='Saved to your city';}
   catch(error){$('#connection').textContent='Connection interrupted · retrying';if(!state)$('#loading').innerHTML='<div class="initial-error"><h1>Your city is unavailable</h1><p>We could not connect to your city. Please try again in a moment.</p><button class="primary" data-action="retry">Try again</button></div>';}
 }
 // Live notices: compare with the previous snapshot so things other players caused pop up immediately.
@@ -53,7 +56,7 @@ async function send(input,{keepModal=false,quiet=false}={}){
   try{
     let response;
     for(let attempt=0;attempt<2;attempt++){try{response=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(15000)});break;}catch(error){if(attempt)throw error;}}
-    const data=await response.json();if(!response.ok)throw new Error(data.error||'Action unavailable.');
+    const data=await response.json();if(response.status===409&&data.code==='other_device'){playingElsewhere();return;}if(!response.ok)throw new Error(data.error||'Action unavailable.');
     if(!keepModal&&modalPage!=='create')closeModal();
     closeTray();receive(data,true);$('#connection').textContent='Saved to your city';
     if(keepModal){if(modalPage==='phone')phone(phoneTab);else if(modalPage==='shop')shop();else if(modalPage==='inventory')inventory();else if(modalPage==='career')career();else if(modalPage==='vip')vip();else if(modalPage==='phones')phoneStore();else if(modalPage==='battle')battleView();}
@@ -336,6 +339,7 @@ document.addEventListener('click',async event=>{
     case 'creationNext':if(!$('#name').reportValidity())break;$('#stepLook').hidden=true;$('#stepCareer').hidden=false;$('#stepTwoLabel').classList.add('on');break;
     case 'creationBack':$('#stepLook').hidden=false;$('#stepCareer').hidden=true;$('#stepTwoLabel').classList.remove('on');break;
     case 'closeTip':closeTip();break;
+    case 'playHere':elsewhere=false;modalPage=null;$('#modal').hidden=true;await refresh(true);scheduleHeartbeat();break;
     case 'authTab':authStep.from=d.tab;authScreen(d.tab);break;
     case 'authResend':try{await auth({type:'sendCode',purpose:authStep.purpose,email:authStep.email,...authStep.extra});authScreen('code','A new code is on its way.');}catch(e){authScreen('code',e.message);}break;
     case 'closeWelcome':closeModal();break;
@@ -418,8 +422,7 @@ const pollPulse=()=>setInterval(async()=>{if(document.hidden)return;try{const r=
 try{const live=new EventSource('/api/live');let opened=false;live.onmessage=soon;live.onopen=()=>opened=true;live.onerror=()=>{if(!opened){live.close();pollPulse();}};}catch{pollPulse();}
 // Hosting is billed per request. Every action returns fresh state at once; after that the full refresh
 // (also the online heartbeat) runs 20s after the last update, never while hidden. Returning refreshes at once.
-let heartbeat;
-function scheduleHeartbeat(){clearTimeout(heartbeat);heartbeat=setTimeout(async()=>{if(document.hidden){scheduleHeartbeat();return;}await refresh();scheduleHeartbeat();},20000);}
+function scheduleHeartbeat(){clearTimeout(heartbeat);if(elsewhere)return;heartbeat=setTimeout(async()=>{if(document.hidden){scheduleHeartbeat();return;}await refresh();scheduleHeartbeat();},20000);}
 scheduleHeartbeat();
 // Coming back after a real absence refreshes at once; quick app switches don't.
 let hiddenAt=0;document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();return;}if(Date.now()-hiddenAt>=10_000&&Date.now()-lastUpdate>=5_000)refresh();});
