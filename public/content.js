@@ -91,11 +91,54 @@ export function along(points, f) {
 }
 // Your phone holds every menu. Better models unlock with fame (free, never spent).
 export const PHONES = {
-  basic: {name: 'Starter phone', fame: 0, color: '#3b4a42', screen: '#f4f7f1', perk: 'All the essentials.'},
-  smart: {name: 'Glow smartphone', fame: 300, color: '#2f6fb3', screen: '#eef5fc', perk: 'Shows friends online on the home screen.'},
-  pro: {name: 'Pro edition', fame: 5_000, color: '#7b4fa3', screen: '#f5effa', perk: 'Adds your season standing and next unlock to the home screen.'},
-  gold: {name: 'Gold edition', fame: 50_000, color: '#b8932f', screen: '#fbf6e8', perk: 'A gold phone everyone notices. Shown on your public profile.'},
+  // lag: [min, max] ms before an app opens; hang: chance of an "isn't responding" dialog.
+  basic: {name: 'Starter phone', fame: 0, color: '#3b4a42', screen: '#f4f7f1', perk: 'Gets you by. Slow to open apps and sometimes freezes.', network: 'E', battery: 23, lag: [900, 2000], hang: .14, nag: .35},
+  smart: {name: 'Glow smartphone', fame: 300, color: '#2f6fb3', screen: '#eef5fc', perk: 'Smoother, colourful, shows friends online. The odd stutter.', network: '4G', battery: 61, lag: [250, 650], hang: .03, nag: 0},
+  pro: {name: 'Pro edition', fame: 5_000, color: '#7b4fa3', screen: '#f5effa', perk: 'Flagship feel: big clock, dock, next unlock widget. Smooth.', network: '5G', battery: 88, lag: [0, 0], hang: 0, nag: 0},
+  gold: {name: 'Gold edition', fame: 50_000, color: '#b8932f', screen: '#fbf6e8', perk: 'Premium gold, glass icons, instant. Everyone notices.', network: '5G', battery: 100, lag: [0, 0], hang: 0, nag: 0},
 };
+// Watching TV can teach your career a little. One insight per WATCH_COOLDOWN; longer watching teaches more.
+export const WATCH = {
+  sport: {title: 'Watch the big match', label: 'Watching the big match', hero: 'That number 24 guy'},
+  music: {title: 'Watch a live concert', label: 'Watching a concert', hero: 'The headliner'},
+  acting: {title: 'Watch a movie', label: 'Watching a movie', hero: 'The lead actor'},
+  creator: {title: 'Binge top creators', label: 'Binge-watching creators', hero: 'That creator'},
+  tech: {title: 'Watch a tech keynote', label: 'Watching a keynote', hero: 'The keynote speaker'},
+  risk: {title: 'Watch a heist movie', label: 'Watching a heist movie', hero: 'The film’s mastermind'},
+};
+export const WATCH_COOLDOWN = 20 * 60_000, WATCH_MAX_POINTS = 4;
+const INSIGHTS = {
+  dribbling: 'That number 24 guy glided past three defenders. You learnt to dribble a little better.',
+  shooting: 'Their striker buried one from 25 metres. Your shooting clicked a little more.',
+  passing: 'The playmaker found impossible angles. You see passing lanes a bit better now.',
+  defending: 'The centre-back read every run. You learnt to anticipate attackers.',
+  handling: 'Their point guard’s crossover was unreal. Your ball handling improved.',
+  serve: 'Ace after ace. You noticed how they tossed the ball and your serve got sharper.',
+  forehand: 'That inside-out forehand was textbook. Yours feels a little crisper.',
+  backhand: 'One-handed backhand down the line. You picked up the timing.',
+  footwork: 'Never off balance once. You learnt to move your feet better.',
+  strength: 'Pure power in that slam. You understand leverage a little better.',
+  stamina: 'Still fighting in the final minute. You learnt to pace yourself.',
+  acting: 'You learnt from the main actor’s abilities. You now understand the importance of emotion in acting.',
+  expression: 'The close-ups showed how much a face can say without words. Your expression improved.',
+  improvisation: 'That unscripted moment felt so real. You learnt to trust your instincts.',
+  charisma: 'The star owned every room. You picked up a little of that presence.',
+  songwriting: 'The bridge in that ballad gave you chills. Your songwriting grew.',
+  'stage presence': 'The headliner had 50,000 people in the palm of their hand. You learnt to own a stage.',
+  production: 'That mix was so clean. You noticed tricks for your own production.',
+  storytelling: 'Every cut moved the story forward. Your storytelling sharpened.',
+  editing: 'Tight cuts, no wasted seconds. You learnt to edit with intent.',
+  comedy: 'The timing on that punchline was perfect. You got a little funnier.',
+  timing: 'A pause, then the laugh. You understand comic timing better.',
+  engagement: 'They answered chat like old friends. You learnt to engage your audience.',
+  presentation: 'Calm, clear, confident. Your presentation improved.',
+  'product judgement': 'One feature, done brilliantly. Your product judgement grew.',
+  leadership: 'The founder rallied the room. You learnt a little about leading.',
+  coding: 'The live demo wrote itself. You picked up a cleaner way to code.',
+  deception: 'Nobody saw the twist coming. You learnt how misdirection works (in fiction).',
+  planning: 'Every step of the plan clicked into place. Your planning improved.',
+};
+export const insightFor = (family, skill) => INSIGHTS[skill] || `${WATCH[family]?.hero || 'Someone on screen'} was brilliant. You learnt a little more about ${skill}.`;
 export const RIDES = {hatchback: {name: 'Family hatchback', icon: '🚗', color: '#5f8f8a'}, ...Object.fromEntries(Object.entries(SPONSORSHIPS).filter(([, d]) => d.kind === 'ride'))};
 export const NPCS = [
   {id:'nova', name:'Nova', career:'musician', location:'studio', role:'Producer', color:'#b4a7d9'},

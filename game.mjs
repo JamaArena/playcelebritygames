@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, NPCS, LOCATIONS, SPONSORSHIPS, PHONES, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, CAREERS, ITEMS, NPCS, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_MAX_POINTS, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -65,17 +65,23 @@ export function reconcile(s, now) {
     item.level=item.upgrade.target; item.upgrade=null; log(s,`${ITEMS[key].name} reached level ${item.level}.`,now);
   }
   if(s.trip && now>=s.trip.arrives){s.location=s.trip.to;s.position3d=arrivalSpot(s.trip.to);s.visiting=null;log(s,`Arrived at ${LOCATIONS[s.trip.to].name}.`,now);s.trip=null;}
-  if(s.recovery && now>=s.recovery.endsAt) {
-    const r=s.recovery;
-    s.needs[r.need]=clamp(s.needs[r.need]+B.recovery[r.need][0]);
-    s.recovery=null;log(s,`${r.label} completed.`,now);
-  }
+  if(s.recovery && now>=s.recovery.endsAt)finishRecovery(s,s.recovery.endsAt);
   if(s.active?.kind==='practice' && now>=s.active.readyAt) {
     const a=s.active,c=s.careers[a.career];
     learn(s,a.career,a.skill,7,a.id); s.needs.energy=clamp(s.needs.energy-5); c.practices++;c.exposure=0;
     s.results.unshift({id:a.id,title:`${a.skill} practice`,quality:null,learning:7,at:now});
     s.active=null;evaluate(s,a.career);log(s,`Practice complete: +7 ${a.skill} learning points.`,now);
   }
+}
+// Needs fill up while you do something; you can stop any time and keep what you gained.
+export function finishRecovery(s,now){
+  const r=s.recovery,start=r.startedAt??r.endsAt-B.recovery[r.need][1],share=Math.max(0,Math.min(1,(now-start)/(r.endsAt-start)));
+  s.needs[r.need]=clamp(s.needs[r.need]+B.recovery[r.need][0]*share);s.recovery=null;
+  if(r.watch&&now-start>=30_000&&(s.watchLearnAt==null||now-s.watchLearnAt>=WATCH_COOLDOWN)){
+    const c=s.careers[s.career],family=CAREERS[s.career].family,skill=r.watch,points=Math.max(1,Math.round(WATCH_MAX_POINTS*share));
+    if(c?.skills[skill]){learn(s,s.career,skill,points,`watch:${r.id}`);s.watchLearnAt=now;s.insight={id:r.id,text:insightFor(family,skill),skill,points,at:now};log(s,`${insightFor(family,skill)} (+${points} ${skill})`,now);evaluate(s);}
+  }
+  log(s,share>=1?`${r.label} completed.`:`${r.label}: stopped early, +${Math.round(B.recovery[r.need][0]*share)} ${r.need}.`,now);
 }
 export function generalProbability(skill,difficulty,pressure,fatigue) { return clamp(.5+.05*(skill-difficulty)-.1*pressure-.1*fatigue,.1,.9); }
 export function shootingProbability(skill,distance,pressure,fatigue,angle) {return clamp(.15+.065*skill-.012*Math.max(0,distance-12)-.1*pressure-.05*fatigue-.1*angle,.02,.85);}
@@ -267,7 +273,7 @@ export function act(s,input,now,rng=Math.random) {
     }
     case 'cancel':
       if(s.active){if(s.careers[s.active.career].affiliation)s.careers[s.active.career].reputation=clamp(s.careers[s.active.career].reputation-3);log(s,'Activity abandoned. Earned learning remains; no completion reward.',now);s.active=null;}
-      s.recovery=null;break;
+      if(s.recovery)finishRecovery(s,now);break;
     case 'recover': {
       requireRule(!s.active&&!s.recovery,'Finish or cancel your activity first.');
       requireRule(B.recovery[input.need],'Unknown need.');
@@ -275,7 +281,8 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(where,'Go home to use this recovery object.');
       const labels={hunger:'Eating',energy:'Sleeping',fun:'Relaxing',social:'Socialising',hygiene:'Washing',bladder:'Using the toilet'};
       const rest=s.location==='home'&&!s.visiting?SPONSORSHIPS[s.home]?.rest??1:1;
-      s.recovery={id:id(),need:input.need,label:labels[input.need],startedAt:now,endsAt:now+Math.round(B.recovery[input.need][1]*rest)};break;
+      const family=CAREERS[s.career].family,watch=input.watch&&input.need==='fun'&&s.location==='home'?CAREERS[s.career].skills[Math.floor(Math.random()*CAREERS[s.career].skills.length)]:null;
+      s.recovery={id:id(),need:input.need,label:watch?WATCH[family].label:labels[input.need],startedAt:now,endsAt:now+Math.round(B.recovery[input.need][1]*rest),watch};break;
     }
     case 'buy': {
       const item=ITEMS[input.item];requireRule(item,'Unknown item.');requireRule(s.location==='plaza','Visit Palm plaza to shop.');

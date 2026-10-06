@@ -84,7 +84,7 @@ export class World {
   update(state,players,visitedHome,townPlayers=[],residents=[],friends=[]){
     // Real players are kept in absolute town coordinates and glide toward each polled position.
     this.people??=new Map();const seen=new Set(),hereLot=TOWN[state.location]||TOWN.home;
-    for(const p of [...players.map(p=>({...p,lot:hereLot})),...townPlayers.map(p=>({...p,lot:TOWN[LOT(p.location)]}))]){if(!p.lot||!p.position3d)continue;
+    for(const p of [...players.map(p=>({...p,lot:hereLot,scene:true})),...townPlayers.map(p=>({...p,lot:TOWN[LOT(p.location)],scene:false}))]){if(!p.lot||!p.position3d)continue;
       const tx=p.lot.x+p.position3d.x,tz=p.lot.z+p.position3d.z,prev=this.people.get(p.id);seen.add(p.id);
       if(!prev||prev.location!==p.location||this.reduced)this.people.set(p.id,{...p,x:tx,z:tz,tx,tz,heading:0,gait:0,moving:false});else Object.assign(prev,p,{tx,tz});}
     for(const id of [...this.people.keys()])if(!seen.has(id))this.people.delete(id);
@@ -387,14 +387,14 @@ export class World {
   paintSpeech(){
     if(!this.speech?.size)return;const ctx=this.ctx,here=TOWN[this.location]||TOWN.home,now=performance.now();
     for(const [id,bubble] of this.speech){if(now>bubble.until){this.speech.delete(id);continue;}
-      const who=id==='me'?{x:this.actor.x,z:this.actor.z}:this.people?.get(id)&&{x:this.people.get(id).x-here.x,z:this.people.get(id).z-here.z};if(!who||!this.onScreen(who.x,who.z,1))continue;
+      const who=id==='me'?{x:this.actor.x,z:this.actor.z}:this.people?.get(id)&&!(this.interior()&&!this.people.get(id).scene)&&{x:this.people.get(id).x-here.x,z:this.people.get(id).z-here.z};if(!who||!this.onScreen(who.x,who.z,1))continue;
       const p=this.project(who.x,2.2,who.z),y=p.y-(id==='me'?44:16);ctx.font='500 11px Segoe UI';const words=bubble.text.length>34?bubble.text.slice(0,33)+'…':bubble.text,w=Math.min(240,ctx.measureText(words).width+20),fade=Math.min(1,(bubble.until-now)/600);
       ctx.globalAlpha=fade;ctx.fillStyle='#ffffff';ctx.strokeStyle='#cfdccb';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(p.x-w/2,y-26,w,24,12);ctx.fill();ctx.stroke();
       ctx.beginPath();ctx.moveTo(p.x-6,y-3);ctx.lineTo(p.x,y+5);ctx.lineTo(p.x+6,y-3);ctx.closePath();ctx.fill();ctx.fillStyle='#22392d';ctx.textAlign='center';ctx.fillText(words,p.x,y-10);ctx.globalAlpha=1;}
   }
   paintPeople(){
     const here=TOWN[this.location]||TOWN.home;
-    for(const p of this.people?.values()||[]){if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride)this.ride(p.trip.ride,t.x,t.z,t.axis);else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes),style:p.hair});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1))continue;this.human(x,z,p.color,{...this.look(p.career,p.clothes),style:p.hair,walk:p.moving,heading:p.heading,gait:p.gait});}
+    for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride)this.ride(p.trip.ride,t.x,t.z,t.axis);else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes),style:p.hair});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1))continue;this.human(x,z,p.color,{...this.look(p.career,p.clothes),style:p.hair,walk:p.moving,heading:p.heading,gait:p.gait});}
   }
   // The home screen: a soft sky and a round lawn under the house, like a dollhouse on a table.
   paintIsland(light){const ctx=this.ctx,g=ctx.createLinearGradient(0,0,0,this.height);g.addColorStop(0,light.night?'#24324d':'#cfe3f4');g.addColorStop(1,light.night?'#3b4a66':'#eef5f9');ctx.fillStyle=g;ctx.fillRect(0,0,this.width,this.height);
@@ -417,7 +417,7 @@ export class World {
     const ctx=this.ctx,tag=(x,z,text)=>{const p=this.project(x,2.05,z);ctx.font='600 9px Segoe UI';ctx.textAlign='center';const w=ctx.measureText(text).width+14;ctx.fillStyle='#fffef5dd';ctx.beginPath();ctx.roundRect(p.x-w/2,p.y-8,w,16,8);ctx.fill();ctx.fillStyle='#49614f';ctx.fillText(text,p.x,p.y+3);};
     const npc=NPCS.find(n=>n.location===this.location),spot=npc&&worldObjects(this.location).find(o=>o.action==='phone');if(npc&&this.zoom>=.55)tag(spot?.x??2.5,spot?.z??2,`${npc.role} ${npc.name}`);
     const here=TOWN[this.location]||TOWN.home;this.peopleHits=[];
-    for(const p of this.people?.values()||[]){const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1))continue;this.peopleHits.push({player:p,screen:this.project(x,1.1,z)});if((p.location===this.location&&this.zoom>=.45)||this.zoom>=.85||this.hover?.player?.id===p.id)tag(x,z,(this.friends?.includes(p.id)?'♥ ':'')+p.name);}
+    for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1))continue;this.peopleHits.push({player:p,screen:this.project(x,1.1,z)});if((p.location===this.location&&this.zoom>=.45)||this.zoom>=.85||this.hover?.player?.id===p.id)tag(x,z,(this.friends?.includes(p.id)?'♥ ':'')+p.name);}
     this.houseHits=[];if(!this.interior())for(const [index,owner] of this.owners||[]){const h=CITY.houses[index],x=h.x-here.x,z=h.z-here.z;if(!this.onScreen(x,z,2))continue;const screen=this.project(x,h.h+.9,z);this.houseHits.push({house:owner,screen});if(this.zoom>=.5||this.hover?.house?.id===owner.id){ctx.font='600 9px Segoe UI';ctx.textAlign='center';const label=`⌂ ${owner.name}`,w=ctx.measureText(label).width+14;ctx.fillStyle='#153d32d9';ctx.beginPath();ctx.roundRect(screen.x-w/2,screen.y-8,w,16,8);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(label,screen.x,screen.y+3);}}
     if(this.zoom<.5&&!this.interior()){ctx.textAlign='center';ctx.font=`700 ${Math.round(11+this.scale*.25)}px Segoe UI`;for(const [name,x,z] of DISTRICTS){const p=this.project(x-here.x,0,z-here.z);ctx.fillStyle='#ffffff';ctx.globalAlpha=.75;ctx.fillText(name.split('').join(' '),p.x,p.y);ctx.globalAlpha=1;}}
     const a=this.actor,low=Object.entries(this.state.needs).filter(([,v])=>v<30).sort((x,y)=>x[1]-y[1])[0];
