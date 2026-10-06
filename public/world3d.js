@@ -128,7 +128,7 @@ class Figure {
     const phase = o.walk && !reduced ? Math.sin(o.gait) : pose === 'sport' && !reduced ? Math.sin(time * 7) : 0, bob = o.walk && !reduced ? Math.abs(Math.cos(o.gait)) * .02 : 0;
     // Standing still people breathe and shift their weight a little.
     const idle = !o.walk && !pose && !reduced, breath = idle ? Math.sin(time * 1.7 + x) : 0, sway = idle ? Math.sin(time * .6 + z) : 0;
-    const hip = seated ? .58 : .9 * tall + bob, top = o.outfit, skinMat = mat(skin, 'skin'), pants = mat(o.pants);
+    const hip = pose === 'toilet' ? .57 : seated ? .7 : .9 * tall + bob, top = o.outfit, skinMat = mat(skin, 'skin'), pants = mat(o.pants);
     this.root.position.set(x, 0, z); this.root.rotation.set(0, o.heading || 0, 0);
     this.torso.position.set(sway * .012, hip, 0); this.torso.scale.set(1, tall, 1); this.torso.rotation.set(o.walk ? .05 : 0, 0, sway * .015);
     this.pelvis.material = pants; this.pelvis.scale.set(.96 * H, 1, .58 * H);
@@ -144,7 +144,7 @@ class Figure {
     }
     for (const leg of this.legs) {
       const stride = phase * leg.side; leg.position.set(leg.side * .078 * H, hip - .02, 0); leg.scale.set(H, tall, H);
-      leg.rotation.set(seated ? -1.5 : stride * .5, 0, idle ? leg.side * .03 : 0); leg.shin.rotation.set(seated ? 1.5 : Math.max(0, -stride) * .6 + (o.walk ? .08 : 0), 0, 0);
+      leg.rotation.set(seated ? -1.25 : stride * .5, 0, idle ? leg.side * .03 : 0); leg.shin.rotation.set(seated ? 1.25 : Math.max(0, -stride) * .6 + (o.walk ? .08 : 0), 0, 0);
       // Kits show bare knees between shorts and socks; trousers cover the whole leg.
       leg.bone.material = kit ? skinMat : pants; leg.shin.bone.material = kit ? skinMat : pants; leg.shorts.visible = kit; leg.shorts.material = pants;
       leg.sock.visible = kit; leg.sock.material = mat('#f4f2ee'); leg.shoe.material = mat(o.shoes, suit ? 'gloss' : 'matte'); leg.sole.material = mat(suit ? '#151312' : '#e9e4da');
