@@ -1,5 +1,6 @@
 import { CAREERS, LOCATIONS, ITEMS, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace } from './content.js';
 import { World, worldObjects } from './world.js';
+import { World3D } from './world3d.js';
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=value=>Math.floor(value).toLocaleString();
@@ -78,7 +79,8 @@ function pie(object,options){
   Object.assign($('#pieMenu').style,{left:x+'px',top:y+'px'});$('#pieMenu').hidden=false;$('#pieMenu .pie-option')?.focus({preventScroll:true});
 }
 function showTray(title,html){$('#pieMenu').hidden=true;$('#objectTray').innerHTML='<header><h3>'+escape(title)+'</h3>'+button('×','closeTray','aria-label="Close object actions"','tray-close')+'</header>'+html;$('#objectTray').hidden=false;}
-const world=new World($('#world'),position=>{closeTray();send({type:'move',...position},{keepModal:true,quiet:true});},object=>{
+const onWorldMove=position=>{closeTray();send({type:'move',...position},{keepModal:true,quiet:true});};
+const onWorldObject=object=>{
   if(object.blocked){toast(object.message||'Choose open ground.');return;}
   if(object.placement){send({type:'place',...object.placement}).then(data=>{if(data){world.placement=null;world.draw();}});return;}
   if(object.decision!==undefined){chooseDecision(object.decision);return;}
@@ -101,7 +103,23 @@ const world=new World($('#world'),position=>{closeTray();send({type:'move',...po
   if(object.action==='phone'){pie(object,[['💬 Chat <small>+10 Social</small>','talkNpc'],['♧ Contacts','page','data-page="phone"'],['↗ Go here','goObject']]);return;}
   const watch=object.name==='Television'&&!state.visiting?[[`📺 ${escape(WATCH[def.family].title)} <small>learn a little</small>`,'watchObject']]:[];
   pie(object,[...watch,[`${object.icon} ${escape(object.verb||'Use')}${object.need?` <small>+${B.recovery[object.need][0]} ${escape(needs[object.need][0])}, stop any time</small>`:''}`,'useObject'],['↗ Go here','goObject']]);
-});
+};
+// The world view: 3D (WebGL) inside places, the 2D renderer for the street, trips and the city map.
+// Add ?renderer=2d to the address to force the 2D view. Without WebGL the game stays 2D.
+function makeWorld(){
+  const flat=new World($('#world'),onWorldMove,onWorldObject);let deep=null;
+  try{if(!/[?&]renderer=2d/.test(location.search))deep=new World3D($('#world3d'),$('#world3dGL'),onWorldMove,onWorldObject);}catch(error){console.warn('3D view unavailable; using 2D.',error);}
+  if(!deep)return flat;
+  const views=[flat,deep];let active=flat;deep.paused=true;
+  const swap=()=>{const next=deep.interior()?deep:flat;if(next===active)return;
+    for(const key of ['player','target','heading','pose','moving','waypoints','pending','speed','people','speech','zoom','angle','pitch','lift','pan','npcTalkUntil','lampOff','fridgeOpen','windowOpen','placement'])next[key]=active[key];
+    active.paused=true;next.paused=false;active=next;$('#world').style.display=active===flat?'':'none';$('#world3dWrap').style.display=active===deep?'':'none';active.draw();};
+  return new Proxy({},{
+    get(_,key){if(key==='update')return (...args)=>{for(const view of views)view.update(...args);swap();};const value=active[key];return typeof value==='function'?value.bind(active):value;},
+    set(_,key,value){for(const view of views)view[key]=value;if(key==='overview')swap();return true;},
+  });
+}
+const world=makeWorld();
 world.onGround=closeTray;
 function whenIdle(perform){if(!busy){perform();return;}const timer=setInterval(()=>{if(!busy){clearInterval(timer);perform();}},50);}
 async function startAtObject(input){

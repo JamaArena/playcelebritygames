@@ -393,7 +393,7 @@ export class World {
     this.actor={...pos,pose};
   }
   draw(){
-    if(!this.state)return;
+    if(!this.state||this.paused)return;
     const r=this.canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);this.width=r.width;this.height=r.height;
     if(this.canvas.width!==Math.round(r.width*dpr)||this.canvas.height!==Math.round(r.height*dpr)){this.canvas.width=Math.round(r.width*dpr);this.canvas.height=Math.round(r.height*dpr);}
     const ctx=this.ctx;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,r.width,r.height);this.scale=Math.min(r.width/17,r.height/11.8)*this.zoom;
@@ -523,7 +523,7 @@ export class World {
   }
   arrived(){this.moving=false;const cb=this.pending;this.pending=null;if(cb)cb();}
   stop(){this.stopped=true;this.resize?.disconnect();}
-  frame(time){if(this.stopped)return;const dt=Math.min((time-this.last)/1000,.05);this.last=time;
+  frame(time){if(this.stopped)return;if(this.paused){this.last=time;requestAnimationFrame(t=>this.frame(t));return;}const dt=Math.min((time-this.last)/1000,.05);this.last=time;
     if(this.pose?.expires&&time>this.pose.expires){const kind=this.pose.kind;this.pose=null;if(kind==='water')this.respond('water',true,'❀');}
     if(this.npcTalkUntil&&time>this.npcTalkUntil)this.npcTalkUntil=null;
     if(this.moving){const dx=this.target.x-this.player.x,dz=this.target.z-this.player.z,d=Math.hypot(dx,dz),desired=this.waypoints.length?2.8:Math.min(2.8,Math.sqrt(14*d));this.speed+=Math.max(-7*dt,Math.min(7*dt,desired-this.speed));const step=Math.min(d,this.speed*dt);this.heading=turnToward(this.heading,Math.atan2(dx,dz),dt);this.gait+=step*8;
