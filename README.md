@@ -33,7 +33,7 @@ Tests cover core mechanics and a real HTTP server with an isolated temporary SQL
 - **Social** contains local chat, player contacts, direct messages, blocks, reports, home invitations and accepted collaboration agreements. A second browser profile creates a second player on the same running server.
 - **Profile** shows outputs, permanent milestones, season rules and awards.
 
-Normal production has three beats over two real minutes of commentary; sports use six over five minutes. Practice lasts three minutes. Needs recovery and equipment upgrades also use real timers. Commentary waits at every decision; already-started practice, recovery, upgrades and charge refills reconcile offline.
+Normal production has three beats over two real minutes of commentary; sports use six over five minutes. Practice lasts 10 seconds. Needs recovery and equipment upgrades also use real timers. Commentary waits at every decision; already-started practice, recovery, upgrades and charge refills reconcile offline.
 
 ## Persistence and rules
 

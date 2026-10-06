@@ -1,6 +1,6 @@
 // PRD proposals are centralized here; confirmed progression and charge rules are shared.
 export const BALANCE = {
-  capacity: 10, refillMs: 36 * 60_000, practiceMs: 3 * 60_000,
+  capacity: 10, refillMs: 36 * 60_000, practiceMs: 10_000,
   recovery: { hunger: [40, 60_000], energy: [60, 300_000], fun: [30, 120_000], social: [30, 120_000], hygiene: [50, 60_000], bladder: [80, 30_000] },
   decay: { hunger: 12, energy: 8, fun: 6, social: 6, hygiene: 8, bladder: 15 },
   activityMs: 120_000, sportMs: 300_000, upgradeMs: 30 * 60_000,
