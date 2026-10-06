@@ -67,7 +67,7 @@ function captureEligibility(s,now){
 }
 const TOWN_PLAYER_LIMIT=120;
 const roomFor=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
-function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<20_000};}
+function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<45_000};}
 function snapshot(playerId,s,now){
   const account=accountOf(playerId);
   if(!s)return {state:null,serverNow:now,account};
@@ -155,7 +155,7 @@ function battleAction(playerId,s,input,now){
   else if(input.type==='battleStart'){
     fail(b.status==='open'&&b.host===playerId,'Only the host starts an open battle.');fail(b.teams.every(t=>t.length===b.mode),`Both teams need ${b.mode} fighter${b.mode>1?'s':''}.`);
     const states=Object.fromEntries(b.teams.flat().map(p=>[p,p===playerId?s:load(p)]));
-    for(const [p,ps] of Object.entries(states)){if(p!==playerId)reconcile(ps,now);fail(ps.location===b.location&&now-ps.lastSeen<20_000,`${ps.name} needs to be here and online.`);fail(ps.charges>0,`${ps.name} has no career charges left.`);fail(ps.needs.energy>=20,`${ps.name} is too tired to battle.`);fail(!ps.active&&!ps.recovery,`${ps.name} is busy with an activity.`);}
+    for(const [p,ps] of Object.entries(states)){if(p!==playerId)reconcile(ps,now);fail(ps.location===b.location&&now-ps.lastSeen<45_000,`${ps.name} needs to be here and online.`);fail(ps.charges>0,`${ps.name} has no career charges left.`);fail(ps.needs.energy>=20,`${ps.name} is too tired to battle.`);fail(!ps.active&&!ps.recovery,`${ps.name} is busy with an activity.`);}
     for(const [p,ps] of Object.entries(states)){ps.charges--;if(ps.refillAnchor===null)ps.refillAnchor=now;b.fighters[p]=fighterStats(ps);if(p!==playerId)persist(p,ps);}
     b.order=[];for(let i=0;i<b.mode;i++)b.order.push(b.teams[0][i],b.teams[1][i]);
     b.status='running';b.turn=0;b.turnEndsAt=now+BATTLE.turnMs;battleLog(b,`Fight! ${b.fighters[b.order[0]].name} moves first.`,now);

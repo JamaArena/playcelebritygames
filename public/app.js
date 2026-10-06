@@ -413,7 +413,10 @@ await refresh();
 // Real-time: the local server pushes a ping after any player's action; polling remains the heartbeat and fallback.
 let liveTimer,pulseAt=null;const soon=()=>{clearTimeout(liveTimer);liveTimer=setTimeout(()=>{if(!busy)refresh();},150);};
 // Fallback for hosts without a push channel (Netlify): poll a one-row change counter, fetch state only when it moves.
-const pollPulse=()=>setInterval(async()=>{if(document.hidden)return;try{const r=await fetch('/api/pulse');if(!r.ok)return;const {at}=await r.json();if(pulseAt!==null&&at!==pulseAt)soon();pulseAt=at;}catch{}},1500);
+const pollPulse=()=>setInterval(async()=>{if(document.hidden)return;try{const r=await fetch('/api/pulse');if(!r.ok)return;const {at}=await r.json();if(pulseAt!==null&&at!==pulseAt)soon();pulseAt=at;}catch{}},5000);
 try{const live=new EventSource('/api/live');let opened=false;live.onmessage=soon;live.onopen=()=>opened=true;live.onerror=()=>{if(!opened){live.close();pollPulse();}};}catch{pollPulse();}
-setInterval(async()=>{await refresh();if(modalPage==='phone'&&phoneTab==='local'&&$('#chatLog'))$('#chatLog').innerHTML=chatMessages();},4000);
+// Hosting is billed per request: the full refresh doubles as the online heartbeat every 20s, and nothing
+// polls while the tab is hidden. Coming back to the tab refreshes at once.
+setInterval(async()=>{if(document.hidden)return;await refresh();if(modalPage==='phone'&&phoneTab==='local'&&$('#chatLog'))$('#chatLog').innerHTML=chatMessages();},20000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
 setInterval(()=>{if(state&&!busy){renderActivity();clock();const bt=$('#battleTimer'),bb=(snapshot.battles||[]).find(x=>x.id===battleId);if(bt&&bb)bt.textContent=duration(bb.turnEndsAt-now());const next=$('#chargeRefill');if(next&&state.refillAnchor!==null)next.textContent=`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`;}},1000);

@@ -57,9 +57,9 @@ export function reconcile(s, now) {
   // Coins were removed: drop balances and groceries; contracts now boost reach instead of paying fees.
   if(s.version<3){delete s.money;delete s.inventory.food;for(const c of Object.values(s.careers))for(const deal of [c.affiliation,c.offer])if(deal){deal.boost=B.contractBoost;delete deal.fee;delete deal.share;}s.version=3;}
   refill(s,now);
-  // Only heartbeat gaps <= 20 seconds count as active. Offline needs never decay.
+  // Heartbeats arrive every 20 seconds; gaps up to 30 seconds count as active. Offline needs never decay.
   const dt=Math.max(0,now-s.lastSeen);
-  if(dt<=20_000)for(const [need,rate] of Object.entries(B.decay))s.needs[need]=clamp(s.needs[need]-rate*dt/3600_000);
+  if(dt<=30_000)for(const [need,rate] of Object.entries(B.decay))s.needs[need]=clamp(s.needs[need]-rate*dt/3600_000);
   s.lastSeen=now;
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
     item.level=item.upgrade.target; item.upgrade=null; log(s,`${ITEMS[key].name} reached level ${item.level}.`,now);
