@@ -193,9 +193,9 @@ function social(playerId,s,input,now){
     case 'collabInvite': {
       const target=load(input.playerId);fail(target&&target.career===s.career&&!target.blocks.includes(playerId),'Choose an available player in your career.');
       fail(!['founder','web3'].includes(s.career),'Product builds and launches are solo activities in this edition.');
-      const moneyShare=Number(input.moneyShare),audienceShare=Number(input.audienceShare);
-      fail(moneyShare>=0&&moneyShare<=100&&audienceShare>=0&&audienceShare<=100,'Shares must be between 0 and 100.');
-      const a={id:id(),host:playerId,participants:[playerId,input.playerId],accepted:[playerId],career:s.career,title:String(input.title||'Together in the city').slice(0,70),moneyShares:[moneyShare/100,1-moneyShare/100],audienceShares:[audienceShare/100,1-audienceShare/100],status:'pending',at:now};
+      const audienceShare=Number(input.audienceShare);
+      fail(audienceShare>=0&&audienceShare<=100,'Shares must be between 0 and 100.');
+      const a={id:id(),host:playerId,participants:[playerId,input.playerId],accepted:[playerId],career:s.career,title:String(input.title||'Together in the city').slice(0,70),audienceShares:[audienceShare/100,1-audienceShare/100],status:'pending',at:now};
       db.prepare('INSERT INTO agreements VALUES(?,?)').run(a.id,JSON.stringify(a));break;
     }
     case 'collabAccept':case 'collabStart':case 'collabCancel': {
@@ -212,7 +212,7 @@ function social(playerId,s,input,now){
         for(const p of a.participants) {
           const ps=p===playerId?s:load(p);fail(ps&&ps.career===a.career,'A participant changed career. Renew the agreement.');
           act(ps,{type:'start',kind:'produce',title:a.title},now);
-          ps.active.agreementId=a.id;ps.active.moneyShare=1;ps.active.audienceShare=1;
+          ps.active.agreementId=a.id;ps.active.audienceShare=1;
           if(p!==playerId)persist(p,ps);
         }
         a.status='running';
@@ -234,17 +234,15 @@ function collaborativeFinish(playerId,s,input,now) {
   fail(states.every(ps=>ps.active?.agreementId===a.id),'A participant has left. The host can cancel.');
   const quality=Math.round(states.flatMap(ps=>ps.active.outcomes).reduce((n,o)=>n+o.score,0)/states.flatMap(ps=>ps.active.outcomes).length);
   const host=states[0],hc=host.careers[a.career],tier=Math.min(hc.tier,3);
-  const gross=hc.affiliation?hc.affiliation.fee:Math.floor(BALANCE.fees[tier]*quality/100);
   const gain=Math.floor(BALANCE.reaches[tier]*quality/100);
-  let allocatedMoney=0,allocatedAudience=0;
+  let allocatedAudience=0;
   for(let i=0;i<states.length;i++){
     const ps=states[i],c=ps.careers[a.career];
-    const payout=i===states.length-1?gross-allocatedMoney:Math.floor(gross*a.moneyShares[i]);
-    const audience=i===states.length-1?gain-allocatedAudience:Math.floor(gain*a.audienceShares[i]);allocatedMoney+=payout;allocatedAudience+=audience;
-    const net=Math.floor(payout*(1-(c.affiliation?.share||0)));ps.money+=net;c.audience+=audience;const fame=fameFor(audience);addFame(ps,fame);c.completed++;c.engagement=clamp(c.engagement+(quality-50)/10);
-    const output={id:a.id,title:a.title,career:a.career,kind:'collaboration',quality,released:true,credits:states.map(p=>p.name),gain:audience,fame,payout:net,at:now,tier};
+    const audience=i===states.length-1?gain-allocatedAudience:Math.floor(gain*a.audienceShares[i]);allocatedAudience+=audience;
+    c.audience+=audience;const fame=fameFor(audience);addFame(ps,fame);c.completed++;c.engagement=clamp(c.engagement+(quality-50)/10);
+    const output={id:a.id,title:a.title,career:a.career,kind:'collaboration',quality,released:true,credits:states.map(p=>p.name),gain:audience,fame,at:now,tier};
     ps.outputs.unshift(output);ps.results.unshift({...output,learning:ps.active.outcomes.length*5});ps.active=null;
-    evaluate(ps,a.career);captureEligibility(ps,now);log(ps,`Collaboration completed: +${net} coins · ${audience.toLocaleString('en-US')} ${CAREERS[a.career].audience} · +${fame} fame.`,now);
+    evaluate(ps,a.career);captureEligibility(ps,now);log(ps,`Collaboration completed: ${audience.toLocaleString('en-US')} ${CAREERS[a.career].audience} · +${fame} fame.`,now);
     if(a.participants[i]!==playerId)persist(a.participants[i],ps);
   }
   a.status='completed';a.quality=quality;db.prepare('UPDATE agreements SET state=? WHERE id=?').run(JSON.stringify(a),a.id);return true;

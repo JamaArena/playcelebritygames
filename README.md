@@ -39,7 +39,7 @@ Normal production has three beats over two real minutes of commentary; sports us
 
 SQLite stores characters, activity decisions, session hashes, messages, reports, agreements, seasons and idempotency keys under `data/celebrity.sqlite`. Back up the database and its WAL consistently. Keep the browser's session cookie to return to your character. Session cookies are HttpOnly and SameSite Strict; bearer tokens are hashed at rest.
 
-All clocks, random outcomes, charge debits, learning, purchases and reward settlement run on the server. Transactions serialize starts and shared settlements. Each write carries an idempotency key; a retry cannot debit or settle again. Reconnecting preserves the activity ID, chosen actions and outcomes. Career changes preserve skills, possessions, money and the shared charge bar.
+All clocks, random outcomes, charge debits, learning, purchases and reward settlement run on the server. Transactions serialize starts and shared settlements. Each write carries an idempotency key; a retry cannot debit or settle again. Reconnecting preserves the activity ID, chosen actions and outcomes. Career changes preserve skills, possessions, fame and the shared charge bar. There are no coins: items, upgrades and sponsorships unlock with fame.
 
 Confirmed PRD rules include 10 charges, one refill every 36 minutes, football's four skills, shooting capped at 10, distance-sensitive shooting, origins and the arithmetic-then-geometric effort curve. Suggested rates and content are centralized in `public/content.js`. Skill thresholds are 35, 70, 105, 140, 280, 560, 1,120, 2,240 and 4,480. Practice gives 7 points; a relevant decision gives 5 even on failure. Equipment grants quality bonuses, never learning levels.
 

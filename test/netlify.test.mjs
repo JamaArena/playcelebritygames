@@ -27,13 +27,13 @@ test('Netlify Postgres persists cold requests, serializes retries and rolls back
   assert.equal((await call({ type: 'create', name: 'Cloud River', career: 'musician', origin: 0 })).status, 200);
   const saved = (await call()).data;
   assert.equal(saved.state.name, 'Cloud River');
-  await call({ type: 'travel', location: 'plaza' });
+  await call({ type: 'travel', location: 'studio' });
   const requestId = randomUUID();
-  const retries = await Promise.all(Array.from({ length: 3 }, () => call({ type: 'buy', item: 'food', requestId })));
+  const retries = await Promise.all(Array.from({ length: 3 }, () => call({ type: 'start', kind: 'practice', skill: 'songwriting', requestId })));
   assert.ok(retries.every(result => result.status === 200));
-  assert.equal((await call()).data.state.money, 485);
-  assert.equal((await call()).data.state.inventory.food.quantity, 4);
-  assert.equal((await call({ type: 'buy', item: 'food' }, { headers: { Origin: 'https://other.example' } })).status, 400);
+  assert.equal((await call()).data.state.charges, 9, 'concurrent retries spend one charge');
+  assert.equal((await call({ type: 'cancel' }, { headers: { Origin: 'https://other.example' } })).status, 400);
+  await call({ type: 'cancel' });
   const failingPool = { async connect() {
     const client = await pool.connect();
     return { release: () => client.release(), query: (sql, params) => {
@@ -42,10 +42,10 @@ test('Netlify Postgres persists cold requests, serializes retries and rolls back
     } };
   } };
   const failedId = randomUUID();
-  assert.equal((await call({ type: 'buy', item: 'food', requestId: failedId }, { pool: failingPool })).status, 503);
-  assert.equal((await call()).data.state.money, 485);
-  assert.equal((await call({ type: 'buy', item: 'food', requestId: failedId })).status, 200);
-  assert.equal((await call()).data.state.money, 470);
+  assert.equal((await call({ type: 'travel', location: 'plaza', requestId: failedId }, { pool: failingPool })).status, 503);
+  assert.equal((await call()).data.state.location, 'studio', 'a failed save changes nothing');
+  assert.equal((await call({ type: 'travel', location: 'plaza', requestId: failedId })).status, 200);
+  assert.equal((await call()).data.state.location, 'plaza');
   const pulse = async () => Number((await pool.query('SELECT at FROM celebrity.pulse WHERE id = 1')).rows[0].at);
   const afterAction = await pulse();
   assert.ok(afterAction > 0, 'successful actions bump the live pulse');

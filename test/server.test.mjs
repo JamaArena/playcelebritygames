@@ -45,12 +45,12 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   assert.equal((await a.call()).data.state.name,'River');
   assert.equal((await a.call({type:'create',name:'Again',career:'football',origin:0})).status,400);
   assert.equal((await a.call({type:'travel',location:'plaza'},{headers:{Origin:'https://untrusted.example'}})).status,400);
-  await a.call({type:'travel',location:'plaza'});
-  const requestId=randomUUID();await a.call({type:'buy',item:'food',requestId});await a.call({type:'buy',item:'food',requestId});
-  assert.equal((await a.call()).data.state.money,485);assert.equal((await a.call()).data.state.inventory.food.quantity,4);
+  await a.call({type:'travel',location:'studio'});const chargesBefore=(await a.call()).data.state.charges;
+  const requestId=randomUUID();await a.call({type:'start',kind:'practice',skill:'songwriting',requestId});await a.call({type:'start',kind:'practice',skill:'songwriting',requestId});
+  assert.equal((await a.call()).data.state.charges,chargesBefore-1,'a retried start spends one charge');await a.call({type:'cancel'});await a.call({type:'travel',location:'plaza'});
   assert.equal((await b.call({type:'visit',playerId:aId})).status,400);
   await a.call({type:'friend',playerId:bId});await a.call({type:'invite',playerId:bId});assert.equal((await b.call({type:'visit',playerId:aId})).status,200);
-  assert.equal((await b.call({type:'buy',item:'food'})).status,400);
+  assert.equal((await b.call({type:'buy',item:'chair'})).status,400);
   assert.equal((await b.call({type:'recover',need:'energy'})).status,400);
   await b.call({type:'leaveVisit'});
   await a.call({type:'chat',body:'Hello Palm City'});assert.ok((await b.call()).data.messages.some(m=>m.body==='Hello Palm City'));
@@ -60,9 +60,9 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   await a.call({type:'travel',location:'studio'});await b.call({type:'travel',location:'studio'});
   const invite=await a.call({type:'collabInvite',playerId:bId,title:'Shared sunrise',moneyShare:70,audienceShare:60});assert.equal(invite.status,200);
   const agreementId=invite.data.agreements[0].id;
-  assert.equal((await a.call({type:'collabStart',agreementId})).status,400);assert.equal((await a.call()).data.state.charges,10);
+  assert.equal((await a.call({type:'collabStart',agreementId})).status,400);assert.equal((await a.call()).data.state.charges,chargesBefore-1);
   await b.call({type:'collabAccept',agreementId});assert.equal((await a.call({type:'collabStart',agreementId})).status,200);
-  assert.equal((await a.call()).data.state.charges,9);assert.equal((await b.call()).data.state.charges,9);
+  assert.equal((await a.call()).data.state.charges,chargesBefore-2);assert.equal((await b.call()).data.state.charges,9);
   assert.equal((await b.call({type:'cancel'})).status,400);
   // Mutate only this isolated test database to advance timer fixtures. No
   // accelerated clock or admin bypass is present in the game server.
@@ -74,13 +74,13 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   }
   fixture(aId,s=>s.active.readyAt=Date.now()-1);fixture(bId,s=>s.active.readyAt=Date.now()-1);
   const aActivity=(await a.call()).data.state.active.id,bActivity=(await b.call()).data.state.active.id;
-  const ready=await a.call({type:'finish',activityId:aActivity});assert.ok(ready.data.state.active);assert.equal(ready.data.state.money,485);
+  const ready=await a.call({type:'finish',activityId:aActivity});assert.ok(ready.data.state.active);
   assert.equal((await b.call({type:'finish',activityId:bActivity})).status,200);
   const aFinal=(await a.call()).data.state,bFinal=(await b.call()).data.state;assert.equal(aFinal.active,null);assert.equal(bFinal.active,null);
   assert.equal(aFinal.outputs[0].id,bFinal.outputs[0].id);assert.deepEqual(aFinal.outputs[0].credits,['River','Sky']);
-  const totalAudience=aFinal.outputs[0].gain+bFinal.outputs[0].gain,totalPayout=aFinal.outputs[0].payout+bFinal.outputs[0].payout;
-  assert.equal(totalAudience,100*aFinal.outputs[0].quality);assert.equal(totalPayout,Math.floor(50*aFinal.outputs[0].quality/100));
-  assert.equal((await b.call({type:'finish',activityId:bActivity})).status,400);assert.equal((await b.call()).data.state.money,bFinal.money);
+  const totalAudience=aFinal.outputs[0].gain+bFinal.outputs[0].gain;
+  assert.equal(totalAudience,100*aFinal.outputs[0].quality);
+  assert.equal((await b.call({type:'finish',activityId:bActivity})).status,400);assert.equal((await b.call()).data.state.fame,bFinal.fame);
   fixture(aId,s=>{s.careers.musician.audience=20000;});await a.call();
   database.prepare('UPDATE seasons SET ends=? WHERE id=1').run(Date.now()+1);
   // The first post-cutoff request freezes and settles before any new action.

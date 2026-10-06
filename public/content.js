@@ -5,7 +5,7 @@ export const BALANCE = {
   decay: { hunger: 12, energy: 8, fun: 6, social: 6, hygiene: 8, bladder: 15 },
   activityMs: 120_000, sportMs: 300_000, upgradeMs: 30 * 60_000,
   // Reach per output (views, streams, fans cheering, users) before quality; 1,000 reach = 1 fame point.
-  reaches: [10_000, 100_000, 1_000_000, 10_000_000], famePerReach: 1 / 1000, seasonMinReach: 10_000, fees: [50, 250, 1000, 5000],
+  reaches: [10_000, 100_000, 1_000_000, 10_000_000], famePerReach: 1 / 1000, seasonMinReach: 10_000, contractBoost: .25,
   tiers: [['Newcomer', 0, 1], ['Emerging', 100, 2], ['Established', 1000, 4], ['Star', 10000, 6], ['Icon', 100000, 8]],
   milestones: [100, 1000, 10000, 100000], seasonMs: 28 * 86400_000, driveMsPerBlock: 60_000,
 };
@@ -42,11 +42,11 @@ export const TOWN = {
 };
 export const lotAt = (x, z) => Object.keys(TOWN).find(key => Math.abs(x - TOWN[key].x) <= 5.5 && Math.abs(z - TOWN[key].z) <= 5.5);
 export const ITEMS = {
-  food: {name: 'Fresh groceries', price: 15, description: 'One meal. Restores 40 hunger after eating.'},
-  gear: {name: 'Career equipment', price: 150, description: 'Practice at home. Production quality +5 per level above 1.', upgradable: true, slot: 'gear'},
-  jacket: {name: 'Signature jacket', price: 75, description: 'An emerald layer for your everyday look.', slot: 'clothes'},
-  chair: {name: 'Lounge chair', price: 80, description: 'Place it in a free apartment position.', furniture: true},
-  trophyShelf: {name: 'Award shelf', price: 100, description: 'A place for the milestones you earn.', furniture: true},
+  // There are no coins: items unlock at a fame level and are free to claim. Fame is never spent.
+  chair: {name: 'Lounge chair', fame: 25, description: 'Place it in a free spot at home.', furniture: true},
+  gear: {name: 'Career equipment', fame: 50, description: 'Practise at home. Production quality +5 per level above 1. Higher levels need more fame.', upgradable: true, slot: 'gear'},
+  jacket: {name: 'Signature jacket', fame: 150, description: 'An emerald layer for your everyday look.', slot: 'clothes'},
+  trophyShelf: {name: 'Award shelf', fame: 1000, description: 'A place for the milestones you earn.', furniture: true},
 };
 // VIP sponsorship deals: free items unlocked by fame, claimed at Palm Motors in Palm plaza.
 // Fame is not spent and claimed items stay yours. Brand names are fictional.
