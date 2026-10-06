@@ -1,4 +1,4 @@
-import { CAREERS, LOCATIONS, ITEMS, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, BALANCE as B, effort, canPlace } from './content.js';
+import { CAREERS, LOCATIONS, ITEMS, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, BALANCE as B, effort, canPlace } from './content.js';
 import { World, worldObjects } from './world.js';
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -36,9 +36,10 @@ function notice(data,own){
     for(const m of room.filter(m=>m.at>seen.roomAt))world.say(m.sender===me?'me':m.sender,m.body);
       for(const b of (data.battles||[]))if(b.invited===me&&b.status==='open'&&!seen.battles.has(b.id)){fresh.push(`⚔ ${b.teamNames[0][0]?.name} challenged you to a 1v1!`);battleId=b.id;setTimeout(battleView,0);}
     if(s.battle&&s.battle!==seen.battle){battleId=s.battle;setTimeout(battleView,0);}
+    for(const item of (s.insights||[]).filter(i=>!seen.insights.has(i.id)))insight(['💡 You learnt something',`${escape(item.text)}<br><strong class="insight-points">+${item.points} ${escape(item.skill)}</strong>`]);
   if(fresh.length)toast(fresh.slice(-2).join('  ·  '));
   }
-  seen={player:me,eventAt:Math.max(seen?.player===me?seen.eventAt:0,latest(s.events)),dmAt:Math.max(seen?.player===me?seen.dmAt:0,latest(dms)),roomAt:Math.max(seen?.player===me?seen.roomAt:0,latest(room)),tiers,battle:s.battle,battles:new Set((data.battles||[]).map(b=>b.id))};
+  seen={player:me,eventAt:Math.max(seen?.player===me?seen.eventAt:0,latest(s.events)),dmAt:Math.max(seen?.player===me?seen.dmAt:0,latest(dms)),roomAt:Math.max(seen?.player===me?seen.roomAt:0,latest(room)),tiers,insights:new Set((s.insights||[]).map(i=>i.id)),battle:s.battle,battles:new Set((data.battles||[]).map(b=>b.id))};
 }
 function receive(data,own=false){notice(data,own);snapshot=data;state=data.state;offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();
   $('#loading').hidden=true;
@@ -66,9 +67,10 @@ function closeTray(){ $('#objectTray').hidden=true;$('#pieMenu').hidden=true;wor
 function pie(object,options){
   $('#objectTray').hidden=true;
   const card=$('.world-card'),canvas=$('#world'),p=world.screenOf(object),n=options.length;
-  const x=Math.min(card.clientWidth-150,Math.max(150,canvas.offsetLeft+p.x)),y=Math.min(card.clientHeight-60,Math.max(110,canvas.offsetTop+p.y));
-  const angle=i=>(n<=4?-90+(i-(n-1)/2)*58:-90+i*360/n)*Math.PI/180;
-  $('#pieMenu').innerHTML=button(escape(object.name),'closeTray','aria-label="Close '+escape(object.name)+' menu"','pie-center')+options.map(([label,action,attrs=''],i)=>`<button class="pie-option" role="menuitem" style="--x:${Math.round(Math.cos(angle(i))*96)}px;--y:${Math.round(Math.sin(angle(i))*72)}px;--i:${i}" data-action="${action}" ${attrs}>${label}</button>`).join('');
+  const half=Math.min(170,card.clientWidth/2),x=Math.min(card.clientWidth-half,Math.max(half,canvas.offsetLeft+p.x)),y=Math.min(card.clientHeight-40,Math.max(80+n*44,canvas.offsetTop+p.y));
+  // Options stack upward in one centred column above the object's name, so they never collide or leave the screen.
+  const place=i=>({side:0,y:-46-(n-1-i)*44});
+  $('#pieMenu').innerHTML=button(escape(object.name),'closeTray','aria-label="Close '+escape(object.name)+' menu"','pie-center')+options.map(([label,action,attrs=''],i)=>{const p=place(i);return `<button class="pie-option side-${p.side<0?'left':p.side>0?'right':'mid'}" role="menuitem" style="--y:${p.y}px;--i:${i}" data-action="${action}" ${attrs}>${label}</button>`;}).join('');
   Object.assign($('#pieMenu').style,{left:x+'px',top:y+'px'});$('#pieMenu').hidden=false;$('#pieMenu .pie-option')?.focus({preventScroll:true});
 }
 function showTray(title,html){$('#pieMenu').hidden=true;$('#objectTray').innerHTML='<header><h3>'+escape(title)+'</h3>'+button('×','closeTray','aria-label="Close object actions"','tray-close')+'</header>'+html;$('#objectTray').hidden=false;}
@@ -92,7 +94,8 @@ const world=new World($('#world'),position=>{closeTray();send({type:'move',...po
   if(object.action==='enter'){pie(object,[['🏠 Go inside','travel','data-location="home"']]);return;}
   if(object.action==='vip'){pie(object,[['🏁 Sponsorship deals','page','data-page="vip"'],['↗ Go here','goObject']]);return;}
   if(object.action==='phone'){pie(object,[['♡ Chat','quickSocial'],['♧ Contacts','page','data-page="phone"'],['↗ Go here','goObject']]);return;}
-  pie(object,[[`${object.icon} ${escape(object.verb||'Use')}${object.need?` <small>+${B.recovery[object.need][0]} ${escape(needs[object.need][0])} · ${duration(B.recovery[object.need][1])}</small>`:''}`,'useObject'],['↗ Go here','goObject']]);
+  const watch=object.name==='Television'&&!state.visiting?[[`📺 ${escape(WATCH[def.family].title)} <small>learn a little</small>`,'watchObject']]:[];
+  pie(object,[...watch,[`${object.icon} ${escape(object.verb||'Use')}${object.need?` <small>+${B.recovery[object.need][0]} ${escape(needs[object.need][0])}, stop any time</small>`:''}`,'useObject'],['↗ Go here','goObject']]);
 });
 world.onGround=closeTray;
 function whenIdle(perform){if(!busy){perform();return;}const timer=setInterval(()=>{if(!busy){clearInterval(timer);perform();}},50);}
@@ -131,7 +134,7 @@ function progress(start,end){const value=Math.min(100,Math.max(0,(now()-start)/(
 function renderActivity(){
   const a=state.active,r=state.recovery,def=CAREERS[state.career],t=state.trip;let html='';
   if(t)html='<div class="sim-status"><span>'+(RIDES[t.ride]?.icon||'🚶')+'</span><strong>'+(t.ride?'Driving':'Walking')+' to '+escape(LOCATIONS[t.to].name)+'</strong><time>'+duration(t.arrives-now())+'</time></div>'+progress(t.departs,t.arrives);
-  else if(r)html='<div class="sim-status"><span>'+needs[r.need][1]+'</span><strong>'+escape(r.label)+'</strong><time>'+duration(r.endsAt-now())+'</time>'+button('×','cancel','aria-label="Cancel recovery"','tray-close')+'</div>'+progress(r.startedAt??r.endsAt-B.recovery[r.need][1],r.endsAt);
+  else if(r){const start=r.startedAt??r.endsAt-B.recovery[r.need][1],gained=Math.round(B.recovery[r.need][0]*Math.min(1,Math.max(0,(now()-start)/(r.endsAt-start))));html='<div class="sim-status"><span>'+(r.watch?'📺':needs[r.need][1])+'</span><strong>'+escape(r.label)+'</strong><small>+'+gained+' '+escape(needs[r.need][0])+(r.watch?.learn?` · ${r.watch.given||0}/5 insights`:r.watch?' · just for fun (learning cooldown)':'')+'</small>'+button('Get up','getUp','','secondary')+'</div>'+progress(start,r.endsAt);}
   else if(a?.kind==='practice')html='<div class="sim-status"><span>'+def.icon+'</span><strong>'+escape(a.skill)+'</strong><small>+7 XP</small><time>'+duration(a.readyAt-now())+'</time>'+button('×','cancel','aria-label="Cancel practice"','tray-close')+'</div>'+progress(a.startedAt,a.readyAt);
   else if(a){
     const waiting=now()<a.readyAt,complete=a.beat>=a.totalBeats;
@@ -245,19 +248,35 @@ const TIPS={
 };
 let tipQueue=[],tipsSeen={};try{tipsSeen=JSON.parse(localStorage.getItem('celebritygames-tips')||'{}');}catch{}
 function tip(key){if(tipsSeen[key]||!TIPS[key])return;tipsSeen[key]=1;try{localStorage.setItem('celebritygames-tips',JSON.stringify(tipsSeen));}catch{}tipQueue.push(key);if(tipQueue.length===1)showTip();}
-function showTip(){const key=tipQueue[0];if(!key){$('#tipCard').hidden=true;return;}const [title,body]=TIPS[key];$('#tipCard').innerHTML=`<strong>${title}</strong><p>${body}</p>${button('Got it','closeTip','','primary')}`;$('#tipCard').hidden=false;}
+function insight(item){tipQueue.push(item);if(tipQueue.length===1)showTip();}
+function showTip(){const key=tipQueue[0];if(!key){$('#tipCard').hidden=true;return;}const [title,body]=typeof key==='string'?TIPS[key]:key;$('#tipCard').innerHTML=`<strong>${title}</strong><p>${body}</p>${button('Got it','closeTip','','primary')}`;$('#tipCard').hidden=false;}
 function closeTip(){tipQueue.shift();showTip();}
 // The phone at the top of the screen holds every menu. Tap it to open the home screen of apps.
 function alerts(){const me=snapshot.playerId;return state.invitations.filter(i=>i.expiresAt>now()).length+(snapshot.battles||[]).filter(b=>b.invited===me&&b.status==='open').length;}
 function phoneWidget(){const model=PHONES[state.phone]||PHONES.basic,count=alerts();
-  return `<button class="phone-widget" data-action="openPhone" style="--phone:${model.color}" aria-label="Open your phone${count?`, ${count} alerts`:''}"><span class="phone-mini">📱${count?`<i>${count}</i>`:''}</span><span class="phone-line"><strong>✦ ${fmt(state.fame||0)}</strong><small>fame · ${B.tiers[state.careers[state.career].tier][0]}</small></span><span class="phone-line"><strong>ϟ ${state.charges}/10</strong><small id="chargeRefill">${state.refillAnchor===null?'charged':`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></span></button>`;}
+  return `<button class="phone-widget skin-${PHONES[state.phone]?state.phone:'basic'}" data-action="openPhone" style="--phone:${model.color}" aria-label="Open your phone${count?`, ${count} alerts`:''}"><span class="phone-mini">📱${count?`<i>${count}</i>`:''}</span><span class="phone-line"><strong>✦ ${fmt(state.fame||0)}</strong><small>fame · ${B.tiers[state.careers[state.career].tier][0]}</small></span><span class="phone-line"><strong>ϟ ${state.charges}/10</strong><small id="chargeRefill">${state.refillAnchor===null?'charged':`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></span></button>`;}
 const APPS=[['map','🗺️','Map'],['career','✦','Career'],['phone','💬','Social'],['battles','⚔','Battles'],['inventory','🏠','My stuff'],['shop','🛍️','Market'],['vip','🏁','Palm Motors'],['profile','♙','Profile'],['life','♡','My life'],['nearby','◇','Nearby'],['tips','💡','Tips'],['upgrade','📲','Upgrade']];
+// Each phone tier has its own look and feel; cheaper phones lag and sometimes hang (only ever a delay).
+function phoneModel(){const key=PHONES[state.phone]?state.phone:'basic';return {key,...PHONES[key]};}
 function phoneHome(){
-  const model=PHONES[state.phone]||PHONES.basic,me=snapshot.playerId,online=snapshot.players.filter(p=>p.online&&state.friends.includes(p.id)).length,next=Object.values(SPONSORSHIPS).filter(d=>d.fame>(state.fame||0)).sort((x,y)=>x.fame-y.fame)[0];
-  const widgets=[(state.phone||'basic')!=='basic'?`<div class="phone-card">👥 ${online} friend${online===1?'':'s'} online</div>`:'',['pro','gold'].includes(state.phone)&&next?`<div class="phone-card">🔓 Next unlock: ${next.icon} ${escape(next.name)} at ${fmt(next.fame)} fame</div>`:''].join('');
-  showModal('phoneHome',`<div class="phone-device" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-status"><span>${new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</span><span>${escape(model.name)}</span><span>●●● 🔋</span></div><div class="phone-hello"><strong>${escape(state.name)}</strong><small>✦ ${fmt(state.fame||0)} fame · ${escape(LOCATIONS[state.location].name)}</small></div>${widgets}<div class="app-grid">${APPS.map(([key,icon,label])=>`<button class="app" data-action="app" data-app="${key}"><span>${icon}</span><small>${label}${key==='phone'&&alerts()?` <i>${alerts()}</i>`:''}</small></button>`).join('')}</div></div>`);
+  const model=phoneModel(),online=snapshot.players.filter(p=>p.online&&state.friends.includes(p.id)).length,next=Object.values(SPONSORSHIPS).filter(d=>d.fame>(state.fame||0)).sort((x,y)=>x.fame-y.fame)[0];
+  const time=new Date(),clockText=time.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),dateText=time.toLocaleDateString([],{weekday:'long',day:'numeric',month:'short'});
+  const widgets=[model.key==='pro'||model.key==='gold'?`<div class="phone-clock"><strong>${clockText}</strong><small>${dateText}</small></div>`:'',model.key!=='basic'?`<div class="phone-card">👥 ${online} friend${online===1?'':'s'} online</div>`:'',['pro','gold'].includes(model.key)&&next?`<div class="phone-card">🔓 Next: ${next.icon} ${escape(next.name)} at ${fmt(next.fame)} fame</div>`:'',model.nag&&Math.random()<model.nag?`<div class="phone-nag">⚠ Storage almost full. Delete some photos?</div>`:''].join('');
+  const dock=['phone','career','map','tips'],apps=['pro','gold'].includes(model.key)?APPS.filter(([k])=>!dock.includes(k)):APPS,icon=([key,icon,label])=>`<button class="app" data-action="app" data-app="${key}"><span>${icon}</span><small>${model.key==='basic'&&label.length>8?label.slice(0,7)+'…':label}${key==='phone'&&alerts()?` <i>${alerts()}</i>`:''}</small></button>`;
+  showModal('phoneHome',`<div class="phone-device skin-${model.key}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen"><div class="phone-status"><span>${model.key==='basic'?time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false}):clockText}</span><span>${model.network} ${'▂▄▆█'.slice(0,model.key==='basic'?2:model.key==='smart'?3:4)}</span><span>${model.battery}% ${model.battery<30?'🪫':'🔋'}</span></div>${['pro','gold'].includes(model.key)?'':`<div class="phone-hello"><strong>${escape(state.name)}</strong><small>✦ ${fmt(state.fame||0)} fame · ${escape(LOCATIONS[state.location].name)}</small></div>`}${widgets}<div class="app-grid">${apps.map(icon).join('')}</div>${['pro','gold'].includes(model.key)?`<div class="phone-dock">${APPS.filter(([k])=>dock.includes(k)).map(icon).join('')}</div>`:''}<div class="phone-overlay" id="phoneOverlay" hidden></div></div></div>`);
 }
-function openApp(key){({map,phone:()=>phone('local'),battles:()=>phone('battles'),career,inventory,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,upgrade:phoneStore}[key]||phoneHome)();}
+const APP_NAMES=Object.fromEntries(APPS.map(([key,,label])=>[key,label]));
+function launch(key){({map,phone:()=>phone('local'),battles:()=>phone('battles'),career,inventory,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,upgrade:phoneStore}[key]||phoneHome)();}
+// Budget phones make you wait, and now and then the app hangs. You can always wait or close it.
+function openApp(key){
+  const model=phoneModel(),overlay=$('#phoneOverlay'),delay=model.lag[0]+Math.random()*(model.lag[1]-model.lag[0]);
+  if(!overlay||!delay){launch(key);return;}
+  overlay.hidden=false;overlay.innerHTML=`<div class="phone-loading"><span class="spinner"></span><small>${model.key==='basic'?'Loading…':'Opening'} ${escape(APP_NAMES[key]||'')}</small></div>`;
+  setTimeout(()=>{if(modalPage!=='phoneHome'||!$('#phoneOverlay'))return;
+    if(Math.random()<model.hang){overlay.innerHTML=`<div class="phone-anr"><strong>${escape(APP_NAMES[key]||'App')} isn't responding</strong><p>Do you want to close it?</p><div>${button('Close app','anrClose')}${button('Wait','anrWait',`data-app="${key}"`)}</div></div>`;return;}
+    launch(key);
+  },delay);
+}
 function lifePanel(){showModal('life',`<span class="eyebrow">YOUR DAILY LIFE</span><h2>How you're doing</h2>${$('#profileCard').innerHTML}<hr>${$('#needsCard').innerHTML}<hr>${$('#skillsCard').innerHTML}<hr><h3>Recent moments</h3>${$('#feed').innerHTML}`);}
 function nearby(){closeModal();$('#objects').hidden=false;$('#objects').scrollIntoView({block:'nearest'});toast('Tap anything nearby to use it.');}
 function tipsApp(){showModal('tips',`<span class="eyebrow">💡 TIPS</span><h2>How Palm City works</h2><div class="tips-list">${Object.values(TIPS).map(([title,body])=>`<div class="tip-item"><strong>${title}</strong><p>${body}</p></div>`).join('')}</div>`);}
@@ -287,14 +306,15 @@ document.addEventListener('click',async event=>{
     case 'creationNext':if(!$('#name').reportValidity())break;$('#stepLook').hidden=true;$('#stepCareer').hidden=false;$('#stepTwoLabel').classList.add('on');break;
     case 'creationBack':$('#stepLook').hidden=false;$('#stepCareer').hidden=true;$('#stepTwoLabel').classList.remove('on');break;
     case 'closeTip':closeTip();break;
+    case 'getUp':await send({type:'cancel'});break;
     case 'travel':await send({type:'travel',location:d.location});break;
     case 'object':world.walkToObject(d.name);break;
-    case 'goObject':case 'useObject':{
-      const object=selectedObject,use=d.action==='useObject';closeTray();closeModal();
+    case 'goObject':case 'useObject':case 'watchObject':{
+      const object=selectedObject,use=d.action!=='goObject',watch=d.action==='watchObject';closeTray();closeModal();
       world.approach(object,()=>{
         if(!use)return;
         const perform=async()=>{
-          if(object.need){const data=await send({type:'recover',need:object.need});if(!data)return;}
+          if(object.need){const data=await send({type:'recover',need:object.need,watch});if(!data)return;}
           if(object.pose){const x=object.pose==='dine'?.5:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?-3.5:object.vx??object.x;const z=object.pose==='dine'?2.1:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?1.5:object.vz??object.z;world.pose={kind:object.pose,x,z};}
           if(object.name==='Bedside lamp')world.lampOff=!world.lampOff;
           if(object.name==='Fridge')world.fridgeOpen=!world.fridgeOpen;
@@ -322,6 +342,8 @@ document.addEventListener('click',async event=>{
     case 'openBattle':openBattle(d.battle);break;
     case 'openPhone':phoneHome();break;
     case 'app':openApp(d.app);break;
+    case 'anrClose':phoneHome();break;
+    case 'anrWait':{const overlay=$('#phoneOverlay');if(overlay)overlay.innerHTML='<div class="phone-loading"><span class="spinner"></span><small>Still waiting…</small></div>';setTimeout(()=>{if(modalPage==='phoneHome')launch(d.app);},1200);break;}
     case 'backToPhone':phoneHome();break;
     case 'phoneUpgrade':await send({type:'phoneUpgrade',item:d.item},{keepModal:true});break;
     case 'buy':case 'equip':case 'claim':case 'useVip':await send({type:d.action,item:d.item},{keepModal:true});break;

@@ -138,3 +138,70 @@ html,body,#app{height:100%;height:100dvh;overflow:hidden}.rail{background:#153d3
 .tips-list{display:grid;gap:10px}
 .tip-item{padding:12px 14px;border-radius:14px;background:#f6f8f2;border:1px solid #e3e9dc}
 .tip-item p{margin:4px 0 0;font-size:12px;line-height:1.5;color:#46594b}
+
+/* Phone skins: budget brick → mid-range → flagship → gold. */
+.phone-screen{position:relative;overflow:hidden;border-radius:26px;background:var(--screen)}
+.phone-screen .phone-status,.phone-screen .phone-hello,.phone-screen .phone-card,.phone-screen .app-grid{background:transparent}
+.phone-overlay{position:absolute;inset:0;display:grid;place-items:center;background:#0008;z-index:3}
+.phone-loading{display:grid;justify-items:center;gap:10px;color:#fff;font-size:12px}
+.spinner{width:30px;height:30px;border-radius:50%;border:3px solid #ffffff55;border-top-color:#fff;animation:spin .9s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.phone-anr{width:78%;padding:16px;border-radius:6px;background:#fff;color:#222;font-size:12px;box-shadow:0 10px 30px #0006}
+.phone-anr strong{font-size:14px}
+.phone-anr div{display:flex;justify-content:flex-end;gap:6px;margin-top:10px}
+.phone-anr button{background:transparent;color:#1a73e8;font-weight:700;text-transform:uppercase;font-size:11px;padding:6px}
+.phone-nag{margin:4px 14px;padding:6px 10px;border-radius:4px;background:#fff3cd;color:#7a5b00;font-size:10px}
+.phone-dock{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:0 12px 14px;padding:10px 6px;border-radius:24px;background:#ffffff26;backdrop-filter:blur(8px)}
+.phone-clock{display:grid;padding:22px 20px 10px}
+.phone-clock strong{font:200 46px/1 'Segoe UI',sans-serif;letter-spacing:-1px}
+.phone-clock small{font-size:12px;opacity:.75}
+
+/* Budget: thick plastic, low-res, flat squares, flickery. */
+.skin-basic.phone-device{padding:22px 16px 30px;border-radius:22px;background:linear-gradient(160deg,#4a524d,#2e3431);box-shadow:0 20px 50px #0007,inset 0 0 0 2px #ffffff14}
+.skin-basic .phone-notch{width:14px;height:14px;margin-left:-7px;top:8px;border-radius:50%;background:#111}
+.skin-basic .phone-screen{border-radius:4px;background:#dfe6ea;font-family:'Courier New',monospace;filter:saturate(.75) contrast(.92);animation:flicker 2.8s steps(1) 1}
+.skin-basic .phone-screen::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg,#0000 0 2px,#0000000a 2px 3px);z-index:2}
+.skin-basic .phone-status{border-radius:0;background:#2b3a44;color:#cfd9de;font-size:10px;padding:4px 8px}
+.skin-basic .phone-hello strong{font:700 16px 'Courier New',monospace}
+.skin-basic .app-grid{grid-template-columns:repeat(3,1fr);gap:10px 4px}
+.skin-basic .app span{width:46px;height:46px;border-radius:4px;background:#b9c6cd;box-shadow:none;font-size:20px;filter:saturate(.6)}
+.skin-basic .app small{font:10px 'Courier New',monospace}
+.skin-basic .app:nth-child(5) span{transform:translateY(2px) rotate(-2deg)}
+.skin-basic .app:hover span{transform:none;box-shadow:none}
+@keyframes flicker{0%{opacity:.2}6%{opacity:1}9%{opacity:.6}12%{opacity:1}}
+.phone-widget.skin-basic{border-radius:8px;font-family:'Courier New',monospace;background:#eef1ee}
+
+/* Mid-range: gradient wallpaper, rounded colourful icons. */
+.skin-smart .phone-screen{background:linear-gradient(160deg,#5b7cfa,#9b5de5 60%,#f15bb5)}
+.skin-smart .phone-status,.skin-smart .phone-hello strong,.skin-smart .phone-hello small,.skin-smart .phone-card,.skin-smart .app small{color:#fff}
+.skin-smart .app span{border-radius:14px;background:#ffffffe6}
+
+/* Flagship: big clock, pastel squircles, dock, smooth spring. */
+.skin-pro.phone-device{padding:10px;border-radius:44px;background:linear-gradient(160deg,#2b2440,#15121f)}
+.skin-pro .phone-notch{width:12px;height:12px;margin-left:-6px;top:20px;border-radius:50%}
+.skin-pro .phone-screen{border-radius:36px;background:radial-gradient(circle at 30% 0%,#3c3a6e,#151530 70%);color:#fff}
+.skin-pro .phone-status,.skin-pro .phone-card,.skin-pro .app small{color:#e8e6ff}
+.skin-pro .app span{border-radius:22px;background:linear-gradient(160deg,#ffffff,#e6e0ff);transition:transform .25s cubic-bezier(.3,1.6,.5,1)}
+.skin-pro .app:hover span{transform:scale(1.08)}
+.skin-pro .phone-device,.skin-gold .phone-device{animation:none}
+
+/* Gold: gold frame, pill cut-out, glass icons, shimmer. */
+.skin-gold.phone-device{padding:9px;border-radius:46px;background:linear-gradient(135deg,#f7e7a9,#b8932f 40%,#f3dc8e 60%,#9c7a20);box-shadow:0 30px 70px #0b1f1666,inset 0 0 0 1px #fff8}
+.skin-gold .phone-notch{width:96px;height:26px;margin-left:-48px;top:18px;border-radius:14px}
+.skin-gold .phone-screen{border-radius:38px;background:linear-gradient(180deg,#1c1710,#3a2d12 60%,#7a5c1c)}
+.skin-gold .phone-status,.skin-gold .phone-hello strong,.skin-gold .phone-hello small,.skin-gold .phone-card,.skin-gold .app small,.skin-gold .phone-clock{color:#f7e7a9}
+.skin-gold .phone-status{padding-top:14px}
+.skin-gold .app span{border-radius:20px;background:#ffffff1f;border:1px solid #f7e7a955;backdrop-filter:blur(10px);box-shadow:inset 0 1px 0 #fff4}
+.skin-gold .phone-screen::before{content:'';position:absolute;inset:-50%;background:linear-gradient(115deg,#0000 45%,#fff2 50%,#0000 55%);animation:shine 6s ease-in-out infinite;pointer-events:none}
+@keyframes shine{0%,70%{transform:translateX(-60%)}100%{transform:translateX(60%)}}
+.phone-widget.skin-gold{border-color:#d4af37;background:linear-gradient(135deg,#fffaf0,#f7e7a9)}
+@media(prefers-reduced-motion:reduce){.skin-basic .phone-screen,.skin-gold .phone-screen::before,.spinner{animation:none}}
+
+/* Pie options in two columns beside the object's name. */
+.pie-option{transform:translate(var(--dx),calc(-50% + var(--y)))!important}
+.pie-option.side-left{--dx:calc(-100% - 6px)}
+.pie-option.side-right{--dx:6px}
+.pie-option.side-mid{--dx:-50%}
+@keyframes pie-in{from{opacity:0;transform:translate(var(--dx),-50%) scale(.6)}}
+.insight-points{display:inline-block;margin-top:6px;padding:3px 10px;border-radius:12px;background:#e3f0df;color:#1f6b3f;font-size:12px}
+.pie-option{max-width:calc(100vw - 32px);overflow:hidden;text-overflow:ellipsis}
