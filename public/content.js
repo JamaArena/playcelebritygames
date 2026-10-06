@@ -10,7 +10,7 @@ export const BALANCE = {
   milestones: [100, 1000, 10000, 100000], seasonMs: 28 * 86400_000, walkMsPerBlock: 25_000, walkCapMs: 90_000,
 };
 // Careers sit under four umbrellas. Origins are [humble start, best start]; the start is drawn at random.
-export const UMBRELLAS = {sport: 'Sports', creator: 'Content creation', music: 'Entertainment', acting: 'Entertainment', tech: 'Technology', risk: 'Technology'};
+export const UMBRELLAS = {sport: 'Sports', creator: 'Content creation', music: 'Entertainment', acting: 'Entertainment', tech: 'Technology'};
 const career = (name, icon, family, skills, origins, location, output, beats, focus = skills[0]) => ({name, icon, family, umbrella: UMBRELLAS[family], skills, origins, location, output, beats, focus, audience: family === 'tech' ? 'users' : family === 'music' ? 'streams' : family === 'sport' ? 'fans cheering' : 'views'});
 export const CAREERS = {
   football: career('Footballer', '⚽', 'sport', ['passing', 'dribbling', 'shooting', 'defending'], ['Street footballer', 'Academy prodigy'], 'sports', 'Match', ['Find space behind the defence.', 'A defender closes down your passing lane.', 'The ball breaks near your penalty area.', 'You have a clear view of goal.', 'Track the runner on the flank.', 'One final attack could change the game.'], 'passing'),
@@ -27,7 +27,6 @@ export const CAREERS = {
   founder: career('Founder', '⬡', 'tech', ['product judgement', 'leadership', 'sales', 'finance'], ['Bootstrapped founder', 'Mentored builder'], 'tech', 'Product', ['Choose a feature after customer feedback.', 'Allocate a limited production budget.', 'Resolve a problem before delivery.']),
   developer: career('Developer', '⌘', 'tech', ['coding', 'debugging', 'architecture', 'communication'], ['Self-taught freelancer', 'Mentored coding prodigy'], 'tech', 'Client project', ['Inspect a fictional bug in the client project.', 'Choose a repair that preserves stability.', 'Communicate a delivery tradeoff.']),
   web3: career('Web3 builder', '⬢', 'tech', ['product', 'community', 'research', 'technical skill'], ['Independent newcomer', 'Community-connected talent'], 'tech', 'Product', ['Pick a useful fictional product direction.', 'Respond to community concerns.', 'Handle a launch-readiness decision.']),
-  hacker: career('Fraudster', '⌁', 'risk', ['technical skill', 'deception', 'planning', 'risk judgement'], ['Small-time hustler', 'Crew recruit'], 'tech', 'Operation', ['Choose a route through an invented simulation.', 'An invented complication raises exposure.', 'Decide whether to complete the simulation or stop.']),
 };
 export const LOCATIONS = {
   home: {name: 'Your apartment', subtitle: 'A little room for big dreams', icon: '⌂', color: '#edc594'},
@@ -50,6 +49,34 @@ export const ITEMS = {
   gear: {name: 'Career equipment', fame: 50, description: 'Practise at home. Production quality +5 per level above 1. Higher levels need more fame.', upgradable: true, slot: 'gear'},
   jacket: {name: 'Signature jacket', fame: 150, description: 'An emerald layer for your everyday look.', slot: 'clothes'},
   trophyShelf: {name: 'Award shelf', fame: 1000, description: 'A place for the milestones you earn.', furniture: true},
+  // Home items: place them at home, then tap them to use. `use` says what they do while you use them;
+  // `extra` changes other needs, `onItem` puts you on the item itself (a seat or a treadmill).
+  ankaraRug: {name: 'Ankara print rug', fame: 50, description: 'A bright patterned rug for the living room.', furniture: true},
+  floorLamp: {name: 'Floor lamp', fame: 30, description: 'A tall lamp for warm evenings.', furniture: true},
+  plants: {name: 'Indoor plant pack', fame: 40, description: 'Monstera and snake plants to water.', furniture: true, use: {verb: 'Water plants', icon: '❀', need: 'fun', amount: 5, ms: 10_000, pose: 'water'}},
+  mirror: {name: 'Full-length mirror', fame: 60, description: 'Check your look before you head out.', furniture: true, use: {verb: 'Check your look', icon: '🪞', need: 'fun', amount: 10, ms: 15_000, pose: 'gesture'}},
+  beanBag: {name: 'Bean bag', fame: 80, description: 'A comfy seat for lazy afternoons.', furniture: true, use: {verb: 'Lounge', icon: '◒', need: 'fun', amount: 25, ms: 45_000, pose: 'sit', seat: .4, onItem: true}},
+  bookshelf: {name: 'Bookshelf', fame: 100, description: 'Read a good book to unwind.', furniture: true, use: {verb: 'Read a book', icon: '📖', need: 'fun', amount: 20, ms: 40_000, pose: 'chat'}},
+  microwave: {name: 'Microwave', fame: 120, description: 'A fast, so-so meal when you are in a rush.', furniture: true, use: {verb: 'Quick meal', icon: '🍱', need: 'hunger', amount: 25, ms: 15_000, pose: 'chat'}},
+  coffeeMachine: {name: 'Coffee machine', fame: 150, description: 'A quick energy boost.', furniture: true, use: {verb: 'Make coffee', icon: '☕', need: 'energy', amount: 20, ms: 20_000, pose: 'chat'}},
+  washingMachine: {name: 'Washing machine', fame: 250, description: 'Fresh clothes keep you clean.', furniture: true, use: {verb: 'Do laundry', icon: '🧺', need: 'hygiene', amount: 20, ms: 30_000, pose: 'chat'}},
+  dressingTable: {name: 'Dressing table', fame: 300, description: 'Groom and get ready for the day.', furniture: true, use: {verb: 'Get ready', icon: '💄', need: 'hygiene', amount: 30, ms: 30_000, pose: 'work', seat: .52}},
+  gamingConsole: {name: 'Gaming console', fame: 400, description: 'Big fun, a little tiring.', furniture: true, use: {verb: 'Play games', icon: '🎮', need: 'fun', amount: 40, ms: 60_000, pose: 'work', seat: .4, extra: {energy: -5}}},
+  soundSystem: {name: 'Sound system', fame: 500, description: 'Turn it up and dance.', furniture: true, use: {verb: 'Dance', icon: '🔊', need: 'fun', amount: 35, ms: 45_000, pose: 'perform', extra: {energy: -5}}},
+  aquarium: {name: 'Aquarium', fame: 600, description: 'Calming fish to watch.', furniture: true, use: {verb: 'Watch the fish', icon: '🐠', need: 'fun', amount: 12, ms: 20_000, pose: null}},
+  treadmill: {name: 'Treadmill', fame: 800, description: 'Run at home: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Run', icon: '🏃', need: 'fun', amount: 20, ms: 40_000, pose: 'sport', onItem: true, extra: {energy: -10, hygiene: -15}}},
+  weights: {name: 'Weight bench', fame: 1000, description: 'Lift weights: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Lift weights', icon: '🏋️', need: 'fun', amount: 20, ms: 40_000, pose: 'sport', extra: {energy: -10, hygiene: -15}}},
+};
+// The kitchen menu. Each dish fills hunger over `ms` and may lift other needs; some unlock with fame.
+export const FOODS = {
+  jollof: {name: 'Jollof rice', icon: '🍛', hunger: 60, ms: 90_000, extra: {fun: 5}},
+  friedRice: {name: 'Fried rice & chicken', icon: '🍗', hunger: 55, ms: 80_000, extra: {social: 5}},
+  poundedYam: {name: 'Pounded yam & egusi', icon: '🥣', hunger: 80, ms: 120_000, extra: {energy: -5}},
+  dodo: {name: 'Fried plantain (dodo)', icon: '🍌', hunger: 25, ms: 30_000},
+  puffPuff: {name: 'Puff-puff', icon: '🍩', hunger: 15, ms: 20_000, extra: {fun: 5}},
+  smoothie: {name: 'Fruit smoothie', icon: '🥤', hunger: 10, ms: 15_000, extra: {energy: 10}},
+  zobo: {name: 'Zobo drink', icon: '🍷', hunger: 5, ms: 10_000, extra: {fun: 8}},
+  chapman: {name: 'Chapman', icon: '🍹', hunger: 5, ms: 10_000, extra: {fun: 10, social: 5}, fame: 500},
 };
 // VIP sponsorship deals: free items unlocked by fame, claimed at Palm Motors in Palm plaza.
 // Fame is not spent and claimed items stay yours. Brand names are fictional.
@@ -104,7 +131,6 @@ export const WATCH = {
   acting: {title: 'Watch a movie', label: 'Watching a movie', hero: 'The lead actor'},
   creator: {title: 'Binge top creators', label: 'Binge-watching creators', hero: 'That creator'},
   tech: {title: 'Watch a tech keynote', label: 'Watching a keynote', hero: 'The keynote speaker'},
-  risk: {title: 'Watch a heist movie', label: 'Watching a heist movie', hero: 'The film’s mastermind'},
 };
 // First insight after 10s of watching, then one every 30s, five at most (+1 point each). A session that
 // teaches anything starts a 20-minute cooldown; watching during it is just for fun. Sessions run 2:20.

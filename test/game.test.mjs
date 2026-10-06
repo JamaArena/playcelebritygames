@@ -15,8 +15,8 @@ function complete(s,kind='produce',rng=()=>0){
   for(let n=0;n<s.active.totalBeats;n++){const at=s.active.readyAt;act(s,{type:'decision',activityId:activity,beat:n,choice:0},at,rng);}
   act(s,{type:'finish',activityId:activity},s.active.readyAt,rng);return activity;
 }
-test('all 15 career definitions have two valid starts and four skills',()=>{
-  assert.equal(Object.keys(CAREERS).length,15);
+test('all 14 career definitions have two valid starts and four skills',()=>{
+  assert.equal(Object.keys(CAREERS).length,14);
   for(const key of Object.keys(CAREERS))for(const origin of [0,1]){
     const s=make(key,origin),c=s.careers[key];assert.equal(Object.keys(c.skills).length,4);assert.equal(s.money,undefined,'there are no coins');assert.equal(s.charges,10);assert.equal(c.skills[CAREERS[key].focus].level,origin?2:1);
   }
@@ -128,9 +128,22 @@ test('tennis uses deuce, advantage, two-game sets, tiebreaks and best-of-three',
   for(let i=0;i<7;i++)tennisPoint(t,0);assert.deepEqual(t.history,[[7,6]]);assert.deepEqual(t.sets,[1,0]);
   for(let i=0;i<24;i++)tennisPoint(t,0);assert.equal(t.winner,0);assert.deepEqual(t.sets,[2,0]);
 });
-test('adult path requires explicit adult confirmation; fictional risk can be stopped',()=>{
+test('adult path requires explicit adult confirmation',()=>{
   assert.throws(()=>createCharacter({name:'River',career:'adult',origin:0},T),/adult/);
-  const s=make('hacker');go(s);act(s,{type:'start',kind:'produce'},T);const a=s.active;act(s,{type:'decision',activityId:a.id,beat:0,choice:3},a.readyAt);assert.equal(s.active,null);assert.equal(s.fame,0);
+});
+test('retired Fraudster characters continue as developers with their fame',()=>{
+  const s=make('developer');s.careers.hacker=s.careers.developer;delete s.careers.developer;s.career='hacker';s.fame=900;s.lastSeen=T;reconcile(s,T+1000);
+  assert.equal(s.career,'developer');assert.equal(s.careers.hacker,undefined);assert.equal(s.fame,900);assert.match(s.events[0].message,/retired/);
+});
+test('kitchen dishes and placed home items fill needs with their own effects',()=>{
+  const s=make();s.fame=1000;s.needs.hunger=10;s.needs.fun=50;
+  assert.throws(()=>act(s,{type:'recover',need:'hunger',food:'caviar'},T),/menu/);
+  act(s,{type:'recover',need:'hunger',food:'jollof'},T);assert.equal(s.recovery.amount,60);
+  reconcile(s,s.recovery.endsAt+1);assert.equal(Math.round(s.needs.hunger),70);assert.ok(s.needs.fun>=54,'jollof lifts fun a little');
+  assert.throws(()=>act(s,{type:'useItem',item:'treadmill'},T+200_000),/Place that item/);
+  s.location='plaza';act(s,{type:'buy',item:'treadmill'},T+200_000);s.location='home';act(s,{type:'place',item:'treadmill',x:0,z:-1},T+200_000);
+  s.needs.fun=40;s.needs.energy=80;act(s,{type:'useItem',item:'treadmill'},T+200_000);assert.equal(s.recovery.item,'treadmill');
+  reconcile(s,s.recovery.endsAt+1);assert.equal(Math.round(s.needs.fun),60);assert.ok(s.needs.energy<=71,'running is tiring');
 });
 test('interaction points are walkable and blocked moves or placements spend nothing',()=>{
   for(const location of ['home','sports','studio','creator','tech','plaza'])for(const o of worldObjects(location))assert.ok(walkable(location,o.x,o.z),`${location}: ${o.name}`);
