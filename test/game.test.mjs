@@ -253,3 +253,18 @@ test('emotes are recorded for others to see and unknown ones are refused',()=>{
   const s=make();act(s,{type:'emote',emote:'dance'},T);assert.deepEqual(s.emote,{kind:'dance',at:T});
   assert.throws(()=>act(s,{type:'emote',emote:'moonwalk'},T),/Unknown emote/);
 });
+test('pets: adopt at the plaza, care at home, and a happy pet gives its perk',()=>{
+  const s=make();s.fame=400;
+  assert.throws(()=>act(s,{type:'adoptPet',kind:'dog',name:'Bingo'},T),/plaza/);
+  s.location='plaza';assert.throws(()=>act(s,{type:'adoptPet',kind:'parrot'},T),/600 fame/);
+  act(s,{type:'adoptPet',kind:'dog',name:'Bingo'},T);assert.equal(s.pet.name,'Bingo');assert.throws(()=>act(s,{type:'adoptPet',kind:'cat'},T),/already/);
+  assert.throws(()=>act(s,{type:'petCare',act:'feed'},T),/at home/);
+  s.location='home';s.pet.food=20;act(s,{type:'petCare',act:'feed'},T);assert.equal(s.pet.food,60);
+  s.needs.fun=50;s.lastSeen=T;reconcile(s,T+20_000);const happy=s.needs.fun;
+  s.pet.joy=10;s.lastSeen=T+20_000;reconcile(s,T+40_000);assert.ok(50-happy<happy-s.needs.fun,'a sad dog stops slowing fun drain');
+  act(s,{type:'rehomePet'},T+50_000);assert.equal(s.pet,null);
+});
+test('home upgrades work without placing: a king-size bed makes sleep faster',()=>{
+  const s=make();s.fame=5000;s.location='home';act(s,{type:'recover',need:'energy'},T);const plain=s.recovery.endsAt-T;act(s,{type:'cancel'},T);
+  s.inventory.kingBed={level:1};act(s,{type:'recover',need:'energy'},T+1);assert.equal(s.recovery.endsAt-(T+1),Math.round(plain*.8));
+});

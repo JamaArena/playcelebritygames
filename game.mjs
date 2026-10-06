@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, FOODS, WEAR, wearPerks, EMOTES, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -61,8 +61,9 @@ export function reconcile(s, now) {
   refill(s,now);
   // Heartbeats arrive every 20 seconds; gaps up to 30 seconds count as active. Offline needs never decay.
   const dt=Math.max(0,now-s.lastSeen);
-  const perks=wearPerks(s.wear);
+  const perks=perksFor(s),up=upgradesFor(s);if(s.location==='home'&&!s.visiting&&up.hygiene)perks.hygiene=(perks.hygiene||0)+up.hygiene;
   if(dt<=30_000)for(const [need,rate] of Object.entries(B.decay))s.needs[need]=clamp(s.needs[need]-rate*(1-(perks[need]||0)/100)*dt/3600_000);
+  if(s.pet&&dt<=30_000)for(const [k,rate] of Object.entries(PET_CARE.decay))s.pet[k]=clamp(s.pet[k]-rate*dt/3600_000);
   mishaps(s,now);
   s.lastSeen=now;
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
@@ -85,7 +86,7 @@ export function mishaps(s,now){
   s.mishapAt??={};if(now-(s.mishap?.at||0)<MISHAP.gapMs)return;
   for(const [need,m] of Object.entries(MISHAPS)){
     if(s.needs[need]>MISHAP.at||s.recovery?.need===need||now-(s.mishapAt[need]||0)<MISHAP.cooldownMs)continue;
-    const lost=Math.min(s.fame||0,Math.round(Math.max(MISHAP.minFame,(s.fame||0)*m.fame)*(1-(wearPerks(s.wear).scandal||0)/100)));
+    const lost=Math.min(s.fame||0,Math.round(Math.max(MISHAP.minFame,(s.fame||0)*m.fame)*(1-(perksFor(s).scandal||0)/100)));
     addFame(s,-lost);s.mishapAt[need]=now;for(const [k,v] of Object.entries(m.set))s.needs[k]=v;
     s.mishap={id:id(),need,at:now,lost};log(s,`${m.icon} ${m.title}. ${m.text} −${lost.toLocaleString('en-US')} fame.`,now);return;
   }
@@ -94,11 +95,12 @@ export function finishRecovery(s,now){
   const r=s.recovery,start=r.startedAt??r.endsAt-B.recovery[r.need][1],share=Math.max(0,Math.min(1,(now-start)/(r.endsAt-start))),amount=r.amount??B.recovery[r.need][0];
   s.needs[r.need]=clamp(s.needs[r.need]+amount*share);for(const [k,v] of Object.entries(r.extra||{}))s.needs[k]=clamp(s.needs[k]+v*share);s.recovery=null;
   if(r.watch){watchInsights(s,r,now);if(r.watch.given)s.watchLearnAt=now;}
+  const train=r.item&&ITEMS[r.item]?.use?.learn;if(train&&CAREERS[s.career].family===train.family&&share>=.5)learn(s,s.career,CAREERS[s.career].focus,Math.round(train.points*share),`item:${r.id}`);
   log(s,share>=1?`${r.label} completed.`:`${r.label}: stopped early, +${Math.round(amount*share)} ${r.need}.`,now);
 }
 // Insights land while you watch: due = 1 at 10s, +1 every 30s after, capped at WATCH_MAX.
 export function watchInsights(s,r,now){
-  if(!r.watch?.learn)return;const elapsed=now-r.startedAt,due=elapsed<WATCH_FIRST?0:Math.min(WATCH_MAX,1+Math.floor((elapsed-WATCH_FIRST)/WATCH_EVERY));
+  if(!r.watch?.learn)return;const elapsed=now-r.startedAt,due=elapsed<WATCH_FIRST?0:Math.min(WATCH_MAX+(upgradesFor(s).insights||0),1+Math.floor((elapsed-WATCH_FIRST)/WATCH_EVERY));
   const def=CAREERS[s.career],c=s.careers[s.career];
   while(r.watch.given<due){
     r.watch.given++;const skill=def.skills[(r.watch.seed+r.watch.given)%def.skills.length],id=`${r.id}:${r.watch.given}`,text=insightFor(def.family,skill);
@@ -170,7 +172,7 @@ export function view(s,now) {
   if(a&&a.kind!=='practice') {a.scene=beat(s,a);if(a.tennis)a.scoreLabel=tennisScore(a.tennis);a.choices=choices(s).map(choice=>{
     const scene=a.scene, skill=choice.action==='signature'?(s.careers[a.career].skills[choice.skill].level+s.careers[a.career].skills.stamina.level)/2:s.careers[a.career].skills[choice.skill].level,fatigue=(100-s.needs.energy)/100;
     const difficulty=clamp(scene.difficulty+({safe:-2,balanced:0,risky:2}[choice.risk]),1,10);
-    return {...choice,probability:choice.action==='shoot'?(1-.15*scene.pressure)*shootingProbability(skill,scene.distance,scene.pressure,fatigue,scene.angle)*(1-clamp(.2+.04*scene.goalkeeper,.1,.7)):clamp(generalProbability(skill,difficulty,scene.pressure,fatigue)+(wearPerks(s.wear).success||0)/100,.1,.95),difficulty,level:skill};
+    return {...choice,probability:choice.action==='shoot'?(1-.15*scene.pressure)*shootingProbability(skill,scene.distance,scene.pressure,fatigue,scene.angle)*(1-clamp(.2+.04*scene.goalkeeper,.1,.7)):clamp(generalProbability(skill,difficulty,scene.pressure,fatigue)+(perksFor(s).success||0)/100,.1,.95),difficulty,level:skill};
   });}
   result.opportunities=opportunities(s); result.serverNow=now;return result;
 }
@@ -218,7 +220,7 @@ function settle(s,a,now) {
   const contract=c.affiliation;
   if(qualifies&&contract)gain=Math.floor(gain*(1+(contract.boost??B.contractBoost)));
   gain=Math.floor(gain*a.audienceShare);
-  const fame=Math.round(fameFor(gain)*(1+(wearPerks(s.wear).fame||0)/100));c.audience+=gain;addFame(s,fame);c.completed++;
+  const fame=Math.round(fameFor(gain)*(1+(perksFor(s).fame||0)/100));c.audience+=gain;addFame(s,fame);c.completed++;
   if(qualifies)c.engagement=clamp(c.engagement+(quality-50)/10);
   if(contract&&qualifies)c.reputation=clamp(c.reputation+(quality>=60?2:-2));
   if(a.kind==='trial') {
@@ -256,11 +258,11 @@ export function act(s,input,now,rng=Math.random) {
       let skill=c.skills[choice.skill].level;
       if(choice.action==='signature')skill=(skill+c.skills.stamina.level)/2;
       const difficulty=clamp(scene.difficulty+({safe:-2,balanced:0,risky:2}[choice.risk]),1,10);
-      const p=clamp(generalProbability(skill,difficulty,scene.pressure,fatigue)+(wearPerks(s.wear).success||0)/100,.1,.95),draw=rng();
+      const p=clamp(generalProbability(skill,difficulty,scene.pressure,fatigue)+(perksFor(s).success||0)/100,.1,.95),draw=rng();
       const outcome=choice.action==='shoot'?shot(skill,scene,fatigue,rng):{success:draw<p,probability:p,draws:[draw],result:draw<p?'Successful':'Missed opportunity'};
       const score=outcome.success?{safe:60,balanced:80,risky:100}[choice.risk]:20;
       a.outcomes.push({...outcome,score,choice:choice.label,action:choice.action,target:choice.target,scene,skill:choice.skill,at:now});
-      learn(s,a.career,choice.skill,5,`${a.id}:${a.beat}`);s.needs.energy=clamp(s.needs.energy-2*(1-(wearPerks(s.wear).energy||0)/100));
+      learn(s,a.career,choice.skill,5,`${a.id}:${a.beat}`);s.needs.energy=clamp(s.needs.energy-2*(1-(perksFor(s).energy||0)/100));
       if(sport(a.career)) {
         if(a.career==='football'&&choice.action==='shoot'&&outcome.success)a.playerScore++;
         if(a.career==='football'){
@@ -305,8 +307,8 @@ export function act(s,input,now,rng=Math.random) {
       const food=input.need==='hunger'&&input.food!=null?FOODS[input.food]:null;
       if(input.food!=null){requireRule(food,'That dish is not on the menu.');requireRule(s.location==='home','Cook at home.');requireRule((s.fame||0)>=(food.fame||0),`${food.name} unlocks at ${(food.fame||0).toLocaleString('en-US')} fame.`);}
       if(food){s.recovery={id:id(),need:'hunger',label:`Eating ${food.name.toLowerCase()}`,startedAt:now,endsAt:now+Math.round(food.ms*rest),amount:food.hunger,extra:food.extra||{},food:input.food};break;}
-      const sleep=input.need==='energy'?1-(wearPerks(s.wear).sleep||0)/100:1;
-      s.recovery={id:id(),need:input.need,label:watching?WATCH[family].label:labels[input.need],startedAt:now,endsAt:now+Math.round((watching?WATCH_SESSION:B.recovery[input.need][1])*rest*sleep),watch};break;
+      const ups=upgradesFor(s),sleep=input.need==='energy'?Math.max(.4,1-((perksFor(s).sleep||0)+(s.location==='home'&&!s.visiting?ups.sleep||0:0))/100):1,sofa=input.need==='fun'&&!watching&&s.location==='home'&&!s.visiting?ups.sofa||0:0;
+      s.recovery={id:id(),need:input.need,label:watching?WATCH[family].label:labels[input.need],startedAt:now,endsAt:now+Math.round((watching?WATCH_SESSION:B.recovery[input.need][1])*rest*sleep),watch,...(sofa?{amount:B.recovery.fun[0]+sofa}:{})};break;
     }
     // Wardrobe: claim clothes free at Palm Boutique (Palm plaza), then wear or take them off anywhere.
     case 'claimWear': {
@@ -321,6 +323,20 @@ export function act(s,input,now,rng=Math.random) {
     }
     // Emotes are shown to everyone nearby for a few seconds; they do nothing else.
     case 'emote': {requireRule(EMOTES[input.emote],'Unknown emote.');requireRule(!s.trip,'You can emote when you arrive.');s.emote={kind:input.emote,at:now};break;}
+    // Pets: adopt at Palm plaza, care for them at home, or find them a new home.
+    case 'adoptPet': {
+      const pet=PETS[input.kind];requireRule(pet,'Unknown pet.');requireRule(s.location==='plaza','Adopt pets at the Palm plaza pet stall.');requireRule(!s.pet,'You already have a pet.');
+      requireRule((s.fame||0)>=pet.fame,`${pet.name}s are for players with ${pet.fame.toLocaleString('en-US')} fame.`);
+      const name=text(input.name,20)||pet.name;s.pet={kind:input.kind,name,food:80,joy:80,since:now};log(s,`${pet.icon} You adopted ${name} the ${pet.name.toLowerCase()}!`,now);break;
+    }
+    case 'petCare': {
+      requireRule(s.pet,'You have no pet.');requireRule(s.location==='home'&&!s.visiting,'Your pet is at home.');const p=s.pet;
+      if(input.act==='feed'){p.food=clamp(p.food+PET_CARE.feed);log(s,`Fed ${p.name}.`,now);}
+      else if(input.act==='play'){requireRule(s.needs.energy>=5,'You are too tired to play.');p.joy=clamp(p.joy+PET_CARE.play);s.needs.energy=clamp(s.needs.energy-3);s.needs.fun=clamp(s.needs.fun+5);log(s,`Played with ${p.name}. (+5 fun)`,now);}
+      else if(input.act==='cuddle'){p.joy=clamp(p.joy+PET_CARE.cuddle);s.needs.social=clamp(s.needs.social+3);}
+      else requireRule(false,'Choose feed, play or cuddle.');break;
+    }
+    case 'rehomePet': {requireRule(s.pet,'You have no pet.');log(s,`${s.pet.name} went to a loving new home.`,now);s.pet=null;break;}
     case 'takeOff': {requireRule(s.wear?.[input.slot],'Nothing to take off there.');delete s.wear[input.slot];break;}
     case 'useItem': {
       // Use a placed home item: it fills a need over time like the built-in objects.
@@ -358,7 +374,7 @@ export function act(s,input,now,rng=Math.random) {
     case 'talk': {
       const npc=NPCS.find(n=>n.id===input.npc);requireRule(npc&&npc.location===s.location,'That person isn’t here.');
       s.talks??={};requireRule(!s.talks[npc.id]||now-s.talks[npc.id]>=NPC_TALK.cooldownMs,`${npc.name} needs a moment. Try again shortly.`);
-      const gain=NPC_TALK.social+(wearPerks(s.wear).chat||0);s.talks[npc.id]=now;s.needs.social=clamp(s.needs.social+gain);const line=NPC_TALK.lines[Math.floor(Math.random()*NPC_TALK.lines.length)];
+      const gain=NPC_TALK.social+(perksFor(s).chat||0);s.talks[npc.id]=now;s.needs.social=clamp(s.needs.social+gain);const line=NPC_TALK.lines[Math.floor(Math.random()*NPC_TALK.lines.length)];
       s.lastTalk={npc:npc.id,line,at:now};log(s,`${npc.name}: “${line}” (+${gain} social)`,now);break;
     }
     case 'phoneUpgrade': {
