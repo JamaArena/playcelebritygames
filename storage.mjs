@@ -4,7 +4,7 @@ import { schema, createGameService } from './service.mjs';
 const tables = {
   players: ['id'], requests: ['player_id', 'request_id'], messages: ['id'],
   reports: ['id'], seasons: ['id'], agreements: ['id'], battles: ['id'],
-  accounts: ['player_id'], codes: ['email'], sessions: ['token_hash'],
+  accounts: ['player_id'], codes: ['email'], sessions: ['token_hash'], active_devices: ['player_id'],
 };
 const numeric = new Set(['created', 'at', 'starts', 'ends', 'settled']);
 

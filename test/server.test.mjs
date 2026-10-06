@@ -19,7 +19,7 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   t.after(async()=>{database.close();const stopped=new Promise(resolve=>server.once('exit',resolve));server.kill();await stopped;
     assert.ok(path.resolve(directory).startsWith(path.resolve(tmpdir())+path.sep+'celebrity-life-test-'));rmSync(directory,{recursive:true,force:true});});
   function client(){let cookie='';return {async call(input,options={}){
-    const response=await fetch(base+(input?'/api/action':'/api/state'),{method:input?'POST':'GET',headers:{...(input?{'Content-Type':'application/json'}:{}),...(cookie?{Cookie:cookie}:{}),...options.headers},...(input?{body:JSON.stringify({requestId:randomUUID(),...input})}:{})});
+    const response=await fetch(base+(input?'/api/action':'/api/state')+(options.takeover?'?takeover=1':''),{method:input?'POST':'GET',headers:{...(input?{'Content-Type':'application/json'}:{}),...(cookie?{Cookie:cookie}:{}),...options.headers},...(input?{body:JSON.stringify({requestId:randomUUID(),...input})}:{})});
     const setCookie=response.headers.get('set-cookie');if(setCookie)cookie=setCookie.split(';')[0];return {status:response.status,data:await response.json()};
   },async auth(input){
     const response=await fetch(base+'/api/auth',{method:'POST',headers:{'Content-Type':'application/json',...(cookie?{Cookie:cookie}:{})},body:JSON.stringify(input)});
@@ -125,9 +125,11 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   assert.equal((await phone.auth({type:'verifyCode',email:'nobody@example.com',code:'123456'})).status,400,'and cannot sign in');
   const login=await phone.auth({type:'sendCode',purpose:'login',email:'tolu@example.com'});assert.equal(login.data.fallback,true,'the client is told to use the fallback code');
   assert.equal((await phone.auth({type:'verifyCode',email:'tolu@example.com',code:'123456'})).status,200);
-  assert.equal((await phone.call()).data.state.name,'Tolu','the same character on a second device');
+  const blocked=await phone.call();assert.equal(blocked.status,409,'one device at a time');assert.equal(blocked.data.code,'other_device');
+  assert.equal((await phone.call(null,{takeover:true})).data.state.name,'Tolu','Play here moves the game to the second device');
+  assert.equal((await tolu.call()).status,409,'and the first device is now blocked');
   assert.equal((await phone.auth({type:'logout'})).status,200);assert.equal((await phone.call()).data.state,null,'logged out');
-  assert.equal((await tolu.call()).data.state.name,'Tolu','other devices stay signed in');
+  assert.equal((await tolu.call(null,{takeover:true})).data.state.name,'Tolu','other devices stay signed in');
   assert.equal((await tolu.auth({type:'newLife',confirm:'nope'})).status,400);
   assert.equal((await tolu.auth({type:'newLife',confirm:'NEW LIFE'})).status,200);const fresh=(await tolu.call()).data;assert.equal(fresh.state,null);assert.equal(fresh.account.username,'tolu_eko','the account remains');
   const guest=client();await guest.call({type:'create',name:'Guesty',career:'actor'});

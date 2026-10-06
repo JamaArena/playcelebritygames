@@ -232,3 +232,35 @@ html,body,#app{height:100%;height:100dvh;overflow:hidden}.rail{background:#153d3
 .welcome-card .wide{border-radius:24px;padding:14px}
 .welcome-foot{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#6a7d6c}
 .auth-note{margin:0;padding:8px 12px;border-radius:10px;background:#fff6e0;color:#7a5b00;font-size:12px}
+
+/* Look pickers and live preview. */
+.choice-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:6px}
+.choice-grid .choice,.choice-row .choice{padding:8px 6px;font-size:11px}
+.choice-row{flex-wrap:wrap}
+.look-preview{--w:1;--hip:1;--tall:1;--hair:#1d1714;height:140px}
+.look-head{top:calc(16px + (1 - var(--tall)) * 60px)}
+.look-head::before{background:var(--hair)!important}
+.look-preview[data-hair=curls] .look-head::before{background:radial-gradient(circle at 20% 60%,var(--hair) 30%,transparent 31%),radial-gradient(circle at 80% 60%,var(--hair) 30%,transparent 31%),radial-gradient(circle at 50% 35%,var(--hair) 45%,transparent 46%)!important}
+.look-preview[data-hair=afro] .look-head::before{inset:-20px -18px 8px;border-radius:50%}
+.look-preview[data-hair=long] .look-head::before{inset:-6px -6px -34px;border-radius:50% 50% 20% 20%;z-index:-1}
+.look-preview[data-hair=bob] .look-head::before{inset:-6px -6px -8px;border-radius:50% 50% 30% 30%;z-index:-1}
+.look-preview[data-hair=bun] .look-head::after{content:'';position:absolute;left:12px;top:-18px;width:16px;height:14px;border-radius:50%;background:var(--hair)}
+.look-preview[data-hair=ponytail] .look-head::after{content:'';position:absolute;right:-10px;top:8px;width:12px;height:30px;border-radius:8px;background:var(--hair)}
+.look-preview[data-hair=locs] .look-head::before,.look-preview[data-hair=braids] .look-head::before{inset:-6px -8px -30px;border-radius:40% 40% 10% 10%;background:repeating-linear-gradient(90deg,var(--hair) 0 5px,transparent 5px 7px)!important;z-index:-1}
+.look-preview[data-hair=buzz] .look-head::before{opacity:.45;inset:-2px -1px 26px}
+.look-preview[data-hair=fade] .look-head::before{inset:-6px 6px 28px}
+.look-preview[data-hair=cornrows] .look-head::before{background:repeating-linear-gradient(90deg,var(--hair) 0 4px,#ffffff33 4px 6px)!important}
+.look-preview[data-hair=bald] .look-head::before{display:none}
+.look-body{top:auto;bottom:0;left:50%;width:calc(52px * var(--w));height:calc(62px * var(--tall));margin-left:calc(-26px * var(--w));border-radius:calc(18px * var(--w)) calc(18px * var(--w)) calc(10px * var(--hip)) calc(10px * var(--hip));box-shadow:0 10px 0 calc((var(--hip) - 1) * 18px) #8ea9a4}
+.look-head{left:50%;margin-left:-20px;top:auto;bottom:calc(62px * var(--tall) + 2px)}
+/* Story reel. */
+.reel-card{display:grid;gap:12px;text-align:center}
+.reel{height:56px;overflow:hidden;border-radius:16px;background:#153d32;box-shadow:inset 0 0 0 3px #d4af37}
+.reel-strip{transition:transform 3s cubic-bezier(.12,.75,.15,1)}
+.reel-strip div{height:56px;display:grid;place-items:center;color:#fff;font:700 17px Georgia,serif}
+.reel-result p{margin:0 0 12px;font-size:13px;line-height:1.55;color:#46594b}
+@media(prefers-reduced-motion:reduce){.reel-strip{transition:none}}
+
+/* Real-renderer look preview. */
+.look-canvas{display:block;width:100%;height:220px;border-radius:18px;background:#eef3ea;cursor:grab;touch-action:none}
+.look-hint{display:block;margin:4px 0 10px;text-align:center;font-size:10px;color:#6a7d6c}

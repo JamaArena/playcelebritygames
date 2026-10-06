@@ -2,7 +2,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame } from './game.mjs';
 import { CAREERS, BALANCE, clamp } from './public/content.js';
-export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);";
+export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL);";
 export function createGameService(db,{secureCookies=false,sendEmail=null}={}) {
 db.exec(schema);
 const read=db.prepare('SELECT * FROM players WHERE id=?');
@@ -65,9 +65,10 @@ function captureEligibility(s,now){
     }
   }
 }
-const TOWN_PLAYER_LIMIT=120;
+const TOWN_PLAYER_LIMIT=120,ACTIVE_DEVICE_MS=45_000;
+class OtherDevice extends Error {}
 const roomFor=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
-function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<45_000};}
+function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,hairColor:s.hairColor||'black',build:s.build||'average',height:s.height||'average',career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<45_000};}
 function snapshot(playerId,s,now){
   const account=accountOf(playerId);
   if(!s)return {state:null,serverNow:now,account};
@@ -76,7 +77,7 @@ function snapshot(playerId,s,now){
   // Everyone online in a public place, wherever they are in town; homes stay private. Capped per response.
   const townPlayers=players.filter(p=>p.online&&(p.location!=='home'||p.trip)&&p.sceneRoom!==roomFor(playerId,s)&&!load(p.id)?.blocks.includes(playerId))
     .sort((x,y)=>Number(s.friends.includes(y.id))-Number(s.friends.includes(x.id))).slice(0,TOWN_PLAYER_LIMIT)
-    .map(({id,name,color,hair,career,location,position3d,tier,fame,ride,clothes,trip})=>({id,name,color,hair,career,location,position3d,tier,fame,ride,clothes,trip}));
+    .map(({id,name,color,hair,hairColor,build,height,career,location,position3d,tier,fame,ride,clothes,trip})=>({id,name,color,hair,hairColor,build,height,career,location,position3d,tier,fame,ride,clothes,trip}));
   const messages=db.prepare('SELECT * FROM messages WHERE (location=? AND recipient IS NULL) OR recipient=? OR (sender=? AND recipient IS NOT NULL) ORDER BY at DESC LIMIT 50').all(roomFor(playerId,s),playerId,playerId).filter(m=>!s.blocks.includes(m.sender)).reverse().map(m=>({...m,name:load(m.sender)?.name||'Visitor'}));
   const agreements=db.prepare('SELECT * FROM agreements').all().map(r=>JSON.parse(r.state)).filter(a=>a.participants.includes(playerId)&&['pending','running'].includes(a.status));
   const visiting=s.visiting?load(s.visiting):null;
@@ -325,8 +326,16 @@ try {
       }
       const token=String(req.headers.cookie||'').match(/(?:^|;\s*)celebrity=([a-f0-9]{64})/)?.[1];
       let row=token?db.prepare('SELECT * FROM players WHERE token_hash=?').get(hash(token))||db.prepare('SELECT players.* FROM sessions JOIN players ON players.id=sessions.player_id WHERE sessions.token_hash=?').get(hash(token)):null;
-      if(!row){const session=randomBytes(32).toString('hex'),playerId=id();db.prepare('INSERT INTO players VALUES(?,?,?,?)').run(playerId,'null',hash(session),clock());row=read.get(playerId);res.setHeader('Set-Cookie',`celebrity=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000${secureCookies?'; Secure':''}`);}
+      let device=token?hash(token):null;
+      if(!row){const session=randomBytes(32).toString('hex');device=hash(session);const playerId=id();db.prepare('INSERT INTO players VALUES(?,?,?,?)').run(playerId,'null',hash(session),clock());row=read.get(playerId);res.setHeader('Set-Cookie',`celebrity=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000${secureCookies?'; Secure':''}`);}
       const playerId=row.id,now=clock();settleSeasons(now);
+      // One device at a time: another device that was active in the last 45s blocks this one until it
+      // chooses "Play here" (?takeover=1). Sign-in requests are never blocked.
+      if(url.pathname!=='/api/auth'){
+        const active=db.prepare('SELECT token_hash,at FROM active_devices WHERE player_id=?').get(playerId);
+        if(active&&active.token_hash!==device&&now-active.at<ACTIVE_DEVICE_MS&&url.searchParams.get('takeover')!=='1')throw new OtherDevice();
+        db.prepare('INSERT INTO active_devices VALUES(?,?,?) ON CONFLICT(player_id) DO UPDATE SET token_hash=excluded.token_hash,at=excluded.at').run(playerId,device,now);
+      }
       if(req.method==='POST'&&url.pathname==='/api/auth'){json(...await authAction(playerId,token,await body(req),now,res));}
       if(req.method==='GET'&&url.pathname==='/api/state') {
         const s=load(playerId);if(s){reconcile(s,now);captureEligibility(s,now);persist(playerId,s);}json(200,snapshot(playerId,s,now));
@@ -354,7 +363,7 @@ try {
       if(!payload)json(404,{error:'Endpoint not found.'});
     }
 
-}catch(error){if(!(error instanceof GameError)&&!(error instanceof SyntaxError))console.error(error);json(error instanceof GameError||error instanceof SyntaxError?400:500,{error:error instanceof GameError?error.message:'The request could not be completed.'});}
+}catch(error){if(error instanceof OtherDevice){json(409,{error:'Celebrity Games is open on another device.',code:'other_device'});return new Response(JSON.stringify(payload),{status,headers});}if(!(error instanceof GameError)&&!(error instanceof SyntaxError))console.error(error);json(error instanceof GameError||error instanceof SyntaxError?400:500,{error:error instanceof GameError?error.message:'The request could not be completed.'});}
 return new Response(JSON.stringify(payload??{error:'Endpoint not found.'}),{status:payload?status:404,headers});
 };
 }

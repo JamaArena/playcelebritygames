@@ -1,25 +1,28 @@
-import { CAREERS, LOCATIONS, ITEMS, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, BALANCE as B, effort, canPlace } from './content.js';
+import { CAREERS, LOCATIONS, ITEMS, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace } from './content.js';
 import { World, worldObjects } from './world.js';
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=value=>Math.floor(value).toLocaleString();
 const duration=ms=>{const seconds=Math.max(0,Math.ceil(ms/1000));return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;};
 const needs={hunger:['Hunger','♨'],energy:['Energy','☾'],fun:['Fun','✧'],social:['Social','♡'],hygiene:['Hygiene','♧'],bladder:['Bladder','◡']};
-let lastUpdate=0,snapshot,state,busy=false,modalPage=null,previousFocus,toastTimer,offset=0,phoneTab='local',selectedObject;
+let lastUpdate=0,heartbeat,snapshot,state,busy=false,modalPage=null,previousFocus,toastTimer,offset=0,phoneTab='local',selectedObject;
 let motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;
 const now=()=>Date.now()+offset;
 const button=(label,action,attrs='',style='secondary')=>`<button class="${style}" data-action="${action}" ${attrs}>${label}</button>`;
 const careerOptions=(selected)=>Object.entries(CAREERS).map(([key,def])=>`<option value="${key}" ${key===selected?'selected':''}>${escape(def.name)}</option>`).join('');
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,5500);}
 function showModal(page,html,closable=true){
-  if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;$('#modalContent').innerHTML=(closable&&!['phoneHome','create','welcome','auth','newLife','logoutConfirm'].includes(page)?button('‹ Phone','backToPhone','','phone-back'):'')+html;$('#modal').classList.toggle('as-phone',page==='phoneHome');
+  if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;$('#modalContent').innerHTML=(closable&&!['phoneHome','create','welcome','auth','newLife','logoutConfirm','elsewhere'].includes(page)?button('‹ Phone','backToPhone','','phone-back'):'')+html;$('#modal').classList.toggle('as-phone',page==='phoneHome');
   const title=$('#modalContent h2');if(title)title.id='modalTitle';
   setTimeout(()=>$('#modalContent input, #modalContent button, #closeModal')?.focus(),0);
 }
 function closeModal(){if(modalPage==='create')return;$('#modal').hidden=true;modalPage=null;previousFocus?.focus();}
-async function refresh(){
-  if(busy)return;
-  try{const response=await fetch('/api/state');if(!response.ok)throw new Error('City connection unavailable.');receive(await response.json());$('#connection').textContent='Saved to your city';}
+// One device at a time: when another device is playing, this one pauses all requests until "Play here".
+let elsewhere=false;
+function playingElsewhere(){if(elsewhere)return;elsewhere=true;clearTimeout(heartbeat);showModal('elsewhere',`<div class="welcome-card"><span class="eyebrow">ONE DEVICE AT A TIME</span><h2>You’re playing on another device</h2><p class="modal-intro">Celebrity Games is open somewhere else right now. Play here to move the game to this device; the other one will pause.</p>${button('Play here','playHere','','primary wide')}</div>`,false);}
+async function refresh(takeover=false){
+  if(busy||(elsewhere&&!takeover))return;
+  try{const response=await fetch('/api/state'+(takeover?'?takeover=1':''));if(response.status===409){playingElsewhere();return;}if(!response.ok)throw new Error('City connection unavailable.');receive(await response.json());$('#connection').textContent='Saved to your city';}
   catch(error){$('#connection').textContent='Connection interrupted · retrying';if(!state)$('#loading').innerHTML='<div class="initial-error"><h1>Your city is unavailable</h1><p>We could not connect to your city. Please try again in a moment.</p><button class="primary" data-action="retry">Try again</button></div>';}
 }
 // Live notices: compare with the previous snapshot so things other players caused pop up immediately.
@@ -53,7 +56,7 @@ async function send(input,{keepModal=false,quiet=false}={}){
   try{
     let response;
     for(let attempt=0;attempt<2;attempt++){try{response=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(15000)});break;}catch(error){if(attempt)throw error;}}
-    const data=await response.json();if(!response.ok)throw new Error(data.error||'Action unavailable.');
+    const data=await response.json();if(response.status===409&&data.code==='other_device'){playingElsewhere();return;}if(!response.ok)throw new Error(data.error||'Action unavailable.');
     if(!keepModal&&modalPage!=='create')closeModal();
     closeTray();receive(data,true);$('#connection').textContent='Saved to your city';
     if(keepModal){if(modalPage==='phone')phone(phoneTab);else if(modalPage==='shop')shop();else if(modalPage==='inventory')inventory();else if(modalPage==='career')career();else if(modalPage==='vip')vip();else if(modalPage==='phones')phoneStore();else if(modalPage==='battle')battleView();}
@@ -150,7 +153,6 @@ function renderActivity(){
 }
 async function chooseDecision(index){const a=state.active;if(!a)return;const chosen=a.choices[index];const data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});if(data&&motion)world.respond(chosen.action,data.state.active?.outcomes.at(-1)?.success);}
 // Character creation is two steps: your look, then your career. The starting story is drawn at random.
-const SKINS=['#f1d0b5','#e0b08c','#c88f69','#a46a4a','#7d5642','#5a3a2a'];
 // Accounts, like Lagos Life: create an account or log in with an emailed one-time code. No passwords.
 let welcomed=false,authStep={tab:'signup',email:''};
 async function auth(input){const response=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Something went wrong. Try again.');return data;}
@@ -175,15 +177,36 @@ function confirmLogout(){
 function newLife(){showModal('newLife',`<span class="eyebrow">NEW LIFE</span><h2>Start over?</h2><p class="modal-intro">Your character, skills, fame and possessions are erased for good. Your account and username stay.</p><form id="newLifeForm"><div class="field"><label for="confirmLife">Type NEW LIFE to confirm</label><input id="confirmLife" name="confirm" autocomplete="off" required></div><button class="primary wide" type="submit">Erase and start a new life</button></form>`);}
 function creation(account=snapshot?.account){
   showModal('create',`<div class="creation-hero"><span class="eyebrow">WELCOME TO PALM CITY</span><h2>A little life.<br>A lot of possibility.</h2><p>Find your craft, make your people, and turn everyday moments into a life worth remembering.</p></div><form id="createForm"><div class="steps"><span class="step on">1 · Your look</span><span class="step" id="stepTwoLabel">2 · Your career</span></div>
-  <section id="stepLook"><div class="look-preview" id="lookPreview"><span class="look-head"></span><span class="look-body"></span></div><div class="field"><label for="name">What should we call you?</label><input id="name" name="name" placeholder="Your character’s name" minlength="2" maxlength="30" required autocomplete="nickname" value="${escape(account?.username||'')}"></div>
-  <div class="field"><label>Skin tone</label><div class="swatches">${SKINS.map((c,i)=>`<button type="button" class="swatch ${i===2?'on':''}" style="--c:${c}" data-action="pickSkin" data-color="${c}" aria-label="Skin tone ${i+1}"></button>`).join('')}<input id="color" name="color" type="color" value="${SKINS[2]}" aria-label="Custom skin tone"></div></div>
-  <div class="field"><label>Hair</label><div class="choice-row"><button type="button" class="choice on" data-action="pickHair" data-hair="curls">Soft curls</button><button type="button" class="choice" data-action="pickHair" data-hair="short">Short crop</button></div><input type="hidden" id="hair" name="hair" value="curls"></div>
+  <section id="stepLook"><canvas class="look-canvas" id="lookCanvas" aria-label="Preview of your character. Drag to turn them around."></canvas><small class="look-hint">Drag to turn around</small><div class="field"><label for="name">What should we call you?</label><input id="name" name="name" placeholder="Your character’s name" minlength="2" maxlength="30" required autocomplete="nickname" value="${escape(account?.username||'')}"></div>
+  <div class="field"><label>Skin tone</label><div class="swatches">${SKIN_TONES.map((c,i)=>`<button type="button" class="swatch ${i===3?'on':''}" style="--c:${c}" data-action="pick" data-field="color" data-value="${c}" aria-label="Skin tone ${i+1}"></button>`).join('')}</div><input type="hidden" id="color" name="color" value="${SKIN_TONES[3]}"></div>
+  <div class="field"><label>Hairstyle</label><div class="choice-grid">${Object.entries(HAIRSTYLES).map(([key,name])=>`<button type="button" class="choice ${key==='curls'?'on':''}" data-action="pick" data-field="hair" data-value="${key}">${name}</button>`).join('')}</div><input type="hidden" id="hair" name="hair" value="curls"></div>
+  <div class="field"><label>Hair colour</label><div class="swatches">${Object.entries(HAIR_COLORS).map(([key,c])=>`<button type="button" class="swatch ${key==='black'?'on':''}" style="--c:${c}" data-action="pick" data-field="hairColor" data-value="${key}" aria-label="${key} hair"></button>`).join('')}</div><input type="hidden" id="hairColor" name="hairColor" value="black"></div>
+  <div class="field"><label>Body</label><div class="choice-row">${Object.entries(BUILDS).map(([key,b])=>`<button type="button" class="choice ${key==='average'?'on':''}" data-action="pick" data-field="build" data-value="${key}">${b.name}</button>`).join('')}</div><input type="hidden" id="build" name="build" value="average"></div>
+  <div class="field"><label>Height</label><div class="choice-row">${Object.entries(HEIGHTS).map(([key,h])=>`<button type="button" class="choice ${key==='average'?'on':''}" data-action="pick" data-field="height" data-value="${key}">${h.name}</button>`).join('')}</div><input type="hidden" id="height" name="height" value="average"></div>
   <button class="primary wide" type="button" data-action="creationNext">Next: choose your career ↗</button></section>
   <section id="stepCareer" hidden><input type="hidden" name="career" value="football">${['Sports','Content creation','Entertainment','Technology'].map(u=>`<span class="eyebrow umbrella">${u.toUpperCase()}</span><div class="career-grid">${Object.entries(CAREERS).filter(([,d])=>d.umbrella===u).map(([key,d])=>`<button type="button" class="career-option ${key==='football'?'selected':''}" data-action="selectCareer" data-career="${key}"><span>${d.icon}</span><strong>${escape(d.name)}</strong></button>`).join('')}</div>`).join('')}
   <div id="careerExtras"></div><div class="notice">🎲 <strong>Your starting story is drawn at random.</strong> The best start (e.g. academy prodigy) begins with a focus skill at level 2 and a family car. The humble start (e.g. street footballer) walks everywhere and starts every skill at level 1. Both can reach Icon.</div>
   <div class="actions"><button class="secondary" type="button" data-action="creationBack">← Back</button><button class="primary" type="submit">Roll my story &amp; begin ↗</button></div><p class="empty">Your character is saved on this city server. Keep this browser’s cookie to return to the same character.</p></section></form>`,false);updateCreationCareer('football');paintLook();
 }
-function paintLook(){const p=$('#lookPreview');if(p){p.style.setProperty('--skin',$('#color').value);p.dataset.hair=$('#hair').value;}}
+// After creation, a slot-machine reel spins between the two starting stories and lands on the drawn one.
+function storyReel(s){
+  const def=CAREERS[s.career],best=s.careers[s.career].origin===1,labels=[`🚗 ${def.origins[1]}`,`🚶 ${def.origins[0]}`],items=Array.from({length:18},(_,i)=>labels[i%2]);items.push(labels[best?0:1]);
+  showModal('storyReel',`<div class="reel-card"><span class="eyebrow">YOUR STARTING STORY</span><h2>Spinning your story…</h2><div class="reel"><div class="reel-strip" id="reelStrip">${items.map(t=>`<div>${escape(t)}</div>`).join('')}</div></div><div id="reelResult" class="reel-result" hidden></div></div>`,false);
+  const strip=$('#reelStrip'),stop=-(items.length-1)*56;
+  requestAnimationFrame(()=>{strip.style.transform=`translateY(${stop}px)`;});
+  setTimeout(()=>{$('#modalContent h2').textContent=best?'The best start!':'The humble start';
+    $('#reelResult').innerHTML=`<p>${best?`Your story: <strong>${escape(def.origins[1])}</strong>. Connected from day one, your ${escape(def.focus)} starts at level 2, and you have a <strong>family car</strong> to get around.`:`Your story: <strong>${escape(def.origins[0])}</strong>. No connections yet, every skill starts at level 1, and you’ll walk until fame buys you a ride. Every Icon started somewhere.`}</p>${button('Begin my story ↗','closeReel','','primary wide')}`;$('#reelResult').hidden=false;},matchMedia('(prefers-reduced-motion: reduce)').matches?300:3200);
+}
+// The look preview uses the real game renderer, so hair, colours and body shapes match the game exactly.
+let lookWorld=null;
+function paintLook(){
+  const canvas=$('#lookCanvas');if(!canvas)return;
+  if(!lookWorld||lookWorld.canvas!==canvas){lookWorld?.stop();lookWorld=new World(canvas,()=>{},()=>{});lookWorld.click=()=>{};lookWorld.location='home';lookWorld.zoom=6.5;const project=World.prototype.project;lookWorld.project=function(x,y,z){const p=project.call(this,x,y,z);return {x:p.x,y:p.y+this.height*.26};};lookWorld.forceHour=12;lookWorld.interior=()=>true;
+    for(const f of ['paintRoutine','paintLabels','paintPlumbob','paintSpeech','paintPins'])lookWorld[f]=()=>{};
+    lookWorld.scene=function(){this.human(0,0,this.previewLook.color,{...this.previewLook,walk:false,heading:Math.PI/4});this.actor={x:0,z:0,pose:null};};}
+  const look={color:$('#color').value,style:$('#hair').value,hair:HAIR_COLORS[$('#hairColor').value],build:$('#build').value,height:$('#height').value,outfit:'#8ea9a4',pants:'#34435e',shoes:'#f4f1ea'};
+  lookWorld.previewLook=look;lookWorld.state={location:'home',needs:{hunger:80,energy:80,fun:80,social:80,hygiene:80,bladder:80},equipped:{},career:'actor',color:look.color,furniture:[],serverNow:Date.now()};lookWorld.draw();
+}
 function updateCreationCareer(key){
   const def=CAREERS[key];$('#createForm [name=career]').value=key;
   document.querySelectorAll('.career-option').forEach(b=>b.classList.toggle('selected',b.dataset.career===key));
@@ -331,11 +354,12 @@ document.addEventListener('click',async event=>{
     case 'lifePanel':showModal('life',`<span class="eyebrow">YOUR DAILY LIFE</span><h2>How you're doing</h2>${$('#profileCard').innerHTML}<hr>${$('#needsCard').innerHTML}<hr>${$('#skillsCard').innerHTML}<hr><h3>Recent moments</h3>${$('#feed').innerHTML}`);break;
     case 'page':openPage(d.page);break;
     case 'selectCareer':updateCreationCareer(d.career);break;
-    case 'pickSkin':$('#color').value=d.color;document.querySelectorAll('.swatch').forEach(b=>b.classList.toggle('on',b===target));paintLook();break;
-    case 'pickHair':$('#hair').value=d.hair;document.querySelectorAll('.choice[data-hair]').forEach(b=>b.classList.toggle('on',b===target));paintLook();break;
+    case 'pick':$('#'+d.field).value=d.value;document.querySelectorAll(`[data-action=pick][data-field=${d.field}]`).forEach(b=>b.classList.toggle('on',b===target));paintLook();break;
     case 'creationNext':if(!$('#name').reportValidity())break;$('#stepLook').hidden=true;$('#stepCareer').hidden=false;$('#stepTwoLabel').classList.add('on');break;
     case 'creationBack':$('#stepLook').hidden=false;$('#stepCareer').hidden=true;$('#stepTwoLabel').classList.remove('on');break;
     case 'closeTip':closeTip();break;
+    case 'closeReel':lookWorld?.stop();lookWorld=null;modalPage=null;$('#modal').hidden=true;toast('Welcome to Palm City. Your next chapter starts at home.');break;
+    case 'playHere':elsewhere=false;modalPage=null;$('#modal').hidden=true;await refresh(true);scheduleHeartbeat();break;
     case 'authTab':authStep.from=d.tab;authScreen(d.tab);break;
     case 'authResend':try{await auth({type:'sendCode',purpose:authStep.purpose,email:authStep.email,...authStep.extra});authScreen('code','A new code is on its way.');}catch(e){authScreen('code',e.message);}break;
     case 'closeWelcome':closeModal();break;
@@ -403,7 +427,7 @@ document.addEventListener('submit',async event=>{
     try{const sent=await auth({type:'sendCode',purpose,email:values.email,...extra});authStep.fallback=!!sent.fallback;authScreen('code');}catch(e){authScreen(purpose,e.message);}}
   if(form.id==='codeForm'){try{await auth({type:'verifyCode',email:authStep.email,code:values.code});modalPage=null;$('#modal').hidden=true;welcomed=true;await refresh();toast('You’re signed in.');}catch(e){authScreen('code',e.message);}}
   if(form.id==='newLifeForm'){try{await auth({type:'newLife',confirm:values.confirm.trim()});}catch(e){toast(e.message);return;}location.reload();}
-  if(form.id==='createForm'){values.adult=values.adult==='on';const data=await send({type:'create',...values});if(data){modalPage=null;$('#modal').hidden=true;const c=data.state.careers[data.state.career];toast(c.origin===1?`🎲 Best start: ${CAREERS[data.state.career].origins[1]}. You have a family car 🚗`:`🎲 Humble start: ${CAREERS[data.state.career].origins[0]}. You'll walk for now. Fame buys rides.`);}}
+  if(form.id==='createForm'){values.adult=values.adult==='on';const data=await send({type:'create',...values});if(data){modalPage=null;storyReel(data.state);}}
   if(form.id==='prepareForm')await send({type:'start',...values});
   if(form.id==='switchForm')await send({type:'switch',...values,adult:values.adult==='on'});
   if(form.id==='chatForm'){await send({type:'chat',...values},{keepModal:true});}
@@ -418,8 +442,7 @@ const pollPulse=()=>setInterval(async()=>{if(document.hidden)return;try{const r=
 try{const live=new EventSource('/api/live');let opened=false;live.onmessage=soon;live.onopen=()=>opened=true;live.onerror=()=>{if(!opened){live.close();pollPulse();}};}catch{pollPulse();}
 // Hosting is billed per request. Every action returns fresh state at once; after that the full refresh
 // (also the online heartbeat) runs 20s after the last update, never while hidden. Returning refreshes at once.
-let heartbeat;
-function scheduleHeartbeat(){clearTimeout(heartbeat);heartbeat=setTimeout(async()=>{if(document.hidden){scheduleHeartbeat();return;}await refresh();scheduleHeartbeat();},20000);}
+function scheduleHeartbeat(){clearTimeout(heartbeat);if(elsewhere)return;heartbeat=setTimeout(async()=>{if(document.hidden){scheduleHeartbeat();return;}await refresh();scheduleHeartbeat();},20000);}
 scheduleHeartbeat();
 // Coming back after a real absence refreshes at once; quick app switches don't.
 let hiddenAt=0;document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();return;}if(Date.now()-hiddenAt>=10_000&&Date.now()-lastUpdate>=5_000)refresh();});
