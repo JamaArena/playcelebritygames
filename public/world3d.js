@@ -51,6 +51,20 @@ const SHAPES = {
   head: lathe([[0, -.115], [.04, -.112], [.068, -.09], [.084, -.055], [.093, -.01], [.098, .04], [.096, .09], [.082, .13], [.05, .155], [0, .162]]),
 };
 
+// A ceramic toilet facing -z: pedestal and bowl in one lathe, an oval seat ring over water, the lid
+// raised against a cistern with a flush button. Built once per pooled copy.
+function makeToilet() {
+  const g = new T.Group(), ceramic = mat('#f7f6f0', 'gloss'), add = (geo, m, x, y, z, sx = 1, sy = 1, sz = 1, rx = 0) => { const o = new T.Mesh(geo, m); o.position.set(x, y, z); o.scale.set(sx, sy, sz); o.rotation.x = rx; o.castShadow = o.receiveShadow = true; g.add(o); return o; };
+  add(lathe([[0, 0], [.14, 0], [.12, .06], [.11, .18], [.15, .27], [.21, .36], [.235, .42], [.22, .44], [0, .44]]), ceramic, 0, 0, 0, 1, 1, 1.3);
+  add(new T.CylinderGeometry(.17, .17, .01, 28), mat('#a9cfd6', 'glass'), 0, .44, -.01, 1, 1, 1.25);
+  add(new T.TorusGeometry(.19, .032, 10, 32), mat('#ffffff', 'gloss'), 0, .465, -.01, 1, 1.3, 1, Math.PI / 2);
+  add(UNIT_BOX, mat('#ffffff', 'gloss'), 0, .74, .3, .44, .52, .035, -.08);
+  add(UNIT_BOX, ceramic, 0, .62, .44, .54, .62, .22);
+  add(UNIT_BOX, mat('#ffffff', 'gloss'), 0, .95, .44, .58, .04, .26);
+  add(new T.CylinderGeometry(.035, .035, .02, 16), mat('#c9ccc8', 'gold'), 0, .975, .44);
+  return g;
+}
+
 // One person with natural proportions: a sculpted torso and tapered limbs, layered clothes (a suit with
 // lapels, shirt and tie; a sports kit with shorts and socks; or a tee and trousers), a face and a
 // hairstyle. Scaled by build and height.
@@ -110,12 +124,12 @@ class Figure {
   // Place, dress and pose the figure. Mirrors the 2D poses: walking, seated, sleeping, gesturing, working, sport.
   apply(x, z, skin, o, time, reduced) {
     const shape = BUILDS[o.build] || BUILDS.average, W = shape.w, H = shape.hip, S = shape.shoulders || W, pose = o.pose, fit = o.fit || 'tee', suit = fit === 'suit', kit = fit === 'kit';
-    const seated = ['sit', 'dine', 'tv', 'work'].includes(pose), tall = seated || pose === 'sleep' ? 1 : (HEIGHTS[o.height]?.h || 1);
+    const seated = ['sit', 'dine', 'tv', 'work', 'toilet'].includes(pose), tall = seated || pose === 'sleep' ? 1 : (HEIGHTS[o.height]?.h || 1);
     const phase = o.walk && !reduced ? Math.sin(o.gait) : pose === 'sport' && !reduced ? Math.sin(time * 7) : 0, bob = o.walk && !reduced ? Math.abs(Math.cos(o.gait)) * .02 : 0;
     // Standing still people breathe and shift their weight a little.
     const idle = !o.walk && !pose && !reduced, breath = idle ? Math.sin(time * 1.7 + x) : 0, sway = idle ? Math.sin(time * .6 + z) : 0;
     const hip = seated ? .58 : .9 * tall + bob, top = o.outfit, skinMat = mat(skin, 'skin'), pants = mat(o.pants);
-    this.root.position.set(x, 0, z); this.root.rotation.set(0, pose && pose !== 'gesture' ? 0 : o.heading || 0, 0);
+    this.root.position.set(x, 0, z); this.root.rotation.set(0, !pose || ['gesture', 'toilet', 'pee', 'doze', 'stink'].includes(pose) ? o.heading || 0 : 0, 0);
     this.torso.position.set(sway * .012, hip, 0); this.torso.scale.set(1, tall, 1); this.torso.rotation.set(o.walk ? .05 : 0, 0, sway * .015);
     this.pelvis.material = pants; this.pelvis.scale.set(.96 * H, 1, .58 * H);
     this.chest.material = mat(top); this.chest.scale.set(S, 1 + breath * .006, .62 * W);
@@ -158,6 +172,14 @@ class Figure {
     this.styleHair(o.style || 'curls', o.hair || '#2b211c', skin);
     // Sleeping: lie the whole figure down along the bed, head toward the headboard.
     if (pose === 'sleep') { this.root.rotation.set(-Math.PI / 2, 0, 0); this.root.position.set(x, .95, z + .7); }
+    // Mishaps: fainted flat on the floor, dozing on your feet, or caught wetting yourself.
+    if (pose === 'faint') { this.root.rotation.set(-Math.PI / 2, 0, .3); this.root.position.set(x, .11, z + .8); for (const arm of this.arms) arm.rotation.set(0, 0, arm.side * 1.25); }
+    if (pose === 'doze') { this.head.rotation.set(.55, 0, Math.sin(time * 1.3) * .1); for (const arm of this.arms) arm.rotation.set(.05, 0, arm.side * .04); }
+    if (pose === 'pee') {
+      this.head.rotation.set(.45, 0, 0);
+      for (const arm of this.arms) { arm.rotation.set(-.35, 0, -arm.side * .32); arm.fore.rotation.set(-.55, 0, 0); }
+      for (const leg of this.legs) { leg.rotation.set(-.12, 0, -leg.side * .06); leg.shin.rotation.set(.25, 0, 0); }
+    }
     this.root.updateMatrixWorld();
   }
 }
@@ -185,7 +207,7 @@ export class World3D extends World {
     this.world3 = new T.Group(); this.scene3.add(this.world3);
     this.boxes = new Pool(this.world3, () => { const m = new T.Mesh(UNIT_BOX, mat('#fff')); m.castShadow = true; m.receiveShadow = true; return m; });
     this.balls = new Pool(this.world3, () => { const m = new T.Mesh(UNIT_BALL, mat('#fff')); m.castShadow = true; m.receiveShadow = true; return m; });
-    this.figures = new Pool(this.world3, () => new Figure());
+    this.figures = new Pool(this.world3, () => new Figure()); this.toilets = new Pool(this.world3, makeToilet);
     this.raycaster = new T.Raycaster(); this.ground = new T.Vector3();
   }
   // Drawing primitives used by the shared scene descriptions, now as 3D meshes.
@@ -194,6 +216,7 @@ export class World3D extends World {
   // Room-sized floors indoors are tiled; paths, lawns and streets stay plain.
   floor(x, z, w, d, color, y = 0) { const m = this.boxes.next(); m.material = this.interior() && w >= 8 && d >= 8 && w <= 12 && d <= 12 ? tileMat(color, w, d) : mat(color); m.scale.set(w, .03, d); m.position.set(x, y - .01, z); }
   polygon() {} limb() {} shadowRect() {} paintIsland() {}
+  toilet(x, z) { this.toilets.next().position.set(x, 0, z); }
   human(x, z, skin, o = {}) {
     const f = this.figures.next(); o = { hair: '#2b211c', style: 'curls', outfit: '#8ea9a4', pants: '#34435e', shoes: '#f4f1ea', gait: this.gait, ...o };
     f.apply(x, z, skin, o, performance.now() / 1000, this.reduced);
@@ -228,9 +251,9 @@ export class World3D extends World {
     const size = this.renderer.getSize(new T.Vector2()); if (size.x !== Math.round(r.width) || size.y !== Math.round(r.height)) { this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); this.renderer.setSize(r.width, r.height, false); this.camera.aspect = r.width / r.height; this.camera.updateProjectionMatrix(); }
     this.focusPoint = this.focus(); this.placeCamera();
     const day = this.daylight(); this.light(day);
-    for (const p of [this.boxes, this.balls, this.figures]) p.begin();
+    for (const p of [this.boxes, this.balls, this.figures, this.toilets]) p.begin();
     this.meshes = []; this.scene();
-    for (const p of [this.boxes, this.balls, this.figures]) p.end();
+    for (const p of [this.boxes, this.balls, this.figures, this.toilets]) p.end();
     this.renderer.render(this.scene3, this.camera);
     // Labels, bubbles and rings stay crisp on the 2D layer above the 3D view.
     const ctx = this.ctx; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, r.width, r.height);
