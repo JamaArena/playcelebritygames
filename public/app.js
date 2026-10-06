@@ -94,7 +94,7 @@ const world=new World($('#world'),position=>{closeTray();send({type:'move',...po
   if(object.action==='enter'){pie(object,[['🏠 Go inside','travel','data-location="home"']]);return;}
   if(object.action==='leave'){pie(object,[['🗺️ Open the map','app','data-app="map"'],['🏠 Go home','travel','data-location="home"']]);return;}
   if(object.action==='vip'){pie(object,[['🏁 Sponsorship deals','page','data-page="vip"'],['↗ Go here','goObject']]);return;}
-  if(object.action==='phone'){pie(object,[['♡ Chat','quickSocial'],['♧ Contacts','page','data-page="phone"'],['↗ Go here','goObject']]);return;}
+  if(object.action==='phone'){pie(object,[['💬 Chat <small>+10 Social</small>','talkNpc'],['♧ Contacts','page','data-page="phone"'],['↗ Go here','goObject']]);return;}
   const watch=object.name==='Television'&&!state.visiting?[[`📺 ${escape(WATCH[def.family].title)} <small>learn a little</small>`,'watchObject']]:[];
   pie(object,[...watch,[`${object.icon} ${escape(object.verb||'Use')}${object.need?` <small>+${B.recovery[object.need][0]} ${escape(needs[object.need][0])}, stop any time</small>`:''}`,'useObject'],['↗ Go here','goObject']]);
 });
@@ -298,6 +298,8 @@ document.addEventListener('click',async event=>{
     case 'closeTray':closeTray();break;
     case 'toggleObjects':$('#objects').hidden=!$('#objects').hidden;break;
     case 'quickSocial':closeTray();await send({type:'recover',need:'social'});break;
+    case 'talkNpc':{const object=selectedObject,npc=NPCS.find(n=>n.location===state.location);closeTray();if(!object||!npc)break;
+      world.approach(object,()=>whenIdle(async()=>{const data=await send({type:'talk',npc:npc.id});if(data?.state.lastTalk)world.talkTo(object,data.state.lastTalk.line);}));break;}
     case 'quickStart':await startAtObject({kind:d.kind});break;
     case 'prepareDetails':closeTray();prepareDetails(d.kind);break;
     case 'lifePanel':showModal('life',`<span class="eyebrow">YOUR DAILY LIFE</span><h2>How you're doing</h2>${$('#profileCard').innerHTML}<hr>${$('#needsCard').innerHTML}<hr>${$('#skillsCard').innerHTML}<hr><h3>Recent moments</h3>${$('#feed').innerHTML}`);break;

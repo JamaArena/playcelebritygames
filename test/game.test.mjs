@@ -199,3 +199,10 @@ test('watching TV: first insight at 10s, then every 30s, five at most, then a 20
   act(s,{type:'recover',need:'fun',watch:true},T+140_000+20*60_000);reconcile(s,T+150_000+20*60_000);assert.equal(points(),6,'after 20 minutes it teaches again');
   const quick=make('actor');act(quick,{type:'recover',need:'fun',watch:true},T);act(quick,{type:'cancel'},T+9_000);assert.equal(quick.insights,undefined,'under 10 seconds teaches nothing');assert.equal(quick.watchLearnAt,undefined);
 });
+
+test('talking to an NPC is instant, gives a little social and has a short cool-off',()=>{
+  const s=make('musician');s.needs.social=40;assert.throws(()=>act(s,{type:'talk',npc:'nova'},T),/isn’t here/);
+  act(s,{type:'travel',location:'studio'},T);s.location='studio';s.trip=null;
+  act(s,{type:'talk',npc:'nova'},T);assert.equal(s.needs.social,50);assert.equal(s.recovery,null,'no timer');assert.match(s.lastTalk.line,/./);
+  assert.throws(()=>act(s,{type:'talk',npc:'nova'},T+10_000),/needs a moment/);act(s,{type:'talk',npc:'nova'},T+45_000);assert.ok(Math.abs(s.needs.social-60)<.5,'another chat after the cool-off');
+});

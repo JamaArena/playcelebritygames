@@ -180,7 +180,7 @@ export class World {
     const segment=(a,b,width,tone)=>this.limb(point(...a),point(...b),width,tone);
     for(const side of [-1,1]){const stride=phase*side*.24,knee=seated?[side*.12,.5,.36]:[side*.12,.43+bob,stride*.55],foot=seated?[side*.12,.09,.42]:[side*.12,.08+Math.max(0,phase*side)*.1,stride];
       segment([side*.12,hip,0],knee,.16,pants);segment(knee,foot,.13,shade(pants,.92));ball(foot[0],foot[1]-.05,foot[2]+.06,.19,.3,.12,shoes);ball(foot[0],foot[1]-.09,foot[2]+.06,.2,.31,.04,shade(shoes,.7));
-      const using=['work','cook','perform','water','chat'].includes(pose),swing=using?.3+(this.reduced?0:Math.sin(time*5+side)*.05):seated?.16:-stride*.8,shoulder=[side*.25,hip+.5,0],elbow=[side*.29,hip+.22,swing*.5],hand=[side*.26,using?hip+.28:hip-.03,swing];
+      const using=['work','cook','perform','water','chat'].includes(pose),talking=pose==='gesture',wave=this.reduced?0:Math.sin(time*7+side*1.9),swing=talking?.28+wave*.14:using?.3+(this.reduced?0:Math.sin(time*5+side)*.05):seated?.16:-stride*.8,shoulder=[side*.25,hip+.5,0],elbow=[side*(talking?.33:.29),hip+(talking?.3:.22),swing*.5],hand=[side*(talking?.3+wave*.05:.26),talking?hip+.42+Math.max(0,wave)*.18:using?hip+.28:hip-.03,swing];
       segment(shoulder,elbow,.13,outfit);segment(elbow,hand,.095,skin);ball(hand[0],hand[1]-.035,hand[2],.11,.11,.12,skin);
     }
     ball(0,hip-.08,0,.38,.27,.24,pants);ball(0,hip+.08,0,.34,.23,.36,outfit);ball(0,hip+.32,0,.5,.28,.26,outfit);ball(0,hip+.47,0,.48,.25,.1,shade(outfit,1.08));
@@ -353,13 +353,13 @@ export class World {
     }
     if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.item,p.x,p.z);this.floor(p.x,p.z,.9,.9,valid?'#87bc9c':'#d79c8c',.025);if(p.item==='chair')this.chair(p.x,p.z);else this.box(p.x,p.z,.85,.45,.8,valid?'#abc8a0':'#d0a18d');}
     if(this.interior()&&l!=='home')this.paintCrowd(l);
-    const npc=NPCS.find(n=>n.location===l);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone');this.human(obj?.x||2.5,obj?.z||2,'#bd8b68',{...this.look(npc.career),style:'short'});}
+    const npc=NPCS.find(n=>n.location===l);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone'),nx=obj?.x||2.5,nz=obj?.z||2,talking=this.npcTalkUntil>performance.now();this.human(nx,nz,'#bd8b68',{...this.look(npc.career),style:'short',pose:talking?'gesture':null,heading:talking?Math.atan2(this.player.x-nx,this.player.z-nz):0});}
     this.paintPeople();
     const need=this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=({energy:'sleep',fun:'tv',hygiene:'shower',bladder:'sit',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
     const pos=need==='bladder'?{x:4.1,z:3.1}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:1.5}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
     if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride){this.ride(this.state.trip.ride,p.x,p.z,p.axis);this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),style:this.state.hair});this.actor={x:p.x,z:p.z,pose:null};}return;}
     if(this.state.ride){if(this.interior())this.ride(this.state.ride,-2.5,7.4,'x');else this.ride(this.state.ride,-7.1,2.6,'z');}
-    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),style:this.state.hair,walk:this.moving,pose,heading:pose?0:this.heading,smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
+    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),style:this.state.hair,walk:this.moving,pose,heading:pose==='gesture'?this.pose.heading:pose?0:this.heading,smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
     this.actor={...pos,pose};
   }
   draw(){
@@ -390,11 +390,13 @@ export class World {
     ctx.font='600 10px Segoe UI';for(const o of this.hits.filter(o=>o.name===this.hover?.name)){const p=o.screen;const width=ctx.measureText(o.name).width+14;ctx.fillStyle='#fff9';ctx.beginPath();ctx.roundRect(p.x-width/2,p.y+13,width,17,8);ctx.fill();ctx.fillStyle='#49614f';ctx.fillText(o.name,p.x,p.y+25);}
   }
   // Local chat appears as a speech bubble over the speaker for a few seconds.
+  // A short face-to-face chat: both gesture for a couple of seconds and the NPC's line pops up.
+  talkTo(object,line){const heading=Math.atan2(object.x-this.player.x,object.z-this.player.z);this.heading=heading;this.pose={kind:'gesture',x:this.player.x,z:this.player.z,heading,expires:performance.now()+2600};this.npcTalkUntil=performance.now()+2600;this.say('npc',line);}
   say(id,text){this.speech??=new Map();this.speech.set(id,{text:String(text).slice(0,70),until:performance.now()+6500});this.draw();}
   paintSpeech(){
     if(!this.speech?.size)return;const ctx=this.ctx,here=TOWN[this.location]||TOWN.home,now=performance.now();
     for(const [id,bubble] of this.speech){if(now>bubble.until){this.speech.delete(id);continue;}
-      const who=id==='me'?{x:this.actor.x,z:this.actor.z}:this.people?.get(id)&&!(this.interior()&&!this.people.get(id).scene)&&{x:this.people.get(id).x-here.x,z:this.people.get(id).z-here.z};if(!who||!this.onScreen(who.x,who.z,1))continue;
+      const npcSpot=id==='npc'&&worldObjects(this.location).find(o=>o.action==='phone'),who=id==='me'?{x:this.actor.x,z:this.actor.z}:npcSpot?{x:npcSpot.x,z:npcSpot.z}:this.people?.get(id)&&!(this.interior()&&!this.people.get(id).scene)&&{x:this.people.get(id).x-here.x,z:this.people.get(id).z-here.z};if(!who||!this.onScreen(who.x,who.z,1))continue;
       const p=this.project(who.x,2.2,who.z),y=p.y-(id==='me'?44:16);ctx.font='500 11px Segoe UI';const words=bubble.text.length>34?bubble.text.slice(0,33)+'…':bubble.text,w=Math.min(240,ctx.measureText(words).width+20),fade=Math.min(1,(bubble.until-now)/600);
       ctx.globalAlpha=fade;ctx.fillStyle='#ffffff';ctx.strokeStyle='#cfdccb';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(p.x-w/2,y-26,w,24,12);ctx.fill();ctx.stroke();
       ctx.beginPath();ctx.moveTo(p.x-6,y-3);ctx.lineTo(p.x,y+5);ctx.lineTo(p.x+6,y-3);ctx.closePath();ctx.fill();ctx.fillStyle='#22392d';ctx.textAlign='center';ctx.fillText(words,p.x,y-10);ctx.globalAlpha=1;}
@@ -491,7 +493,8 @@ export class World {
   }
   arrived(){this.moving=false;const cb=this.pending;this.pending=null;if(cb)cb();}
   frame(time){const dt=Math.min((time-this.last)/1000,.05);this.last=time;
-    if(this.pose?.expires&&time>this.pose.expires){this.pose=null;this.respond('water',true,'❀');}
+    if(this.pose?.expires&&time>this.pose.expires){const kind=this.pose.kind;this.pose=null;if(kind==='water')this.respond('water',true,'❀');}
+    if(this.npcTalkUntil&&time>this.npcTalkUntil)this.npcTalkUntil=null;
     if(this.moving){const dx=this.target.x-this.player.x,dz=this.target.z-this.player.z,d=Math.hypot(dx,dz),desired=this.waypoints.length?2.8:Math.min(2.8,Math.sqrt(14*d));this.speed+=Math.max(-7*dt,Math.min(7*dt,desired-this.speed));const step=Math.min(d,this.speed*dt);this.heading=turnToward(this.heading,Math.atan2(dx,dz),dt);this.gait+=step*8;
       if(d<.025||step>=d){this.player={...this.target};if(this.waypoints.length)this.target=this.waypoints.shift();else{this.speed=0;this.arrived();}}else{this.player.x+=dx/d*step;this.player.z+=dz/d*step;}this.draw();}
     for(const p of this.people?.values()||[]){const dx=p.tx-p.x,dz=p.tz-p.z,d=Math.hypot(dx,dz);if(d>12){p.x=p.tx;p.z=p.tz;p.moving=false;}else if(d>.03){const step=Math.min(d,2.6*dt);p.x+=dx/d*step;p.z+=dz/d*step;p.heading=turnToward(p.heading,Math.atan2(dx,dz),dt);p.gait+=step*8;p.moving=true;}else p.moving=false;}
