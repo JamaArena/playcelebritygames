@@ -7,7 +7,7 @@ export const BALANCE = {
   // Reach per output (views, streams, fans cheering, users) before quality; 1,000 reach = 1 fame point.
   reaches: [10_000, 100_000, 1_000_000, 10_000_000], famePerReach: 1 / 1000, seasonMinReach: 10_000, fees: [50, 250, 1000, 5000],
   tiers: [['Newcomer', 0, 1], ['Emerging', 100, 2], ['Established', 1000, 4], ['Star', 10000, 6], ['Icon', 100000, 8]],
-  milestones: [100, 1000, 10000, 100000], seasonMs: 28 * 86400_000,
+  milestones: [100, 1000, 10000, 100000], seasonMs: 28 * 86400_000, driveMsPerBlock: 60_000,
 };
 const career = (name, icon, family, skills, origins, location, output, beats, focus = skills[0]) => ({name, icon, family, skills, origins, location, output, beats, focus, audience: family === 'tech' ? 'users' : family === 'music' ? 'streams' : family === 'sport' ? 'fans cheering' : 'views'});
 export const CAREERS = {
@@ -56,7 +56,28 @@ export const SPONSORSHIPS = {
   coupe: {name: 'Rossa sports coupé', sponsor: 'Rossa Motori', fame: 5_000, kind: 'ride', icon: '🏎️', color: '#c9302c', description: 'Low, loud and very red.'},
   suv: {name: 'Atlas luxury SUV', sponsor: 'Atlas Autos', fame: 20_000, kind: 'ride', icon: '🚙', color: '#23262f', description: 'Tinted windows for when the paparazzi find you.'},
   hypercar: {name: 'Vitesse hypercar', sponsor: 'Vitesse', fame: 100_000, kind: 'ride', icon: '🏁', color: '#1d4fa8', description: 'A hand-built hypercar for Icons only. A sponsorship deal, free to claim.'},
+  townhouse: {name: 'Palm Heights townhouse', sponsor: 'Palm Realty', fame: 2_000, kind: 'home', icon: '🏡', color: '#b86b52', rest: .9, description: 'Warm wood floors and art on the walls. Home recovery 10% faster.'},
+  villa: {name: 'Lagoon villa', sponsor: 'Coastline Estates', fame: 25_000, kind: 'home', icon: '🏝️', color: '#3a8fa8', rest: .8, description: 'Marble, sea light and a statement chandelier. Home recovery 20% faster.'},
+  mansion: {name: 'Island mansion', sponsor: 'Isle Royale', fame: 150_000, kind: 'home', icon: '🏰', color: '#b8932f', rest: .7, description: 'Gold trim, a grand piano and room for the whole entourage. Home recovery 30% faster.'},
 };
+// Driving: owners of a sponsored ride drive between lots along the roads. One 16-unit block takes
+// BALANCE.driveMsPerBlock, scaled by the ride's speed factor. Walking (no ride) stays instant.
+export const RIDE_SPEED = {scooter: 1, suv: .8, coupe: .7, hypercar: .5};
+export function route(from, to) {
+  const a = TOWN[from], b = TOWN[to], road = lot => lot.z + 8, points = [{x: a.x, z: a.z}, {x: a.x, z: road(a)}];
+  if (road(a) !== road(b)) { const side = a.x + (b.x >= a.x ? 8 : -8); points.push({x: side, z: road(a)}, {x: side, z: road(b)}); }
+  points.push({x: b.x, z: road(b)}, {x: b.x, z: b.z});
+  return points;
+}
+export const routeLength = points => points.slice(1).reduce((n, p, i) => n + Math.abs(p.x - points[i].x) + Math.abs(p.z - points[i].z), 0);
+export const tripMs = (from, to, ride) => Math.round(routeLength(route(from, to)) / 16 * BALANCE.driveMsPerBlock * (RIDE_SPEED[ride] ?? 1));
+export function along(points, f) {
+  const total = routeLength(points); let left = Math.max(0, Math.min(1, f)) * total;
+  for (let i = 1; i < points.length; i++) { const a = points[i - 1], b = points[i], d = Math.abs(b.x - a.x) + Math.abs(b.z - a.z);
+    if (left <= d || i === points.length - 1) { const t = d ? Math.min(1, left / d) : 1; return {x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, axis: b.x !== a.x ? 'x' : 'z', heading: Math.atan2(b.x - a.x, b.z - a.z)}; }
+    left -= d; }
+  return {...points.at(-1), axis: 'z', heading: 0};
+}
 export const NPCS = [
   {id:'nova', name:'Nova', career:'musician', location:'studio', role:'Producer', color:'#b4a7d9'},
   {id:'kai', name:'Kai', career:'football', location:'sports', role:'Scout', color:'#88bda5'},

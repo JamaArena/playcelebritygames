@@ -97,15 +97,17 @@ function whenIdle(perform){if(!busy){perform();return;}const timer=setInterval((
 async function startAtObject(input){
   if(state.active||state.recovery){toast('Finish or stop your current action first.');return;}
   closeTray();closeModal();const def=CAREERS[state.career];
-  if(state.location!==def.location&&!(input.kind==='practice'&&state.location==='home'&&state.inventory.gear)){const data=await send({type:'travel',location:def.location});if(!data)return;}
+  if(state.location!==def.location&&!(input.kind==='practice'&&state.location==='home'&&state.inventory.gear)){const data=await send({type:'travel',location:def.location});if(!data)return;if(data.state.trip){toast(`Driving to ${LOCATIONS[def.location].name}. Start work when you arrive.`);return;}}
   const object=worldObjects(state.location,state.furniture).find(o=>o.action===(input.kind==='practice'?'practice':'career'));
   if(object)world.approach(object,()=>whenIdle(()=>send({type:'start',...input})));else await send({type:'start',...input});
 }
+let tripTimer;
 function render(){
+  clearTimeout(tripTimer);if(state.trip)tripTimer=setTimeout(()=>refresh(),Math.max(500,state.trip.arrives-now()+400));
   const c=state.careers[state.career],def=CAREERS[state.career],location=LOCATIONS[state.location];
   $('#navigation').innerHTML=[['city','⌂','Home'],['career','✧','Career'],['phone','♧','Social'],['inventory','◇','My home'],['profile','♙','Profile']].map(([page,icon,label])=>`<button class="nav-button ${page==='city'?'active':''}" data-action="${page==='city'?(state.visiting?'leaveVisit':'travel'):'page'}" data-location="home" data-page="${page}"><span>${icon}</span>${label}</button>`).join('');
   $('#topStats').innerHTML=`<div class="stat-chip"><span class="stat-icon">◈</span><div><strong>${fmt(state.money)} <small>coins</small></strong><small>Your balance</small></div></div><div class="stat-chip"><span class="stat-icon">ϟ</span><div><strong>${state.charges} / 10 <small>career charges</small></strong><div class="charges">${Array.from({length:10},(_,i)=>`<span class="charge ${i<state.charges?'full':''}"></span>`).join('')}</div><small id="chargeRefill" class="refill-time">${state.refillAnchor===null?'Fully charged':`Next charge in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></div></div><div class="stat-chip"><span class="stat-icon">✦</span><div><strong>${fmt(state.fame||0)} <small>fame</small></strong><small>${B.tiers[state.careers[state.career].tier][0]}</small></div></div><div class="stat-chip"><span class="stat-icon">☀</span><div><strong>Day ${Math.max(1,Math.floor((now()-state.seasonStart)/86400000)+1)}</strong><small>Your new chapter</small></div></div>`;
-  $('#locationTitle').textContent=state.visiting?`${snapshot.players.find(p=>p.id===state.visiting)?.name||'Friend'}’s apartment`:location.name;
+  $('#locationTitle').textContent=state.visiting?`${snapshot.players.find(p=>p.id===state.visiting)?.name||'Friend'}’s home`:state.location==='home'&&SPONSORSHIPS[state.home]?`Your ${SPONSORSHIPS[state.home].name.toLowerCase()}`:location.name;
   $('#locationSubtitle').textContent=location.subtitle;
   $('#locationEyebrow').textContent=state.location==='home'?'YOUR NEIGHBOURHOOD':'OUT IN PALM CITY';
   $('#objects').innerHTML=worldObjects(state.location,snapshot.visitedHome?.furniture||state.furniture).map(o=>button(`${o.icon} ${escape(o.name)}`,'object',`data-name="${escape(o.name)}"`,'object-button')).join('')+(state.location==='home'?button('♧ Socialise','recover','data-need="social"','object-button'):'');
@@ -124,8 +126,9 @@ function render(){
 function clock(){const hour=world.daylight().hour,day=Math.max(1,Math.floor((now()-state.seasonStart)/86400000)+1);$('#worldClock').innerHTML=`${hour>=6&&hour<19?'☀':'☾'} <strong>${new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</strong><span>Day ${day}</span>`;}
 function progress(start,end){const value=Math.min(100,Math.max(0,(now()-start)/(end-start)*100));return '<div class="sim-progress"><i style="width:'+value+'%"></i></div>';}
 function renderActivity(){
-  const a=state.active,r=state.recovery,def=CAREERS[state.career];let html='';
-  if(r)html='<div class="sim-status"><span>'+needs[r.need][1]+'</span><strong>'+escape(r.label)+'</strong><time>'+duration(r.endsAt-now())+'</time>'+button('×','cancel','aria-label="Cancel recovery"','tray-close')+'</div>'+progress(r.endsAt-B.recovery[r.need][1],r.endsAt);
+  const a=state.active,r=state.recovery,def=CAREERS[state.career],t=state.trip;let html='';
+  if(t)html='<div class="sim-status"><span>'+(SPONSORSHIPS[t.ride]?.icon||'🚗')+'</span><strong>Driving to '+escape(LOCATIONS[t.to].name)+'</strong><time>'+duration(t.arrives-now())+'</time></div>'+progress(t.departs,t.arrives);
+  else if(r)html='<div class="sim-status"><span>'+needs[r.need][1]+'</span><strong>'+escape(r.label)+'</strong><time>'+duration(r.endsAt-now())+'</time>'+button('×','cancel','aria-label="Cancel recovery"','tray-close')+'</div>'+progress(r.startedAt??r.endsAt-B.recovery[r.need][1],r.endsAt);
   else if(a?.kind==='practice')html='<div class="sim-status"><span>'+def.icon+'</span><strong>'+escape(a.skill)+'</strong><small>+7 XP</small><time>'+duration(a.readyAt-now())+'</time>'+button('×','cancel','aria-label="Cancel practice"','tray-close')+'</div>'+progress(a.startedAt,a.readyAt);
   else if(a){
     const waiting=now()<a.readyAt,complete=a.beat>=a.totalBeats;
@@ -159,7 +162,7 @@ function career(){
 }
 function outputs(list){return list.slice(0,30).map(o=>`<div class="output"><div><strong>${escape(o.title)}</strong><p>${escape(o.genre||o.kind)} · ${o.released?'Released':'Unreleased build'} · ${new Date(o.at).toLocaleDateString()}</p><small>Credits: ${o.credits.map(escape).join(', ')} · ${fmt(o.gain)} reach · +${fmt(o.fame??Math.floor(o.gain*B.famePerReach))} fame · +${o.payout} coins</small></div><span class="tier-pill">${o.quality} QUALITY</span></div>`).join('')||'<p class="empty">Your first credited output is still ahead of you.</p>';}
 
-async function recover(need){if(need==='social'){showTray('♡ Socialise','<div class="tray-options">'+button('♡ Chat','quickSocial')+button('♧ Contacts','page','data-page="phone"')+'</div>');return;}if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;}const object=worldObjects('home',state.furniture).find(o=>o.need===need);if(object)world.onObject(object);}
+async function recover(need){if(need==='social'){showTray('♡ Socialise','<div class="tray-options">'+button('♡ Chat','quickSocial')+button('♧ Contacts','page','data-page="phone"')+'</div>');return;}if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast('Driving home. Recover when you arrive.');return;}}const object=worldObjects('home',state.furniture).find(o=>o.need===need);if(object)world.onObject(object);}
 function shop(){showModal('shop',`<span class="eyebrow">PALM CITY MARKET</span><h2>Make yourself at home.</h2><p class="modal-intro">${fmt(state.money)} coins available · purchases happen at Palm plaza.</p><div class="item-grid">${Object.entries(ITEMS).map(([key,item])=>`<div class="item-card"><h3>${item.name}</h3><p>${item.description}</p><div class="shop-price">◈ ${item.price} coins</div>${button(key!=='food'&&state.inventory[key]?'Owned':'Buy','buy',`data-item="${key}" ${key!=='food'&&state.inventory[key]?'disabled':''}`,'primary')}</div>`).join('')}</div>`);}
 function inventory(){
   showModal('inventory',`<span class="eyebrow">YOUR POSSESSIONS</span><h2>A place to call yours.</h2><p class="modal-intro">Furnish your apartment, equip a new look, and improve your tools.</p><div class="actions">${button('Visit market','travel','data-location="plaza"')}${button('Go home','travel','data-location="home"')}</div><div class="item-grid">${Object.entries(state.inventory).map(([key,item])=>{
@@ -193,8 +196,8 @@ function directMessage(playerId){const p=snapshot.players.find(p=>p.id===playerI
 function vip(){
   const fame=state.fame||0,claimed=state.vip||{};
   showModal('vip',`<span class="eyebrow">PALM MOTORS · SPONSORSHIPS</span><h2>Fame opens doors. And garages.</h2><p class="modal-intro">You have <strong>✦ ${fmt(fame)} fame</strong>. Sponsors give these to famous players for free. Fame isn't spent, and what you claim stays yours.</p><div class="item-grid">${Object.entries(SPONSORSHIPS).map(([key,d])=>{
-    const owned=claimed[key],using=d.kind==='ride'?state.ride===key:state.equipped.clothes===key,ready=fame>=d.fame;
-    const action=owned?(using?button(d.kind==='ride'?'Driving ✓':'Wearing ✓','noop','disabled'):button(d.kind==='ride'?'Drive it':'Wear it','useVip',`data-item="${key}"`)):ready?(state.location==='plaza'?button('Claim free ✦','claim',`data-item="${key}"`,'primary'):button('Claim at Palm Motors ↗','travel','data-location="plaza"','primary')):button(`🔒 ${fmt(d.fame)} fame`,'noop','disabled');
+    const owned=claimed[key],using=d.kind==='ride'?state.ride===key:d.kind==='home'?state.home===key:state.equipped.clothes===key,ready=fame>=d.fame,verb={ride:['Driving ✓','Drive it'],home:['Living here ✓','Move in'],style:['Wearing ✓','Wear it']}[d.kind];
+    const action=owned?(using?button(verb[0],'noop','disabled'):button(verb[1],'useVip',`data-item="${key}"`)):ready?(state.location==='plaza'?button('Claim free ✦','claim',`data-item="${key}"`,'primary'):button('Claim at Palm Motors ↗','travel','data-location="plaza"','primary')):button(`🔒 ${fmt(d.fame)} fame`,'noop','disabled');
     return `<div class="item-card vip-card ${owned?'owned':''}"><div class="vip-icon" style="--tone:${d.color}">${d.icon}</div><h3>${escape(d.name)}</h3><small class="vip-sponsor">by ${escape(d.sponsor)}</small><p>${escape(d.description)}</p><div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,fame/d.fame*100)}%"></div></div><small>${owned?'Claimed':ready?'Ready to claim':`${fmt(d.fame-fame)} fame to go`}</small>${action}</div>`;
   }).join('')}</div>`);
 }

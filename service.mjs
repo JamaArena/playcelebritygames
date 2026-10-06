@@ -67,20 +67,20 @@ function captureEligibility(s,now){
 }
 const TOWN_PLAYER_LIMIT=120;
 const roomFor=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
-function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<20_000};}
+function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,home:s.home||null,trip:s.trip||null,tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<20_000};}
 function snapshot(playerId,s,now){
   if(!s)return {state:null,serverNow:now};
   const players=db.prepare('SELECT id,state FROM players WHERE id!=?').all(playerId).flatMap(row=>{const p=JSON.parse(row.state);return p?[publicProfile(row.id,p)]:[];}).filter(p=>!s.blocks.includes(p.id));
   const scenePlayers=players.filter(p=>p.sceneRoom===roomFor(playerId,s)&&p.online&&!load(p.id)?.blocks.includes(playerId));
   // Everyone online in a public place, wherever they are in town; homes stay private. Capped per response.
-  const townPlayers=players.filter(p=>p.online&&p.location!=='home'&&p.sceneRoom!==roomFor(playerId,s)&&!load(p.id)?.blocks.includes(playerId))
+  const townPlayers=players.filter(p=>p.online&&(p.location!=='home'||p.trip)&&p.sceneRoom!==roomFor(playerId,s)&&!load(p.id)?.blocks.includes(playerId))
     .sort((x,y)=>Number(s.friends.includes(y.id))-Number(s.friends.includes(x.id))).slice(0,TOWN_PLAYER_LIMIT)
-    .map(({id,name,color,hair,career,location,position3d,tier,fame,ride,clothes})=>({id,name,color,hair,career,location,position3d,tier,fame,ride,clothes}));
+    .map(({id,name,color,hair,career,location,position3d,tier,fame,ride,clothes,trip})=>({id,name,color,hair,career,location,position3d,tier,fame,ride,clothes,trip}));
   const messages=db.prepare('SELECT * FROM messages WHERE (location=? AND recipient IS NULL) OR recipient=? OR (sender=? AND recipient IS NOT NULL) ORDER BY at DESC LIMIT 50').all(roomFor(playerId,s),playerId,playerId).filter(m=>!s.blocks.includes(m.sender)).reverse().map(m=>({...m,name:load(m.sender)?.name||'Visitor'}));
   const agreements=db.prepare('SELECT * FROM agreements').all().map(r=>JSON.parse(r.state)).filter(a=>a.participants.includes(playerId)&&['pending','running'].includes(a.status));
   const visiting=s.visiting?load(s.visiting):null;
   const battles=battlesFor(playerId,s,now);
-  return {state:view(s,now),playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture}:null,season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
+  return {state:view(s,now),playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture,home:visiting.home||null}:null,season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
 }
 // Turn-based team battles between real players. Stats come from career skills, energy and fame.
 // Winners gain fame; losers lose the same stake (never below zero). Each fighter spends one charge.
@@ -127,7 +127,7 @@ function tickBattle(b,now){let changed=false;for(let n=0;n<40&&b.status==='runni
 function battleAction(playerId,s,input,now){
   if(input.type==='battleCreate'){
     const mode=Number(input.mode);fail(BATTLE.modes.includes(mode),'Choose 1v1, 3v3 or 5v5.');
-    fail(s.location!=='home'&&!s.visiting,'Battles happen in public places around town.');fail(!s.battle,'You are already in a battle.');fail(!s.active&&!s.recovery,'Finish your current activity first.');
+    fail(s.location!=='home'&&!s.visiting&&!s.trip,'Battles happen in public places around town.');fail(!s.battle,'You are already in a battle.');fail(!s.active&&!s.recovery,'Finish your current activity first.');
     let invited=null;if(input.opponent){const o=load(input.opponent);fail(o&&input.opponent!==playerId&&o.location===s.location&&!o.blocks.includes(playerId)&&!s.blocks.includes(input.opponent),'That player is not here to challenge.');fail(!o.battle,'That player is already battling.');invited=input.opponent;}
     const b={id:id(),mode,location:s.location,host:playerId,invited,status:'open',teams:[[playerId],[]],fighters:{},order:[],turn:0,round:1,hype:[false,false],log:[],createdAt:now};
     battleLog(b,`${s.name} opened a ${mode}v${mode} battle${invited?` and challenged ${load(invited).name}`:''}.`,now);s.battle=b.id;saveBattle(b);return true;
@@ -135,7 +135,7 @@ function battleAction(playerId,s,input,now){
   const b=loadBattle(input.battleId);fail(b,'Battle not found.');persist(playerId,s);tickBattle(b,now);Object.assign(s,load(playerId));
   if(input.type==='battleJoin'){
     const team=Number(input.team);fail(b.status==='open'&&[0,1].includes(team),'This battle is not taking fighters.');fail(!s.battle,'You are already in a battle.');
-    fail(s.location===b.location,'Go to the battle location to join.');fail(b.teams[team].length<b.mode,'That team is full.');
+    fail(s.location===b.location&&!s.trip,'Go to the battle location to join.');fail(b.teams[team].length<b.mode,'That team is full.');
     if(b.invited)fail(team===0||playerId===b.invited,'This challenge is for someone else.');
     fail(!b.teams.flat().some(p=>load(p)?.blocks.includes(playerId)||s.blocks.includes(p)),'You cannot join this battle.');
     b.teams[team].push(playerId);s.battle=b.id;battleLog(b,`${s.name} joins team ${team?'B':'A'}.`,now);

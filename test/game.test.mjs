@@ -161,3 +161,15 @@ test('fame unlocks free sponsorships at Palm Motors, once, without spending fame
   act(s,{type:'claim',item:'designer'},T);assert.equal(s.equipped.clothes,'designer');
   assert.throws(()=>act(s,{type:'useVip',item:'suv'},T),/Claim this/);
 });
+
+test('a sponsored ride drives along the roads for a distance-based time; homes speed up recovery',()=>{
+  const s=make('football');s.vip={hypercar:{at:T},villa:{at:T}};s.ride='hypercar';s.home='villa';
+  act(s,{type:'travel',location:'tech'},T);
+  assert.equal(s.location,'home');assert.equal(s.trip.to,'tech');assert.equal(s.trip.arrives-T,120_000,'home to tech: 4 blocks of road at half time');
+  assert.throws(()=>act(s,{type:'start',kind:'practice',skill:'passing'},T+1000),/on the road/);
+  act(s,{type:'travel',location:'tech'},T+120_000);assert.equal(s.location,'tech');assert.equal(s.trip,null);
+  s.ride='scooter';act(s,{type:'travel',location:'home'},T+121_000);assert.equal(s.trip.arrives-(T+121_000),240_000,'the scooter takes full time');
+  reconcile(s,T+361_000);assert.equal(s.location,'home');
+  act(s,{type:'recover',need:'energy'},T+362_000);assert.equal(s.recovery.endsAt-s.recovery.startedAt,Math.round(B.recovery.energy[1]*.8));
+  const walker=make('football');act(walker,{type:'travel',location:'tech'},T);assert.equal(walker.location,'tech','walking stays instant');
+});
