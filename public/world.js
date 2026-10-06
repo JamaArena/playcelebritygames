@@ -42,6 +42,7 @@ export class World {
     this.last=performance.now();requestAnimationFrame(t=>this.frame(t));
   }
   update(state,players,visitedHome){
+    if(this.state?.recovery&&!state.recovery)this.pose=null;
     if(this.location!==state.location){this.player={...state.position3d};this.target={...this.player};this.moving=false;this.pending=null;this.pose=null;}
     this.state=state;this.location=state.location;this.players=players;this.visitedHome=visitedHome;this.draw();
   }
@@ -124,8 +125,8 @@ export class World {
     }
     const npc=NPCS.find(n=>n.location===l);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone');this.human(obj?.x||2.5,obj?.z||2,'#bd8b68');}
     for(const p of (this.players||[]).filter(p=>p.location===l&&p.online))this.human(p.position3d.x,p.position3d.z,p.color);
-    const pose=this.state.recovery?.need==='energy'?'sleep':this.state.recovery?.need==='fun'?'tv':this.pose?.kind;
-    const pos=pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'?{x:-3.5,z:1.5}:this.pose||this.player;
+    const need=this.state.recovery?.need,pose=({energy:'sleep',fun:'tv',hygiene:'shower',bladder:'sit',hunger:'cook'})[need]||this.pose?.kind;
+    const pos=need==='bladder'?{x:4.1,z:3.1}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'?{x:-3.5,z:1.5}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
     const actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,'#e8bf75',this.moving,pose);for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
     this.actor={...pos,pose};
   }
