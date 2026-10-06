@@ -140,6 +140,7 @@ function chatMessages(){return snapshot.messages.map(m=>`<div class="message"><s
 function directMessage(playerId){const p=snapshot.players.find(p=>p.id===playerId);showModal('direct',`<span class="eyebrow">FRIENDS</span><h2>Message ${escape(p.name)}</h2><form id="directForm"><input type="hidden" name="recipient" value="${playerId}"><div class="field"><label for="directBody">Your message</label><input id="directBody" name="body" maxlength="300" required></div><button class="primary close-action" type="submit">Send message</button></form>`);}
 function openPage(page){({city:map,career,phone,inventory,profile,shop}[page]||map)();}
 $('#mapButton').addEventListener('click',map);$('#cameraButton').addEventListener('click',()=>world.rotate());$('#closeModal').addEventListener('click',closeModal);
+$('#zoomIn').addEventListener('click',()=>world.setZoom(world.zoom*1.2));$('#zoomOut').addEventListener('click',()=>world.setZoom(world.zoom/1.2));$('#resetCamera').addEventListener('click',()=>world.resetCamera());
 $('.modal-backdrop').addEventListener('click',closeModal);$('#motionButton').addEventListener('click',()=>{motion=!motion;world.reduced=!motion;$('#motionButton').textContent=motion?'Motion on':'Motion reduced';});
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape')closeModal();
