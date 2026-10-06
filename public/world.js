@@ -214,11 +214,12 @@ export class World {
     segment([0,hip+.5*Y,0],[0,hip+.6*Y,0],.12,skin);
     this.meshes.push({head:true,x,z,y:hip+.57*Y,w:.4,d:.36,h:.45,color:skin,hair,style,smile,heading,depth:x*Math.sin(this.angle)+z*Math.cos(this.angle)+.25}); // heads (and hair falling over the back) paint after their own body
   }
-  body(who){return {style:who.hair||'curls',hair:HAIR_COLORS[who.hairColor]||HAIR_COLORS.black,build:who.build||'average',height:who.height||'average'};}
+  body(who){return {style:who.hair||'curls',hair:HAIR_COLORS[who.hairColor]||HAIR_COLORS.black,build:who.build||'average',height:who.height||'average',crown:(who.fame||0)>=10_000};}
   // Background people get varied looks from a fixed rotation so the city feels mixed.
   extra(n){const k=n+CROWD_SEED,styles=Object.keys(HAIRSTYLES),builds=Object.keys(BUILDS),heights=Object.keys(HEIGHTS),colors=Object.values(HAIR_COLORS);return {style:styles[(k*5+3)%styles.length],hair:colors[(k*7)%colors.length],build:builds[(k*3+1)%builds.length],height:heights[(k*2+1)%heights.length]};}
   // Clothing reads the career at a glance; an equipped jacket overrides it.
-  look(career,clothes=null){const family=CAREERS[career]?.family;if(clothes==='designer')return {outfit:'#1f1f24',pants:'#2a2a30',shoes:'#d4af37'};return {outfit:clothes==='jacket'?'#24634e':({sport:'#2f6fb3',music:'#7b4fa3',creator:'#e07a5f',acting:'#b23a48',tech:'#3d6a8a',risk:'#2b2d42'})[family]||'#8ea9a4',pants:family==='sport'?'#f2f2ee':'#34435e',shoes:family==='sport'?'#2b2d42':'#f4f1ea'};}
+  // fit tells the 3D view how to dress them: a suit (jacket, shirt, tie), a sports kit or a tee.
+  look(career,clothes=null){const family=CAREERS[career]?.family;if(clothes==='designer')return {outfit:'#1f1f24',pants:'#2a2a30',shoes:'#d4af37',fit:'suit',accent:'#d4af37'};const fit=clothes==='jacket'||family==='acting'||family==='tech'?'suit':family==='sport'?'kit':'tee';return {outfit:clothes==='jacket'?'#24634e':({sport:'#2f6fb3',music:'#7b4fa3',creator:'#e07a5f',acting:'#b23a48',tech:'#3d6a8a',risk:'#2b2d42'})[family]||'#8ea9a4',pants:family==='sport'?'#f2f2ee':family==='tech'||family==='acting'?'#23262e':'#34435e',shoes:family==='sport'?'#2b2d42':fit==='suit'?'#1d1b1a':'#f4f1ea',fit,accent:family==='acting'?'#1d1b1a':'#7a2433'};}
   // Local time drives the sky, building lights and the HUD clock; it never affects game rules.
   daylight(){const d=new Date(),h=this.forceHour??d.getHours()+d.getMinutes()/60,dark=h<5||h>=21?1:h<7?(7-h)/2:h>=19?(h-19)/2:0;return {hour:h,dark,night:dark>.5};}
   palm(x,z,size=1){this.round(x,z,.2*size,.2*size,2*size,'#a98b67');this.round(x,z,1.5*size,1.5*size,.45*size,'#6aa679',1.9*size);this.round(x+.25*size,z-.1,.9*size,.9*size,.35*size,'#86c493',2.15*size);}
@@ -393,7 +394,7 @@ export class World {
     this.actor={...pos,pose};
   }
   draw(){
-    if(!this.state)return;
+    if(!this.state||this.paused)return;
     const r=this.canvas.getBoundingClientRect(),dpr=Math.min(devicePixelRatio||1,2);this.width=r.width;this.height=r.height;
     if(this.canvas.width!==Math.round(r.width*dpr)||this.canvas.height!==Math.round(r.height*dpr)){this.canvas.width=Math.round(r.width*dpr);this.canvas.height=Math.round(r.height*dpr);}
     const ctx=this.ctx;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,r.width,r.height);this.scale=Math.min(r.width/17,r.height/11.8)*this.zoom;
@@ -523,7 +524,7 @@ export class World {
   }
   arrived(){this.moving=false;const cb=this.pending;this.pending=null;if(cb)cb();}
   stop(){this.stopped=true;this.resize?.disconnect();}
-  frame(time){if(this.stopped)return;const dt=Math.min((time-this.last)/1000,.05);this.last=time;
+  frame(time){if(this.stopped)return;if(this.paused){this.last=time;requestAnimationFrame(t=>this.frame(t));return;}const dt=Math.min((time-this.last)/1000,.05);this.last=time;
     if(this.pose?.expires&&time>this.pose.expires){const kind=this.pose.kind;this.pose=null;if(kind==='water')this.respond('water',true,'❀');}
     if(this.npcTalkUntil&&time>this.npcTalkUntil)this.npcTalkUntil=null;
     if(this.moving){const dx=this.target.x-this.player.x,dz=this.target.z-this.player.z,d=Math.hypot(dx,dz),desired=this.waypoints.length?2.8:Math.min(2.8,Math.sqrt(14*d));this.speed+=Math.max(-7*dt,Math.min(7*dt,desired-this.speed));const step=Math.min(d,this.speed*dt);this.heading=turnToward(this.heading,Math.atan2(dx,dz),dt);this.gait+=step*8;
