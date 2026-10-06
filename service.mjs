@@ -67,7 +67,7 @@ function captureEligibility(s,now){
 }
 const TOWN_PLAYER_LIMIT=120;
 const roomFor=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
-function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<20_000};}
+function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<20_000};}
 function snapshot(playerId,s,now){
   if(!s)return {state:null,serverNow:now};
   const players=db.prepare('SELECT id,state FROM players WHERE id!=?').all(playerId).flatMap(row=>{const p=JSON.parse(row.state);return p?[publicProfile(row.id,p)]:[];}).filter(p=>!s.blocks.includes(p.id));
@@ -75,7 +75,7 @@ function snapshot(playerId,s,now){
   // Everyone online in a public place, wherever they are in town; homes stay private. Capped per response.
   const townPlayers=players.filter(p=>p.online&&p.location!=='home'&&p.sceneRoom!==roomFor(playerId,s)&&!load(p.id)?.blocks.includes(playerId))
     .sort((x,y)=>Number(s.friends.includes(y.id))-Number(s.friends.includes(x.id))).slice(0,TOWN_PLAYER_LIMIT)
-    .map(({id,name,color,hair,career,location,position3d,tier})=>({id,name,color,hair,career,location,position3d,tier}));
+    .map(({id,name,color,hair,career,location,position3d,tier,fame,ride,clothes})=>({id,name,color,hair,career,location,position3d,tier,fame,ride,clothes}));
   const messages=db.prepare('SELECT * FROM messages WHERE (location=? AND recipient IS NULL) OR recipient=? OR (sender=? AND recipient IS NOT NULL) ORDER BY at DESC LIMIT 50').all(roomFor(playerId,s),playerId,playerId).filter(m=>!s.blocks.includes(m.sender)).reverse().map(m=>({...m,name:load(m.sender)?.name||'Visitor'}));
   const agreements=db.prepare('SELECT * FROM agreements').all().map(r=>JSON.parse(r.state)).filter(a=>a.participants.includes(playerId)&&['pending','running'].includes(a.status));
   const visiting=s.visiting?load(s.visiting):null;

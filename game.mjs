@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, NPCS, LOCATIONS, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, CAREERS, ITEMS, NPCS, LOCATIONS, SPONSORSHIPS, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -292,6 +292,18 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(canPlace(s.furniture,input.item,input.x,input.z),'Choose a free position away from furniture and interaction points.');
       requireRule(!s.furniture.some(f=>f.item!==input.item&&f.x===input.x&&f.z===input.z),'That position is occupied.');
       s.furniture=s.furniture.filter(f=>f.item!==input.item);s.furniture.push({item:input.item,x:input.x,z:input.z});break;
+    }
+    case 'claim': {
+      const deal=SPONSORSHIPS[input.item];requireRule(deal,'Unknown sponsorship.');
+      requireRule(s.location==='plaza','Visit Palm Motors at Palm plaza to claim sponsorships.');
+      s.vip??={};requireRule(!s.vip[input.item],'You already claimed this sponsorship.');
+      requireRule((s.fame||0)>=deal.fame,`${deal.sponsor} sponsors players with ${deal.fame.toLocaleString('en-US')} fame.`);
+      s.vip[input.item]={at:now};if(deal.kind==='ride')s.ride=input.item;else s.equipped.clothes=input.item;
+      log(s,`${deal.sponsor} sponsorship claimed: ${deal.name}. Free, and yours to keep.`,now);break;
+    }
+    case 'useVip': {
+      const deal=SPONSORSHIPS[input.item];requireRule(deal&&s.vip?.[input.item],'Claim this sponsorship first.');
+      if(deal.kind==='ride')s.ride=input.item;else s.equipped.clothes=input.item;break;
     }
     case 'switch':requireRule(CAREERS[input.career]&&!s.active&&!s.recovery,'Finish your activity and choose a valid career.');requireRule(input.career!=='adult'||input.adult===true,'Confirm an adult character.');if(!s.careers[input.career])s.careers[input.career]=newCareer(input.career,0);s.career=input.career;break;
     case 'acceptOffer': {

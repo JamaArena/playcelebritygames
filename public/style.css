@@ -49,3 +49,9 @@ html,body,#app{height:100%;height:100dvh;overflow:hidden}.rail{background:#153d3
 .pie-option:hover,.pie-option:focus-visible{background:#e3f0df;border-color:#9cc3a3;outline:none}
 @keyframes pie-in{from{opacity:0;transform:translate(-50%,-50%) scale(.5)}}
 @media(prefers-reduced-motion:reduce){.plumbob,.pie-option{animation:none}}
+
+/* Palm Motors sponsorship cards. */
+.vip-card{position:relative;display:grid;gap:7px;align-content:start}
+.vip-card.owned{border-color:#9cc3a3;background:linear-gradient(180deg,#f3faf0,#fff)}
+.vip-icon{display:grid;place-items:center;width:52px;height:52px;border-radius:16px;font-size:28px;background:color-mix(in srgb,var(--tone) 16%,#fff);border:1px solid color-mix(in srgb,var(--tone) 35%,#fff)}
+.vip-sponsor{color:#7a6a3a;font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:9px}

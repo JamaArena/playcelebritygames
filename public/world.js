@@ -1,6 +1,6 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { NPCS, CAREERS, LOCATIONS, TOWN, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
+import { NPCS, CAREERS, LOCATIONS, TOWN, SPONSORSHIPS, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 export const worldObjects = (location,furniture=[]) => ({
@@ -27,7 +27,7 @@ export const worldObjects = (location,furniture=[]) => ({
   studio:[{name:'Recording desk',icon:'♫',x:-3.2,z:-2.3,action:'career'},{name:'Rehearsal stage',icon:'♬',x:2.5,z:-2,action:'practice'},{name:'Producer Nova',icon:'☺',x:2.5,z:2,action:'phone'}],
   creator:[{name:'Camera set',icon:'▷',x:-2,z:-1,action:'career'},{name:'Editing station',icon:'⌘',x:3,z:-2,action:'practice'},{name:'Lounge',icon:'▱',x:1,z:3,need:'social'}],
   tech:[{name:'Project desk',icon:'⌘',x:-3.2,z:-2.3,action:'career'},{name:'Practice lab',icon:'⬡',x:2.5,z:-2,action:'practice'},{name:'Builder Ari',icon:'☺',x:2,z:2,action:'phone'}],
-  plaza:[{name:'City shop',icon:'◇',x:-3,z:-1.7,action:'shop'},{name:'Café',icon:'♨',x:3,z:-1.7,need:'social'},{name:'Park bench',icon:'▱',x:-2.5,z:1.6,need:'fun'},{name:'Creator Mika',icon:'☺',x:2.5,z:2.6,action:'phone'}],
+  plaza:[{name:'City shop',icon:'◇',x:-3,z:-1.7,action:'shop'},{name:'Palm Motors',icon:'🏁',x:3.3,z:2.75,action:'vip'},{name:'Café',icon:'♨',x:3,z:-1.7,need:'social'},{name:'Park bench',icon:'▱',x:-2.5,z:1.6,need:'fun'},{name:'Creator Mika',icon:'☺',x:2.5,z:2.6,action:'phone'}],
 }[location]||[]);
 const shades=new Map(),shade=(hex,factor)=>{const key=hex+factor;let out=shades.get(key);if(!out){const value=parseInt(hex.slice(1),16),c=v=>Math.min(255,Math.round(v*factor));out=`rgb(${c(value>>16)},${c((value>>8)&255)},${c(value&255)})`;shades.set(key,out);}return out;};
 const SKIN_TONES=['#8d5a3f','#c88f69','#6b4532','#b07a58','#e0b08c','#7d5642','#a46a4a'],CAR_TONES=['#d9534f','#f0ad4e','#3d7ea6','#f5f3ee','#3b4a42','#7a5ea8','#2f8f6b'];
@@ -165,7 +165,7 @@ export class World {
     this.meshes.push({head:true,x,z,y:hip+.57,w:.4,d:.36,h:.45,color:skin,hair,style,smile,heading,depth:x*Math.sin(this.angle)+z*Math.cos(this.angle)});
   }
   // Clothing reads the career at a glance; an equipped jacket overrides it.
-  look(career,jacket=false){const family=CAREERS[career]?.family;return {outfit:jacket?'#24634e':({sport:'#2f6fb3',music:'#7b4fa3',creator:'#e07a5f',acting:'#b23a48',tech:'#3d6a8a',risk:'#2b2d42'})[family]||'#8ea9a4',pants:family==='sport'?'#f2f2ee':'#34435e',shoes:family==='sport'?'#2b2d42':'#f4f1ea'};}
+  look(career,clothes=null){const family=CAREERS[career]?.family;if(clothes==='designer')return {outfit:'#1f1f24',pants:'#2a2a30',shoes:'#d4af37'};return {outfit:clothes==='jacket'?'#24634e':({sport:'#2f6fb3',music:'#7b4fa3',creator:'#e07a5f',acting:'#b23a48',tech:'#3d6a8a',risk:'#2b2d42'})[family]||'#8ea9a4',pants:family==='sport'?'#f2f2ee':'#34435e',shoes:family==='sport'?'#2b2d42':'#f4f1ea'};}
   // Local time drives the sky, building lights and the HUD clock; it never affects game rules.
   daylight(){const d=new Date(),h=this.forceHour??d.getHours()+d.getMinutes()/60,dark=h<5||h>=21?1:h<7?(7-h)/2:h>=19?(h-19)/2:0;return {hour:h,dark,night:dark>.5};}
   palm(x,z,size=1){this.round(x,z,.2*size,.2*size,2*size,'#a98b67');this.round(x,z,1.5*size,1.5*size,.45*size,'#6aa679',1.9*size);this.round(x+.25*size,z-.1,.9*size,.9*size,.35*size,'#86c493',2.15*size);}
@@ -200,6 +200,17 @@ export class World {
     for(let b=0;b<bands;b++){const y=.9+b*1.1,lit=n=>night&&(b*7+n*3+t.seed)%5<3,glass=n=>lit(n)?'#ffd98a':night?'#3a4c63':'#9ec3d6';
       this.box(x,z+f.z*(t.d/2+.03),t.w*.86,.05,.62,glass(1),y);this.box(x+f.x*(t.w/2+.03),z,.05,t.d*.86,.62,glass(2),y);}
     this.box(x-t.w*.2,z+t.d*.15,t.w*.25,t.d*.25,.5,'#cfd5d6',t.h+.35);
+  }
+  showroomRide(){const claimed=this.state?.vip||{};return Object.keys(SPONSORSHIPS).find(k=>SPONSORSHIPS[k].kind==='ride'&&!claimed[k])||'hypercar';}
+  // Sponsored rides: each model has its own silhouette. along is the axis the car points down.
+  ride(key,x,z,along='x'){
+    const deal=SPONSORSHIPS[key];if(!deal)return;const c=deal.color,X=(l,w)=>along==='x'?[l,w]:[w,l];
+    const body=(l,w,h,y,tone)=>{const [bw,bd]=X(l,w);this.box(x,z,bw,bd,h,tone,y);};
+    const wheels=(span,track)=>{for(const a of [-1,1])for(const b of [-1,1]){const [dx,dz]=X(a*span,b*track);this.round(x+dx,z+dz,.3,.3,.3,'#1d1f22',0);}};
+    if(key==='scooter'){body(1,.3,.25,.25,c);body(.25,.25,.7,.45,'#2b2f36');wheels(.4,.02);return;}
+    if(key==='suv'){wheels(.7,.45);body(2.1,1.05,.6,.15,c);body(1.5,.95,.5,.75,'#2b3440');body(2.12,1.07,.05,.5,shade(c,1.4));return;}
+    if(key==='coupe'){wheels(.68,.42);body(2,1,.4,.12,c);body(1,.85,.3,.52,'#2b2f36');const [sx,sz]=X(-.95,0);this.box(x+sx,z+sz,...X(.12,.9),.08,'#1d1f22',.6);return;}
+    wheels(.75,.46);body(2.3,1.12,.34,.1,c);body(2.32,.3,.02,.44,shade(c,1.35));body(.95,.86,.24,.44,'#14161a');const [wx,wz]=X(-1.05,0);this.box(x+wx,z+wz,...X(.18,1.05),.06,'#14161a',.66);for(const s of [-1,1]){const [px,pz]=X(-1.05,s*.35);this.box(x+px,z+pz,.08,.08,.22,'#14161a',.44);}
   }
   car(x,z,along,color){
     const [w,d]=along==='x'?[1.8,.9]:[.9,1.8];
@@ -300,14 +311,18 @@ export class World {
       this.box(3.1,-3.3,3,2.2,1.8,'#e3cfad');this.box(3.1,-3.3,3.2,2.35,.2,'#bda57e',1.8);this.box(3.1,-2.1,3,.9,.13,'#ba8c70',1.3);
       this.box(-3,2.4,2,.6,.48,'#b8a077');this.box(-3,2.62,2,.15,.95,'#b8a077');
       this.box(2.7,1.8,.9,.9,.63,'#e6ddc7');this.box(2.7,1.8,1.1,1.1,.1,'#c7b18b',.63);
-      this.plant(-4.1,4,1.8);this.plant(4,4,1.8);this.plant(0,-4.4,1.5);this.plant(-4.8,-.1);
+      // Palm Motors: a sponsor showroom with the next car on a slowly turning stand.
+      this.floor(3.3,3.9,2.6,1.5,'#2b2f36',.02);this.floor(3.3,3.9,2.3,1.2,'#e8e4da',.03);this.box(3.3,4.62,2.6,.1,1.6,'#d9e6ec');this.box(3.3,4.62,2.7,.12,.3,'#1d4fa8',1.6);
+      this.ride(this.showroomRide(),3.3,3.9,'x');
+      this.plant(-4.1,4,1.8);this.plant(0,-4.4,1.5);this.plant(-4.8,-.1);
     }
     if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.item,p.x,p.z);this.floor(p.x,p.z,.9,.9,valid?'#87bc9c':'#d79c8c',.025);if(p.item==='chair')this.chair(p.x,p.z);else this.box(p.x,p.z,.85,.45,.8,valid?'#abc8a0':'#d0a18d');}
     const npc=NPCS.find(n=>n.location===l);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone');this.human(obj?.x||2.5,obj?.z||2,'#bd8b68',{...this.look(npc.career),style:'short'});}
     this.paintPeople();
     const need=this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=({energy:'sleep',fun:'tv',hygiene:'shower',bladder:'sit',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
     const pos=need==='bladder'?{x:4.1,z:3.1}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:1.5}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
-    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,!!this.state.equipped.clothes),style:this.state.hair,walk:this.moving,pose,heading:pose?0:this.heading,smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
+    if(this.state.ride)this.ride(this.state.ride,-6,2.6,'z');
+    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),style:this.state.hair,walk:this.moving,pose,heading:pose?0:this.heading,smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
     this.actor={...pos,pose};
   }
   draw(){
@@ -345,7 +360,7 @@ export class World {
   }
   paintPeople(){
     const here=TOWN[this.location]||TOWN.home;
-    for(const p of this.people?.values()||[]){const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1))continue;this.human(x,z,p.color,{...this.look(p.career),style:p.hair,walk:p.moving,heading:p.heading,gait:p.gait});}
+    for(const p of this.people?.values()||[]){const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1))continue;this.human(x,z,p.color,{...this.look(p.career,p.clothes),style:p.hair,walk:p.moving,heading:p.heading,gait:p.gait});}
   }
   paintPins(){
     const ctx=this.ctx,here=TOWN[this.location]||TOWN.home;this.pins=[];

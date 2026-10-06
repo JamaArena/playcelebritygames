@@ -48,6 +48,15 @@ export const ITEMS = {
   chair: {name: 'Lounge chair', price: 80, description: 'Place it in a free apartment position.', furniture: true},
   trophyShelf: {name: 'Award shelf', price: 100, description: 'A place for the milestones you earn.', furniture: true},
 };
+// VIP sponsorship deals: free items unlocked by fame, claimed at Palm Motors in Palm plaza.
+// Fame is not spent and claimed items stay yours. Brand names are fictional.
+export const SPONSORSHIPS = {
+  scooter: {name: 'City e-scooter', sponsor: 'Volt Mobility', fame: 100, kind: 'ride', icon: '🛵', color: '#3d9a7a', description: 'Zip between lots in style. Your first sponsor believes in you.'},
+  designer: {name: 'Designer look', sponsor: 'Maison Palme', fame: 500, kind: 'style', icon: '🕶️', color: '#1f1f24', description: 'A tailored black-and-gold outfit for red carpets.'},
+  coupe: {name: 'Rossa sports coupé', sponsor: 'Rossa Motori', fame: 5_000, kind: 'ride', icon: '🏎️', color: '#c9302c', description: 'Low, loud and very red.'},
+  suv: {name: 'Atlas luxury SUV', sponsor: 'Atlas Autos', fame: 20_000, kind: 'ride', icon: '🚙', color: '#23262f', description: 'Tinted windows for when the paparazzi find you.'},
+  hypercar: {name: 'Vitesse hypercar', sponsor: 'Vitesse', fame: 100_000, kind: 'ride', icon: '🏁', color: '#1d4fa8', description: 'A hand-built hypercar for Icons only. A sponsorship deal, free to claim.'},
+};
 export const NPCS = [
   {id:'nova', name:'Nova', career:'musician', location:'studio', role:'Producer', color:'#b4a7d9'},
   {id:'kai', name:'Kai', career:'football', location:'sports', role:'Scout', color:'#88bda5'},
@@ -63,7 +72,7 @@ export function obstacles(location, furniture=[]) {
     studio:[[-2.2,-3.3,3.6,1.35],[-2.2,-1.9,.6,.6],[-.7,3.5,2.2,1],[0,2.2,1.3,.9]],
     creator:[[-2.2,-3.3,3.6,1.35],[-2.2,-1.9,.6,.6],[-.7,3.5,2.2,1],[0,2.2,1.3,.9]],
     tech:[[-2.2,-3.3,3.6,1.35],[-2.2,-1.9,.6,.6],[-.7,3.5,2.2,1],[0,2.2,1.3,.9]],
-    plaza:[[-3.1,-3.3,3.2,2.35],[3.1,-3.3,3.2,2.35],[-3,2.4,2,.75],[2.7,1.8,1.1,1.1]],
+    plaza:[[-3.1,-3.3,3.2,2.35],[3.1,-3.3,3.2,2.35],[-3,2.4,2,.75],[2.7,1.8,1.1,1.1],[3.3,3.9,2.4,1.3]],
   }[location]||[];
   return [...rects,...(location==='home'?furniture.map(f=>[f.x,f.z,.85,.85]):[])];
 }

@@ -1,4 +1,4 @@
-import { CAREERS, LOCATIONS, ITEMS, NPCS, TOWN, BALANCE as B, effort, canPlace } from './content.js';
+import { CAREERS, LOCATIONS, ITEMS, NPCS, TOWN, SPONSORSHIPS, BALANCE as B, effort, canPlace } from './content.js';
 import { World, worldObjects } from './world.js';
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -52,7 +52,7 @@ async function send(input,{keepModal=false,quiet=false}={}){
     const data=await response.json();if(!response.ok)throw new Error(data.error||'Action unavailable.');
     if(!keepModal&&modalPage!=='create')closeModal();
     closeTray();receive(data,true);$('#connection').textContent='Saved to your city';
-    if(keepModal){if(modalPage==='phone')phone(phoneTab);else if(modalPage==='shop')shop();else if(modalPage==='inventory')inventory();else if(modalPage==='career')career();}
+    if(keepModal){if(modalPage==='phone')phone(phoneTab);else if(modalPage==='shop')shop();else if(modalPage==='inventory')inventory();else if(modalPage==='career')career();else if(modalPage==='vip')vip();}
     if(!quiet&&input.type==='report')toast('Report recorded for the city operator.');
     return data;
   }catch(error){toast(error.message||'Could not connect. Your last saved progress is safe.');}
@@ -75,7 +75,7 @@ const world=new World($('#world'),position=>{closeTray();send({type:'move',...po
   if(object.placement){send({type:'place',...object.placement}).then(data=>{if(data){world.placement=null;world.draw();}});return;}
   if(object.decision!==undefined){chooseDecision(object.decision);return;}
   if(object.travel){closeTray();send({type:'travel',location:object.travel});return;}
-  if(object.person){const p=object.person,friend=state.friends.includes(p.id);selectedObject=null;pie(object,[[`${CAREERS[p.career]?.icon||'☺'} ${escape(CAREERS[p.career]?.name||'Player')} <small>${escape(B.tiers[p.tier||0][0])}</small>`,'page','data-page="phone"'],friend?['✉ Message','directMessage',`data-player="${p.id}"`]:['♡ Add friend','friend',`data-player="${p.id}"`],['💬 Local chat','page','data-page="phone"']]);return;}
+  if(object.person){const p=object.person,friend=state.friends.includes(p.id);selectedObject=null;if(p.ride&&SPONSORSHIPS[p.ride])toast(`${SPONSORSHIPS[p.ride].icon} ${p.name} drives a ${SPONSORSHIPS[p.ride].name}.`);pie(object,[[`${CAREERS[p.career]?.icon||'☺'} ${escape(CAREERS[p.career]?.name||'Player')} <small>${escape(B.tiers[p.tier||0][0])}</small>`,'page','data-page="phone"'],friend?['✉ Message','directMessage',`data-player="${p.id}"`]:['♡ Add friend','friend',`data-player="${p.id}"`],['💬 Local chat','page','data-page="phone"']]);return;}
   if(object.house){const p=object.house,friend=state.friends.includes(p.id);pie(object,[friend?['✉ Ask for an invite','directMessage',`data-player="${p.id}"`]:['♡ Add friend','friend',`data-player="${p.id}"`],['♧ Contacts','page','data-page="phone"']]);toast(`Visiting ${p.name}’s home needs their invitation.`);return;}
   selectedObject=object;$('#objects').hidden=true;const def=CAREERS[state.career],c=state.careers[state.career];
   // Venue spots only serve the careers based there; point everyone else to their own venue.
@@ -86,6 +86,7 @@ const world=new World($('#world'),position=>{closeTray();send({type:'move',...po
   }
   if(object.action==='career'){const kind=['founder','web3'].includes(state.career)?'build':'produce';pie(object,[[`${def.icon} ${escape(def.output)} <small>ϟ 1</small>`,'quickStart',`data-kind="${kind}"`],['✎ Plan it first','prepareDetails',`data-kind="${kind}"`],['↗ Go here','goObject']]);return;}
   if(object.action==='shop'){pie(object,[['◇ Browse shop','page','data-page="shop"'],['↗ Go here','goObject']]);return;}
+  if(object.action==='vip'){pie(object,[['🏁 Sponsorship deals','page','data-page="vip"'],['↗ Go here','goObject']]);return;}
   if(object.action==='phone'){pie(object,[['♡ Chat','quickSocial'],['♧ Contacts','page','data-page="phone"'],['↗ Go here','goObject']]);return;}
   pie(object,[[`${object.icon} ${escape(object.verb||'Use')}${object.need?` <small>+${B.recovery[object.need][0]} ${escape(needs[object.need][0])} · ${duration(B.recovery[object.need][1])}</small>`:''}`,'useObject'],['↗ Go here','goObject']]);
 });
@@ -183,7 +184,16 @@ function phone(tab='local'){
 }
 function chatMessages(){return snapshot.messages.map(m=>`<div class="message"><strong>${escape(m.name)}</strong> <small>${m.recipient?'· direct':'· local'}</small><br>${escape(m.body)} <button class="text-button" data-action="report" data-message="${m.id}" aria-label="Report message by ${escape(m.name)}">Report</button></div>`).join('')||'<p class="empty">A quiet moment. Be the first to say hello.</p>';}
 function directMessage(playerId){const p=snapshot.players.find(p=>p.id===playerId);showModal('direct',`<span class="eyebrow">FRIENDS</span><h2>Message ${escape(p.name)}</h2><form id="directForm"><input type="hidden" name="recipient" value="${playerId}"><div class="field"><label for="directBody">Your message</label><input id="directBody" name="body" maxlength="300" required></div><button class="primary close-action" type="submit">Send message</button></form>`);}
-function openPage(page){({city:map,career,phone,inventory,profile,shop}[page]||map)();}
+// Palm Motors: fame unlocks free sponsored rides and looks. Fame is never spent.
+function vip(){
+  const fame=state.fame||0,claimed=state.vip||{};
+  showModal('vip',`<span class="eyebrow">PALM MOTORS · SPONSORSHIPS</span><h2>Fame opens doors. And garages.</h2><p class="modal-intro">You have <strong>✦ ${fmt(fame)} fame</strong>. Sponsors give these to famous players for free. Fame isn't spent, and what you claim stays yours.</p><div class="item-grid">${Object.entries(SPONSORSHIPS).map(([key,d])=>{
+    const owned=claimed[key],using=d.kind==='ride'?state.ride===key:state.equipped.clothes===key,ready=fame>=d.fame;
+    const action=owned?(using?button(d.kind==='ride'?'Driving ✓':'Wearing ✓','noop','disabled'):button(d.kind==='ride'?'Drive it':'Wear it','useVip',`data-item="${key}"`)):ready?(state.location==='plaza'?button('Claim free ✦','claim',`data-item="${key}"`,'primary'):button('Claim at Palm Motors ↗','travel','data-location="plaza"','primary')):button(`🔒 ${fmt(d.fame)} fame`,'noop','disabled');
+    return `<div class="item-card vip-card ${owned?'owned':''}"><div class="vip-icon" style="--tone:${d.color}">${d.icon}</div><h3>${escape(d.name)}</h3><small class="vip-sponsor">by ${escape(d.sponsor)}</small><p>${escape(d.description)}</p><div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,fame/d.fame*100)}%"></div></div><small>${owned?'Claimed':ready?'Ready to claim':`${fmt(d.fame-fame)} fame to go`}</small>${action}</div>`;
+  }).join('')}</div>`);
+}
+function openPage(page){({city:map,career,phone,inventory,profile,shop,vip}[page]||map)();}
 $('#mapButton').addEventListener('click',map);$('#cameraButton').addEventListener('click',()=>world.rotate());$('#closeModal').addEventListener('click',closeModal);
 $('#zoomIn').addEventListener('click',()=>world.setZoom(world.zoom*1.2));$('#zoomOut').addEventListener('click',()=>world.setZoom(world.zoom/1.2));$('#resetCamera').addEventListener('click',()=>world.resetCamera());
 $('.modal-backdrop').addEventListener('click',closeModal);$('#motionButton').addEventListener('click',()=>{motion=!motion;world.reduced=!motion;$('#motionButton').textContent=motion?'Motion on':'Motion reduced';});
@@ -233,7 +243,7 @@ document.addEventListener('click',async event=>{
     case 'finish':await send({type:'finish',activityId:d.id});break;
     case 'cancel':showTray('Stop this action?','<div class="tray-options">'+button('Stop','confirmCancel','','primary')+button('Keep going','closeTray')+'</div><small>Spent charges are not refunded.</small>');break;
     case 'confirmCancel':await send({type:'cancel'});break;
-    case 'buy':case 'equip':await send({type:d.action,item:d.item},{keepModal:true});break;
+    case 'buy':case 'equip':case 'claim':case 'useVip':await send({type:d.action,item:d.item},{keepModal:true});break;
     case 'previewUpgrade':upgrade(d.item);break;
     case 'upgrade':await send({type:'upgrade',item:d.item});break;
     case 'placePreview':placement(d.item);break;

@@ -149,3 +149,15 @@ test('fame is shared across careers, sets tiers, and older saves convert once',(
   const old=make('musician');old.version=1;delete old.fame;old.careers.musician.audience=80;reconcile(old,T);
   assert.equal(old.careers.musician.audience,8000);assert.equal(old.fame,8);reconcile(old,T+1000);assert.equal(old.fame,8);
 });
+
+test('fame unlocks free sponsorships at Palm Motors, once, without spending fame or money',()=>{
+  const s=make('musician');
+  assert.throws(()=>act(s,{type:'claim',item:'hypercar'},T),/Palm Motors/);
+  act(s,{type:'travel',location:'plaza'},T);
+  assert.throws(()=>act(s,{type:'claim',item:'hypercar'},T),/100,000 fame/);
+  s.fame=100_000;act(s,{type:'claim',item:'hypercar'},T);
+  assert.equal(s.ride,'hypercar');assert.equal(s.fame,100_000);assert.equal(s.money,500);
+  assert.throws(()=>act(s,{type:'claim',item:'hypercar'},T),/already claimed/);
+  act(s,{type:'claim',item:'designer'},T);assert.equal(s.equipped.clothes,'designer');
+  assert.throws(()=>act(s,{type:'useVip',item:'suv'},T),/Claim this/);
+});
