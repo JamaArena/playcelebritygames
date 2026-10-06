@@ -26,6 +26,17 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   assert.equal((await a.call()).data.state,null);
   const first=await a.call({type:'create',name:'River',career:'musician',origin:1});assert.equal(first.status,200);const aId=first.data.playerId;
   const second=await b.call({type:'create',name:'Sky',career:'musician',origin:0});const bId=second.data.playerId;
+  assert.equal((await a.call()).data.scenePlayers.length,0,'separate private homes never share occupants');
+  await a.call({type:'chat',body:'Private home message'});
+  assert.equal((await b.call()).data.messages.length,0,'home chat is private to its occupants');
+  await a.call({type:'friend',playerId:bId});await a.call({type:'invite',playerId:bId});
+  await b.call({type:'visit',playerId:aId});
+  assert.deepEqual((await a.call()).data.scenePlayers.map(p=>p.id),[bId]);
+  assert.deepEqual((await b.call()).data.scenePlayers.map(p=>p.id),[aId]);
+  assert.ok((await b.call()).data.messages.some(m=>m.body==='Private home message'));
+  await b.call({type:'leaveVisit'});await b.call({type:'travel',location:'home'});
+  assert.equal((await a.call()).data.scenePlayers.length,0,'departed guests disappear');
+  fixture(bId,s=>s.invitations=[]);database.prepare('UPDATE messages SET at=?').run(Date.now()-2000);
   assert.equal((await a.call()).data.state.name,'River');
   assert.equal((await a.call({type:'create',name:'Again',career:'football',origin:0})).status,400);
   assert.equal((await a.call({type:'travel',location:'plaza'},{headers:{Origin:'https://untrusted.example'}})).status,400);
