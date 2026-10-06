@@ -206,3 +206,10 @@ test('talking to an NPC is instant, gives a little social and has a short cool-o
   act(s,{type:'talk',npc:'nova'},T);assert.equal(s.needs.social,50);assert.equal(s.recovery,null,'no timer');assert.match(s.lastTalk.line,/./);
   assert.throws(()=>act(s,{type:'talk',npc:'nova'},T+10_000),/needs a moment/);act(s,{type:'talk',npc:'nova'},T+45_000);assert.ok(Math.abs(s.needs.social-60)<.5,'another chat after the cool-off');
 });
+
+test('looks come from fixed choices; anything else falls back safely',()=>{
+  const s=createCharacter({name:'Zee',career:'actor',origin:0,color:'#4b2e20',hair:'locs',hairColor:'auburn',build:'curvy',height:'tall'},T);
+  assert.deepEqual([s.color,s.hair,s.hairColor,s.build,s.height],['#4b2e20','locs','auburn','curvy','tall']);
+  const odd=createCharacter({name:'Odd',career:'actor',origin:0,color:'#00ff00',hair:'toString',hairColor:'__proto__',build:'giant',height:'huge'},T);
+  assert.deepEqual([odd.color,odd.hair,odd.hairColor,odd.build,odd.height],['#c98d64','curls','black','average','average']);
+});

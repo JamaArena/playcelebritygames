@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, NPCS, NPC_TALK, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, CAREERS, ITEMS, NPCS, NPC_TALK, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -13,7 +13,7 @@ export function createCharacter(input, now) {
   requireRule([0,1].includes(input.origin), 'Select an origin.');
   requireRule(text(input.name).length >= 2, 'Use a name of at least two characters.');
   requireRule(input.career !== 'adult' || input.adult === true, 'Confirm that your character is an adult.');
-  return {version:3, name:text(input.name,30), color: /^#[\da-f]{6}$/i.test(input.color) ? input.color : '#d49872', hair: input.hair === 'short' ? 'short' : 'curls', technique: input.technique === 'instrument' ? 'instrument' : 'vocals', career:input.career, careers:{[input.career]:newCareer(input.career,input.origin)}, location:'home', position3d:{x:0,z:1}, fame:0, needs:Object.fromEntries(Object.keys(B.decay).map(n=>[n,80])), lastSeen:now, charges:10, refillAnchor:null, active:null, recovery:null, inventory:{bed:{level:1}, shower:{level:1}, toilet:{level:1}}, furniture:[], outputs:[], events:[], learningEvents:[], awards:[], results:[], friends:[], blocks:[], invitations:[], equipped:{}, seasonStart:now, appearance:{}, collaborations:[], ride: input.origin === 1 ? STARTER_RIDE : null, phone:'basic'};
+  return {version:3, name:text(input.name,30), color: SKIN_TONES.includes(input.color) ? input.color : SKIN_TONES[3], hair: pick(HAIRSTYLES, input.hair, 'curls'), hairColor: pick(HAIR_COLORS, input.hairColor, 'black'), build: pick(BUILDS, input.build, 'average'), height: pick(HEIGHTS, input.height, 'average'), technique: input.technique === 'instrument' ? 'instrument' : 'vocals', career:input.career, careers:{[input.career]:newCareer(input.career,input.origin)}, location:'home', position3d:{x:0,z:1}, fame:0, needs:Object.fromEntries(Object.keys(B.decay).map(n=>[n,80])), lastSeen:now, charges:10, refillAnchor:null, active:null, recovery:null, inventory:{bed:{level:1}, shower:{level:1}, toilet:{level:1}}, furniture:[], outputs:[], events:[], learningEvents:[], awards:[], results:[], friends:[], blocks:[], invitations:[], equipped:{}, seasonStart:now, appearance:{}, collaborations:[], ride: input.origin === 1 ? STARTER_RIDE : null, phone:'basic'};
 }
 // Fame is one character-wide total earned from reach in any career. Battles can also move it.
 export const fameFor = reach => Math.floor(reach * B.famePerReach);

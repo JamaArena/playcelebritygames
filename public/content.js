@@ -143,6 +143,13 @@ const INSIGHTS = {
 export const insightFor = (family, skill) => INSIGHTS[skill] || `${WATCH[family]?.hero || 'Someone on screen'} was brilliant. You learnt a little more about ${skill}.`;
 export const RIDES = {hatchback: {name: 'Family hatchback', icon: '🚗', color: '#5f8f8a'}, ...Object.fromEntries(Object.entries(SPONSORSHIPS).filter(([, d]) => d.kind === 'ride'))};
 // Talking to an NPC is instant: a short chat, a line of dialogue and a little social boost per cool-off.
+// Character looks: a fixed set of skin tones, hairstyles, hair colours and body shapes.
+export const SKIN_TONES = ['#f6d9c5', '#ecc3a2', '#dba67f', '#c98d64', '#ad7350', '#8d5b3d', '#6e442e', '#4b2e20'];
+export const HAIRSTYLES = {curls: 'Soft curls', short: 'Short crop', afro: 'Afro', braids: 'Box braids', locs: 'Locs', bun: 'Top bun', ponytail: 'Ponytail', long: 'Long & straight', bob: 'Bob', buzz: 'Buzz cut', fade: 'Fade', cornrows: 'Cornrows', bald: 'Bald'};
+export const HAIR_COLORS = {black: '#1d1714', brown: '#5a3a26', auburn: '#8a3b22', blonde: '#d8b46a', grey: '#a9a6a1', pink: '#d97aa6'};
+export const BUILDS = {slim: {name: 'Slim', w: .86, hip: .92}, average: {name: 'Average', w: 1, hip: 1}, athletic: {name: 'Athletic', w: 1.08, hip: .98, shoulders: 1.18}, curvy: {name: 'Curvy', w: 1.04, hip: 1.25}, heavy: {name: 'Heavy', w: 1.3, hip: 1.25}};
+export const HEIGHTS = {short: {name: 'Short', h: .9}, average: {name: 'Average', h: 1}, tall: {name: 'Tall', h: 1.1}};
+export const pick = (table, value, fallback) => Object.hasOwn(table, value) ? value : fallback;
 export const NPC_TALK = {social: 10, cooldownMs: 45_000, lines: ['Big things are coming for you, I can feel it.', 'Saw your last post. You’re getting better!', 'This city never sleeps, eh?', 'Keep practising. People are starting to notice.', 'Have you been to Palm Motors? Those cars, ehn!', 'Don’t forget to rest. Burnout is real.', 'You know who you should meet? Everybody!', 'Fame is a marathon, not a sprint.']};
 export const NPCS = [
   {id:'nova', name:'Nova', career:'musician', location:'studio', role:'Producer', color:'#b4a7d9'},
