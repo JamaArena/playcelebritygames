@@ -12,7 +12,7 @@ const button=(label,action,attrs='',style='secondary')=>`<button class="${style}
 const careerOptions=(selected)=>Object.entries(CAREERS).map(([key,def])=>`<option value="${key}" ${key===selected?'selected':''}>${escape(def.name)}</option>`).join('');
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,5500);}
 function showModal(page,html,closable=true){
-  if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;$('#modalContent').innerHTML=(closable&&!['phoneHome','create','welcome','auth','newLife'].includes(page)?button('‹ Phone','backToPhone','','phone-back'):'')+html;$('#modal').classList.toggle('as-phone',page==='phoneHome');
+  if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;$('#modalContent').innerHTML=(closable&&!['phoneHome','create','welcome','auth','newLife','logoutConfirm'].includes(page)?button('‹ Phone','backToPhone','','phone-back'):'')+html;$('#modal').classList.toggle('as-phone',page==='phoneHome');
   const title=$('#modalContent h2');if(title)title.id='modalTitle';
   setTimeout(()=>$('#modalContent input, #modalContent button, #closeModal')?.focus(),0);
 }
@@ -167,6 +167,10 @@ function welcome(data){
   showModal('welcome',`<div class="welcome-card"><div class="welcome-who"><div class="avatar" style="background:${escape(s.color)}">${escape(s.name.slice(0,1).toUpperCase())}</div><div><strong>${a?'@'+escape(a.username):escape(s.name)}</strong><small>${new Date().toLocaleDateString([],{weekday:'long',day:'numeric',month:'short'})} · ✦ ${fmt(s.fame||0)} fame</small></div></div>
   ${button('Continue','closeWelcome','','primary wide')}${a?button('New life','newLife','','secondary wide'):button('Save my character to an account','authTab','data-tab="signup"','secondary wide')}<div class="welcome-foot"><span>${a?`Signed in as <strong>@${escape(a.username)}</strong>`:'Playing as a guest on this browser'}</span>${a?button('Log out','logout','','text-button'):button('Log in','authTab','data-tab="login"','text-button')}</div></div>`);
 }
+function confirmLogout(){
+  // Guests have no account to return to, so logging out deletes their character.
+  if(!snapshot.account){showModal('logoutConfirm',`<span class="eyebrow">GUEST</span><h2>Log out and start afresh?</h2><p class="modal-intro">You’re playing as a guest. Logging out <strong>permanently deletes ${escape(state.name)}</strong>, with all fame, skills and possessions. Save your character to an account first if you want to keep it.</p><div class="actions">${button('Save my character','authTab','data-tab="signup"','primary')}${button('Delete and log out','logoutGuest','','quiet')}</div>`);return;}
+  showModal('logoutConfirm',`<span class="eyebrow">ACCOUNT</span><h2>Log out?</h2><p class="modal-intro">You’re signed in as <strong>@${escape(snapshot.account.username)}</strong>. Your character stays safe on your account; log in with your email to play again on any device.</p><div class="actions">${button('Log out','logout','','primary')}${button('Stay signed in','closeWelcome')}</div>`);}
 function newLife(){showModal('newLife',`<span class="eyebrow">NEW LIFE</span><h2>Start over?</h2><p class="modal-intro">Your character, skills, fame and possessions are erased for good. Your account and username stay.</p><form id="newLifeForm"><div class="field"><label for="confirmLife">Type NEW LIFE to confirm</label><input id="confirmLife" name="confirm" autocomplete="off" required></div><button class="primary wide" type="submit">Erase and start a new life</button></form>`);}
 function creation(account=snapshot?.account){
   showModal('create',`<div class="creation-hero"><span class="eyebrow">WELCOME TO PALM CITY</span><h2>A little life.<br>A lot of possibility.</h2><p>Find your craft, make your people, and turn everyday moments into a life worth remembering.</p></div><form id="createForm"><div class="steps"><span class="step on">1 · Your look</span><span class="step" id="stepTwoLabel">2 · Your career</span></div>
@@ -276,6 +280,8 @@ function closeTip(){tipQueue.shift();showTip();}
 function alerts(){const me=snapshot.playerId;return state.invitations.filter(i=>i.expiresAt>now()).length+(snapshot.battles||[]).filter(b=>b.invited===me&&b.status==='open').length;}
 function phoneWidget(){const model=PHONES[state.phone]||PHONES.basic,count=alerts();
   return `<button class="phone-widget skin-${PHONES[state.phone]?state.phone:'basic'}" data-action="openPhone" style="--phone:${model.color}" aria-label="Open your phone${count?`, ${count} alerts`:''}"><span class="phone-mini">📱${count?`<i>${count}</i>`:''}</span><span class="phone-line"><strong>✦ ${fmt(state.fame||0)}</strong><small>fame · ${B.tiers[state.careers[state.career].tier][0]}</small></span><span class="phone-line"><strong>ϟ ${state.charges}/10</strong><small id="chargeRefill">${state.refillAnchor===null?'charged':`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></span></button>`;}
+// The last app depends on who you are: Log out for accounts, Account for guests.
+const accountApp=()=>['logout','🚪','Log out'];
 const APPS=[['map','🗺️','Map'],['career','✦','Career'],['phone','💬','Social'],['battles','⚔','Battles'],['inventory','🏠','My stuff'],['shop','🛍️','Market'],['vip','🏁','Palm Motors'],['profile','♙','Profile'],['life','♡','My life'],['nearby','◇','Nearby'],['tips','💡','Tips'],['upgrade','📲','Upgrade']];
 // Each phone tier has its own look and feel; cheaper phones lag and sometimes hang (only ever a delay).
 function phoneModel(){const key=PHONES[state.phone]?state.phone:'basic';return {key,...PHONES[key]};}
@@ -283,11 +289,11 @@ function phoneHome(){
   const model=phoneModel(),online=snapshot.players.filter(p=>p.online&&state.friends.includes(p.id)).length,next=Object.values(SPONSORSHIPS).filter(d=>d.fame>(state.fame||0)).sort((x,y)=>x.fame-y.fame)[0];
   const time=new Date(),clockText=time.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}),dateText=time.toLocaleDateString([],{weekday:'long',day:'numeric',month:'short'});
   const widgets=[model.key==='pro'||model.key==='gold'?`<div class="phone-clock"><strong>${clockText}</strong><small>${dateText}</small></div>`:'',model.key!=='basic'?`<div class="phone-card">👥 ${online} friend${online===1?'':'s'} online</div>`:'',['pro','gold'].includes(model.key)&&next?`<div class="phone-card">🔓 Next: ${next.icon} ${escape(next.name)} at ${fmt(next.fame)} fame</div>`:'',model.nag&&Math.random()<model.nag?`<div class="phone-nag">⚠ Storage almost full. Delete some photos?</div>`:''].join('');
-  const dock=['phone','career','map','tips'],apps=['pro','gold'].includes(model.key)?APPS.filter(([k])=>!dock.includes(k)):APPS,icon=([key,icon,label])=>`<button class="app" data-action="app" data-app="${key}"><span>${icon}</span><small>${model.key==='basic'&&label.length>8?label.slice(0,7)+'…':label}${key==='phone'&&alerts()?` <i>${alerts()}</i>`:''}</small></button>`;
+  const dock=['phone','career','map','tips'],apps=[...(['pro','gold'].includes(model.key)?APPS.filter(([k])=>!dock.includes(k)):APPS),accountApp()],icon=([key,icon,label])=>`<button class="app" data-action="app" data-app="${key}"><span>${icon}</span><small>${model.key==='basic'&&label.length>8?label.slice(0,7)+'…':label}${key==='phone'&&alerts()?` <i>${alerts()}</i>`:''}</small></button>`;
   showModal('phoneHome',`<div class="phone-device skin-${model.key}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen"><div class="phone-status"><span>${model.key==='basic'?time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false}):clockText}</span><span>${model.network} ${'▂▄▆█'.slice(0,model.key==='basic'?2:model.key==='smart'?3:4)}</span><span>${model.battery}% ${model.battery<30?'🪫':'🔋'}</span></div>${['pro','gold'].includes(model.key)?'':`<div class="phone-hello"><strong>${escape(state.name)}</strong><small>✦ ${fmt(state.fame||0)} fame · ${escape(LOCATIONS[state.location].name)}</small></div>`}${widgets}<div class="app-grid">${apps.map(icon).join('')}</div>${['pro','gold'].includes(model.key)?`<div class="phone-dock">${APPS.filter(([k])=>dock.includes(k)).map(icon).join('')}</div>`:''}<div class="phone-overlay" id="phoneOverlay" hidden></div></div></div>`);
 }
 const APP_NAMES=Object.fromEntries(APPS.map(([key,,label])=>[key,label]));
-function launch(key){({map,phone:()=>phone('local'),battles:()=>phone('battles'),career,inventory,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,upgrade:phoneStore}[key]||phoneHome)();}
+function launch(key){if(key==='logout'){confirmLogout();return;}({map,phone:()=>phone('local'),battles:()=>phone('battles'),career,inventory,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,upgrade:phoneStore}[key]||phoneHome)();}
 // Budget phones make you wait, and now and then the app hangs. You can always wait or close it.
 function openApp(key){
   const model=phoneModel(),overlay=$('#phoneOverlay'),delay=model.lag[0]+Math.random()*(model.lag[1]-model.lag[0]);
@@ -334,6 +340,7 @@ document.addEventListener('click',async event=>{
     case 'closeWelcome':closeModal();break;
     case 'newLife':newLife();break;
     case 'logout':try{await auth({type:'logout'});}catch(e){toast(e.message);break;}location.reload();break;
+    case 'logoutGuest':try{await auth({type:'logout',deleteGuest:true});}catch(e){toast(e.message);break;}location.reload();break;
     case 'getUp':await send({type:'cancel'});break;
     case 'travel':await send({type:'travel',location:d.location});break;
     case 'object':world.walkToObject(d.name);break;

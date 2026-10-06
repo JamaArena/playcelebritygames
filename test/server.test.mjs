@@ -130,6 +130,10 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   assert.equal((await tolu.call()).data.state.name,'Tolu','other devices stay signed in');
   assert.equal((await tolu.auth({type:'newLife',confirm:'nope'})).status,400);
   assert.equal((await tolu.auth({type:'newLife',confirm:'NEW LIFE'})).status,200);const fresh=(await tolu.call()).data;assert.equal(fresh.state,null);assert.equal(fresh.account.username,'tolu_eko','the account remains');
+  const guest=client();await guest.call({type:'create',name:'Guesty',career:'actor'});
+  assert.equal((await guest.auth({type:'logout'})).status,400,'guests must confirm');
+  assert.equal((await guest.auth({type:'logout',deleteGuest:true})).status,200);assert.equal((await guest.call()).data.state,null,'the guest starts afresh');
+  assert.ok(!(await a.call()).data.players.some(p=>p.name==='Guesty'),'the guest character is gone');
   assert.equal((await fetch(base+'/../server.mjs')).status,404);
   assert.match((await fetch(base+'/')).headers.get('content-security-policy'),/frame-ancestors 'none'/);
 });

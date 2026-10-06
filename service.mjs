@@ -214,7 +214,9 @@ async function authAction(playerId,token,input,now,res){
     res.setHeader('Set-Cookie',`celebrity=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000${secureCookies?'; Secure':''}`);return [200,{account:accountOf(account.player_id)}];
   }
   if(input.type==='logout'){
-    fail(accountOf(playerId),'You are not signed in.');
+    // Guests have nothing to come back to: logging out deletes the guest character for good.
+    if(!accountOf(playerId)){fail(input.deleteGuest===true,'Guests lose their character when they log out. Confirm to continue.');fail(!load(playerId)?.battle,'Finish your battle first.');
+      db.prepare('DELETE FROM players WHERE id=?').run(playerId);res.setHeader('Set-Cookie',`celebrity=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secureCookies?'; Secure':''}`);return [200,{loggedOut:true,deleted:true}];}
     if(token){db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hash(token));db.prepare('UPDATE players SET token_hash=? WHERE token_hash=?').run(hash(randomBytes(32).toString('hex')),hash(token));}
     res.setHeader('Set-Cookie',`celebrity=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secureCookies?'; Secure':''}`);return [200,{loggedOut:true}];
   }
