@@ -214,7 +214,7 @@ export class World {
     segment([0,hip+.5*Y,0],[0,hip+.6*Y,0],.12,skin);
     this.meshes.push({head:true,x,z,y:hip+.57*Y,w:.4,d:.36,h:.45,color:skin,hair,style,smile,heading,depth:x*Math.sin(this.angle)+z*Math.cos(this.angle)+.25}); // heads (and hair falling over the back) paint after their own body
   }
-  body(who){return {style:who.hair||'curls',hair:HAIR_COLORS[who.hairColor]||HAIR_COLORS.black,build:who.build||'average',height:who.height||'average',crown:(who.fame||0)>=10_000};}
+  body(who){return {style:who.hair||'curls',hair:HAIR_COLORS[who.hairColor]||HAIR_COLORS.black,build:who.build||'average',height:who.height||'average'};}
   // Background people get varied looks from a fixed rotation so the city feels mixed.
   extra(n){const k=n+CROWD_SEED,styles=Object.keys(HAIRSTYLES),builds=Object.keys(BUILDS),heights=Object.keys(HEIGHTS),colors=Object.values(HAIR_COLORS);return {style:styles[(k*5+3)%styles.length],hair:colors[(k*7)%colors.length],build:builds[(k*3+1)%builds.length],height:heights[(k*2+1)%heights.length]};}
   // Clothing reads the career at a glance; an equipped jacket overrides it.
@@ -412,7 +412,6 @@ export class World {
     this.paintRoutine();
     this.paintLabels();
     if(!island)this.paintPins();
-    this.paintPlumbob();
     this.paintSpeech();
 
     if(this.moving){const t=this.project(this.target.x,.03,this.target.z);ctx.strokeStyle='#fff8';ctx.lineWidth=1.3;ctx.beginPath();ctx.ellipse(t.x,t.y,7,3.5,0,0,Math.PI*2);ctx.stroke();}
@@ -474,13 +473,6 @@ export class World {
     if(low&&!a.pose&&!this.moving&&!this.state.recovery&&!this.state.active){const p=this.project(a.x,1.95,a.z),bx=p.x+26,by=p.y-22;ctx.fillStyle='#fffef8f0';for(const [dx,dy,rad] of [[-17,15,2.5],[-11,9,4]]){ctx.beginPath();ctx.arc(bx+dx,by+dy,rad,0,Math.PI*2);ctx.fill();}ctx.beginPath();ctx.ellipse(bx,by-4,16,13,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#dfe5d6';ctx.lineWidth=1;ctx.stroke();ctx.font='14px "Segoe UI Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText({hunger:'🍲',energy:'💤',fun:'🎮',social:'💬',hygiene:'🛁',bladder:'🚽'}[low[0]],bx,by-3);ctx.textBaseline='alphabetic';}
   }
   // The Sims-style mood diamond: green when needs are met, through yellow, to red.
-  paintPlumbob(){
-    const ctx=this.ctx,a=this.actor,mood=Object.values(this.state.needs).reduce((s,v)=>s+v,0)/6,t=this.reduced?0:performance.now()/1000,ring=this.state.recovery||this.state.active;
-    const head=this.project(a.x,a.pose==='sleep'?1.4:2.15,a.z),x=head.x,y=(ring?head.y-34:head.y-6)+Math.sin(t*2.2)*2.5,h=Math.max(9,this.scale*.2),w=h*.62*(this.reduced?1:.5+.5*Math.abs(Math.cos(t*1.4))),hue=Math.round(mood*1.2);
-    ctx.beginPath();ctx.moveTo(x,y-h);ctx.lineTo(x+w,y);ctx.lineTo(x,y+h*.9);ctx.lineTo(x-w,y);ctx.closePath();ctx.fillStyle=`hsl(${hue} 62% 42%)`;ctx.fill();
-    ctx.beginPath();ctx.moveTo(x,y-h);ctx.lineTo(x-w,y);ctx.lineTo(x,y+h*.9);ctx.closePath();ctx.fillStyle=`hsl(${hue} 72% 62%)`;ctx.fill();
-    ctx.beginPath();ctx.moveTo(x,y-h);ctx.lineTo(x+w,y);ctx.lineTo(x-w,y);ctx.closePath();ctx.fillStyle='#ffffff40';ctx.fill();
-  }
   screenOf(object){if(object.screen&&!('x' in object))return object.screen;return this.project(object.vx??object.x,.8,object.vz??object.z);}
   flyTo(zoom){this.zoomGoal=clampZoom(zoom);}
   click(event){if(!this.state)return;const r=this.canvas.getBoundingClientRect(),x=event.clientX-r.left,y=event.clientY-r.top;
@@ -532,7 +524,7 @@ export class World {
     for(const p of this.people?.values()||[]){const dx=p.tx-p.x,dz=p.tz-p.z,d=Math.hypot(dx,dz);if(d>12){p.x=p.tx;p.z=p.tz;p.moving=false;}else if(d>.03){const step=Math.min(d,2.6*dt);p.x+=dx/d*step;p.z+=dz/d*step;p.heading=turnToward(p.heading,Math.atan2(dx,dz),dt);p.gait+=step*8;p.moving=true;}else p.moving=false;}
     if(this.angleGoal!=null){this.angle+=(this.angleGoal-this.angle)*Math.min(1,dt*7);if(Math.abs(this.angleGoal-this.angle)<.002){this.angle=this.angleGoal;this.angleGoal=null;}this.draw();}
     if(this.zoomGoal!=null){this.zoom+=(this.zoomGoal-this.zoom)*Math.min(1,dt*6);if(Math.abs(this.zoomGoal-this.zoom)<.004){this.zoom=this.zoomGoal;this.zoomGoal=null;}this.draw();}
-    // Walkers, the plumbob and routines animate continuously unless motion is reduced.
+    // Walkers and routines animate continuously unless motion is reduced.
     else if(!this.moving&&(!this.reduced||this.state?.trip||this.state?.active||this.state?.recovery||this.pose?.kind==='water'||this.effect)&&time-(this.lastDraw||0)>(this.zoom<.4?90:40)){this.draw();this.lastDraw=time;}
     requestAnimationFrame(t=>this.frame(t));
   }
