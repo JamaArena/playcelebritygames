@@ -64,7 +64,7 @@ export class World {
       const previous=this.pointers.get(event.pointerId);
       if(previous){this.pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
         if(this.pointers.size>1){const distance=this.pointerDistance();if(this.pinchDistance>0)this.setZoom(this.zoom*distance/this.pinchDistance);this.pinchDistance=distance;}
-        else if(!this.gesture.multi){const g=this.gesture;if(Math.hypot(event.clientX-g.startX,event.clientY-g.startY)>6)g.dragged=true;if(g.dragged&&this.scale){const s=this.scale,c=Math.cos(this.angle),sn=Math.sin(this.angle),dx=(event.clientX-previous.x)/s,dy=(event.clientY-previous.y)/(s*this.pitch);this.pan.x-=dx*c+dy*sn;this.pan.z-=-dx*sn+dy*c;this.panned=true;}}
+        else if(!this.gesture.multi){const g=this.gesture;if(Math.hypot(event.clientX-g.startX,event.clientY-g.startY)>6)g.dragged=true;if(g.dragged){this.angleGoal=null;this.angle+=(event.clientX-previous.x)*.009;this.tilt(this.pitch+(event.clientY-previous.y)*.002);}}
         this.canvas.classList.toggle('dragging',this.gesture.dragged);this.draw();return;
       }
       const r=canvas.getBoundingClientRect();if(this.placement){const point=this.unproject(event.clientX-r.left,event.clientY-r.top);this.placement.x=Math.round(point.x);this.placement.z=Math.round(point.z);}const near=list=>list?.find(p=>Math.hypot(p.screen.x-event.clientX+r.left,p.screen.y-event.clientY+r.top)<24);this.hover=event.pointerType==='mouse'?near(this.pins)||near(this.peopleHits)||near(this.houseHits)||this.hits?.find(o=>Math.hypot(o.screen.x-event.clientX+r.left,o.screen.y-event.clientY+r.top)<(this.hitRadius||24)):null;this.draw();
@@ -93,8 +93,10 @@ export class World {
     if(this.location!==state.location){this.player={...state.position3d};this.target={...this.player};this.moving=false;this.pending=null;this.pose=null;if(this.location&&this.zoom<.9)this.flyTo(1);this.pan={x:0,z:0};}
     this.serverOffset=state.serverNow-Date.now();this.state=state;this.location=state.location;this.players=players;this.visitedHome=visitedHome;this.draw();
   }
-  setView(index){this.view=index%VIEWS.length;const v=VIEWS[this.view];this.angle=v.angle;this.pitch=v.pitch;this.lift=v.lift;this.draw();return v.name;}
-  rotate(){return this.setView(this.view+1);}
+  // Tilting up flattens heights toward a top view.
+  tilt(pitch){this.pitch=Math.min(.93,Math.max(.3,pitch));this.lift=this.pitch<=.6?1:1-(this.pitch-.6)/.33*.6;}
+  setView(index){this.view=index%VIEWS.length;const v=VIEWS[this.view];this.angle=v.angle;this.tilt(v.pitch);this.draw();return v.name;}
+  rotate(){this.angleGoal=(this.angleGoal??this.angle)+Math.PI/2;return 'Quarter turn';}
   pointerDistance(){const [a,b]=[...this.pointers.values()];return a&&b?Math.hypot(a.x-b.x,a.y-b.y):0;}
   setZoom(value){this.zoomGoal=null;this.zoom=clampZoom(value);this.draw();}
   resetCamera(){this.zoomGoal=null;this.zoom=1;this.pan={x:0,z:0};this.setView(0);}
@@ -165,6 +167,9 @@ export class World {
   plant(x,z,size=1){this.round(x,z,.4,.4,.42,'#cfb398');this.round(x,z,.07,.07,.7,'#699a7d',.35);for(const [dx,dz,dy] of [[-.2,0,.7],[.2,.1,.9],[0,-.1,1.12]])this.round(x+dx*size,z+dz,.45*size,.4,.4*size,'#87c4a0',dy);}
   limb(a,b,width,color){this.meshes.push({a,b,width,color,limb:true,y:Math.min(a[1],b[1]),depth:((a[0]+b[0])*Math.sin(this.angle)+(a[2]+b[2])*Math.cos(this.angle))/2});}
   // A stylised Sims-like figure: career outfit, hairstyle, shaded face and a soft contact shadow.
+  // Cutaway walls: the two walls on the far side stand full height; walls facing the camera drop to stubs.
+  walls(h,toneZ,toneX,edge=5.35,t=.18){const c=Math.cos(this.angle),s=Math.sin(this.angle),stub=.18;
+    this.box(0,-edge,11,t,c>0?h:stub,toneZ);this.box(0,edge,11,t,c<0?h:stub,toneZ);this.box(-edge,0,t,11,s>0?h:stub,toneX);this.box(edge,0,t,11,s<0?h:stub,toneX);}
   human(x,z,skin,{hair='#2b211c',style='curls',outfit='#8ea9a4',pants='#34435e',shoes='#f4f1ea',walk=false,pose=null,heading=0,gait=this.gait,smile=1}={}){
     const ctx=this.ctx;
     if(pose!=='sleep'){const p=this.project(x,0,z);ctx.fillStyle='#1d2b2433';ctx.beginPath();ctx.ellipse(p.x,p.y,this.scale*.3,this.scale*.3*this.pitch,0,0,Math.PI*2);ctx.fill();}
@@ -292,7 +297,7 @@ export class World {
 
       const style=HOME_STYLES[(this.visitedHome?this.visitedHome.home:this.state.home)||'apartment']||HOME_STYLES.apartment;
       for(let x=-5;x<=5;x++)for(let z=-5;z<=5;z++)this.floor(x,z,.99,.99,(x+z)%2?style.floor[1]:style.floor[0]);
-      this.box(0,-5.35,11,.18,Math.cos(this.angle)>0?2.4:.18,style.walls[0]);this.box(-5.35,0,.18,11,Math.sin(this.angle)>0?2.4:.18,style.walls[1]);
+      this.walls(2.4,style.walls[0],style.walls[1],5.35,.18);
       if(style.trim){if(Math.cos(this.angle)>0)this.box(0,-5.26,11,.06,.1,style.trim,2.3);if(Math.sin(this.angle)>0)this.box(-5.26,0,.06,11,.1,style.trim,2.3);}
       if(style.art){if(Math.cos(this.angle)>0){this.box(.5,-5.23,1.3,.04,.85,'#f6f1e6',1.35);this.box(.5,-5.21,1.1,.04,.65,style.art[0],1.45);}if(Math.sin(this.angle)>0){this.box(-5.23,1.5,.04,1.5,.9,'#f6f1e6',1.35);this.box(-5.21,1.5,.04,1.3,.7,style.art[1],1.45);}}
       if(style.rug)this.floor(-2.2,1.5,3,2.4,style.rug,.012);
@@ -326,7 +331,7 @@ export class World {
     }else if(['studio','creator','tech'].includes(l)){
       const colors={studio:['#dacac2','#b5a3c5'],creator:['#ded0bd','#d4a38c'],tech:['#cbd8d3','#83acb2']},[floor,accent]=colors[l];
       for(let x=-5;x<=5;x++)for(let z=-5;z<=5;z++)this.floor(x,z,.99,.99,(x+z)%2?floor:shade(floor,1.025));
-      this.box(0,-5.3,11,.2,2.5,'#ece8df');this.box(-5.3,0,.2,11,2.5,'#e6e6d9');
+      this.walls(2.5,'#ece8df','#e6e6d9',5.3,.2);
       this.box(-2.2,-3.3,3.5,1.3,.83,'#c0a784');this.box(-2.2,-3.3,3.6,1.35,.1,'#efe7d6',.83);
       for(let x=-3.3;x<=-1;x+=1.2){this.box(x,-3.5,.8,.15,.55,'#456052',1);this.box(x,-3.25,.7,.35,.05,'#87958a',.94);}
       this.box(-2.2,-1.9,.6,.6,.45,accent);this.box(-2.2,-2.1,.6,.15,.8,accent);
@@ -490,6 +495,7 @@ export class World {
     if(this.moving){const dx=this.target.x-this.player.x,dz=this.target.z-this.player.z,d=Math.hypot(dx,dz),desired=this.waypoints.length?2.8:Math.min(2.8,Math.sqrt(14*d));this.speed+=Math.max(-7*dt,Math.min(7*dt,desired-this.speed));const step=Math.min(d,this.speed*dt);this.heading=turnToward(this.heading,Math.atan2(dx,dz),dt);this.gait+=step*8;
       if(d<.025||step>=d){this.player={...this.target};if(this.waypoints.length)this.target=this.waypoints.shift();else{this.speed=0;this.arrived();}}else{this.player.x+=dx/d*step;this.player.z+=dz/d*step;}this.draw();}
     for(const p of this.people?.values()||[]){const dx=p.tx-p.x,dz=p.tz-p.z,d=Math.hypot(dx,dz);if(d>12){p.x=p.tx;p.z=p.tz;p.moving=false;}else if(d>.03){const step=Math.min(d,2.6*dt);p.x+=dx/d*step;p.z+=dz/d*step;p.heading=turnToward(p.heading,Math.atan2(dx,dz),dt);p.gait+=step*8;p.moving=true;}else p.moving=false;}
+    if(this.angleGoal!=null){this.angle+=(this.angleGoal-this.angle)*Math.min(1,dt*7);if(Math.abs(this.angleGoal-this.angle)<.002){this.angle=this.angleGoal;this.angleGoal=null;}this.draw();}
     if(this.zoomGoal!=null){this.zoom+=(this.zoomGoal-this.zoom)*Math.min(1,dt*6);if(Math.abs(this.zoomGoal-this.zoom)<.004){this.zoom=this.zoomGoal;this.zoomGoal=null;}this.draw();}
     // Walkers, the plumbob and routines animate continuously unless motion is reduced.
     else if(!this.moving&&(!this.reduced||this.state?.trip||this.state?.active||this.state?.recovery||this.pose?.kind==='water'||this.effect)&&time-(this.lastDraw||0)>(this.zoom<.4?90:40)){this.draw();this.lastDraw=time;}

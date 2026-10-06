@@ -34,7 +34,7 @@ test('mouse dragging, touch pinching and cancelled gestures never become walking
     const world=new World(canvas,()=>{},()=>{});let taps=0;world.click=()=>taps++;
     const event=(id,x,y)=>({pointerId:id,clientX:x,clientY:y,button:0});
     events.pointerdown(event(1,10,10));events.pointermove(event(1,100,40));events.pointerup(event(1,100,40));
-    assert.equal(world.angle,Math.PI/4,'dragging pans; there is no free rotation');assert.equal(taps,0);
+    assert.notEqual(world.angle,Math.PI/4,'dragging orbits the camera');assert.ok(world.pitch>.5,'and tilts it');assert.equal(taps,0);
     events.pointerdown(event(2,10,10));events.pointerdown(event(3,110,10));events.pointermove(event(3,210,10));
     assert.equal(world.zoom,2);events.pointerup(event(3,210,10));events.pointerup(event(2,10,10));assert.equal(taps,0);
     events.pointerdown(event(4,10,10));events.pointercancel(event(4,10,10));events.pointerup(event(4,10,10));assert.equal(taps,0);
