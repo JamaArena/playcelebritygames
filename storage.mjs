@@ -33,13 +33,17 @@ export async function handlePersistentRequest(pool, request) {
     }
     const response = await createGameService(working, { secureCookies: true })(request);
     if (response.status >= 500) throw new Error('Game request failed before persistence.');
+    let changed = false;
     for (const [table, keys] of Object.entries(tables)) {
       for (const row of working.prepare(`SELECT * FROM ${table}`).all()) {
         if (previous[table].get(keyFor(table, row)) === JSON.stringify(row)) continue;
+        changed = true;
         const columns = Object.keys(row), updates = columns.filter(column => !keys.includes(column));
         await client.query(`INSERT INTO celebrity.${table} (${columns.join(',')}) VALUES (${columns.map((_, i) => '$' + (i + 1)).join(',')}) ON CONFLICT (${keys.join(',')}) ${updates.length ? 'DO UPDATE SET ' + updates.map(column => `${column}=EXCLUDED.${column}`).join(',') : 'DO NOTHING'}`, Object.values(row));
       }
     }
+    // Successful actions bump the pulse so other players refresh promptly; state polls do not.
+    if (changed && request.method === 'POST' && response.status < 400) await client.query('UPDATE celebrity.pulse SET at = $1 WHERE id = 1', [Date.now()]);
     await client.query('COMMIT');
     return response;
   } catch (error) {

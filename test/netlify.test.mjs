@@ -46,6 +46,11 @@ test('Netlify Postgres persists cold requests, serializes retries and rolls back
   assert.equal((await call()).data.state.money, 485);
   assert.equal((await call({ type: 'buy', item: 'food', requestId: failedId })).status, 200);
   assert.equal((await call()).data.state.money, 470);
+  const pulse = async () => Number((await pool.query('SELECT at FROM celebrity.pulse WHERE id = 1')).rows[0].at);
+  const afterAction = await pulse();
+  assert.ok(afterAction > 0, 'successful actions bump the live pulse');
+  await call();
+  assert.equal(await pulse(), afterAction, 'state polling does not bump the pulse');
   const count = await pool.query('SELECT count(*) FROM celebrity.players');
   assert.equal(Number(count.rows[0].count), 1);
 });

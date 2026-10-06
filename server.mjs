@@ -12,7 +12,8 @@ const handle=createGameService(db,{secureCookies:process.env.SECURE_COOKIE==='1'
 // Live channel: every successful action pings all connected browsers, which then fetch their own
 // authorised state. The ping carries no player data. Netlify keeps using polling instead.
 const listeners=new Set();
-const broadcast=()=>{const line=`data: ${Date.now()}\n\n`;for(const res of listeners)res.write(line);};
+let pulse=0;
+const broadcast=()=>{pulse=Date.now();const line=`data: ${pulse}\n\n`;for(const res of listeners)res.write(line);};
 setInterval(()=>{for(const res of listeners)res.write(': keep-alive\n\n');},25000).unref();
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml'};
 const server=http.createServer(async(req,res)=>{
@@ -20,6 +21,7 @@ const server=http.createServer(async(req,res)=>{
   res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
   try {
     const url=new URL(req.url,'http://'+req.headers.host);
+    if(url.pathname==='/api/pulse'&&req.method==='GET'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({at:pulse}));return;}
     if(url.pathname==='/api/live'&&req.method==='GET'){
       if(listeners.size>=5000){res.writeHead(503);res.end();return;}
       res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store','Connection':'keep-alive','X-Accel-Buffering':'no'});res.write('retry: 3000\n\n');

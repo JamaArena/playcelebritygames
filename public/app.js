@@ -22,10 +22,26 @@ async function refresh(){
   try{const response=await fetch('/api/state');if(!response.ok)throw new Error('City connection unavailable.');receive(await response.json());$('#connection').textContent='Saved to your city';}
   catch(error){$('#connection').textContent='Connection interrupted · retrying';if(!state)$('#loading').innerHTML='<div class="initial-error"><h1>Your city is unavailable</h1><p>We could not connect to your city. Please try again in a moment.</p><button class="primary" data-action="retry">Try again</button></div>';}
 }
-function receive(data){snapshot=data;state=data.state;offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();
+// Live notices: compare with the previous snapshot so things other players caused pop up immediately.
+let seen=null;
+function notice(data,own){
+  const me=data.playerId,s=data.state;if(!s)return;
+  const tiers=new Map((data.players||[]).map(p=>[p.id,p.tier||0])),dms=(data.messages||[]).filter(m=>m.recipient===me&&m.sender!==me),room=(data.messages||[]).filter(m=>!m.recipient);
+  const latest=list=>list.reduce((n,m)=>Math.max(n,m.at),0);
+  if(seen&&seen.player===me){
+    const fresh=[];
+    if(!own)for(const e of s.events.filter(e=>e.at>seen.eventAt).slice(0,2))fresh.push('✧ '+e.message);
+    for(const m of dms.filter(m=>m.at>seen.dmAt))fresh.push(`💬 ${m.name}: ${m.body}`);
+    for(const id of s.friends){const before=seen.tiers.get(id),after=tiers.get(id);if(before!==undefined&&after>before)fresh.push(`⭐ ${(data.players.find(p=>p.id===id)||{}).name} is now ${B.tiers[after][0]}!`);}
+    for(const m of room.filter(m=>m.at>seen.roomAt))world.say(m.sender===me?'me':m.sender,m.body);
+    if(fresh.length)toast(fresh.slice(-2).join('  ·  '));
+  }
+  seen={player:me,eventAt:Math.max(seen?.player===me?seen.eventAt:0,latest(s.events)),dmAt:Math.max(seen?.player===me?seen.dmAt:0,latest(dms)),roomAt:Math.max(seen?.player===me?seen.roomAt:0,latest(room)),tiers};
+}
+function receive(data,own=false){notice(data,own);snapshot=data;state=data.state;offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();
   $('#loading').hidden=true;
   if(!state){if(modalPage!=='create')creation();return;}
-  $('#app').hidden=false;render();world.update(state,data.scenePlayers||[],data.visitedHome,data.townPlayers||[],data.players||[],state.friends);
+  $('#app').hidden=false;render();if(modalPage==='phone'&&phoneTab==='local'&&$('#chatLog'))$('#chatLog').innerHTML=chatMessages();world.update(state,data.scenePlayers||[],data.visitedHome,data.townPlayers||[],data.players||[],state.friends);
 }
 async function send(input,{keepModal=false,quiet=false}={}){
   if(busy)return;busy=true;$('#connection').textContent='Saving…';
@@ -35,7 +51,7 @@ async function send(input,{keepModal=false,quiet=false}={}){
     for(let attempt=0;attempt<2;attempt++){try{response=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal:AbortSignal.timeout(15000)});break;}catch(error){if(attempt)throw error;}}
     const data=await response.json();if(!response.ok)throw new Error(data.error||'Action unavailable.');
     if(!keepModal&&modalPage!=='create')closeModal();
-    closeTray();receive(data);$('#connection').textContent='Saved to your city';
+    closeTray();receive(data,true);$('#connection').textContent='Saved to your city';
     if(keepModal){if(modalPage==='phone')phone(phoneTab);else if(modalPage==='shop')shop();else if(modalPage==='inventory')inventory();else if(modalPage==='career')career();}
     if(!quiet&&input.type==='report')toast('Report recorded for the city operator.');
     return data;
@@ -243,6 +259,9 @@ document.addEventListener('submit',async event=>{
 });
 await refresh();
 // Real-time: the local server pushes a ping after any player's action; polling remains the heartbeat and fallback.
-let liveTimer;try{const live=new EventSource('/api/live');live.onmessage=()=>{clearTimeout(liveTimer);liveTimer=setTimeout(()=>{if(!busy)refresh();},150);};let opened=false;live.onopen=()=>opened=true;live.onerror=()=>{if(!opened)live.close();};}catch{}
+let liveTimer,pulseAt=null;const soon=()=>{clearTimeout(liveTimer);liveTimer=setTimeout(()=>{if(!busy)refresh();},150);};
+// Fallback for hosts without a push channel (Netlify): poll a one-row change counter, fetch state only when it moves.
+const pollPulse=()=>setInterval(async()=>{if(document.hidden)return;try{const r=await fetch('/api/pulse');if(!r.ok)return;const {at}=await r.json();if(pulseAt!==null&&at!==pulseAt)soon();pulseAt=at;}catch{}},1500);
+try{const live=new EventSource('/api/live');let opened=false;live.onmessage=soon;live.onopen=()=>opened=true;live.onerror=()=>{if(!opened){live.close();pollPulse();}};}catch{pollPulse();}
 setInterval(async()=>{await refresh();if(modalPage==='phone'&&phoneTab==='local'&&$('#chatLog'))$('#chatLog').innerHTML=chatMessages();},4000);
 setInterval(()=>{if(state&&!busy){renderActivity();clock();const next=$('#chargeRefill');if(next&&state.refillAnchor!==null)next.textContent=`Next charge in ${duration(state.refillAnchor+B.refillMs-now())}`;}},1000);
