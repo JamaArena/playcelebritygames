@@ -4,7 +4,7 @@
 // Meshes are pooled and re-placed each frame, so nothing is rebuilt while playing.
 import * as T from './vendor/three.min.js';
 import { World, worldObjects } from './world.js';
-import { BUILDS, HEIGHTS } from './content.js';
+import { BUILDS, HEIGHTS, WEAR } from './content.js';
 
 const UNIT_BOX = new T.BoxGeometry(1, 1, 1), UNIT_BALL = new T.SphereGeometry(.5, 24, 16), UNIT_ROD = new T.CylinderGeometry(.5, .5, 1, 18);
 const capsules = new Map();
@@ -100,6 +100,31 @@ class Figure {
     this.brows = [-1, 1].map(side => { const brow = mesh(UNIT_BOX); brow.scale.set(.036, .007, .01); brow.position.set(side * .037, .05, .1); brow.rotation.z = side * -.1; return brow; });
     this.lips = [mesh(UNIT_BALL), mesh(UNIT_BALL)]; this.lips[0].scale.set(.036, .011, .016); this.lips[0].position.set(0, -.05, .091); this.lips[1].scale.set(.032, .013, .016); this.lips[1].position.set(0, -.062, .088);
     this.head.add(this.skull, this.nose, ...this.ears, ...this.eyes, ...this.brows, ...this.lips);
+    // Garment extras: an agbada robe, a gown or skirt, a hood and pocket, pyjama buttons.
+    this.robe = mesh(new T.CylinderGeometry(.2, .34, 1, 22)); this.robeTrim = mesh(new T.TorusGeometry(.085, .018, 8, 24));
+    this.gown = mesh(new T.CylinderGeometry(.165, .44, 1, 24)); this.skirt = mesh(new T.CylinderGeometry(.168, .27, 1, 22));
+    this.hood = mesh(new T.TorusGeometry(.09, .038, 8, 16, Math.PI)); this.pocket = mesh(UNIT_BOX); this.buttons = [mesh(UNIT_BALL), mesh(UNIT_BALL)];
+    this.torso.add(this.robe, this.robeTrim, this.gown, this.skirt, this.hood, this.pocket, ...this.buttons);
+    // Accessories: eyewear, hats, headphones, earrings (on the head); chain or beads (neck); watch and bag (arms).
+    const part = (geo, parent, sx = 1, sy = 1, sz = 1) => { const m = mesh(geo); m.scale.set(sx, sy, sz); parent.add(m); return m; };
+    this.lenses = [-1, 1].map(side => { const l = part(UNIT_BOX, this.head, .036, .024, .008); l.position.set(side * .036, .025, .114); return l; });
+    this.rims = [-1, 1].map(side => { const r = part(new T.TorusGeometry(.019, .003, 6, 16), this.head); r.position.set(side * .036, .025, .113); return r; });
+    this.bridge = part(UNIT_BOX, this.head, .03, .006, .006); this.bridge.position.set(0, .03, .114);
+    this.temples = [-1, 1].map(side => { const t = part(UNIT_BOX, this.head, .005, .008, .1); t.position.set(side * .088, .03, .065); return t; });
+    this.capDome = part(new T.SphereGeometry(.122, 20, 10, 0, Math.PI * 2, 0, Math.PI * .5), this.head, 1.05, .95, 1.1); this.capDome.position.y = .035;
+    this.capBrim = part(UNIT_BOX, this.head, .17, .012, .13); this.capBrim.position.set(0, .062, .14); this.capBrim.rotation.x = .12;
+    this.fila = part(new T.CylinderGeometry(.105, .116, .1, 20), this.head); this.fila.position.set(.01, .13, -.01); this.fila.rotation.z = .16;
+    this.geleWrap = part(new T.TorusGeometry(.12, .055, 10, 24), this.head, 1.15, 1.15, .9); this.geleWrap.position.y = .11; this.geleWrap.rotation.x = Math.PI / 2;
+    this.geleTop = part(UNIT_BALL, this.head, .26, .2, .26); this.geleTop.position.y = .16;
+    this.geleFan = part(UNIT_BOX, this.head, .32, .17, .03); this.geleFan.position.set(0, .23, -.06); this.geleFan.rotation.x = -.45;
+    this.band = part(new T.TorusGeometry(.12, .012, 6, 20, Math.PI), this.head); this.band.position.y = .02;
+    this.cups = [-1, 1].map(side => { const c = part(UNIT_BALL, this.head, .04, .065, .055); c.position.set(side * .114, 0, 0); return c; });
+    this.studs = [-1, 1].map(side => { const st = part(UNIT_BALL, this.head, .018, .018, .018); st.position.set(side * .099, -.036, .005); return st; });
+    this.chain = part(new T.TorusGeometry(.072, .007, 6, 28), this.torso); this.chain.position.set(0, .545, .025); this.chain.rotation.x = Math.PI / 2 - .35;
+    this.beads = [.068, .082].map((r, i) => { const b = part(new T.TorusGeometry(r, .013, 6, 24), this.torso); b.position.set(0, .555 - i * .025, .02 + i * .006); b.rotation.x = Math.PI / 2 - .3; return b; });
+    this.watch = part(UNIT_BOX, this.arms[0].fore, .056, .03, .062); this.watch.position.y = -.23;
+    this.bag = part(UNIT_BOX, this.arms[1].fore, .2, .16, .07); this.bag.position.set(0, -.44, 0);
+    this.strap = part(UNIT_BOX, this.arms[1].fore, .012, .14, .012); this.strap.position.set(0, -.31, 0);
     this.hair = new T.Group(); this.head.add(this.hair); this.hairKey = '';
   }
   // Hairstyles are small groups of shapes in the hair colour, rebuilt only when the style changes.
@@ -123,7 +148,9 @@ class Figure {
   }
   // Place, dress and pose the figure. Mirrors the 2D poses: walking, seated, sleeping, gesturing, working, sport.
   apply(x, z, skin, o, time, reduced) {
-    const shape = BUILDS[o.build] || BUILDS.average, W = shape.w, H = shape.hip, S = shape.shoulders || W, pose = o.pose, fit = o.fit || 'tee', suit = fit === 'suit', kit = fit === 'kit';
+    const shape = BUILDS[o.build] || BUILDS.average, W = shape.w, H = shape.hip, S = shape.shoulders || W, pose = o.pose, fit = o.fit || 'tee', suit = fit === 'suit', kit = fit === 'kit', cut = o.cut || (kit ? 'shorts' : 'trousers');
+    // Sleeve length by cut: long for suits, jackets, hoodies, pyjamas and robes; none for tanks and gowns.
+    const sleeves = ['suit', 'jacket', 'hoodie', 'pyjama', 'robe'].includes(fit) ? 'long' : ['tank', 'gown'].includes(fit) ? 'none' : 'short';
     const seated = ['sit', 'dine', 'tv', 'work', 'toilet'].includes(pose), tall = seated || pose === 'sleep' ? 1 : (HEIGHTS[o.height]?.h || 1);
     const phase = o.walk && !reduced ? Math.sin(o.gait) : pose === 'sport' && !reduced ? Math.sin(time * 7) : 0, bob = o.walk && !reduced ? Math.abs(Math.cos(o.gait)) * .02 : 0;
     // Standing still people breathe and shift their weight a little.
@@ -136,6 +163,19 @@ class Figure {
     this.neck.material = skinMat;
     // Suits: open jacket lapels over a white shirt, collar and tie.
     for (const m of [this.shirt, this.tie, ...this.collar, ...this.lapels]) m.visible = suit;
+    // Jackets: a collar and zip in the jacket colour. Hoodies: a hood and front pocket. Pyjamas: buttons.
+    if (fit === 'jacket') {
+      for (const m of [this.tie, ...this.collar]) m.visible = true; this.tie.material = mat('#d9d9d9', 'gloss'); this.tie.scale.set(.012, .44, .01); this.tie.position.set(0, .31, .104 * W); this.tie.rotation.x = -.05;
+      this.collar.forEach((c, i) => { const side = i ? 1 : -1; c.material = mat(mix(top, '#000', .15)); c.scale.set(.06, .05, .02); c.position.set(side * .04, .56, .07); c.rotation.set(.3, 0, side * .5); });
+    }
+    this.hood.visible = this.pocket.visible = fit === 'hoodie';
+    if (fit === 'hoodie') { this.hood.material = this.pocket.material = mat(mix(top, '#000', .1)); this.hood.position.set(0, .57, -.03); this.hood.rotation.x = -Math.PI / 2 - .25; this.pocket.scale.set(.2, .09, .02); this.pocket.position.set(0, .2, .1 * W); }
+    for (const [i, b] of this.buttons.entries()) { b.visible = fit === 'pyjama'; b.material = mat('#ffffff', 'gloss'); b.scale.setScalar(.022); b.position.set(0, .46 - i * .13, .11 * W - i * .004); }
+    // Agbada: a wide robe from the shoulders to below the knee with an embroidered neckline. Gowns flare to the ankles.
+    this.robe.visible = this.robeTrim.visible = fit === 'robe';
+    if (fit === 'robe') { this.robe.material = mat(top); this.robe.scale.set(S * 1.1, 1.06, .72 * W); this.robe.position.y = .03; this.robeTrim.material = mat(o.accent || '#c9a227', 'gold'); this.robeTrim.position.set(0, .56, .02); this.robeTrim.rotation.x = Math.PI / 2 - .3; }
+    this.gown.visible = fit === 'gown'; if (fit === 'gown') { this.gown.material = mat(top, 'gloss'); this.gown.scale.set(H, .96, .8 * H); this.gown.position.y = -.4; }
+    this.skirt.visible = cut === 'skirt' && fit !== 'gown' && fit !== 'robe'; if (this.skirt.visible) { this.skirt.material = pants; this.skirt.scale.set(H, .54, .8 * H); this.skirt.position.y = -.15; }
     if (suit) {
       this.shirt.material = mat('#f4f2ee'); this.shirt.scale.set(.075, .24, .01); this.shirt.position.set(0, .43, .104 * W); this.shirt.rotation.x = -.12;
       this.tie.material = mat(o.accent || '#7a2433', 'gloss'); this.tie.scale.set(.028, .21, .012); this.tie.position.set(0, .42, .11 * W); this.tie.rotation.x = -.12;
@@ -146,8 +186,10 @@ class Figure {
       const stride = phase * leg.side; leg.position.set(leg.side * .078 * H, hip - .02, 0); leg.scale.set(H, tall, H);
       leg.rotation.set(seated ? -1.25 : stride * .5, 0, idle ? leg.side * .03 : 0); leg.shin.rotation.set(seated ? 1.25 : Math.max(0, -stride) * .6 + (o.walk ? .08 : 0), 0, 0);
       // Kits show bare knees between shorts and socks; trousers cover the whole leg.
-      leg.bone.material = kit ? skinMat : pants; leg.shin.bone.material = kit ? skinMat : pants; leg.shorts.visible = kit; leg.shorts.material = pants;
-      leg.sock.visible = kit; leg.sock.material = mat('#f4f2ee'); leg.shoe.material = mat(o.shoes, suit ? 'gloss' : 'matte'); leg.sole.material = mat(suit ? '#151312' : '#e9e4da');
+      // Trousers cover the leg; shorts show the knees (sport kits add socks); skirts and gowns show bare legs.
+      const bare = cut !== 'trousers' || fit === 'gown';
+      leg.bone.material = bare ? skinMat : pants; leg.shin.bone.material = bare ? skinMat : pants; leg.shorts.visible = cut === 'shorts' && fit !== 'gown'; leg.shorts.material = pants;
+      leg.sock.visible = kit && cut === 'shorts'; leg.sock.material = mat('#f4f2ee'); leg.shoe.material = mat(o.shoes, suit ? 'gloss' : 'matte'); leg.sole.material = mat(suit ? '#151312' : '#e9e4da');
     }
     const using = ['work', 'cook', 'perform', 'water', 'chat'].includes(pose), talking = pose === 'gesture';
     for (const arm of this.arms) {
@@ -158,7 +200,7 @@ class Figure {
       else arm.rotation.set(seated ? -.35 : -phase * arm.side * .5 + breath * .015, 0, arm.side * .07);
       arm.fore.rotation.set(talking || using ? -.7 : seated ? -.55 : -.18, 0, 0);
       // Suits have full jacket sleeves; tees and kits have short sleeves over bare arms.
-      arm.bone.material = suit ? mat(top) : skinMat; arm.fore.bone.material = suit ? mat(top) : skinMat; arm.sleeve.material = mat(top); arm.sleeve.visible = !suit;
+      arm.bone.material = sleeves === 'long' ? mat(top) : skinMat; arm.fore.bone.material = sleeves === 'long' ? mat(top) : skinMat; arm.sleeve.material = mat(top); arm.sleeve.visible = sleeves === 'short';
       arm.hand.material = arm.thumb.material = skinMat;
     }
     this.head.position.set(sway * .015, hip + .74 * tall, 0); this.head.rotation.set(o.walk ? .04 : 0, idle ? Math.sin(time * .4 + x) * .12 : 0, 0);
@@ -170,6 +212,17 @@ class Figure {
     // An occasional blink.
     const blink = !reduced && (time + x * 3) % 4.2 < .12; for (const e of this.eyes) if (e !== this.lids[0] && e !== this.lids[1]) e.visible = !blink;
     this.styleHair(o.style || 'curls', o.hair || '#2b211c', skin);
+    // Accessories, each in its own colour; hats hide short hair underneath.
+    const acc = {}; for (const id of o.acc || []) { const w = WEAR[id]; if (w) acc[w.slot] = { id, color: w.color }; }
+    const show = (meshes, on, color, finish) => { for (const m of meshes) { m.visible = on; if (on) m.material = mat(color, finish); } };
+    const face = acc.face?.id;
+    show(this.lenses, face === 'sunglasses', acc.face?.color, 'gloss'); show(this.rims, face === 'glasses', acc.face?.color, 'gloss'); show([this.bridge, ...this.temples], !!face, acc.face?.color, 'gloss');
+    const head = acc.head?.id;
+    show([this.capDome, this.capBrim], head === 'cap', acc.head?.color); show([this.fila], head === 'fila', acc.head?.color); show([this.geleWrap, this.geleTop, this.geleFan], head === 'gele', acc.head?.color, 'gloss');
+    show([this.band, ...this.cups], head === 'headphones', acc.head?.color, 'gloss');
+    this.hair.visible = !(['cap', 'fila', 'gele'].includes(head) && !['long', 'braids', 'locs', 'ponytail', 'bob'].includes(o.style));
+    show(this.studs, !!acc.ears, acc.ears?.color, 'gold'); show([this.chain], acc.neck?.id === 'chain', acc.neck?.color, 'gold'); show(this.beads, acc.neck?.id === 'beads', acc.neck?.color, 'gloss');
+    show([this.watch], !!acc.wrist, acc.wrist?.color, 'gold'); show([this.bag, this.strap], !!acc.bag, acc.bag?.color, 'gloss');
     // Sleeping: lie the whole figure down along the bed, head toward the headboard.
     if (pose === 'sleep') { this.root.rotation.set(-Math.PI / 2, 0, 0); this.root.position.set(x, .95, z + .7); }
     // Mishaps: fainted flat on the floor, dozing on your feet, or caught wetting yourself.

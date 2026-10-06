@@ -236,3 +236,16 @@ test('a critically low need causes one embarrassing mishap that costs fame',()=>
   assert.equal(s.mishap.need,'hunger','bladder is on cooldown, hunger is not');assert.equal(s.needs.hunger,20);assert.ok(s.needs.bladder<MISHAP_AT,'bladder stays low while on cooldown');
   const poor=make();poor.fame=0;poor.needs.fun=0;poor.lastSeen=T;reconcile(poor,T+1000);assert.equal(poor.fame,0,'fame never goes negative');
 });
+test('wardrobe: claim at the boutique, wear anywhere, and perks change the rules',()=>{
+  const s=make();s.fame=200;
+  assert.throws(()=>act(s,{type:'claimWear',item:'comfyJoggers'},T),/Palm plaza/);
+  s.location='plaza';act(s,{type:'claimWear',item:'comfyJoggers'},T);act(s,{type:'claimWear',item:'sunglasses'},T);
+  assert.throws(()=>act(s,{type:'claimWear',item:'agbada'},T),/1,500 fame/);
+  assert.throws(()=>act(s,{type:'wear',item:'statementShirt'},T),/Claim it/);
+  act(s,{type:'wear',item:'plainTee'},T);act(s,{type:'wear',item:'comfyJoggers'},T);act(s,{type:'wear',item:'sunglasses'},T);
+  assert.deepEqual(s.wear,{top:'plainTee',bottom:'comfyJoggers',face:'sunglasses'});
+  // Comfy joggers: practice uses 10% less energy. Sunglasses: 20% less fame lost in a mishap.
+  go(s);s.needs.energy=80;act(s,{type:'start',kind:'practice',skill:CAREERS[s.career].skills[0]},T+1);reconcile(s,s.active.readyAt+1);assert.ok(Math.abs(s.needs.energy-75.5)<.2,`energy ${s.needs.energy}`);
+  s.fame=1000;s.needs.bladder=1;s.lastSeen=T+100_000;reconcile(s,T+101_000);assert.equal(s.mishap.lost,24,'3% of 1,000 is 30, less 20%');
+  act(s,{type:'takeOff',slot:'face'},T+102_000);assert.equal(s.wear.face,undefined);
+});

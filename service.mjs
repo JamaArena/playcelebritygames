@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame } from './game.mjs';
-import { CAREERS, BALANCE, clamp } from './public/content.js';
+import { CAREERS, BALANCE, clamp, wearPerks } from './public/content.js';
 export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL);";
 export function createGameService(db,{secureCookies=false,sendEmail=null}={}) {
 db.exec(schema);
@@ -68,7 +68,7 @@ function captureEligibility(s,now){
 const TOWN_PLAYER_LIMIT=120,ACTIVE_DEVICE_MS=45_000;
 class OtherDevice extends Error {}
 const roomFor=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
-function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,hairColor:s.hairColor||'black',build:s.build||'average',height:s.height||'average',career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<45_000};}
+function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,hairColor:s.hairColor||'black',build:s.build||'average',height:s.height||'average',career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,wear:s.wear||null,home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<45_000};}
 function snapshot(playerId,s,now){
   const account=accountOf(playerId);
   if(!s)return {state:null,serverNow:now,account};
@@ -93,7 +93,7 @@ const saveBattle=b=>db.prepare('INSERT INTO battles VALUES(?,?) ON CONFLICT(id) 
 function fighterStats(ps){
   const skills=Object.values(ps.careers[ps.career].skills).map(s=>s.level),best=Math.max(...skills),average=skills.reduce((a,b)=>a+b,0)/skills.length;
   const max=Math.round(70+6*average+Math.min(10,Math.floor((ps.fame||0)/10_000)));
-  return {name:ps.name,career:ps.career,color:ps.color,hair:ps.hair,power:best,hp:max,max,fatigue:(100-ps.needs.energy)/100,guard:false,ko:false,signature:SIGNATURES[CAREERS[ps.career].family]||'Signature move'};
+  return {name:ps.name,career:ps.career,color:ps.color,hair:ps.hair,power:best,hp:max,max,fatigue:(100-ps.needs.energy)/100,guard:false,ko:false,signature:SIGNATURES[CAREERS[ps.career].family]||'Signature move',aim:(wearPerks(ps.wear).battle||0)/100};
 }
 function battleLog(b,text,now){b.log.unshift({text,at:now});b.log=b.log.slice(0,30);}
 function nextTurn(b,now){
@@ -106,8 +106,8 @@ function resolveMove(b,fighterId,move,targetId,now,rng=Math.random){
   else if(move==='hype'){b.hype[team]=true;battleLog(b,`${f.name} hypes up the team. Next hit lands harder!`,now);}
   else{
     const target=b.fighters[targetId];fail(target&&!target.ko&&b.teams[1-team].includes(targetId),'Choose a standing opponent.');
-    const signature=move==='signature',p=signature?clamp(.5+.05*(f.power-6)-.1*f.fatigue,.1,.9):clamp(.88-.1*f.fatigue,.5,.95);
-    if(rng()<p){
+    const signature=move==='signature',p=signature?clamp(.5+.05*(f.power-6)-.1*f.fatigue,.1,.9):clamp(.88-.1*f.fatigue,.5,.95);const aimed=clamp(p+(f.aim||0),.1,.97);
+    if(rng()<aimed){
       let damage=signature?16+2.6*f.power:8+1.6*f.power+rng()*4;if(b.hype[team]){damage*=1.25;b.hype[team]=false;}if(target.guard)damage/=2;damage=Math.round(damage);
       target.hp=Math.max(0,target.hp-damage);if(!target.hp)target.ko=true;
       battleLog(b,`${f.name} ${signature?`unleashes ${f.signature}`:'strikes'}: ${damage} damage to ${target.name}${target.ko?' · knocked out!':''}`,now);
