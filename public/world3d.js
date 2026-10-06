@@ -46,14 +46,14 @@ const SHAPES = {
   upperArm: lathe([[0, .02], [.05, 0], [.053, -.06], [.047, -.17], [.039, -.29], [0, -.3]]),
   sleeve: lathe([[0, .03], [.06, .01], [.064, -.06], [.06, -.13], [0, -.13]]),
   foreArm: lathe([[0, .01], [.039, 0], [.042, -.06], [.034, -.19], [.027, -.26], [0, -.27]]),
-  neck: lathe([[0, -.02], [.054, -.02], [.05, .06], [.052, .14], [0, .14]]),
+  neck: lathe([[0, -.02], [.056, -.02], [.052, .04], [.054, .1], [0, .1]]),
   // An egg-shaped head with a jaw and chin, slightly deeper than wide.
   head: lathe([[0, -.115], [.04, -.112], [.068, -.09], [.084, -.055], [.093, -.01], [.098, .04], [.096, .09], [.082, .13], [.05, .155], [0, .162]]),
 };
 
 // One person with natural proportions: a sculpted torso and tapered limbs, layered clothes (a suit with
-// lapels, shirt and tie; a sports kit with shorts and socks; or a tee and trousers), a face, a hairstyle
-// and an optional crown. Scaled by build and height.
+// lapels, shirt and tie; a sports kit with shorts and socks; or a tee and trousers), a face and a
+// hairstyle. Scaled by build and height.
 class Figure {
   constructor() {
     const mesh = (geo, color = '#888', finish) => { const m = new T.Mesh(geo, mat(color, finish)); m.castShadow = true; return m; };
@@ -87,27 +87,13 @@ class Figure {
     this.lips = [mesh(UNIT_BALL), mesh(UNIT_BALL)]; this.lips[0].scale.set(.036, .011, .016); this.lips[0].position.set(0, -.05, .091); this.lips[1].scale.set(.032, .013, .016); this.lips[1].position.set(0, -.062, .088);
     this.head.add(this.skull, this.nose, ...this.ears, ...this.eyes, ...this.brows, ...this.lips);
     this.hair = new T.Group(); this.head.add(this.hair); this.hairKey = '';
-    this.crown = this.makeCrown(); this.head.add(this.crown);
-  }
-  // A gold crown with five points and alternating ruby and emerald gems, for Star-tier fame.
-  makeCrown() {
-    const crown = new T.Group(), gold = new T.MeshStandardMaterial({ color: '#e2b33c', roughness: .28, metalness: .95, side: T.DoubleSide });
-    crown.add(new T.Mesh(new T.CylinderGeometry(.1, .094, .05, 24, 1, true), gold));
-    for (let i = 0; i < 5; i++) {
-      const a = i / 5 * Math.PI * 2, spike = new T.Mesh(new T.ConeGeometry(.024, .075, 8), gold), gem = new T.Mesh(UNIT_BALL, mat(i % 2 ? '#2fae6b' : '#d23b4b', 'glass')), tip = new T.Mesh(UNIT_BALL, gold);
-      spike.position.set(Math.sin(a) * .096, .06, Math.cos(a) * .096); tip.scale.setScalar(.02); tip.position.set(Math.sin(a) * .096, .1, Math.cos(a) * .096);
-      gem.scale.setScalar(.026); gem.position.set(Math.sin(a) * .1, 0, Math.cos(a) * .1); crown.add(spike, tip, gem);
-    }
-    crown.rotation.x = -.1; crown.traverse(m => { m.castShadow = true; }); return crown;
   }
   // Hairstyles are small groups of shapes in the hair colour, rebuilt only when the style changes.
   styleHair(style, color, skin) {
-    // The crown sits on the hair, a little higher for big styles.
-    this.crown.position.y = style === 'afro' ? .2 : style === 'bun' || style === 'curls' ? .15 : .12;
     const key = style + color + skin; if (key === this.hairKey) return; this.hairKey = key; this.hair.clear();
     const add = (geo, c, sx, sy, sz, x, y, z, rx = 0) => { const m = new T.Mesh(geo, mat(c, 'hair')); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.rotation.x = rx; m.castShadow = true; this.hair.add(m); return m; };
-    const cap = (c = color, s = 1) => { const m = new T.Mesh(new T.SphereGeometry(.118 * s, 24, 14, 0, Math.PI * 2, 0, Math.PI * .55), mat(c, 'hair')); m.scale.set(1, 1.1, 1.08); m.rotation.x = -.38; m.position.y = .022; m.castShadow = true; this.hair.add(m); return m; };
-    const shell = (low, c = color) => { const m = new T.Mesh(new T.SphereGeometry(.128, 24, 14, Math.PI * .78, Math.PI * 1.44, 0, Math.PI * low), mat(c, 'hair')); m.scale.set(1, 1.1, 1.05); m.position.y = .005; m.castShadow = true; this.hair.add(m); return m; };
+    const cap = (c = color, s = 1) => { const m = new T.Mesh(new T.SphereGeometry(.118 * s, 24, 14, 0, Math.PI * 2, 0, Math.PI * .55), mat(c, 'hair')); m.scale.set(1.04, 1.12, 1.1); m.rotation.x = -.38; m.position.y = .042; m.castShadow = true; this.hair.add(m); return m; };
+    const shell = (low, c = color) => { const m = new T.Mesh(new T.SphereGeometry(.128, 24, 14, Math.PI * .78, Math.PI * 1.44, 0, Math.PI * low), mat(c, 'hair')); m.scale.set(1.04, 1.12, 1.08); m.position.y = .02; m.castShadow = true; this.hair.add(m); return m; };
     if (style === 'bald') return;
     if (style === 'curls') { cap(); for (const [x, y, z] of [[-.08, .1, .02], [.08, .1, .02], [0, .13, .04], [-.05, .12, -.06], [.05, .12, -.06], [0, .07, -.1], [-.1, .03, -.05], [.1, .03, -.05]]) add(UNIT_BALL, color, .075, .075, .075, x, y, z); return; }
     if (style === 'afro') { add(UNIT_BALL, color, .36, .33, .36, 0, .07, -.02); return; }
@@ -161,7 +147,7 @@ class Figure {
       arm.bone.material = suit ? mat(top) : skinMat; arm.fore.bone.material = suit ? mat(top) : skinMat; arm.sleeve.material = mat(top); arm.sleeve.visible = !suit;
       arm.hand.material = arm.thumb.material = skinMat;
     }
-    this.head.position.set(sway * .015, hip + .8 * tall, 0); this.head.rotation.set(o.walk ? .04 : 0, idle ? Math.sin(time * .4 + x) * .12 : 0, 0);
+    this.head.position.set(sway * .015, hip + .74 * tall, 0); this.head.rotation.set(o.walk ? .04 : 0, idle ? Math.sin(time * .4 + x) * .12 : 0, 0);
     this.skull.material = this.nose.material = skinMat; for (const m of this.ears) m.material = skinMat;
     for (const lid of this.lids) lid.material = mat(mix(skin, '#000', .12), 'skin');
     for (const b of this.brows) b.material = mat(mix(o.hair || '#2b211c', '#000', .25));
@@ -169,7 +155,6 @@ class Figure {
     this.lips[1].scale.y = (o.smile ?? 1) > .5 ? .013 : .009;
     // An occasional blink.
     const blink = !reduced && (time + x * 3) % 4.2 < .12; for (const e of this.eyes) if (e !== this.lids[0] && e !== this.lids[1]) e.visible = !blink;
-    this.crown.visible = !!o.crown;
     this.styleHair(o.style || 'curls', o.hair || '#2b211c', skin);
     // Sleeping: lie the whole figure down along the bed, head toward the headboard.
     if (pose === 'sleep') { this.root.rotation.set(-Math.PI / 2, 0, 0); this.root.position.set(x, .95, z + .7); }
@@ -247,9 +232,9 @@ export class World3D extends World {
     this.meshes = []; this.scene();
     for (const p of [this.boxes, this.balls, this.figures]) p.end();
     this.renderer.render(this.scene3, this.camera);
-    // Labels, bubbles, rings and the plumbob stay crisp on the 2D layer above the 3D view.
+    // Labels, bubbles and rings stay crisp on the 2D layer above the 3D view.
     const ctx = this.ctx; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, r.width, r.height);
-    this.paintRoutine(); this.paintLabels(); this.paintPlumbob(); this.paintSpeech();
+    this.paintRoutine(); this.paintLabels(); this.paintSpeech();
     if (this.moving) { const t = this.project(this.target.x, .03, this.target.z); ctx.strokeStyle = '#fff8'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.ellipse(t.x, t.y, 7, 3.5, 0, 0, Math.PI * 2); ctx.stroke(); }
     this.hits = worldObjects(this.location, this.visitedHome?.furniture || this.state.furniture).map(object => ({ ...object, screen: this.project(object.vx ?? object.x, .6, object.vz ?? object.z) }));
     this.hitRadius = Math.max(14, Math.min(30, this.scale * .42));

@@ -24,11 +24,9 @@ html,body,#app{height:100%;height:100dvh;overflow:hidden}.rail{background:#153d3
 #app .activity-card{scrollbar-width:none}#app .activity-card::-webkit-scrollbar{display:none}@media(max-width:620px){#app .activity-card{max-height:124px}}
 .object-tray:has(.placement-hint){top:172px;bottom:auto;padding:10px 13px}.object-tray:has(.placement-hint) header{margin-bottom:0}.object-tray:has(.placement-hint)>small{margin-top:4px}
 
-/* Sims-style life HUD: portrait with mood plumbob, mood label and labelled need bars. */
+/* Sims-style life HUD: portrait, mood label and labelled need bars. */
 .needs-hud.sim-hud{display:flex;align-items:center;gap:12px;padding:10px 14px 10px 10px;border-radius:20px;background:#fffef4f2;border:1px solid #ffffffb0;box-shadow:0 10px 30px #2f4a3624}
 .sim-portrait{position:relative;flex-shrink:0;display:grid;place-items:center;width:48px;height:48px;border-radius:50%;background:radial-gradient(circle at 34% 28%,#ffffff70,transparent 58%),var(--skin);border:3px solid hsl(var(--mood) 58% 48%);color:#fff;font:700 18px Georgia,serif;text-shadow:0 1px 2px #0004}
-.plumbob{position:absolute;top:-21px;left:50%;width:13px;height:19px;margin-left:-6.5px;background:linear-gradient(90deg,hsl(var(--mood) 72% 62%) 50%,hsl(var(--mood) 62% 40%) 50%);clip-path:polygon(50% 0,100% 48%,50% 100%,0 48%);animation:plumbob 2.6s ease-in-out infinite}
-@keyframes plumbob{50%{transform:translateY(-3px) scaleX(.55)}}
 .sim-meta{display:grid;gap:3px;min-width:74px}
 .sim-meta strong{font-size:12px;color:#22392d}
 .sim-meta small{font-size:10px;font-weight:600;color:hsl(var(--mood) 45% 36%)}
@@ -38,7 +36,7 @@ html,body,#app{height:100%;height:100dvh;overflow:hidden}.rail{background:#153d3
 .need-bar i{display:block;height:7px;border-radius:5px;background:linear-gradient(to right,hsl(var(--hue) 60% 46%) var(--need),#e1e8da var(--need));box-shadow:inset 0 1px 1px #0000001a}
 .need-bar:hover i,.need-bar:focus-visible i{outline:2px solid #ffffffd0;outline-offset:1px}
 .world-weather strong{font-size:12px;font-weight:600;color:#22392d}
-@media(max-width:1000px){.needs-hud.sim-hud{gap:8px;padding:7px 9px 7px 7px}.sim-meta{display:none}.sim-portrait{width:34px;height:34px;font-size:13px;border-width:2px}.plumbob{top:-17px;width:10px;height:15px;margin-left:-5px}.sim-needs{grid-template-columns:repeat(3,52px);gap:4px 7px}.need-bar label{font-size:8px}.need-bar i{height:5px}}
+@media(max-width:1000px){.needs-hud.sim-hud{gap:8px;padding:7px 9px 7px 7px}.sim-meta{display:none}.sim-portrait{width:34px;height:34px;font-size:13px;border-width:2px}.sim-needs{grid-template-columns:repeat(3,52px);gap:4px 7px}.need-bar label{font-size:8px}.need-bar i{height:5px}}
 
 /* Pie menu around the selected object. */
 .pie-menu{position:absolute;z-index:8;width:0;height:0}
@@ -48,7 +46,7 @@ html,body,#app{height:100%;height:100dvh;overflow:hidden}.rail{background:#153d3
 .pie-option small{margin-left:4px;color:#6a7d6c;font-size:10px}
 .pie-option:hover,.pie-option:focus-visible{background:#e3f0df;border-color:#9cc3a3;outline:none}
 @keyframes pie-in{from{opacity:0;transform:translate(-50%,-50%) scale(.5)}}
-@media(prefers-reduced-motion:reduce){.plumbob,.pie-option{animation:none}}
+@media(prefers-reduced-motion:reduce){.pie-option{animation:none}}
 
 /* Palm Motors sponsorship cards. */
 .vip-card{position:relative;display:grid;gap:7px;align-content:start}
