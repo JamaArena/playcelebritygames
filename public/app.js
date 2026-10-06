@@ -88,6 +88,8 @@ const world=new World($('#world'),position=>{closeTray();send({type:'move',...po
   }
   if(object.action==='career'){const kind=['founder','web3'].includes(state.career)?'build':'produce';pie(object,[[`${def.icon} ${escape(def.output)} <small>ϟ 1</small>`,'quickStart',`data-kind="${kind}"`],['✎ Plan it first','prepareDetails',`data-kind="${kind}"`],['↗ Go here','goObject']]);return;}
   if(object.action==='shop'){pie(object,[['◇ Browse shop','page','data-page="shop"'],['↗ Go here','goObject']]);return;}
+  if(object.action==='exit'){pie(object,[['🚪 Go outside','travel','data-location="street"']]);return;}
+  if(object.action==='enter'){pie(object,[['🏠 Go inside','travel','data-location="home"']]);return;}
   if(object.action==='vip'){pie(object,[['🏁 Sponsorship deals','page','data-page="vip"'],['↗ Go here','goObject']]);return;}
   if(object.action==='phone'){pie(object,[['♡ Chat','quickSocial'],['♧ Contacts','page','data-page="phone"'],['↗ Go here','goObject']]);return;}
   pie(object,[[`${object.icon} ${escape(object.verb||'Use')}${object.need?` <small>+${B.recovery[object.need][0]} ${escape(needs[object.need][0])} · ${duration(B.recovery[object.need][1])}</small>`:''}`,'useObject'],['↗ Go here','goObject']]);
@@ -97,7 +99,7 @@ function whenIdle(perform){if(!busy){perform();return;}const timer=setInterval((
 async function startAtObject(input){
   if(state.active||state.recovery){toast('Finish or stop your current action first.');return;}
   closeTray();closeModal();const def=CAREERS[state.career];
-  if(state.location!==def.location&&!(input.kind==='practice'&&state.location==='home'&&state.inventory.gear)){const data=await send({type:'travel',location:def.location});if(!data)return;if(data.state.trip){toast(`Driving to ${LOCATIONS[def.location].name}. Start work when you arrive.`);return;}}
+  if(state.location!==def.location&&!(input.kind==='practice'&&state.location==='home'&&state.inventory.gear)){const data=await send({type:'travel',location:def.location});if(!data)return;if(data.state.trip){toast(`${data.state.trip.ride?'Driving':'Walking'} to ${LOCATIONS[def.location].name}. Start work when you arrive.`);return;}}
   const object=worldObjects(state.location,state.furniture).find(o=>o.action===(input.kind==='practice'?'practice':'career'));
   if(object)world.approach(object,()=>whenIdle(()=>send({type:'start',...input})));else await send({type:'start',...input});
 }
@@ -127,7 +129,7 @@ function clock(){const hour=world.daylight().hour,day=Math.max(1,Math.floor((now
 function progress(start,end){const value=Math.min(100,Math.max(0,(now()-start)/(end-start)*100));return '<div class="sim-progress"><i style="width:'+value+'%"></i></div>';}
 function renderActivity(){
   const a=state.active,r=state.recovery,def=CAREERS[state.career],t=state.trip;let html='';
-  if(t)html='<div class="sim-status"><span>'+(SPONSORSHIPS[t.ride]?.icon||'🚗')+'</span><strong>Driving to '+escape(LOCATIONS[t.to].name)+'</strong><time>'+duration(t.arrives-now())+'</time></div>'+progress(t.departs,t.arrives);
+  if(t)html='<div class="sim-status"><span>'+(SPONSORSHIPS[t.ride]?.icon||'🚶')+'</span><strong>'+(t.ride?'Driving':'Walking')+' to '+escape(LOCATIONS[t.to].name)+'</strong><time>'+duration(t.arrives-now())+'</time></div>'+progress(t.departs,t.arrives);
   else if(r)html='<div class="sim-status"><span>'+needs[r.need][1]+'</span><strong>'+escape(r.label)+'</strong><time>'+duration(r.endsAt-now())+'</time>'+button('×','cancel','aria-label="Cancel recovery"','tray-close')+'</div>'+progress(r.startedAt??r.endsAt-B.recovery[r.need][1],r.endsAt);
   else if(a?.kind==='practice')html='<div class="sim-status"><span>'+def.icon+'</span><strong>'+escape(a.skill)+'</strong><small>+7 XP</small><time>'+duration(a.readyAt-now())+'</time>'+button('×','cancel','aria-label="Cancel practice"','tray-close')+'</div>'+progress(a.startedAt,a.readyAt);
   else if(a){
@@ -148,7 +150,7 @@ function updateCreationCareer(key){
   document.querySelectorAll('.career-option').forEach(b=>b.classList.toggle('selected',b.dataset.career===key));
   $('#careerExtras').innerHTML=key==='football'?'<div class="field"><label for="position">Outfield position</label><select id="position" name="position"><option value="striker">Striker</option><option value="midfielder">Midfielder</option><option value="defender">Defender</option></select></div>':key==='musician'?'<div class="field"><label for="technique">Primary technique</label><select id="technique" name="technique"><option value="vocals">Vocals</option><option value="instrument">Instrument</option></select></div>':key==='adult'?'<label class="check"><input type="checkbox" name="adult" required> 18+ career. My character and everyone in their projects are adults. Expect flirty, suggestive themes; nothing explicit is shown.</label>':'';
 }
-function map(){world.flyTo(.22);showTray('↗ Palm City','<div class="city-tiles">'+Object.entries(LOCATIONS).map(([key,l])=>button('<span>'+TOWN[key].pin+'</span>'+escape(l.name),'travel','data-location="'+key+'"','city-tile')).join('')+'</div><small>Tap a pin on the map or a place here to head over.</small>');}
+function map(){if(state.location!=='home')world.flyTo(.22);showTray('↗ Palm City','<div class="city-tiles">'+Object.entries(LOCATIONS).map(([key,l])=>button('<span>'+(TOWN[key]?.pin||'🚪')+'</span>'+escape(l.name),'travel','data-location="'+key+'"','city-tile')).join('')+'</div><small>Tap a pin on the map or a place here to head over.</small>');}
 function practice(){const def=CAREERS[state.career];if(state.location==='home'&&!state.inventory.gear){showTray('✧ Practise','<div class="tray-options">'+button('↗ Go to venue','travel','data-location="'+def.location+'"','primary')+button('◇ Buy home equipment','travel','data-location="plaza"')+'</div>');return;}showTray('✧ Practise','<div class="tray-options skills-options">'+def.skills.map(skill=>button(escape(skill)+' <small>Lv '+state.careers[state.career].skills[skill].level+'</small>','startPractice','data-skill="'+escape(skill)+'"')).join('')+'</div><small>ϟ 1 · 3:00 · +7 XP</small>');}
 function prepare(kind){const def=CAREERS[state.career];kind??=['founder','web3'].includes(state.career)?'build':'produce';if(kind==='launch'||kind==='collab'){prepareDetails(kind);return;}showTray(def.icon+' '+def.output,'<div class="tray-options">'+button('▶ Start · ϟ 1','quickStart','data-kind="'+kind+'"','primary')+button('Options','prepareDetails','data-kind="'+kind+'"')+'</div><small>'+duration(def.family==='sport'?B.sportMs:B.activityMs)+' · '+(def.family==='sport'?6:3)+' choices</small>');}
 function prepareDetails(kind){
@@ -162,7 +164,7 @@ function career(){
 }
 function outputs(list){return list.slice(0,30).map(o=>`<div class="output"><div><strong>${escape(o.title)}</strong><p>${escape(o.genre||o.kind)} · ${o.released?'Released':'Unreleased build'} · ${new Date(o.at).toLocaleDateString()}</p><small>Credits: ${o.credits.map(escape).join(', ')} · ${fmt(o.gain)} reach · +${fmt(o.fame??Math.floor(o.gain*B.famePerReach))} fame</small></div><span class="tier-pill">${o.quality} QUALITY</span></div>`).join('')||'<p class="empty">Your first credited output is still ahead of you.</p>';}
 
-async function recover(need){if(need==='social'){showTray('♡ Socialise','<div class="tray-options">'+button('♡ Chat','quickSocial')+button('♧ Contacts','page','data-page="phone"')+'</div>');return;}if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast('Driving home. Recover when you arrive.');return;}}const object=worldObjects('home',state.furniture).find(o=>o.need===need);if(object)world.onObject(object);}
+async function recover(need){if(need==='social'){showTray('♡ Socialise','<div class="tray-options">'+button('♡ Chat','quickSocial')+button('♧ Contacts','page','data-page="phone"')+'</div>');return;}if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast(`${data.state.trip.ride?'Driving':'Walking'} home. Recover when you arrive.`);return;}}const object=worldObjects('home',state.furniture).find(o=>o.need===need);if(object)world.onObject(object);}
 function shop(){const fame=state.fame||0;showModal('shop',`<span class="eyebrow">PALM CITY MARKET</span><h2>Make yourself at home.</h2><p class="modal-intro">No coins in Palm City: items unlock with fame and are free to claim. You have ✦ ${fmt(fame)} fame. Claim them at Palm plaza.</p><div class="item-grid">${Object.entries(ITEMS).map(([key,item])=>`<div class="item-card"><h3>${item.name}</h3><p>${item.description}</p><div class="shop-price">✦ ${fmt(item.fame)} fame</div>${state.inventory[key]?button('Owned ✓','noop','disabled'):fame>=item.fame?button('Claim free','buy',`data-item="${key}"`,'primary'):button(`🔒 ${fmt(item.fame-fame)} fame to go`,'noop','disabled')}</div>`).join('')}</div>`);}
 function inventory(){
   showModal('inventory',`<span class="eyebrow">YOUR POSSESSIONS</span><h2>A place to call yours.</h2><p class="modal-intro">Furnish your apartment, equip a new look, and improve your tools.</p><div class="actions">${button('Visit market','travel','data-location="plaza"')}${button('Go home','travel','data-location="home"')}</div><div class="item-grid">${Object.entries(state.inventory).map(([key,item])=>{
@@ -219,7 +221,7 @@ function battleView(){
 }
 function openBattle(id){battleId=id;battleView();}
 function openPage(page){({city:map,career,phone,inventory,profile,shop,vip}[page]||map)();}
-$('#mapButton').addEventListener('click',map);$('#cameraButton').addEventListener('click',()=>world.rotate());$('#closeModal').addEventListener('click',closeModal);
+$('#mapButton').addEventListener('click',map);$('#cameraButton').addEventListener('click',()=>toast(`📷 ${world.rotate()}`));$('#closeModal').addEventListener('click',closeModal);
 $('#zoomIn').addEventListener('click',()=>world.setZoom(world.zoom*1.2));$('#zoomOut').addEventListener('click',()=>world.setZoom(world.zoom/1.2));$('#resetCamera').addEventListener('click',()=>world.resetCamera());
 $('.modal-backdrop').addEventListener('click',closeModal);$('#motionButton').addEventListener('click',()=>{motion=!motion;world.reduced=!motion;$('#motionButton').textContent=motion?'Motion on':'Motion reduced';});
 document.addEventListener('keydown',event=>{

@@ -34,6 +34,7 @@ export const LOCATIONS = {
   creator: {name: 'Creator quarter', subtitle: 'Make something worth sharing', icon: '▷', color: '#e0a28f'},
   tech: {name: 'Innovation hub', subtitle: 'Start small. Build something lasting.', icon: '⌘', color: '#85b9ca'},
   plaza: {name: 'Palm plaza', subtitle: 'Meet the city. Find your people.', icon: '◈', color: '#c3c48c'},
+  street: {name: 'Your street', subtitle: 'Step out into Palm City', icon: '🚪', color: '#c9d6bf'},
 };
 // Every location is an 11×11 lot in one open neighbourhood; x/z are lot centres in world units.
 export const TOWN = {
@@ -60,13 +61,18 @@ export const SPONSORSHIPS = {
   villa: {name: 'Lagoon villa', sponsor: 'Coastline Estates', fame: 25_000, kind: 'home', icon: '🏝️', color: '#3a8fa8', rest: .8, description: 'Marble, sea light and a statement chandelier. Home recovery 20% faster.'},
   mansion: {name: 'Island mansion', sponsor: 'Isle Royale', fame: 150_000, kind: 'home', icon: '🏰', color: '#b8932f', rest: .7, description: 'Gold trim, a grand piano and room for the whole entourage. Home recovery 30% faster.'},
 };
-// Driving: owners of a sponsored ride drive between lots along the roads. One 16-unit block takes
-// BALANCE.driveMsPerBlock, scaled by the ride's speed factor. Walking (no ride) stays instant.
-export const RIDE_SPEED = {scooter: 1, suv: .8, coupe: .7, hypercar: .5};
+// Travel follows the roads. One 16-unit block takes BALANCE.driveMsPerBlock, scaled by the ride's
+// speed factor; without a ride you walk at RIDE_SPEED.walk. Home and its street are next door.
+// Walking is the slowest way around; the street outside your door shares your home's lot.
+export const RIDE_SPEED = {walk: 1.6, scooter: 1, suv: .8, coupe: .7, hypercar: .5};
+export const LOT = location => location === 'street' ? 'home' : location;
+export const arrivalSpot = location => location === 'street' ? {x: 0, z: 6.2} : {x: 0, z: 1};
 export function route(from, to) {
-  const a = TOWN[from], b = TOWN[to], road = lot => lot.z + 8, points = [{x: a.x, z: a.z}, {x: a.x, z: road(a)}];
+  // Homes are entered and left by the front door on the street; venues are walked into.
+  const a = TOWN[LOT(from)], b = TOWN[LOT(to)], road = lot => lot.z + 8, door = (key, lot) => LOT(key) === 'home' ? {x: lot.x, z: lot.z + 6.2} : {x: lot.x, z: lot.z};
+  const points = [door(from, a), {x: a.x, z: road(a)}];
   if (road(a) !== road(b)) { const side = a.x + (b.x >= a.x ? 8 : -8); points.push({x: side, z: road(a)}, {x: side, z: road(b)}); }
-  points.push({x: b.x, z: road(b)}, {x: b.x, z: b.z});
+  points.push({x: b.x, z: road(b)}, door(to, b));
   return points;
 }
 export const routeLength = points => points.slice(1).reduce((n, p, i) => n + Math.abs(p.x - points[i].x) + Math.abs(p.z - points[i].z), 0);
@@ -98,6 +104,7 @@ export function obstacles(location, furniture=[]) {
   return [...rects,...(location==='home'?furniture.map(f=>[f.x,f.z,.85,.85]):[])];
 }
 export function walkable(location,x,z,furniture=[]){
+  if(location==='street')return Number.isFinite(x)&&Number.isFinite(z)&&Math.abs(x)<=7&&z>=5.7&&z<=7.3;
   return Number.isFinite(x)&&Number.isFinite(z)&&Math.abs(x)<=4.8&&Math.abs(z)<=4.8&&!obstacles(location,furniture).some(([cx,cz,w,d])=>Math.abs(x-cx)<w/2+.16&&Math.abs(z-cz)<d/2+.16);
 }
 export function canPlace(furniture,item,x,z){

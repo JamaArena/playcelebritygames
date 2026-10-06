@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, NPCS, LOCATIONS, SPONSORSHIPS, tripMs, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, CAREERS, ITEMS, NPCS, LOCATIONS, SPONSORSHIPS, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -65,7 +65,7 @@ export function reconcile(s, now) {
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
     item.level=item.upgrade.target; item.upgrade=null; log(s,`${ITEMS[key].name} reached level ${item.level}.`,now);
   }
-  if(s.trip && now>=s.trip.arrives){s.location=s.trip.to;s.position3d={x:0,z:1};s.visiting=null;log(s,`Arrived at ${LOCATIONS[s.trip.to].name}.`,now);s.trip=null;}
+  if(s.trip && now>=s.trip.arrives){s.location=s.trip.to;s.position3d=arrivalSpot(s.trip.to);s.visiting=null;log(s,`Arrived at ${LOCATIONS[s.trip.to].name}.`,now);s.trip=null;}
   if(s.recovery && now>=s.recovery.endsAt) {
     const r=s.recovery;
     s.needs[r.need]=clamp(s.needs[r.need]+B.recovery[r.need][0]);
@@ -215,8 +215,8 @@ export function act(s,input,now,rng=Math.random) {
   switch(input.type) {
     case 'travel':
       requireRule(LOCATIONS[input.location],'Unknown destination.');requireRule(!s.active&&!s.recovery,'Finish your activity before travelling.');
-      if(s.ride&&input.location!==s.location&&!s.visiting){const ms=tripMs(s.location,input.location,s.ride);s.trip={from:s.location,to:input.location,ride:s.ride,departs:now,arrives:now+ms};log(s,`Driving to ${LOCATIONS[input.location].name} · ${Math.ceil(ms/60000)} min.`,now);break;}
-      s.location=input.location;s.position3d={x:0,z:1};break;
+      if(input.location!==s.location&&!s.visiting&&LOT(input.location)!==LOT(s.location)){const ms=tripMs(s.location,input.location,s.ride||'walk');s.trip={from:s.location,to:input.location,ride:s.ride||null,departs:now,arrives:now+ms};log(s,`${s.ride?'Driving':'Walking'} to ${LOCATIONS[input.location].name} · ${Math.ceil(ms/60000)} min.`,now);break;}
+      s.location=input.location;s.position3d=arrivalSpot(input.location);break;
     case 'move':
       requireRule(walkable(s.location,input.x,input.z,s.visiting?[]:s.furniture),'That destination is blocked. Choose open ground.');
       s.position3d={x:input.x,z:input.z};break;

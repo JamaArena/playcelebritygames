@@ -1,7 +1,7 @@
 export const clampZoom=value=>Math.min(3,Math.max(.16,value));
-export function projectPoint(x,y,z,{width,height,scale,angle,pitch}){
+export function projectPoint(x,y,z,{width,height,scale,angle,pitch,lift=1}){
   const c=Math.cos(angle),s=Math.sin(angle);
-  return {x:width/2+(x*c-z*s)*scale,y:height*.59+(x*s+z*c)*scale*pitch-y*scale};
+  return {x:width/2+(x*c-z*s)*scale,y:height*.59+(x*s+z*c)*scale*pitch-y*scale*lift};
 }
 export function groundPoint(x,y,{width,height,scale,angle,pitch}){
   const sx=(x-width/2)/scale,sz=(y-height*.59)/(scale*pitch),c=Math.cos(angle),s=Math.sin(angle);

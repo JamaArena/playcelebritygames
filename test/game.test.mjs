@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createCharacter, act, reconcile, refill, learn, shot, shootingProbability, generalProbability, choices, view, tennisPoint, tennisScore, evaluate } from '../game.mjs';
-import { BALANCE as B, CAREERS, effort } from '../public/content.js';
+import { BALANCE as B, CAREERS, effort, tripMs } from '../public/content.js';
 import { worldObjects } from '../public/world.js';
 import { walkable } from '../public/content.js';
 const T=1_000_000;
 const make=(career='football',origin=0)=>createCharacter({name:'River',career,origin,adult:true},T);
-const go=s=>act(s,{type:'travel',location:CAREERS[s.career].location},T);
+// Trips take real time; tests about other rules arrive immediately.
+const arrive=s=>{if(s.trip){s.location=s.trip.to;s.position3d={x:0,z:1};s.trip=null;}};
+const go=s=>{act(s,{type:'travel',location:CAREERS[s.career].location},T);arrive(s);};
 function complete(s,kind='produce',rng=()=>0){
   const start=T+1;act(s,{type:'start',kind,title:'First light'},start,rng);
   const activity=s.active.id;
@@ -49,8 +51,8 @@ test('spending again does not reset refill clock; no surplus time banks at capac
   act(s,{type:'start',kind:'practice',skill:'passing'},T+201*60_000);assert.equal(s.refillAnchor,T+201*60_000);
 });
 test('zero charges allow travel, purchases and recovery but block career starts without debit',()=>{
-  const s=make();s.charges=0;s.refillAnchor=T;act(s,{type:'travel',location:'plaza'},T);
-  s.fame=50;act(s,{type:'buy',item:'gear'},T);assert.equal(s.inventory.gear.level,1);act(s,{type:'travel',location:'home'},T);
+  const s=make();s.charges=0;s.refillAnchor=T;act(s,{type:'travel',location:'plaza'},T);arrive(s);
+  s.fame=50;act(s,{type:'buy',item:'gear'},T);assert.equal(s.inventory.gear.level,1);act(s,{type:'travel',location:'home'},T);arrive(s);
   act(s,{type:'recover',need:'energy'},T);assert.equal(s.charges,0);reconcile(s,T+300_000);assert.equal(s.needs.energy,100);
   go(s);assert.throws(()=>act(s,{type:'start',kind:'produce'},T+300_000),/No career charges/);assert.equal(s.active,null);
 });
@@ -153,7 +155,7 @@ test('fame is shared across careers, sets tiers, and older saves convert once',(
 test('fame unlocks free sponsorships at Palm Motors, once, without spending fame or money',()=>{
   const s=make('musician');
   assert.throws(()=>act(s,{type:'claim',item:'hypercar'},T),/Palm Motors/);
-  act(s,{type:'travel',location:'plaza'},T);
+  act(s,{type:'travel',location:'plaza'},T);arrive(s);
   assert.throws(()=>act(s,{type:'claim',item:'hypercar'},T),/100,000 fame/);
   s.fame=100_000;act(s,{type:'claim',item:'hypercar'},T);
   assert.equal(s.ride,'hypercar');assert.equal(s.fame,100_000);
@@ -165,11 +167,13 @@ test('fame unlocks free sponsorships at Palm Motors, once, without spending fame
 test('a sponsored ride drives along the roads for a distance-based time; homes speed up recovery',()=>{
   const s=make('football');s.vip={hypercar:{at:T},villa:{at:T}};s.ride='hypercar';s.home='villa';
   act(s,{type:'travel',location:'tech'},T);
-  assert.equal(s.location,'home');assert.equal(s.trip.to,'tech');assert.equal(s.trip.arrives-T,120_000,'home to tech: 4 blocks of road at half time');
+  assert.equal(s.location,'home');assert.equal(s.trip.to,'tech');const scooter=tripMs('home','tech','scooter');assert.ok(scooter>180_000&&scooter<240_000,'home to tech is about 3.6 blocks');assert.equal(s.trip.arrives-T,Math.round(scooter*.5),'the hypercar halves the time');
   assert.throws(()=>act(s,{type:'start',kind:'practice',skill:'passing'},T+1000),/on the road/);
-  act(s,{type:'travel',location:'tech'},T+120_000);assert.equal(s.location,'tech');assert.equal(s.trip,null);
-  s.ride='scooter';act(s,{type:'travel',location:'home'},T+121_000);assert.equal(s.trip.arrives-(T+121_000),240_000,'the scooter takes full time');
-  reconcile(s,T+361_000);assert.equal(s.location,'home');
-  act(s,{type:'recover',need:'energy'},T+362_000);assert.equal(s.recovery.endsAt-s.recovery.startedAt,Math.round(B.recovery.energy[1]*.8));
-  const walker=make('football');act(walker,{type:'travel',location:'tech'},T);assert.equal(walker.location,'tech','walking stays instant');
+  act(s,{type:'travel',location:'tech'},s.trip.arrives);assert.equal(s.location,'tech');assert.equal(s.trip,null);
+  s.ride='scooter';const back=T+200_000;act(s,{type:'travel',location:'home'},back);assert.equal(s.trip.arrives-back,tripMs('tech','home','scooter'));
+  reconcile(s,s.trip.arrives);assert.equal(s.location,'home');
+  act(s,{type:'recover',need:'energy'},T+500_000);assert.equal(s.recovery.endsAt-s.recovery.startedAt,Math.round(B.recovery.energy[1]*.8));
+  const walker=make('football');act(walker,{type:'travel',location:'tech'},T);assert.equal(walker.trip.ride,null);assert.equal(walker.trip.arrives-T,Math.round(scooter*1.6),'walking is slowest');
+  const local=make('football');act(local,{type:'travel',location:'street'},T);assert.equal(local.location,'street','home and its street are next door');assert.deepEqual(local.position3d,{x:0,z:6.2});
+  assert.throws(()=>act(local,{type:'move',x:0,z:2},T),/blocked/);act(local,{type:'move',x:3,z:6.5},T);act(local,{type:'travel',location:'home'},T);assert.equal(local.location,'home');
 });
