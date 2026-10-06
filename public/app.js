@@ -1,4 +1,4 @@
-import { CAREERS, LOCATIONS, ITEMS, NPCS, BALANCE as B, effort, canPlace } from './content.js';
+import { CAREERS, LOCATIONS, ITEMS, NPCS, TOWN, BALANCE as B, effort, canPlace } from './content.js';
 import { World, worldObjects } from './world.js';
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -43,18 +43,31 @@ async function send(input,{keepModal=false,quiet=false}={}){
   finally{busy=false;}
 }
 
-function closeTray(){ $('#objectTray').hidden=true;world.placement=null; }
-function showTray(title,html){$('#objectTray').innerHTML='<header><h3>'+escape(title)+'</h3>'+button('×','closeTray','aria-label="Close object actions"','tray-close')+'</header>'+html;$('#objectTray').hidden=false;}
+function closeTray(){ $('#objectTray').hidden=true;$('#pieMenu').hidden=true;world.placement=null; }
+// Sims-style pie menu: the object's name in the centre, its interactions fanned around it.
+function pie(object,options){
+  $('#objectTray').hidden=true;
+  const card=$('.world-card'),canvas=$('#world'),p=world.screenOf(object),n=options.length;
+  const x=Math.min(card.clientWidth-150,Math.max(150,canvas.offsetLeft+p.x)),y=Math.min(card.clientHeight-60,Math.max(110,canvas.offsetTop+p.y));
+  const angle=i=>(n<=4?-90+(i-(n-1)/2)*58:-90+i*360/n)*Math.PI/180;
+  $('#pieMenu').innerHTML=button(escape(object.name),'closeTray','aria-label="Close '+escape(object.name)+' menu"','pie-center')+options.map(([label,action,attrs=''],i)=>`<button class="pie-option" role="menuitem" style="--x:${Math.round(Math.cos(angle(i))*96)}px;--y:${Math.round(Math.sin(angle(i))*72)}px;--i:${i}" data-action="${action}" ${attrs}>${label}</button>`).join('');
+  Object.assign($('#pieMenu').style,{left:x+'px',top:y+'px'});$('#pieMenu').hidden=false;$('#pieMenu .pie-option')?.focus({preventScroll:true});
+}
+function showTray(title,html){$('#pieMenu').hidden=true;$('#objectTray').innerHTML='<header><h3>'+escape(title)+'</h3>'+button('×','closeTray','aria-label="Close object actions"','tray-close')+'</header>'+html;$('#objectTray').hidden=false;}
 const world=new World($('#world'),position=>{closeTray();send({type:'move',...position},{keepModal:true,quiet:true});},object=>{
   if(object.blocked){toast(object.message||'Choose open ground.');return;}
   if(object.placement){send({type:'place',...object.placement}).then(data=>{if(data){world.placement=null;world.draw();}});return;}
   if(object.decision!==undefined){chooseDecision(object.decision);return;}
-  selectedObject=object;$('#objects').hidden=true;
-  if(object.action==='practice'){practice();return;}
-  if(object.action==='career'){prepare();return;}
-  if(object.action==='shop'){shop();return;}
-  if(object.action==='phone'){showTray(object.name,'<div class="tray-options">'+button('♡ Chat','quickSocial')+button('♧ Contacts','page','data-page="phone"')+button('↗ Go to','goObject')+'</div>');return;}
-  showTray(object.name,'<div class="tray-options">'+button('1 · '+escape(object.verb||'Use'),'useObject','','primary')+button('2 · Go to','goObject')+'</div>'+(object.need?'<small>'+duration(B.recovery[object.need][1])+' · +'+B.recovery[object.need][0]+' '+escape(needs[object.need][0])+'</small>':''));
+  if(object.travel){closeTray();send({type:'travel',location:object.travel});return;}
+  selectedObject=object;$('#objects').hidden=true;const def=CAREERS[state.career],c=state.careers[state.career];
+  if(object.action==='practice'){
+    if(state.location==='home'&&!state.inventory.gear){pie(object,[['↗ Practise at venue','travel',`data-location="${def.location}"`],['◇ Buy equipment','travel','data-location="plaza"']]);return;}
+    pie(object,def.skills.map(skill=>[`✧ ${escape(skill)} <small>Lv ${c.skills[skill].level}</small>`,'startPractice',`data-skill="${escape(skill)}"`]));return;
+  }
+  if(object.action==='career'){const kind=['founder','web3'].includes(state.career)?'build':'produce';pie(object,[[`${def.icon} ${escape(def.output)} <small>ϟ 1</small>`,'quickStart',`data-kind="${kind}"`],['✎ Plan it first','prepareDetails',`data-kind="${kind}"`],['↗ Go here','goObject']]);return;}
+  if(object.action==='shop'){pie(object,[['◇ Browse shop','page','data-page="shop"'],['↗ Go here','goObject']]);return;}
+  if(object.action==='phone'){pie(object,[['♡ Chat','quickSocial'],['♧ Contacts','page','data-page="phone"'],['↗ Go here','goObject']]);return;}
+  pie(object,[[`${object.icon} ${escape(object.verb||'Use')}${object.need?` <small>+${B.recovery[object.need][0]} ${escape(needs[object.need][0])} · ${duration(B.recovery[object.need][1])}</small>`:''}`,'useObject'],['↗ Go here','goObject']]);
 });
 world.onGround=closeTray;
 function whenIdle(perform){if(!busy){perform();return;}const timer=setInterval(()=>{if(!busy){clearInterval(timer);perform();}},50);}
@@ -74,7 +87,9 @@ function render(){
   $('#locationEyebrow').textContent=state.location==='home'?'YOUR NEIGHBOURHOOD':'OUT IN PALM CITY';
   $('#objects').innerHTML=worldObjects(state.location,snapshot.visitedHome?.furniture||state.furniture).map(o=>button(`${o.icon} ${escape(o.name)}`,'object',`data-name="${escape(o.name)}"`,'object-button')).join('')+(state.location==='home'?button('♧ Socialise','recover','data-need="social"','object-button'):'');
   if(state.visiting)$('#objects').innerHTML=button('♡ Socialise','recover','data-need="social"','object-button')+button('↗ Leave visit','leaveVisit','','object-button');
-  $('#needsHud').innerHTML=Object.entries(needs).map(([key,[label,icon]])=>button('<span>'+icon+'</span><i style="--need:'+state.needs[key]+'%;--tone:'+(state.needs[key]<30?'#ce9577':'#7ca58a')+'"></i>','recover','data-need="'+key+'" aria-label="'+label+' '+Math.round(state.needs[key])+' percent" title="'+label+'"','need-mini')).join('');
+  const moodValue=Object.values(state.needs).reduce((a,b)=>a+b,0)/6,moodLabel=moodValue>=75?'Very happy':moodValue>=55?'Content':moodValue>=30?'Uncomfortable':'Miserable';
+  $('#needsHud').innerHTML=`<div class="sim-portrait" style="--skin:${escape(state.color)};--mood:${Math.round(moodValue*1.2)}" title="Mood ${Math.round(moodValue)}%"><i class="plumbob" aria-hidden="true"></i><span>${escape(state.name.slice(0,1).toUpperCase())}</span></div><div class="sim-meta"><strong>${escape(state.name)}</strong><small style="--mood:${Math.round(moodValue*1.2)}">${moodLabel}</small></div><div class="sim-needs">${Object.entries(needs).map(([key,[label]])=>button(`<label>${label}</label><i style="--need:${state.needs[key]}%;--hue:${Math.round(state.needs[key]*1.2)}"></i>`,'recover',`data-need="${key}" aria-label="${label} ${Math.round(state.needs[key])} percent. Recover ${label}." title="${label} · ${Math.round(state.needs[key])}%"`,'need-bar')).join('')}</div>`;
+  clock();
   $('#profileCard').innerHTML=`<div class="profile-cover"></div><div class="avatar" style="background:${state.color}">${escape(state.name.slice(0,1).toUpperCase())}</div><h2>${escape(state.name)}</h2><p class="profile-career">${def.icon} ${def.name} · ${c.origin===1?'Connected origin':'Independent origin'}</p><span class="tier-pill">✦ ${B.tiers[c.tier][0]}</span><div class="profile-numbers"><div><strong>${fmt(c.audience)}</strong><small>${def.audience}</small></div><div><strong>${state.awards.length}</strong><small>awards</small></div><div><strong>${Math.round(c.reputation)}</strong><small>reputation</small></div></div>`;
   const mood=Object.values(state.needs).reduce((a,b)=>a+b,0)/6;
   $('#needsCard').innerHTML=`<div class="section-label"><h3>A little self care</h3><span>${mood>=60?'FEELING GOOD':mood>=30?'TAKE A BREATHER':'TIME TO RECOVER'}</span></div>${Object.entries(needs).map(([key,[label,icon]])=>`<div class="need-row ${state.needs[key]<30?'low':''}"><span class="need-icon">${icon}</span><div><label>${label}<small>${Math.round(state.needs[key])}%</small></label><div class="progress-track"><div class="progress-fill" style="width:${state.needs[key]}%"></div></div></div><button data-action="recover" data-need="${key}" aria-label="Recover ${label}">+</button></div>`).join('')}`;
@@ -83,6 +98,7 @@ function render(){
   renderActivity();
 }
 
+function clock(){const hour=world.daylight().hour,day=Math.max(1,Math.floor((now()-state.seasonStart)/86400000)+1);$('#worldClock').innerHTML=`${hour>=6&&hour<19?'☀':'☾'} <strong>${new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</strong><span>Day ${day}</span>`;}
 function progress(start,end){const value=Math.min(100,Math.max(0,(now()-start)/(end-start)*100));return '<div class="sim-progress"><i style="width:'+value+'%"></i></div>';}
 function renderActivity(){
   const a=state.active,r=state.recovery,def=CAREERS[state.career];let html='';
@@ -106,7 +122,7 @@ function updateCreationCareer(key){
   document.querySelectorAll('.career-option').forEach(b=>b.classList.toggle('selected',b.dataset.career===key));
   $('#careerExtras').innerHTML=key==='football'?'<div class="field"><label for="position">Outfield position</label><select id="position" name="position"><option value="striker">Striker</option><option value="midfielder">Midfielder</option><option value="defender">Defender</option></select></div>':key==='musician'?'<div class="field"><label for="technique">Primary technique</label><select id="technique" name="technique"><option value="vocals">Vocals</option><option value="instrument">Instrument</option></select></div>':key==='adult'?'<label class="check"><input type="checkbox" name="adult" required> My character and all participants are adults. Projects are represented without graphic scenes.</label>':'';
 }
-function map(){showTray('↗ Palm City','<div class="city-tiles">'+Object.entries(LOCATIONS).map(([key,l])=>button('<span>'+l.icon+'</span>'+escape(l.name),'travel','data-location="'+key+'"','city-tile')).join('')+'</div>');}
+function map(){world.flyTo(.36);showTray('↗ Palm City','<div class="city-tiles">'+Object.entries(LOCATIONS).map(([key,l])=>button('<span>'+TOWN[key].pin+'</span>'+escape(l.name),'travel','data-location="'+key+'"','city-tile')).join('')+'</div><small>Tap a pin on the map or a place here to head over.</small>');}
 function practice(){const def=CAREERS[state.career];if(state.location==='home'&&!state.inventory.gear){showTray('✧ Practise','<div class="tray-options">'+button('↗ Go to venue','travel','data-location="'+def.location+'"','primary')+button('◇ Buy home equipment','travel','data-location="plaza"')+'</div>');return;}showTray('✧ Practise','<div class="tray-options skills-options">'+def.skills.map(skill=>button(escape(skill)+' <small>Lv '+state.careers[state.career].skills[skill].level+'</small>','startPractice','data-skill="'+escape(skill)+'"')).join('')+'</div><small>ϟ 1 · 3:00 · +7 XP</small>');}
 function prepare(kind){const def=CAREERS[state.career];kind??=['founder','web3'].includes(state.career)?'build':'produce';if(kind==='launch'||kind==='collab'){prepareDetails(kind);return;}showTray(def.icon+' '+def.output,'<div class="tray-options">'+button('▶ Start · ϟ 1','quickStart','data-kind="'+kind+'"','primary')+button('Options','prepareDetails','data-kind="'+kind+'"')+'</div><small>'+duration(def.family==='sport'?B.sportMs:B.activityMs)+' · '+(def.family==='sport'?6:3)+' choices</small>');}
 function prepareDetails(kind){
@@ -223,4 +239,4 @@ document.addEventListener('submit',async event=>{
 });
 await refresh();
 setInterval(async()=>{await refresh();if(modalPage==='phone'&&phoneTab==='local'&&$('#chatLog'))$('#chatLog').innerHTML=chatMessages();},4000);
-setInterval(()=>{if(state&&!busy){renderActivity();const next=$('#chargeRefill');if(next&&state.refillAnchor!==null)next.textContent=`Next charge in ${duration(state.refillAnchor+B.refillMs-now())}`;}},1000);
+setInterval(()=>{if(state&&!busy){renderActivity();clock();const next=$('#chargeRefill');if(next&&state.refillAnchor!==null)next.textContent=`Next charge in ${duration(state.refillAnchor+B.refillMs-now())}`;}},1000);

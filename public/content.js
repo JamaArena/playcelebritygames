@@ -34,6 +34,12 @@ export const LOCATIONS = {
   tech: {name: 'Innovation hub', subtitle: 'Start small. Build something lasting.', icon: '⌘', color: '#85b9ca'},
   plaza: {name: 'Palm plaza', subtitle: 'Meet the city. Find your people.', icon: '◈', color: '#c3c48c'},
 };
+// Every location is an 11×11 lot in one open neighbourhood; x/z are lot centres in world units.
+export const TOWN = {
+  home: {x: -16, z: 0, pin: '🏠', height: 4.5}, plaza: {x: 0, z: 0, pin: '🛍️', height: 2.6}, studio: {x: 16, z: 0, pin: '🎙️', height: 3.9},
+  sports: {x: -16, z: -16, pin: '🏟️', height: 2.4}, creator: {x: 0, z: -16, pin: '🎬', height: 3.3}, tech: {x: 16, z: -16, pin: '💡', height: 7.6},
+};
+export const lotAt = (x, z) => Object.keys(TOWN).find(key => Math.abs(x - TOWN[key].x) <= 5.5 && Math.abs(z - TOWN[key].z) <= 5.5);
 export const ITEMS = {
   food: {name: 'Fresh groceries', price: 15, description: 'One meal. Restores 40 hunger after eating.'},
   gear: {name: 'Career equipment', price: 150, description: 'Practice at home. Production quality +5 per level above 1.', upgradable: true, slot: 'gear'},
