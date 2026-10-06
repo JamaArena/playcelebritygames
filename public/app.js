@@ -1,4 +1,4 @@
-import { CAREERS, LOCATIONS, ITEMS, FOODS, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace } from './content.js';
+import { CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace } from './content.js';
 import { World, worldObjects } from './world.js';
 import { World3D } from './world3d.js';
 const $=selector=>document.querySelector(selector);
@@ -69,7 +69,7 @@ async function send(input,{keepModal=false,quiet=false}={}){
     const data=await response.json();if(response.status===409&&data.code==='other_device'){playingElsewhere();return;}if(!response.ok)throw new Error(data.error||'Action unavailable.');
     if(!keepModal&&modalPage!=='create')closeModal();
     closeTray();receive(data,true);$('#connection').textContent='Saved to your city';
-    if(keepModal){if(modalPage==='phone')phone(phoneTab);else if(modalPage==='shop')shop();else if(modalPage==='inventory')inventory();else if(modalPage==='career')career();else if(modalPage==='vip')vip();else if(modalPage==='phones')phoneStore();else if(modalPage==='battle')battleView();}
+    if(keepModal){if(modalPage==='phone')phone(phoneTab);else if(modalPage==='shop')shop();else if(modalPage==='inventory')inventory();else if(modalPage==='wardrobe')wardrobe();else if(modalPage==='career')career();else if(modalPage==='vip')vip();else if(modalPage==='phones')phoneStore();else if(modalPage==='battle')battleView();}
     if(!quiet&&input.type==='report')toast('Report recorded for the city operator.');
     return data;
   }catch(error){toast(error.message||'Could not connect. Your last saved progress is safe.');}
@@ -104,7 +104,8 @@ const onWorldObject=object=>{
     pie(object,def.skills.map(skill=>[`✧ ${escape(skill)} <small>Lv ${c.skills[skill].level}</small>`,'startPractice',`data-skill="${escape(skill)}"`]));return;
   }
   if(object.action==='career'){const kind=['founder','web3'].includes(state.career)?'build':'produce';pie(object,[[`${def.icon} ${escape(def.output)} <small>ϟ 1</small>`,'quickStart',`data-kind="${kind}"`],['✎ Plan it first','prepareDetails',`data-kind="${kind}"`],['↗ Go here','goObject']]);return;}
-  if(object.action==='shop'){pie(object,[['◇ Browse shop','page','data-page="shop"'],['↗ Go here','goObject']]);return;}
+  if(object.action==='shop'){pie(object,[['◇ Browse shop','page','data-page="shop"'],['👗 Palm Boutique','page','data-page="wardrobe"'],['↗ Go here','goObject']]);return;}
+  if(object.action==='wardrobe'){pie(object,[['👗 Change outfit','page','data-page="wardrobe"'],['↗ Go here','goObject']]);return;}
   if(object.action==='exit'){pie(object,[['🚪 Go outside','travel','data-location="street"']]);return;}
   if(object.action==='enter'){pie(object,[['🏠 Go inside','travel','data-location="home"']]);return;}
   if(object.action==='leave'){pie(object,[['🗺️ Open the map','app','data-app="map"'],['🏠 Go home','travel','data-location="home"']]);return;}
@@ -260,8 +261,20 @@ function outputs(list){return list.slice(0,30).map(o=>`<div class="output"><div>
 
 async function recover(need){if(need==='social'){showTray('♡ Socialise','<div class="tray-options">'+button('♡ Chat','quickSocial')+button('♧ Contacts','page','data-page="phone"')+'</div>');return;}if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast(`${data.state.trip.ride?'Driving':'Walking'} home. Recover when you arrive.`);return;}}const object=worldObjects('home',state.furniture).find(o=>o.need===need);if(object)world.onObject(object);}
 function shop(){const fame=state.fame||0;showModal('shop',`<span class="eyebrow">PALM CITY MARKET</span><h2>Make yourself at home.</h2><p class="modal-intro">No coins in Palm City: items unlock with fame and are free to claim. You have ✦ ${fmt(fame)} fame. Claim them at Palm plaza.</p><div class="item-grid">${Object.entries(ITEMS).map(([key,item])=>`<div class="item-card"><h3>${item.name}</h3><p>${item.description}</p><div class="shop-price">✦ ${fmt(item.fame)} fame</div>${state.inventory[key]?button('Owned ✓','noop','disabled'):fame>=item.fame?button('Claim free','buy',`data-item="${key}"`,'primary'):button(`🔒 ${fmt(item.fame-fame)} fame to go`,'noop','disabled')}</div>`).join('')}</div>`);}
+// The wardrobe: tabs per slot, every piece with its perk; wear what you own, claim new pieces at Palm plaza.
+let wardrobeSlot='top';
+function wardrobe(){
+  const fame=state.fame||0,wear=state.wear||{},closet=state.closet||{},perks=wearPerks(wear),atPlaza=state.location==='plaza';
+  const tabs=Object.entries(WEAR_SLOTS).map(([key,name])=>`<button class="chip ${key===wardrobeSlot?'on':''}" data-action="wardrobeSlot" data-slot="${key}" aria-pressed="${key===wardrobeSlot}">${escape(name)}${wear[key]?' ✓':''}</button>`).join('');
+  const active=Object.entries(perks).map(([key,v])=>`<li>✦ ${escape(PERKS[key].label(v))}</li>`).join('')||'<li>No perks yet. Claim clothes at Palm Boutique and wear them.</li>';
+  const cards=Object.entries(WEAR).filter(([,w])=>w.slot===wardrobeSlot).map(([key,w])=>{
+    const owned=w.fame===0||closet[key],worn=wear[w.slot]===key;
+    const action=worn?button('Take off','takeOff',`data-slot="${w.slot}"`):owned?button('Wear','wear',`data-item="${key}"`,'primary'):fame<w.fame?button(`🔒 ${fmt(w.fame-fame)} fame to go`,'noop','disabled'):atPlaza?button('Claim free','claimWear',`data-item="${key}"`,'primary'):button('Claim at Palm plaza','travel','data-location="plaza"');
+    return `<div class="item-card wear-card ${worn?'worn':''}"><span class="wear-swatch" style="--c:${w.color}"></span><h3>${escape(w.name)}</h3><p>${escape(w.note)}</p>${w.perk?`<div class="perk">✦ ${escape(PERKS[w.perk[0]].label(w.perk[1]))}</div>`:'<div class="perk none">No perk</div>'}<div class="shop-price">${w.fame?`✦ ${fmt(w.fame)} fame`:'Free basic'}${owned&&w.fame?' · Owned':''}</div>${action}</div>`;}).join('');
+  showModal('wardrobe',`<span class="eyebrow">WARDROBE</span><h2>Dress for the moment.</h2><p class="modal-intro">What you wear shows on your character, and perks add up across your outfit. New pieces are free with fame at Palm Boutique in Palm plaza.</p><div class="perk-summary"><strong>Active perks</strong><ul>${active}</ul></div><div class="chip-row wear-tabs">${tabs}</div><div class="item-grid">${cards}</div>`);
+}
 function inventory(){
-  showModal('inventory',`<span class="eyebrow">YOUR POSSESSIONS</span><h2>A place to call yours.</h2><p class="modal-intro">Furnish your apartment, equip a new look, and improve your tools.</p><div class="actions">${button('Visit market','travel','data-location="plaza"')}${button('Go home','travel','data-location="home"')}</div><div class="item-grid">${Object.entries(state.inventory).map(([key,item])=>{
+  showModal('inventory',`<span class="eyebrow">YOUR POSSESSIONS</span><h2>A place to call yours.</h2><p class="modal-intro">Furnish your apartment, equip a new look, and improve your tools.</p><div class="actions">${button('👗 Wardrobe','page','data-page="wardrobe"','primary')}${button('Visit market','travel','data-location="plaza"')}${button('Go home','travel','data-location="home"')}</div><div class="item-grid">${Object.entries(state.inventory).map(([key,item])=>{
     const def=ITEMS[key];return `<div class="item-card"><h3>${def?.name||key[0].toUpperCase()+key.slice(1)}</h3><p>${`Level ${item.level}${item.upgrade?` · upgrading to ${item.upgrade.target} in ${duration(item.upgrade.endsAt-now())}`:''}`}</p>${def?.slot?button(state.equipped[def.slot]===key?'Equipped':'Equip','equip',`data-item="${key}"`):''}${def?.upgradable&&!item.upgrade&&item.level<10?button('Preview upgrade','previewUpgrade',`data-item="${key}"`):''}${def?.furniture?button('Place in home','placePreview',`data-item="${key}"`):''}</div>`;
   }).join('')}</div>`);
 }
@@ -338,7 +351,7 @@ function phoneWidget(){const model=PHONES[state.phone]||PHONES.basic,count=alert
   return `<button class="phone-widget skin-${PHONES[state.phone]?state.phone:'basic'}" data-action="openPhone" style="--phone:${model.color}" aria-label="Open your phone${count?`, ${count} alerts`:''}"><span class="phone-mini">📱${count?`<i>${count}</i>`:''}</span><span class="phone-line"><strong>✦ ${fmt(state.fame||0)}</strong><small>fame · ${B.tiers[state.careers[state.career].tier][0]}</small></span><span class="phone-line"><strong>ϟ ${state.charges}/10</strong><small id="chargeRefill">${state.refillAnchor===null?'charged':`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></span></button>`;}
 // The last app depends on who you are: Log out for accounts, Account for guests.
 const accountApp=()=>['logout','🚪','Log out'];
-const APPS=[['map','🗺️','Map'],['career','✦','Career'],['phone','💬','Social'],['battles','⚔','Battles'],['inventory','🏠','My stuff'],['shop','🛍️','Market'],['vip','🏁','Palm Motors'],['profile','♙','Profile'],['life','♡','My life'],['nearby','◇','Nearby'],['tips','💡','Tips'],['upgrade','📲','Upgrade']];
+const APPS=[['map','🗺️','Map'],['career','✦','Career'],['phone','💬','Social'],['battles','⚔','Battles'],['inventory','🏠','My stuff'],['wardrobe','👗','Wardrobe'],['shop','🛍️','Market'],['vip','🏁','Palm Motors'],['profile','♙','Profile'],['life','♡','My life'],['nearby','◇','Nearby'],['tips','💡','Tips'],['upgrade','📲','Upgrade']];
 // Each phone tier has its own look and feel; cheaper phones lag and sometimes hang (only ever a delay).
 function phoneModel(){const key=PHONES[state.phone]?state.phone:'basic';return {key,...PHONES[key]};}
 function phoneHome(){
@@ -349,7 +362,7 @@ function phoneHome(){
   showModal('phoneHome',`<div class="phone-device skin-${model.key}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen"><div class="phone-status"><span>${model.key==='basic'?time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false}):clockText}</span><span>${model.network} ${'▂▄▆█'.slice(0,model.key==='basic'?2:model.key==='smart'?3:4)}</span><span>${model.battery}% ${model.battery<30?'🪫':'🔋'}</span></div>${['pro','gold'].includes(model.key)?'':`<div class="phone-hello"><strong>${escape(state.name)}</strong><small>✦ ${fmt(state.fame||0)} fame · ${escape(LOCATIONS[state.location].name)}</small></div>`}${widgets}<div class="app-grid">${apps.map(icon).join('')}</div>${['pro','gold'].includes(model.key)?`<div class="phone-dock">${APPS.filter(([k])=>dock.includes(k)).map(icon).join('')}</div>`:''}<div class="phone-overlay" id="phoneOverlay" hidden></div></div></div>`);
 }
 const APP_NAMES=Object.fromEntries(APPS.map(([key,,label])=>[key,label]));
-function launch(key){if(key==='logout'){confirmLogout();return;}({map,phone:()=>phone('local'),battles:()=>phone('battles'),career,inventory,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,upgrade:phoneStore}[key]||phoneHome)();}
+function launch(key){if(key==='logout'){confirmLogout();return;}({map,phone:()=>phone('local'),battles:()=>phone('battles'),career,inventory,wardrobe,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,upgrade:phoneStore}[key]||phoneHome)();}
 // Budget phones make you wait, and now and then the app hangs. You can always wait or close it.
 function openApp(key){
   const model=phoneModel(),overlay=$('#phoneOverlay'),delay=model.lag[0]+Math.random()*(model.lag[1]-model.lag[0]);
@@ -364,7 +377,7 @@ function lifePanel(){showModal('life',`<span class="eyebrow">YOUR DAILY LIFE</sp
 function nearby(){closeModal();$('#objects').hidden=false;$('#objects').scrollIntoView({block:'nearest'});toast('Tap anything nearby to use it.');}
 function tipsApp(){showModal('tips',`<span class="eyebrow">💡 TIPS</span><h2>How Palm City works</h2><div class="tips-list">${Object.values(TIPS).map(([title,body])=>`<div class="tip-item"><strong>${title}</strong><p>${body}</p></div>`).join('')}</div>`);}
 function phoneStore(){const fame=state.fame||0;showModal('phones',`<span class="eyebrow">📲 PHONE UPGRADES</span><h2>A better phone, on the house.</h2><p class="modal-intro">Phones unlock with fame and are free. You have ✦ ${fmt(fame)} fame.</p><div class="item-grid">${Object.entries(PHONES).map(([key,m])=>`<div class="item-card"><div class="vip-icon" style="--tone:${m.color}">📱</div><h3>${escape(m.name)}</h3><p>${escape(m.perk)}</p>${(state.phone||'basic')===key?button('In your pocket ✓','noop','disabled'):fame>=m.fame?button('Switch to this','phoneUpgrade',`data-item="${key}"`,'primary'):button(`🔒 ${fmt(m.fame)} fame`,'noop','disabled')}</div>`).join('')}</div>`);}
-function openPage(page){tip(page);({city:map,career,phone,inventory,profile,shop,vip,tips:tipsApp}[page]||map)();}
+function openPage(page){tip(page);({city:map,career,phone,inventory,wardrobe,profile,shop,vip,tips:tipsApp}[page]||map)();}
 $('#mapButton').addEventListener('click',map);$('#cameraButton').addEventListener('click',()=>toast(`📷 ${world.rotate()}`));$('#closeModal').addEventListener('click',closeModal);
 $('#zoomIn').addEventListener('click',()=>world.setZoom(world.zoom*1.2));$('#zoomOut').addEventListener('click',()=>world.setZoom(world.zoom/1.2));$('#resetCamera').addEventListener('click',()=>world.resetCamera());
 $('.modal-backdrop').addEventListener('click',closeModal);$('#motionButton').addEventListener('click',()=>{motion=!motion;world.reduced=!motion;$('#motionButton').textContent=motion?'Motion on':'Motion reduced';});
@@ -390,6 +403,9 @@ document.addEventListener('click',async event=>{
     case 'creationNext':if(!$('#name').reportValidity())break;$('#stepLook').hidden=true;$('#stepCareer').hidden=false;$('#stepTwoLabel').classList.add('on');break;
     case 'creationBack':$('#stepLook').hidden=false;$('#stepCareer').hidden=true;$('#stepTwoLabel').classList.remove('on');break;
     case 'closeTip':closeTip();break;
+    case 'wardrobeSlot':wardrobeSlot=d.slot;wardrobe();break;
+    case 'claimWear':case 'wear':await send({type:d.action,item:d.item},{keepModal:true});break;
+    case 'takeOff':await send({type:'takeOff',slot:d.slot},{keepModal:true});break;
     case 'closeMishap':modalPage=null;$('#modal').hidden=true;if(state?.mishap)world.playMishap(state.mishap);break;
     case 'closeReel':lookWorld?.stop();lookWorld=null;modalPage=null;$('#modal').hidden=true;toast('Welcome to Palm City. Your next chapter starts at home.');break;
     case 'playHere':elsewhere=false;modalPage=null;$('#modal').hidden=true;await refresh(true);scheduleHeartbeat();break;

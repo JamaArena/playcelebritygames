@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, FOODS, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, CAREERS, ITEMS, FOODS, WEAR, wearPerks, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -61,7 +61,8 @@ export function reconcile(s, now) {
   refill(s,now);
   // Heartbeats arrive every 20 seconds; gaps up to 30 seconds count as active. Offline needs never decay.
   const dt=Math.max(0,now-s.lastSeen);
-  if(dt<=30_000)for(const [need,rate] of Object.entries(B.decay))s.needs[need]=clamp(s.needs[need]-rate*dt/3600_000);
+  const perks=wearPerks(s.wear);
+  if(dt<=30_000)for(const [need,rate] of Object.entries(B.decay))s.needs[need]=clamp(s.needs[need]-rate*(1-(perks[need]||0)/100)*dt/3600_000);
   mishaps(s,now);
   s.lastSeen=now;
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
@@ -72,7 +73,7 @@ export function reconcile(s, now) {
   if(s.recovery && now>=s.recovery.endsAt)finishRecovery(s,s.recovery.endsAt);
   if(s.active?.kind==='practice' && now>=s.active.readyAt) {
     const a=s.active,c=s.careers[a.career];
-    learn(s,a.career,a.skill,7,a.id); s.needs.energy=clamp(s.needs.energy-5); c.practices++;c.exposure=0;
+    learn(s,a.career,a.skill,7,a.id); s.needs.energy=clamp(s.needs.energy-5*(1-(perks.energy||0)/100)); c.practices++;c.exposure=0;
     s.results.unshift({id:a.id,title:`${a.skill} practice`,quality:null,learning:7,at:now});
     s.active=null;evaluate(s,a.career);log(s,`Practice complete: +7 ${a.skill} learning points.`,now);
   }
@@ -84,7 +85,7 @@ export function mishaps(s,now){
   s.mishapAt??={};if(now-(s.mishap?.at||0)<MISHAP.gapMs)return;
   for(const [need,m] of Object.entries(MISHAPS)){
     if(s.needs[need]>MISHAP.at||s.recovery?.need===need||now-(s.mishapAt[need]||0)<MISHAP.cooldownMs)continue;
-    const lost=Math.min(s.fame||0,Math.max(MISHAP.minFame,Math.round((s.fame||0)*m.fame)));
+    const lost=Math.min(s.fame||0,Math.round(Math.max(MISHAP.minFame,(s.fame||0)*m.fame)*(1-(wearPerks(s.wear).scandal||0)/100)));
     addFame(s,-lost);s.mishapAt[need]=now;for(const [k,v] of Object.entries(m.set))s.needs[k]=v;
     s.mishap={id:id(),need,at:now,lost};log(s,`${m.icon} ${m.title}. ${m.text} −${lost.toLocaleString('en-US')} fame.`,now);return;
   }
@@ -169,7 +170,7 @@ export function view(s,now) {
   if(a&&a.kind!=='practice') {a.scene=beat(s,a);if(a.tennis)a.scoreLabel=tennisScore(a.tennis);a.choices=choices(s).map(choice=>{
     const scene=a.scene, skill=choice.action==='signature'?(s.careers[a.career].skills[choice.skill].level+s.careers[a.career].skills.stamina.level)/2:s.careers[a.career].skills[choice.skill].level,fatigue=(100-s.needs.energy)/100;
     const difficulty=clamp(scene.difficulty+({safe:-2,balanced:0,risky:2}[choice.risk]),1,10);
-    return {...choice,probability:choice.action==='shoot'?(1-.15*scene.pressure)*shootingProbability(skill,scene.distance,scene.pressure,fatigue,scene.angle)*(1-clamp(.2+.04*scene.goalkeeper,.1,.7)):generalProbability(skill,difficulty,scene.pressure,fatigue),difficulty,level:skill};
+    return {...choice,probability:choice.action==='shoot'?(1-.15*scene.pressure)*shootingProbability(skill,scene.distance,scene.pressure,fatigue,scene.angle)*(1-clamp(.2+.04*scene.goalkeeper,.1,.7)):clamp(generalProbability(skill,difficulty,scene.pressure,fatigue)+(wearPerks(s.wear).success||0)/100,.1,.95),difficulty,level:skill};
   });}
   result.opportunities=opportunities(s); result.serverNow=now;return result;
 }
@@ -217,7 +218,7 @@ function settle(s,a,now) {
   const contract=c.affiliation;
   if(qualifies&&contract)gain=Math.floor(gain*(1+(contract.boost??B.contractBoost)));
   gain=Math.floor(gain*a.audienceShare);
-  const fame=fameFor(gain);c.audience+=gain;addFame(s,fame);c.completed++;
+  const fame=Math.round(fameFor(gain)*(1+(wearPerks(s.wear).fame||0)/100));c.audience+=gain;addFame(s,fame);c.completed++;
   if(qualifies)c.engagement=clamp(c.engagement+(quality-50)/10);
   if(contract&&qualifies)c.reputation=clamp(c.reputation+(quality>=60?2:-2));
   if(a.kind==='trial') {
@@ -255,11 +256,11 @@ export function act(s,input,now,rng=Math.random) {
       let skill=c.skills[choice.skill].level;
       if(choice.action==='signature')skill=(skill+c.skills.stamina.level)/2;
       const difficulty=clamp(scene.difficulty+({safe:-2,balanced:0,risky:2}[choice.risk]),1,10);
-      const p=generalProbability(skill,difficulty,scene.pressure,fatigue),draw=rng();
+      const p=clamp(generalProbability(skill,difficulty,scene.pressure,fatigue)+(wearPerks(s.wear).success||0)/100,.1,.95),draw=rng();
       const outcome=choice.action==='shoot'?shot(skill,scene,fatigue,rng):{success:draw<p,probability:p,draws:[draw],result:draw<p?'Successful':'Missed opportunity'};
       const score=outcome.success?{safe:60,balanced:80,risky:100}[choice.risk]:20;
       a.outcomes.push({...outcome,score,choice:choice.label,action:choice.action,target:choice.target,scene,skill:choice.skill,at:now});
-      learn(s,a.career,choice.skill,5,`${a.id}:${a.beat}`);s.needs.energy=clamp(s.needs.energy-2);
+      learn(s,a.career,choice.skill,5,`${a.id}:${a.beat}`);s.needs.energy=clamp(s.needs.energy-2*(1-(wearPerks(s.wear).energy||0)/100));
       if(sport(a.career)) {
         if(a.career==='football'&&choice.action==='shoot'&&outcome.success)a.playerScore++;
         if(a.career==='football'){
@@ -304,8 +305,21 @@ export function act(s,input,now,rng=Math.random) {
       const food=input.need==='hunger'&&input.food!=null?FOODS[input.food]:null;
       if(input.food!=null){requireRule(food,'That dish is not on the menu.');requireRule(s.location==='home','Cook at home.');requireRule((s.fame||0)>=(food.fame||0),`${food.name} unlocks at ${(food.fame||0).toLocaleString('en-US')} fame.`);}
       if(food){s.recovery={id:id(),need:'hunger',label:`Eating ${food.name.toLowerCase()}`,startedAt:now,endsAt:now+Math.round(food.ms*rest),amount:food.hunger,extra:food.extra||{},food:input.food};break;}
-      s.recovery={id:id(),need:input.need,label:watching?WATCH[family].label:labels[input.need],startedAt:now,endsAt:now+Math.round((watching?WATCH_SESSION:B.recovery[input.need][1])*rest),watch};break;
+      const sleep=input.need==='energy'?1-(wearPerks(s.wear).sleep||0)/100:1;
+      s.recovery={id:id(),need:input.need,label:watching?WATCH[family].label:labels[input.need],startedAt:now,endsAt:now+Math.round((watching?WATCH_SESSION:B.recovery[input.need][1])*rest*sleep),watch};break;
     }
+    // Wardrobe: claim clothes free at Palm Boutique (Palm plaza), then wear or take them off anywhere.
+    case 'claimWear': {
+      const item=WEAR[input.item];requireRule(item,'Unknown item.');requireRule(s.location==='plaza','Visit Palm Boutique at Palm plaza to claim clothes.');
+      s.closet??={};requireRule(!s.closet[input.item]&&item.fame>0,'You already have this.');
+      requireRule((s.fame||0)>=item.fame,`${item.name} unlocks at ${item.fame.toLocaleString('en-US')} fame.`);
+      s.closet[input.item]=true;log(s,`Claimed ${item.name} from Palm Boutique.`,now);break;
+    }
+    case 'wear': {
+      const item=WEAR[input.item];requireRule(item,'Unknown item.');requireRule(item.fame===0||s.closet?.[input.item],'Claim it at Palm Boutique first.');
+      s.wear??={};s.wear[item.slot]=input.item;break;
+    }
+    case 'takeOff': {requireRule(s.wear?.[input.slot],'Nothing to take off there.');delete s.wear[input.slot];break;}
     case 'useItem': {
       // Use a placed home item: it fills a need over time like the built-in objects.
       const def=ITEMS[input.item],use=def?.use;requireRule(use,'That item has no use.');
@@ -342,8 +356,8 @@ export function act(s,input,now,rng=Math.random) {
     case 'talk': {
       const npc=NPCS.find(n=>n.id===input.npc);requireRule(npc&&npc.location===s.location,'That person isn’t here.');
       s.talks??={};requireRule(!s.talks[npc.id]||now-s.talks[npc.id]>=NPC_TALK.cooldownMs,`${npc.name} needs a moment. Try again shortly.`);
-      s.talks[npc.id]=now;s.needs.social=clamp(s.needs.social+NPC_TALK.social);const line=NPC_TALK.lines[Math.floor(Math.random()*NPC_TALK.lines.length)];
-      s.lastTalk={npc:npc.id,line,at:now};log(s,`${npc.name}: “${line}” (+${NPC_TALK.social} social)`,now);break;
+      const gain=NPC_TALK.social+(wearPerks(s.wear).chat||0);s.talks[npc.id]=now;s.needs.social=clamp(s.needs.social+gain);const line=NPC_TALK.lines[Math.floor(Math.random()*NPC_TALK.lines.length)];
+      s.lastTalk={npc:npc.id,line,at:now};log(s,`${npc.name}: “${line}” (+${gain} social)`,now);break;
     }
     case 'phoneUpgrade': {
       const model=PHONES[input.item];requireRule(model,'Unknown phone.');requireRule((s.fame||0)>=model.fame,`The ${model.name} unlocks at ${model.fame.toLocaleString('en-US')} fame.`);

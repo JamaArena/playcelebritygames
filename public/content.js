@@ -51,6 +51,7 @@ export const ITEMS = {
   trophyShelf: {name: 'Award shelf', fame: 1000, description: 'A place for the milestones you earn.', furniture: true},
   // Home items: place them at home, then tap them to use. `use` says what they do while you use them;
   // `extra` changes other needs, `onItem` puts you on the item itself (a seat or a treadmill).
+  wardrobe: {name: 'Wardrobe', fame: 20, description: 'Change outfits at home. Tap it to open your wardrobe.', furniture: true},
   ankaraRug: {name: 'Ankara print rug', fame: 50, description: 'A bright patterned rug for the living room.', furniture: true},
   floorLamp: {name: 'Floor lamp', fame: 30, description: 'A tall lamp for warm evenings.', furniture: true},
   plants: {name: 'Indoor plant pack', fame: 40, description: 'Monstera and snake plants to water.', furniture: true, use: {verb: 'Water plants', icon: '❀', need: 'fun', amount: 5, ms: 10_000, pose: 'water'}},
@@ -67,6 +68,74 @@ export const ITEMS = {
   treadmill: {name: 'Treadmill', fame: 800, description: 'Run at home: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Run', icon: '🏃', need: 'fun', amount: 20, ms: 40_000, pose: 'sport', onItem: true, extra: {energy: -10, hygiene: -15}}},
   weights: {name: 'Weight bench', fame: 1000, description: 'Lift weights: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Lift weights', icon: '🏋️', need: 'fun', amount: 20, ms: 40_000, pose: 'sport', extra: {energy: -10, hygiene: -15}}},
 };
+// The wardrobe: clothes and accessories by slot. Each unlocks with fame (claimed free at Palm Boutique,
+// Palm plaza) and most carry one perk. Wearing changes how you look; perks change the rules a little.
+export const WEAR_SLOTS = {top: 'Tops', bottom: 'Bottoms', shoes: 'Shoes', head: 'Headwear', face: 'Eyewear', neck: 'Necklaces', ears: 'Earrings', wrist: 'Wrist', bag: 'Bags'};
+// Perks add up across everything you wear, up to the cap.
+export const PERKS = {
+  battle: {cap: 20, label: v => `+${v}% hit chance in battles`},
+  success: {cap: 15, label: v => `+${v}% success in career moments`},
+  energy: {cap: 30, label: v => `${v}% less energy used`},
+  hunger: {cap: 40, label: v => `Hunger drains ${v}% slower`},
+  hygiene: {cap: 40, label: v => `Hygiene drains ${v}% slower`},
+  fun: {cap: 40, label: v => `Fun drains ${v}% slower`},
+  social: {cap: 40, label: v => `Social drains ${v}% slower`},
+  fame: {cap: 25, label: v => `+${v}% fame from your work`},
+  sleep: {cap: 40, label: v => `Sleep ${v}% faster`},
+  chat: {cap: 10, label: v => `+${v} social from every chat`},
+  scandal: {cap: 50, label: v => `${v}% less fame lost in mishaps`},
+};
+export const WEAR = {
+  // Tops. `fit` is the cut: tee, tank, kit, jacket, hoodie, pyjama, suit, robe (agbada) or gown.
+  plainTee: {name: 'Plain tee', slot: 'top', fame: 0, fit: 'tee', color: '#8ea9a4', note: 'A clean everyday basic.'},
+  statementShirt: {name: 'Statement shirt', slot: 'top', fame: 100, fit: 'tee', color: '#e05a47', perk: ['battle', 5], note: 'Loud colours, louder confidence.'},
+  ankaraShirt: {name: 'Ankara shirt', slot: 'top', fame: 50, fit: 'tee', color: '#e8a23a', perk: ['social', 10], note: 'Bright prints start conversations.'},
+  tracksuitTop: {name: 'Tracksuit top', slot: 'top', fame: 80, fit: 'jacket', color: '#2f6fb3', perk: ['energy', 5], note: 'Light and easy to move in.'},
+  teamJersey: {name: 'Team jersey', slot: 'top', fame: 120, fit: 'kit', color: '#c8102e', perk: ['success', 3], note: 'Play for the badge.'},
+  hoodie: {name: 'Streetwear hoodie', slot: 'top', fame: 150, fit: 'hoodie', color: '#3b4252', perk: ['fun', 10], note: 'Cosy, and never boring.'},
+  rainJacket: {name: 'Rain jacket', slot: 'top', fame: 60, fit: 'jacket', color: '#f2c230', perk: ['hygiene', 10], note: 'Stay dry, stay fresh.'},
+  pyjamaTop: {name: 'Pyjama top', slot: 'top', fame: 40, fit: 'pyjama', color: '#9fb7d9', perk: ['sleep', 15], note: 'Sleep like you mean it.'},
+  swimVest: {name: 'Swim vest', slot: 'top', fame: 200, fit: 'tank', color: '#2bb3c0', perk: ['energy', 3], note: 'Beach-ready and breezy.'},
+  businessSuit: {name: 'Business suit', slot: 'top', fame: 600, fit: 'suit', color: '#2b2f3a', accent: '#7a2433', perk: ['success', 5], note: 'Dressed for the deal.'},
+  agbada: {name: 'Agbada', slot: 'top', fame: 1500, fit: 'robe', color: '#f0e6d2', accent: '#c9a227', perk: ['fame', 5], note: 'Flowing robes for big occasions.'},
+  stageOutfit: {name: 'Sparkly stage outfit', slot: 'top', fame: 2500, fit: 'jacket', color: '#7b4fa3', perk: ['success', 8], note: 'Made to catch the spotlight.'},
+  eveningGown: {name: 'Evening gown', slot: 'top', fame: 3000, fit: 'gown', color: '#9b1b30', perk: ['scandal', 25], note: 'So elegant, the blogs forgive you.'},
+  redCarpetTux: {name: 'Red-carpet tux', slot: 'top', fame: 5000, fit: 'suit', color: '#111111', accent: '#d4af37', perk: ['fame', 10], note: 'Every camera finds you.'},
+  // Bottoms: trousers, shorts or a skirt.
+  jeans: {name: 'Classic jeans', slot: 'bottom', fame: 0, cut: 'trousers', color: '#34435e', note: 'They go with everything.'},
+  comfyJoggers: {name: 'Comfy joggers', slot: 'bottom', fame: 60, cut: 'trousers', color: '#555b66', perk: ['energy', 10], note: 'Easier on you: less energy used.'},
+  cargoShorts: {name: 'Cargo shorts', slot: 'bottom', fame: 80, cut: 'shorts', color: '#b49a6c', perk: ['hunger', 10], note: 'Pockets full of snacks.'},
+  sportShorts: {name: 'Sport shorts', slot: 'bottom', fame: 100, cut: 'shorts', color: '#f2f2ee', perk: ['battle', 3], note: 'Quick on your feet.'},
+  ankaraSkirt: {name: 'Ankara skirt', slot: 'bottom', fame: 150, cut: 'skirt', color: '#d9573f', perk: ['social', 10], note: 'Everyone asks where you got it.'},
+  swimShorts: {name: 'Swim shorts', slot: 'bottom', fame: 150, cut: 'shorts', color: '#2bb3c0', perk: ['hygiene', 5], note: 'Always ready for a dip.'},
+  tailoredTrousers: {name: 'Tailored trousers', slot: 'bottom', fame: 300, cut: 'trousers', color: '#23262e', perk: ['success', 3], note: 'Sharp lines, sharp mind.'},
+  pyjamaBottoms: {name: 'Pyjama bottoms', slot: 'bottom', fame: 40, cut: 'trousers', color: '#9fb7d9', perk: ['sleep', 10], note: 'Pairs with the pyjama top.'},
+  // Shoes.
+  sneakers: {name: 'White sneakers', slot: 'shoes', fame: 0, color: '#f4f1ea', note: 'Fresh out the box.'},
+  slides: {name: 'Pool slides', slot: 'shoes', fame: 30, color: '#2b2d42', perk: ['fun', 3], note: 'Maximum chill.'},
+  runningShoes: {name: 'Running shoes', slot: 'shoes', fame: 120, color: '#e05a47', perk: ['energy', 5], note: 'Spring in every step.'},
+  loafers: {name: 'Leather loafers', slot: 'shoes', fame: 400, color: '#4a2e1f', perk: ['success', 2], note: 'Polished and professional.'},
+  goldSneakers: {name: 'Gold sneakers', slot: 'shoes', fame: 4000, color: '#d4af37', perk: ['fame', 5], note: 'Impossible to miss.'},
+  // Accessories.
+  cap: {name: 'Baseball cap', slot: 'head', fame: 50, color: '#2f6fb3', perk: ['scandal', 10], note: 'A low-key disguise.'},
+  headphones: {name: 'Headphones', slot: 'head', fame: 200, color: '#2b2b2b', perk: ['fun', 15], note: 'Your own soundtrack, all day.'},
+  fila: {name: 'Fila cap', slot: 'head', fame: 600, color: '#7a2433', perk: ['chat', 3], note: 'Traditional style that elders respect.'},
+  gele: {name: 'Gele headwrap', slot: 'head', fame: 800, color: '#c9a227', perk: ['fame', 3], note: 'A crown of fabric for owambe.'},
+  glasses: {name: 'Prescription glasses', slot: 'face', fame: 100, color: '#2b2b2b', perk: ['success', 2], note: 'See every detail.'},
+  sunglasses: {name: 'Sunglasses', slot: 'face', fame: 150, color: '#14161a', perk: ['scandal', 20], note: 'Fans recognise you less.'},
+  beads: {name: 'Coral beads', slot: 'neck', fame: 700, color: '#d2493b', perk: ['chat', 3], note: 'Royal and warm.'},
+  chain: {name: 'Gold chain', slot: 'neck', fame: 1000, color: '#d4af37', perk: ['fame', 3], note: 'Flashy, and the fans love it.'},
+  studs: {name: 'Gold studs', slot: 'ears', fame: 300, color: '#d4af37', perk: ['fame', 2], note: 'A small sparkle.'},
+  watch: {name: 'Luxury watch', slot: 'wrist', fame: 2000, color: '#c9a227', perk: ['success', 3], note: 'Never late for your moment.'},
+  handbag: {name: 'Designer handbag', slot: 'bag', fame: 1200, color: '#6b2737', perk: ['hunger', 10], note: 'Room for snacks and lip gloss.'},
+};
+// Total perks from what someone is wearing, each capped.
+export function wearPerks(wear = {}) {
+  const totals = {};
+  for (const id of Object.values(wear || {})) { const perk = WEAR[id]?.perk; if (perk) totals[perk[0]] = (totals[perk[0]] || 0) + perk[1]; }
+  for (const key of Object.keys(totals)) totals[key] = Math.min(totals[key], PERKS[key].cap);
+  return totals;
+}
 // The kitchen menu. Each dish fills hunger over `ms` and may lift other needs; some unlock with fame.
 export const FOODS = {
   jollof: {name: 'Jollof rice', icon: '🍛', hunger: 60, ms: 90_000, extra: {fun: 5}},

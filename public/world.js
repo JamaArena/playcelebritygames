@@ -1,6 +1,6 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { NPCS, CAREERS, ITEMS, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
+import { NPCS, CAREERS, ITEMS, WEAR, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 // On the sofa you face the room; watching TV you sit at the end and turn toward the screen.
@@ -61,6 +61,7 @@ export const worldObjects = (location,furniture=[]) => ({
     {name:'Front door',icon:'🚪',x:-4.6,z:3.6,vx:-5.1,vz:3.6,action:'exit'},
     ...furniture.map((f,i)=>{const def=ITEMS[f.item]||{},use=def.use;
       if(f.item==='chair')return {name:`Chair ${i+1}`,icon:'♙',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Sit',pose:'sit'};
+      if(f.item==='wardrobe')return {name:'Wardrobe',icon:'👗',x:f.x,z:f.z+.75,vx:f.x,vz:f.z,action:'wardrobe'};
       if(use)return {name:def.name,icon:use.icon,x:f.x,z:f.z+.75,vx:f.x,vz:f.z,verb:use.verb,item:f.item,useItem:true,amount:use.amount,useNeed:use.need};
       return {name:f.item==='trophyShelf'?'Display table':def.name||'Display table',icon:'◇',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Admire',pose:null};})
   ],
@@ -261,7 +262,13 @@ export class World {
   extra(n){const k=n+CROWD_SEED,styles=Object.keys(HAIRSTYLES),builds=Object.keys(BUILDS),heights=Object.keys(HEIGHTS),colors=Object.values(HAIR_COLORS);return {style:styles[(k*5+3)%styles.length],hair:colors[(k*7)%colors.length],build:builds[(k*3+1)%builds.length],height:heights[(k*2+1)%heights.length]};}
   // Clothing reads the career at a glance; an equipped jacket overrides it.
   // fit tells the 3D view how to dress them: a suit (jacket, shirt, tie), a sports kit or a tee.
-  look(career,clothes=null){const family=CAREERS[career]?.family;if(clothes==='designer')return {outfit:'#1f1f24',pants:'#2a2a30',shoes:'#d4af37',fit:'suit',accent:'#d4af37'};const fit=clothes==='jacket'||family==='acting'||family==='tech'?'suit':family==='sport'?'kit':'tee';return {outfit:clothes==='jacket'?'#24634e':({sport:'#2f6fb3',music:'#7b4fa3',creator:'#e07a5f',acting:'#b23a48',tech:'#3d6a8a',risk:'#2b2d42'})[family]||'#8ea9a4',pants:family==='sport'?'#f2f2ee':family==='tech'||family==='acting'?'#23262e':'#34435e',shoes:family==='sport'?'#2b2d42':fit==='suit'?'#1d1b1a':'#f4f1ea',fit,accent:family==='acting'?'#1d1b1a':'#7a2433'};}
+  // What someone wears: their career's default look, with each wardrobe piece they've put on layered over it.
+  look(career,clothes=null,wear=null){
+    const base=this.careerLook(career,clothes);if(!wear)return base;const top=WEAR[wear.top],bottom=WEAR[wear.bottom],shoes=WEAR[wear.shoes];
+    if(top)Object.assign(base,{outfit:top.color,fit:top.fit,accent:top.accent||base.accent});if(bottom)Object.assign(base,{pants:bottom.color,cut:bottom.cut});if(shoes)base.shoes=shoes.color;
+    base.acc=['head','face','neck','ears','wrist','bag'].map(k=>wear[k]).filter(Boolean);return base;
+  }
+  careerLook(career,clothes=null){const family=CAREERS[career]?.family;if(clothes==='designer')return {outfit:'#1f1f24',pants:'#2a2a30',shoes:'#d4af37',fit:'suit',accent:'#d4af37'};const fit=clothes==='jacket'||family==='acting'||family==='tech'?'suit':family==='sport'?'kit':'tee';return {outfit:clothes==='jacket'?'#24634e':({sport:'#2f6fb3',music:'#7b4fa3',creator:'#e07a5f',acting:'#b23a48',tech:'#3d6a8a',risk:'#2b2d42'})[family]||'#8ea9a4',pants:family==='sport'?'#f2f2ee':family==='tech'||family==='acting'?'#23262e':'#34435e',shoes:family==='sport'?'#2b2d42':fit==='suit'?'#1d1b1a':'#f4f1ea',fit,accent:family==='acting'?'#1d1b1a':'#7a2433'};}
   // Local time drives the sky, building lights and the HUD clock; it never affects game rules.
   daylight(){const d=new Date(),h=this.forceHour??d.getHours()+d.getMinutes()/60,dark=h<5||h>=21?1:h<7?(7-h)/2:h>=19?(h-19)/2:0;return {hour:h,dark,night:dark>.5};}
   palm(x,z,size=1){this.round(x,z,.2*size,.2*size,2*size,'#a98b67');this.round(x,z,1.5*size,1.5*size,.45*size,'#6aa679',1.9*size);this.round(x+.25*size,z-.1,.9*size,.9*size,.35*size,'#86c493',2.15*size);}
@@ -432,9 +439,9 @@ export class World {
     const using=this.state.recovery?.item&&!this.visitedHome,usedDef=using&&ITEMS[this.state.recovery.item]?.use,usedSpot=using&&this.state.furniture.find(f=>f.item===this.state.recovery.item);
     const mishap=this.freshMishap(),need=using?null:this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=(usedDef?usedDef.pose||'watch':null)||(mishap&&!need?MISHAP_POSES[mishap.need]:null)||({energy:'sleep',fun:this.pose?.kind==='sit'?'sit':'tv',hygiene:'shower',bladder:'toilet',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
     const pos=usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
-    if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride){this.ride(this.state.trip.ride,p.x,p.z,p.axis);this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),...this.body(this.state)});this.actor={x:p.x,z:p.z,pose:null};}return;}
+    if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride){this.ride(this.state.trip.ride,p.x,p.z,p.axis);this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state)});this.actor={x:p.x,z:p.z,pose:null};}return;}
     if(this.state.ride){if(this.interior())this.ride(this.state.ride,-2.5,7.4,'x');else this.ride(this.state.ride,-7.1,2.6,'z');}
-    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),...this.body(this.state),walk:this.moving,pose,seat:usedDef?.seat,heading:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
+    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),walk:this.moving,pose,seat:usedDef?.seat,heading:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
     this.actor={...pos,pose};
     // Mishap props: a growing puddle, or stink clouds drifting up.
     if(mishap?.need==='bladder'&&!need){const r=Math.min(1,mishap.age/2500);this.round(pos.x,pos.z+.15,.25+.75*r,.2+.6*r,.008,'#e3cc45',.004);}
@@ -477,6 +484,7 @@ export class World {
     const t=this.reduced?0:performance.now()/1000,night=this.daylight().night;
     switch(item){
       case 'chair':this.chair(x,z);return;
+      case 'wardrobe':this.box(x,z-.15,1.2,.55,1.95,'#a9825f');for(const s of [-1,1]){this.box(x+s*.3,z+.13,.56,.02,1.8,'#b8916c',.06);this.box(x+s*.06,z+.15,.03,.03,.25,'#e0c27a',.85);}return;
       case 'ankaraRug':this.floor(x,z,1.6,1.1,'#d9573f',.012);this.floor(x,z,1.3,.8,'#f2b33d',.014);this.floor(x,z,.9,.45,'#2d6e9e',.016);for(const s of [-1,1])this.floor(x+s*.55,z,.12,.6,'#2d6e9e',.016);return;
       case 'floorLamp':this.round(x,z,.36,.36,.05,'#3b3b3b');this.round(x,z,.05,.05,1.5,'#3b3b3b',.05);this.round(x,z,.46,.46,.34,night?'#ffe6a8':'#efe6d2',1.48);return;
       case 'plants':this.plant(x-.22,z-.05,.95);this.plant(x+.25,z+.12,.7);return;
@@ -525,7 +533,7 @@ export class World {
   inTrainingZone(x,z){const zone=TRAINING_ZONES[this.location];return !!zone&&x>zone[0]&&x<zone[1]&&z>zone[2]&&z<zone[3];}
   paintPeople(){
     const here=TOWN[this.location]||TOWN.home;
-    const clear=this.training();for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride)this.ride(p.trip.ride,t.x,t.z,t.axis);else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1)||(clear&&this.inTrainingZone(x,z)))continue;this.human(x,z,p.color,{...this.look(p.career,p.clothes),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait});}
+    const clear=this.training();for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride)this.ride(p.trip.ride,t.x,t.z,t.axis);else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1)||(clear&&this.inTrainingZone(x,z)))continue;this.human(x,z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait});}
   }
   // The home screen: a soft sky and a round lawn under the house, like a dollhouse on a table.
   paintIsland(light){const ctx=this.ctx,g=ctx.createLinearGradient(0,0,0,this.height);g.addColorStop(0,light.night?'#24324d':'#cfe3f4');g.addColorStop(1,light.night?'#3b4a66':'#eef5f9');ctx.fillStyle=g;ctx.fillRect(0,0,this.width,this.height);
