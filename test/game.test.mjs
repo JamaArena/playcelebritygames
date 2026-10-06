@@ -249,3 +249,7 @@ test('wardrobe: claim at the boutique, wear anywhere, and perks change the rules
   s.fame=1000;s.needs.bladder=1;s.lastSeen=T+100_000;reconcile(s,T+101_000);assert.equal(s.mishap.lost,24,'3% of 1,000 is 30, less 20%');
   act(s,{type:'takeOff',slot:'face'},T+102_000);assert.equal(s.wear.face,undefined);
 });
+test('emotes are recorded for others to see and unknown ones are refused',()=>{
+  const s=make();act(s,{type:'emote',emote:'dance'},T);assert.deepEqual(s.emote,{kind:'dance',at:T});
+  assert.throws(()=>act(s,{type:'emote',emote:'moonwalk'},T),/Unknown emote/);
+});

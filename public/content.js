@@ -136,6 +136,21 @@ export function wearPerks(wear = {}) {
   for (const key of Object.keys(totals)) totals[key] = Math.min(totals[key], PERKS[key].cap);
   return totals;
 }
+// Emotes: short animations anyone nearby can see. `ms` is how long each plays.
+export const EMOTES = {
+  wave: {label: 'Wave', icon: '👋', ms: 3500},
+  dance: {label: 'Dance', icon: '💃', ms: 9000},
+  shoki: {label: 'Shoki dance', icon: '🕺', ms: 9000},
+  selfie: {label: 'Take a selfie', icon: '🤳', ms: 5000},
+  laugh: {label: 'Laugh', icon: '😂', ms: 4000},
+  cry: {label: 'Cry', icon: '😢', ms: 5000},
+  facepalm: {label: 'Facepalm', icon: '🤦', ms: 3500},
+  victory: {label: 'Victory', icon: '🙌', ms: 4000},
+  sitFloor: {label: 'Sit on the floor', icon: '🧘', ms: 60_000},
+  scroll: {label: 'Scroll on your phone', icon: '📱', ms: 30_000},
+};
+// Quick reactions in local chat.
+export const REACTIONS = ['👍', '😂', '🔥', '❤️', '👏', '😮'];
 // The kitchen menu. Each dish fills hunger over `ms` and may lift other needs; some unlock with fame.
 export const FOODS = {
   jollof: {name: 'Jollof rice', icon: '🍛', hunger: 60, ms: 90_000, extra: {fun: 5}},

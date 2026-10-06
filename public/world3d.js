@@ -68,7 +68,7 @@ function makeToilet() {
 // One person with natural proportions: a sculpted torso and tapered limbs, layered clothes (a suit with
 // lapels, shirt and tie; a sports kit with shorts and socks; or a tee and trousers), a face and a
 // hairstyle. Scaled by build and height.
-class Figure {
+export class Figure {
   constructor() {
     const mesh = (geo, color = '#888', finish) => { const m = new T.Mesh(geo, mat(color, finish)); m.castShadow = true; return m; };
     const joint = (geo, len) => { const pivot = new T.Group(), bone = mesh(geo); pivot.add(bone); pivot.bone = bone; pivot.len = len; return pivot; };
@@ -123,6 +123,7 @@ class Figure {
     this.chain = part(new T.TorusGeometry(.072, .007, 6, 28), this.torso); this.chain.position.set(0, .545, .025); this.chain.rotation.x = Math.PI / 2 - .35;
     this.beads = [.068, .082].map((r, i) => { const b = part(new T.TorusGeometry(r, .013, 6, 24), this.torso); b.position.set(0, .555 - i * .025, .02 + i * .006); b.rotation.x = Math.PI / 2 - .3; return b; });
     this.watch = part(UNIT_BOX, this.arms[0].fore, .056, .03, .062); this.watch.position.y = -.23;
+    this.phone = part(UNIT_BOX, this.arms[1].fore, .05, .1, .01); this.phone.position.set(0, -.33, .035); this.phone.rotation.x = .3;
     this.bag = part(UNIT_BOX, this.arms[1].fore, .2, .16, .07); this.bag.position.set(0, -.44, 0);
     this.strap = part(UNIT_BOX, this.arms[1].fore, .012, .14, .012); this.strap.position.set(0, -.31, 0);
     this.hair = new T.Group(); this.head.add(this.hair); this.hairKey = '';
@@ -151,11 +152,11 @@ class Figure {
     const shape = BUILDS[o.build] || BUILDS.average, W = shape.w, H = shape.hip, S = shape.shoulders || W, pose = o.pose, fit = o.fit || 'tee', suit = fit === 'suit', kit = fit === 'kit', cut = o.cut || (kit ? 'shorts' : 'trousers');
     // Sleeve length by cut: long for suits, jackets, hoodies, pyjamas and robes; none for tanks and gowns.
     const sleeves = ['suit', 'jacket', 'hoodie', 'pyjama', 'robe'].includes(fit) ? 'long' : ['tank', 'gown'].includes(fit) ? 'none' : 'short';
-    const seated = ['sit', 'dine', 'tv', 'work', 'toilet'].includes(pose), tall = seated || pose === 'sleep' ? 1 : (HEIGHTS[o.height]?.h || 1);
+    const seated = ['sit', 'dine', 'tv', 'work', 'toilet', 'sitFloor'].includes(pose), tall = seated || pose === 'sleep' ? 1 : (HEIGHTS[o.height]?.h || 1);
     const phase = o.walk && !reduced ? Math.sin(o.gait) : pose === 'sport' && !reduced ? Math.sin(time * 7) : 0, bob = o.walk && !reduced ? Math.abs(Math.cos(o.gait)) * .02 : 0;
     // Standing still people breathe and shift their weight a little.
     const idle = !o.walk && !pose && !reduced, breath = idle ? Math.sin(time * 1.7 + x) : 0, sway = idle ? Math.sin(time * .6 + z) : 0;
-    const hip = pose === 'toilet' ? .57 : seated ? o.seat ?? .7 : .9 * tall + bob, top = o.outfit, skinMat = mat(skin, 'skin'), pants = mat(o.pants);
+    const hip = pose === 'toilet' ? .57 : pose === 'sitFloor' ? .16 : seated ? o.seat ?? .7 : .9 * tall + bob, top = o.outfit, skinMat = mat(skin, 'skin'), pants = mat(o.pants);
     this.root.position.set(x, 0, z); this.root.rotation.set(0, o.heading || 0, 0);
     this.torso.position.set(sway * .012, hip, 0); this.torso.scale.set(1, tall, 1); this.torso.rotation.set(o.walk ? .05 : 0, 0, sway * .015);
     this.pelvis.material = pants; this.pelvis.scale.set(.96 * H, 1, .58 * H);
@@ -233,7 +234,32 @@ class Figure {
       for (const arm of this.arms) { arm.rotation.set(-.35, 0, -arm.side * .32); arm.fore.rotation.set(-.55, 0, 0); }
       for (const leg of this.legs) { leg.rotation.set(-.12, 0, -leg.side * .06); leg.shin.rotation.set(.25, 0, 0); }
     }
+    this.emote(pose, time, reduced);
     this.root.updateMatrixWorld();
+  }
+  // Emote animations, layered over the base pose. Arm rotation z = side * angle raises an arm outward.
+  emote(pose, time, reduced) {
+    const t = reduced ? 0 : time, [left, right] = this.arms;
+    this.phone.visible = pose === 'selfie' || pose === 'scroll'; this.phone.material = mat('#1d1f22', 'gloss');
+    if (pose === 'wave') { right.rotation.set(-.15, 0, 2.5); right.fore.rotation.set(0, 0, .35 + Math.sin(t * 9) * .45); this.head.rotation.z = -.08; }
+    if (pose === 'dance') {
+      for (const arm of this.arms) { arm.rotation.set(-.3, 0, arm.side * (1.3 + Math.sin(t * 6 + arm.side) * .6)); arm.fore.rotation.set(-.6, 0, 0); }
+      for (const leg of this.legs) leg.rotation.x = Math.sin(t * 6 + (leg.side > 0 ? Math.PI : 0)) * .3;
+      this.root.rotation.y += Math.sin(t * 3) * .5; this.torso.rotation.z = Math.sin(t * 6) * .08; this.head.rotation.x = Math.sin(t * 12) * .08;
+    }
+    if (pose === 'shoki') {
+      const beat = Math.sin(t * 8);
+      for (const arm of this.arms) { arm.rotation.set(-.4, 0, arm.side * (.5 + beat * arm.side * .25)); arm.fore.rotation.set(-1.5, 0, 0); }
+      for (const leg of this.legs) { leg.rotation.x = -.25 - Math.abs(beat) * .15; leg.shin.rotation.x = .5 + Math.abs(beat) * .3; }
+      this.torso.rotation.z = beat * .14; this.head.rotation.z = -beat * .1; this.root.position.y = -.06 - Math.abs(beat) * .05;
+    }
+    if (pose === 'selfie') { right.rotation.set(-2.1, 0, .25); right.fore.rotation.set(-.25, 0, 0); left.rotation.set(-.1, 0, -.75); left.fore.rotation.set(-1.4, 0, 0); this.head.rotation.set(-.1, -.2, .22); }
+    if (pose === 'laugh') { this.torso.rotation.x = -.12 + Math.sin(t * 18) * .04; this.head.rotation.x = -.35 + Math.sin(t * 18) * .05; left.rotation.set(-.55, 0, -.25); left.fore.rotation.set(-1.6, 0, 0); right.rotation.set(-.2, 0, .3); }
+    if (pose === 'cry') { for (const arm of this.arms) { arm.rotation.set(-1.15, 0, -arm.side * .25); arm.fore.rotation.set(-2.05, 0, 0); } this.head.rotation.x = .45; this.torso.position.y += Math.sin(t * 14) * .008; }
+    if (pose === 'facepalm') { right.rotation.set(-1.2, 0, -.4); right.fore.rotation.set(-2.15, 0, 0); this.head.rotation.x = .3; }
+    if (pose === 'victory') { for (const arm of this.arms) { arm.rotation.set(-.1, 0, arm.side * 2.8); arm.fore.rotation.set(0, 0, 0); } this.root.position.y = Math.abs(Math.sin(t * 6)) * .18; }
+    if (pose === 'sitFloor') { for (const leg of this.legs) { leg.rotation.set(-1.5, 0, leg.side * .25); leg.shin.rotation.set(.1, 0, 0); } for (const arm of this.arms) { arm.rotation.set(-.35, 0, arm.side * .2); arm.fore.rotation.set(-.7, 0, 0); } }
+    if (pose === 'scroll') { for (const arm of this.arms) { arm.rotation.set(-.45, 0, -arm.side * .12); arm.fore.rotation.set(-1.35, 0, 0); } this.head.rotation.x = .45; }
   }
 }
 

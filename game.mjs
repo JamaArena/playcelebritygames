@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, FOODS, WEAR, wearPerks, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, CAREERS, ITEMS, FOODS, WEAR, wearPerks, EMOTES, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -319,6 +319,8 @@ export function act(s,input,now,rng=Math.random) {
       const item=WEAR[input.item];requireRule(item,'Unknown item.');requireRule(item.fame===0||s.closet?.[input.item],'Claim it at Palm Boutique first.');
       s.wear??={};s.wear[item.slot]=input.item;break;
     }
+    // Emotes are shown to everyone nearby for a few seconds; they do nothing else.
+    case 'emote': {requireRule(EMOTES[input.emote],'Unknown emote.');requireRule(!s.trip,'You can emote when you arrive.');s.emote={kind:input.emote,at:now};break;}
     case 'takeOff': {requireRule(s.wear?.[input.slot],'Nothing to take off there.');delete s.wear[input.slot];break;}
     case 'useItem': {
       // Use a placed home item: it fills a need over time like the built-in objects.

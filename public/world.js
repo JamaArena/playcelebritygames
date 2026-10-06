@@ -1,10 +1,12 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { NPCS, CAREERS, ITEMS, WEAR, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
+import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 // On the sofa you face the room; watching TV you sit at the end and turn toward the screen.
 const SOFA_TV_FACE=.55;
+// The 2D view approximates emotes with its existing poses.
+const EMOTE_2D={wave:'gesture',victory:'gesture',selfie:'gesture',facepalm:'gesture',dance:'perform',shoki:'perform',laugh:'chat',cry:'chat',scroll:'chat',sitFloor:'sit'};
 // What a character does when a need runs critically low (see MISHAPS in content.js).
 const MISHAP_POSES={bladder:'pee',hunger:'faint',energy:'doze',hygiene:'stink',fun:'chat',social:'gesture'};
 const MISHAP_LINES={bladder:'Oh no… not here 💦',hunger:'😵 Everything’s spinning…',energy:'💤 zzz…',hygiene:'🤢 Is that smell… me?',fun:'📱 Going live at 3am!!',social:'🪴 You get me, Fern.'};
@@ -239,6 +241,7 @@ export class World {
   walls(h,toneZ,toneX,edge=5.35,t=.18){const c=Math.cos(this.angle),s=Math.sin(this.angle),stub=.18;
     this.box(0,-edge,11,t,c>0?h:stub,toneZ);this.box(0,edge,11,t,c<0?h:stub,toneZ);this.box(-edge,0,t,11,s>0?h:stub,toneX);this.box(edge,0,t,11,s<0?h:stub,toneX);}
   human(x,z,skin,{hair='#2b211c',style='curls',outfit='#8ea9a4',pants='#34435e',shoes='#f4f1ea',walk=false,pose=null,heading=0,gait=this.gait,smile=1,build='average',height='average'}={}){
+    pose=EMOTE_2D[pose]||pose;
     // Build widens or narrows the body (hips and shoulders separately); height stretches standing poses.
     const ctx=this.ctx,shape=BUILDS[build]||BUILDS.average,W=shape.w,H=shape.hip,S=shape.shoulders||W;
     if(pose==='faint')pose='sleep';
@@ -437,7 +440,9 @@ export class World {
     this.paintPeople();
     // Using a placed home item: stand in front of it (or sit on it) in that item's pose.
     const using=this.state.recovery?.item&&!this.visitedHome,usedDef=using&&ITEMS[this.state.recovery.item]?.use,usedSpot=using&&this.state.furniture.find(f=>f.item===this.state.recovery.item);
-    const mishap=this.freshMishap(),need=using?null:this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=(usedDef?usedDef.pose||'watch':null)||(mishap&&!need?MISHAP_POSES[mishap.need]:null)||({energy:'sleep',fun:this.pose?.kind==='sit'?'sit':'tv',hygiene:'shower',bladder:'toilet',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
+    let mishap=this.freshMishap(),need=using?null:this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=(usedDef?usedDef.pose||'watch':null)||(mishap&&!need?MISHAP_POSES[mishap.need]:null)||({energy:'sleep',fun:this.pose?.kind==='sit'?'sit':'tv',hygiene:'shower',bladder:'toilet',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
+    const emote=this.emote&&performance.now()<this.emote.until&&!this.moving&&!this.state.recovery&&!this.state.active?this.emote.kind:null;
+    if(emote&&!using)pose=emote;
     const pos=usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
     if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride){this.ride(this.state.trip.ride,p.x,p.z,p.axis);this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state)});this.actor={x:p.x,z:p.z,pose:null};}return;}
     if(this.state.ride){if(this.interior())this.ride(this.state.ride,-2.5,7.4,'x');else this.ride(this.state.ride,-7.1,2.6,'z');}
@@ -533,7 +538,7 @@ export class World {
   inTrainingZone(x,z){const zone=TRAINING_ZONES[this.location];return !!zone&&x>zone[0]&&x<zone[1]&&z>zone[2]&&z<zone[3];}
   paintPeople(){
     const here=TOWN[this.location]||TOWN.home;
-    const clear=this.training();for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride)this.ride(p.trip.ride,t.x,t.z,t.axis);else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1)||(clear&&this.inTrainingZone(x,z)))continue;this.human(x,z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait});}
+    const clear=this.training();for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride)this.ride(p.trip.ride,t.x,t.z,t.axis);else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1)||(clear&&this.inTrainingZone(x,z)))continue;const emoting=p.emote&&!p.moving&&Date.now()+this.serverOffset-p.emote.at<(EMOTES[p.emote.kind]?.ms||0)?p.emote.kind:null;this.human(x,z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait,pose:emoting});}
   }
   // The home screen: a soft sky and a round lawn under the house, like a dollhouse on a table.
   paintIsland(light){const ctx=this.ctx,g=ctx.createLinearGradient(0,0,0,this.height);g.addColorStop(0,light.night?'#24324d':'#cfe3f4');g.addColorStop(1,light.night?'#3b4a66':'#eef5f9');ctx.fillStyle=g;ctx.fillRect(0,0,this.width,this.height);
@@ -580,6 +585,7 @@ export class World {
     this.walk(point.x,point.z);
   }
   walk(x,z,callback){
+    this.emote=null;
     if(this.state.recovery||this.state.active){this.onObject({blocked:true,message:'Finish or stop your current action before moving.'});return;}
     this.pose=null;
     const furniture=this.visitedHome?.furniture||this.state.furniture;
