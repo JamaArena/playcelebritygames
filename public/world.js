@@ -8,6 +8,38 @@ const SOFA_TV_FACE=.55;
 // What a character does when a need runs critically low (see MISHAPS in content.js).
 const MISHAP_POSES={bladder:'pee',hunger:'faint',energy:'doze',hygiene:'stink',fun:'chat',social:'gesture'};
 const MISHAP_LINES={bladder:'Oh no… not here 💦',hunger:'😵 Everything’s spinning…',energy:'💤 zzz…',hygiene:'🤢 Is that smell… me?',fun:'📱 Going live at 3am!!',social:'🪴 You get me, Fern.'};
+// Who works where at each venue. `aside` is where they go while you train there; `watch` turns them to you.
+const REGULARS={
+  sports:[
+    {career:'football',x:-1.2,z:-2.4,heading:Math.PI/2,pose:'sport',aside:{x:4.3,z:-.6,heading:-Math.PI/2,pose:'sit',seat:.62}},
+    {career:'football',x:1.2,z:-2.4,heading:-Math.PI/2,pose:'sport',aside:{x:4.3,z:.8,heading:-Math.PI/2,pose:'sit',seat:.62}},
+    {career:'football',x:-3.6,z:.2,heading:Math.PI/2,pose:'gesture',aside:{x:-3.6,z:.2,heading:Math.PI/2,watch:true}},
+    {career:'tennis',x:4.3,z:-2,heading:-Math.PI/2,pose:'sit',seat:.62},
+    {career:'musician',x:4.3,z:2.2,heading:-Math.PI/2,pose:'sit',seat:.62},
+  ],
+  studio:[
+    {career:'musician',x:-2.2,z:-1.9,heading:Math.PI,pose:'work'},
+    {career:'musician',x:2.8,z:-2.3,heading:0,pose:'perform',aside:{x:-1.2,z:3.3,heading:Math.PI,pose:'sit'}},
+    {career:'actor',x:-.2,z:3.3,heading:Math.PI,pose:'sit'},
+  ],
+  creator:[
+    {career:'vlogger',x:-2.2,z:-1.9,heading:Math.PI,pose:'work'},
+    {career:'skitmaker',x:2.6,z:-2.3,heading:0,pose:'perform',aside:{x:-1.2,z:3.3,heading:Math.PI,pose:'sit'}},
+    {career:'streamer',x:-.2,z:3.3,heading:Math.PI,pose:'sit'},
+  ],
+  tech:[
+    {career:'developer',x:-2.2,z:-1.9,heading:Math.PI,pose:'work'},
+    {career:'founder',x:2.7,z:-2.4,heading:Math.PI,pose:'chat',aside:{x:-1.2,z:3.3,heading:Math.PI,pose:'sit'}},
+    {career:'web3',x:-.2,z:3.3,heading:Math.PI,pose:'sit'},
+  ],
+  plaza:[
+    {career:'vlogger',x:-3.1,z:-1.5,heading:Math.PI},
+    {career:'actor',x:-3,z:2.15,heading:Math.PI,pose:'sit',seat:.62},
+    {career:'musician',x:3.3,z:2.8,heading:0},
+  ],
+};
+// The area kept clear while you train: [minX, maxX, minZ, maxZ].
+const TRAINING_ZONES={sports:[-3.3,3.3,-4.3,4.3],studio:[1,4.7,-4.3,-.9],creator:[1,4.7,-4.3,-.9],tech:[1,4.7,-4.3,-.9]};
 export const worldObjects = (location,furniture=[]) => ({
   home:[
     {name:'Kitchen',icon:'♨',x:-3.6,z:-2.5,vx:-3.2,vz:-4,need:'hunger',verb:'Cook & eat'},
@@ -365,7 +397,7 @@ export class World {
       this.floor(0,0,6,.03,'#f3f1d8',.03);this.box(0,-4.1,1.6,.08,1,'#f0ebd7');this.box(0,4.1,1.6,.08,1,'#f0ebd7');
       this.box(-4.1,-3.6,1.7,2,1.65,'#d5bf95');this.box(-4.1,-3.6,1.9,2.2,.2,'#8b9d7e',1.65);
       for(let z=-2;z<=2;z+=1.4){this.box(4.3,z,.7,1,.5,'#c9b28d');this.box(4.6,z,.2,1,.9,'#c9b28d');}
-      this.human(2,-2,'#bc8966',{...this.look('football'),style:'short',heading:Math.PI});this.human(-1,-1,'#91664d',{...this.look('football'),heading:Math.PI*.8});this.box(.8,-.7,.18,.18,.18,'#f8f5e8');this.plant(-4.4,3,1.4);
+      this.plant(-4.4,3,1.4);
     }else if(['studio','creator','tech'].includes(l)){
       const colors={studio:['#dacac2','#b5a3c5'],creator:['#ded0bd','#d4a38c'],tech:['#cbd8d3','#83acb2']},[floor,accent]=colors[l];
       for(let x=-5;x<=5;x++)for(let z=-5;z<=5;z++)this.floor(x,z,.99,.99,(x+z)%2?floor:shade(floor,1.025));
@@ -451,17 +483,21 @@ export class World {
       ctx.beginPath();ctx.moveTo(p.x-6,y-3);ctx.lineTo(p.x,y+5);ctx.lineTo(p.x+6,y-3);ctx.closePath();ctx.fill();ctx.fillStyle='#22392d';ctx.textAlign='center';ctx.fillText(words,p.x,y-10);ctx.globalAlpha=1;}
   }
   // Ambient people walk loops inside venues so places feel alive. Purely visual and identical for everyone.
+  // Venue regulars: each has a job and a spot (a drill, a desk, the stands) instead of jogging laps.
+  // While you train, anyone on your training spot steps aside to watch, so the area is yours.
   paintCrowd(l){
-    const loops={sports:[[2,-2.6],[-1.6,-2.6],[-1.6,2.4],[2,2.4]],plaza:[[-1.6,-1.2],[1.6,-1.2],[1.6,1],[-1.6,1]],studio:[[1,-.6],[3.6,.6],[3,3.6],[1.2,1.4]],creator:[[1,-.6],[3.6,.6],[3,3.6],[1.2,1.4]],tech:[[1,-.6],[3.6,.6],[3,3.6],[1.2,1.4]]}[l];if(!loops)return;
-    const careers={sports:['football','football','tennis'],plaza:['vlogger','musician','actor'],studio:['musician','actor','musician'],creator:['vlogger','streamer','skitmaker'],tech:['developer','founder','web3']}[l],t=this.reduced?0:performance.now()/1000;
-    const lengths=loops.map((p,i)=>{const q=loops[(i+1)%loops.length];return Math.hypot(q[0]-p[0],q[1]-p[1]);}),total=lengths.reduce((a,b)=>a+b,0);
-    for(let n=0;n<3;n++){let d=((t*(l==='sports'?1.8:.9)+n*total/3)%total),i=0;while(d>lengths[i]){d-=lengths[i];i++;}
-      const a=loops[i],b=loops[(i+1)%loops.length],f=d/lengths[i],x=a[0]+(b[0]-a[0])*f,z=a[1]+(b[1]-a[1])*f;
-      this.human(x,z,SKIN_TONES[(n*3+l.length+CROWD_SEED)%SKIN_TONES.length],{...this.look(careers[n]),...this.extra(n+l.length),walk:!this.reduced,heading:Math.atan2(b[0]-a[0],b[1]-a[1]),gait:t*(l==='sports'?9:6)+n});}
+    const list=REGULARS[l];if(!list)return;const training=this.training(),t=this.reduced?0:performance.now()/1000,a=this.actor||this.player;
+    list.forEach((r,n)=>{const spot=training&&r.aside?r.aside:r,face=spot.watch&&training?Math.atan2(a.x-spot.x,a.z-spot.z):spot.heading;
+      this.human(spot.x,spot.z,SKIN_TONES[(n*3+l.length+CROWD_SEED)%SKIN_TONES.length],{...this.look(r.career),...this.extra(n+l.length),pose:spot.pose||null,heading:face,seat:spot.seat});});
+    // The passing drill: a ball rolls back and forth between the two players.
+    if(l==='sports'&&!training){const k=.5-.5*Math.cos(t*1.6);this.round(-1+2*k,-2.4,.2,.2,.2,'#f8f5e8',Math.abs(Math.sin(t*1.6))*.15);}
   }
+  // You are training (practice or a career activity) at a venue.
+  training(){return !!this.state?.active&&this.location!=='home';}
+  inTrainingZone(x,z){const zone=TRAINING_ZONES[this.location];return !!zone&&x>zone[0]&&x<zone[1]&&z>zone[2]&&z<zone[3];}
   paintPeople(){
     const here=TOWN[this.location]||TOWN.home;
-    for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride)this.ride(p.trip.ride,t.x,t.z,t.axis);else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1))continue;this.human(x,z,p.color,{...this.look(p.career,p.clothes),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait});}
+    const clear=this.training();for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride)this.ride(p.trip.ride,t.x,t.z,t.axis);else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1)||(clear&&this.inTrainingZone(x,z)))continue;this.human(x,z,p.color,{...this.look(p.career,p.clothes),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait});}
   }
   // The home screen: a soft sky and a round lawn under the house, like a dollhouse on a table.
   paintIsland(light){const ctx=this.ctx,g=ctx.createLinearGradient(0,0,0,this.height);g.addColorStop(0,light.night?'#24324d':'#cfe3f4');g.addColorStop(1,light.night?'#3b4a66':'#eef5f9');ctx.fillStyle=g;ctx.fillRect(0,0,this.width,this.height);
