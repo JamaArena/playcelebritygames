@@ -36,10 +36,10 @@ function notice(data,own){
     for(const m of room.filter(m=>m.at>seen.roomAt))world.say(m.sender===me?'me':m.sender,m.body);
       for(const b of (data.battles||[]))if(b.invited===me&&b.status==='open'&&!seen.battles.has(b.id)){fresh.push(`⚔ ${b.teamNames[0][0]?.name} challenged you to a 1v1!`);battleId=b.id;setTimeout(battleView,0);}
     if(s.battle&&s.battle!==seen.battle){battleId=s.battle;setTimeout(battleView,0);}
-    if(s.insight&&s.insight.id!==seen.insight)insight(['💡 You learnt something',`${escape(s.insight.text)}<br><strong class="insight-points">+${s.insight.points} ${escape(s.insight.skill)}</strong>`]);
+    for(const item of (s.insights||[]).filter(i=>!seen.insights.has(i.id)))insight(['💡 You learnt something',`${escape(item.text)}<br><strong class="insight-points">+${item.points} ${escape(item.skill)}</strong>`]);
   if(fresh.length)toast(fresh.slice(-2).join('  ·  '));
   }
-  seen={player:me,eventAt:Math.max(seen?.player===me?seen.eventAt:0,latest(s.events)),dmAt:Math.max(seen?.player===me?seen.dmAt:0,latest(dms)),roomAt:Math.max(seen?.player===me?seen.roomAt:0,latest(room)),tiers,insight:s.insight?.id,battle:s.battle,battles:new Set((data.battles||[]).map(b=>b.id))};
+  seen={player:me,eventAt:Math.max(seen?.player===me?seen.eventAt:0,latest(s.events)),dmAt:Math.max(seen?.player===me?seen.dmAt:0,latest(dms)),roomAt:Math.max(seen?.player===me?seen.roomAt:0,latest(room)),tiers,insights:new Set((s.insights||[]).map(i=>i.id)),battle:s.battle,battles:new Set((data.battles||[]).map(b=>b.id))};
 }
 function receive(data,own=false){notice(data,own);snapshot=data;state=data.state;offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();
   $('#loading').hidden=true;
@@ -134,7 +134,7 @@ function progress(start,end){const value=Math.min(100,Math.max(0,(now()-start)/(
 function renderActivity(){
   const a=state.active,r=state.recovery,def=CAREERS[state.career],t=state.trip;let html='';
   if(t)html='<div class="sim-status"><span>'+(RIDES[t.ride]?.icon||'🚶')+'</span><strong>'+(t.ride?'Driving':'Walking')+' to '+escape(LOCATIONS[t.to].name)+'</strong><time>'+duration(t.arrives-now())+'</time></div>'+progress(t.departs,t.arrives);
-  else if(r){const start=r.startedAt??r.endsAt-B.recovery[r.need][1],gained=Math.round(B.recovery[r.need][0]*Math.min(1,Math.max(0,(now()-start)/(r.endsAt-start))));html='<div class="sim-status"><span>'+(r.watch?'📺':needs[r.need][1])+'</span><strong>'+escape(r.label)+'</strong><small>+'+gained+' '+escape(needs[r.need][0])+(r.watch?' · keep watching to learn':'')+'</small>'+button('Get up','getUp','','secondary')+'</div>'+progress(start,r.endsAt);}
+  else if(r){const start=r.startedAt??r.endsAt-B.recovery[r.need][1],gained=Math.round(B.recovery[r.need][0]*Math.min(1,Math.max(0,(now()-start)/(r.endsAt-start))));html='<div class="sim-status"><span>'+(r.watch?'📺':needs[r.need][1])+'</span><strong>'+escape(r.label)+'</strong><small>+'+gained+' '+escape(needs[r.need][0])+(r.watch?.learn?` · ${r.watch.given||0}/5 insights`:r.watch?' · just for fun (learning cooldown)':'')+'</small>'+button('Get up','getUp','','secondary')+'</div>'+progress(start,r.endsAt);}
   else if(a?.kind==='practice')html='<div class="sim-status"><span>'+def.icon+'</span><strong>'+escape(a.skill)+'</strong><small>+7 XP</small><time>'+duration(a.readyAt-now())+'</time>'+button('×','cancel','aria-label="Cancel practice"','tray-close')+'</div>'+progress(a.startedAt,a.readyAt);
   else if(a){
     const waiting=now()<a.readyAt,complete=a.beat>=a.totalBeats;

@@ -187,11 +187,15 @@ test('phones upgrade with fame anywhere, for free',()=>{
   act(s,{type:'phoneUpgrade',item:'basic'},T);assert.equal(s.phone,'basic');
 });
 
-test('watching TV can teach your career a little, once per cooldown, with an insight',()=>{
+test('watching TV: first insight at 10s, then every 30s, five at most, then a 20-minute cooldown',()=>{
   const s=make('football');s.needs.fun=20;act(s,{type:'recover',need:'fun',watch:true},T);
-  assert.equal(s.recovery.label,'Watching the big match');const skill=s.recovery.watch;assert.ok(CAREERS.football.skills.includes(skill));
-  reconcile(s,T+B.recovery.fun[1]);assert.equal(s.careers.football.skills[skill].points,4);assert.match(s.insight.text,/./);assert.equal(s.insight.points,4);
-  act(s,{type:'recover',need:'fun',watch:true},T+B.recovery.fun[1]+1000);act(s,{type:'cancel'},T+B.recovery.fun[1]+61_000);
-  const total=Object.values(s.careers.football.skills).reduce((n,k)=>n+k.points,0);assert.equal(total,4,'no second insight inside the cooldown');
-  const quick=make('actor');act(quick,{type:'recover',need:'fun',watch:true},T);act(quick,{type:'cancel'},T+10_000);assert.equal(quick.insight,undefined,'a glance teaches nothing');
+  assert.equal(s.recovery.label,'Watching the big match');assert.equal(s.recovery.endsAt-T,140_000);
+  const points=()=>Object.values(s.careers.football.skills).reduce((n,k)=>n+k.points,0);
+  reconcile(s,T+9_000);assert.equal(points(),0);
+  reconcile(s,T+10_000);assert.equal(points(),1,'first insight at 10s');assert.equal(s.insights.length,1);assert.match(s.insights[0].text,/./);
+  reconcile(s,T+39_000);assert.equal(points(),1);reconcile(s,T+40_000);assert.equal(points(),2,'next one 30s later');
+  reconcile(s,T+140_000);assert.equal(points(),5,'five at most');assert.equal(s.recovery,null);assert.equal(s.insights.length,5);
+  act(s,{type:'recover',need:'fun',watch:true},T+141_000);act(s,{type:'cancel'},T+200_000);assert.equal(points(),5,'cooldown: just for fun');
+  act(s,{type:'recover',need:'fun',watch:true},T+140_000+20*60_000);reconcile(s,T+150_000+20*60_000);assert.equal(points(),6,'after 20 minutes it teaches again');
+  const quick=make('actor');act(quick,{type:'recover',need:'fun',watch:true},T);act(quick,{type:'cancel'},T+9_000);assert.equal(quick.insights,undefined,'under 10 seconds teaches nothing');assert.equal(quick.watchLearnAt,undefined);
 });

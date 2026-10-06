@@ -106,7 +106,9 @@ export const WATCH = {
   tech: {title: 'Watch a tech keynote', label: 'Watching a keynote', hero: 'The keynote speaker'},
   risk: {title: 'Watch a heist movie', label: 'Watching a heist movie', hero: 'The film’s mastermind'},
 };
-export const WATCH_COOLDOWN = 20 * 60_000, WATCH_MAX_POINTS = 4;
+// First insight after 10s of watching, then one every 30s, five at most (+1 point each). A session that
+// teaches anything starts a 20-minute cooldown; watching during it is just for fun. Sessions run 2:20.
+export const WATCH_COOLDOWN = 20 * 60_000, WATCH_FIRST = 10_000, WATCH_EVERY = 30_000, WATCH_MAX = 5, WATCH_SESSION = 140_000;
 const INSIGHTS = {
   dribbling: 'That number 24 guy glided past three defenders. You learnt to dribble a little better.',
   shooting: 'Their striker buried one from 25 metres. Your shooting clicked a little more.',
