@@ -14,7 +14,7 @@ export const worldObjects = (location,furniture=[]) => ({
     {name:'Shower',icon:'♧',x:4,z:1.5,vx:4.3,vz:.4,need:'hygiene',verb:'Shower'},
     {name:'Toilet',icon:'◡',x:4,z:2.35,vx:4.1,vz:3.3,need:'bladder',verb:'Use toilet',pose:'sit'},
     {name:'Dining chair',icon:'♙',x:.1,z:1.4,vx:.5,vz:2.1,verb:'Sit',pose:'sit'},
-    {name:'Guest chair',icon:'♙',x:1.6,z:3.9,vx:.5,vz:3.9,verb:'Sit',pose:'sit'},
+    {name:'Guest chair',icon:'♙',x:1.6,z:3.9,vx:.5,vz:3.9,verb:'Sit',pose:'sit',face:Math.PI},
     {name:'Dining table',icon:'♨',x:.1,z:1.4,vx:.5,vz:3,verb:'Sit at table',pose:'dine'},
     {name:'Television',icon:'▷',x:-2.8,z:3.7,vx:-2.8,vz:4.4,verb:'Watch TV',need:'fun',pose:'tv'},
     {name:'Fridge',icon:'❄',x:-.7,z:-3,vx:-.7,vz:-4.25,verb:'Open fridge'},
@@ -192,7 +192,8 @@ export class World {
     this.polygon([[x0,y+h,z0],[x1,y+h,z0],[x1,y+h,z1],[x0,y+h,z1]],color);
   }
   round(x,z,w,d,h,color,y=0){this.box(x,z,w,d,h,color,y);this.meshes.at(-1).round=true;}
-  chair(x,z){for(const dx of [-.25,.25])for(const dz of [-.25,.25])this.round(x+dx,z+dz,.08,.08,.48,'#bfa17d');this.box(x,z,.78,.7,.18,'#c5b394',.48);this.box(x,z-.28,.78,.18,.75,'#e3d1b1',.55);}
+  // A chair whose sitter faces `face` (0 = +z); the backrest goes on the opposite side.
+  chair(x,z,face=0){const s=Math.sin(face),c=Math.cos(face),side=Math.abs(s)>.5;for(const dx of [-.25,.25])for(const dz of [-.25,.25])this.round(x+dx,z+dz,.08,.08,.48,'#bfa17d');this.box(x,z,.78,.7,.18,'#c5b394',.48);this.box(x-s*.28,z-c*.28,side?.18:.78,side?.78:.18,.75,'#e3d1b1',.55);}
   plant(x,z,size=1){this.round(x,z,.4,.4,.42,'#cfb398');this.round(x,z,.07,.07,.7,'#699a7d',.35);for(const [dx,dz,dy] of [[-.2,0,.7],[.2,.1,.9],[0,-.1,1.12]])this.round(x+dx*size,z+dz,.45*size,.4,.4*size,'#87c4a0',dy);}
   limb(a,b,width,color){this.meshes.push({a,b,width,color,limb:true,y:Math.min(a[1],b[1]),depth:((a[0]+b[0])*Math.sin(this.angle)+(a[2]+b[2])*Math.cos(this.angle))/2});}
   // A stylised Sims-like figure: career outfit, hairstyle, shaded face and a soft contact shadow.
@@ -347,7 +348,7 @@ export class World {
       this.floor(-2.4,1.5,3.8,3.2,'#e8ecdd',.015);this.box(-3.6,1.5,1.1,2.9,.48,'#b3c5ac');this.box(-3.98,1.5,.3,2.9,1,'#9ab393');for(const z of [.15,2.85])this.box(-3.5,z,1.2,.3,.8,'#afc1a3');for(const z of [.65,1.5,2.35])this.round(-3.55,z,.8,.75,.17,'#d4dec5',.48);
       for(const dx of [-.4,.4])for(const dz of [-.55,.55])this.round(-1.7+dx,1.5+dz,.08,.08,.48,'#d4a764');this.box(-1.7,1.5,1.2,1.5,.12,'#e7d5b7',.48);this.round(-1.7,1.5,.27,.27,.15,'#b38c63',.6);
       this.box(-2.8,4.4,2.9,.65,.55,'#c4ad8a');this.box(-2.8,4.4,1.85,.13,1,'#455b4e',.65);this.box(-2.8,4.31,1.65,.025,.8,'#a9c9da',.75);this.round(-2.8,4.26,.45,.04,.45,'#e7c18a',.9);
-      for(const dx of [-.4,.4])for(const dz of [-.4,.4])this.round(.5+dx,3+dz,.08,.08,.8,'#c99b68');this.box(.5,3,1.5,1.5,.15,'#f7f4e8',.8);this.round(.5,3,.5,.5,.025,'#e1b2da',.96);this.chair(.5,2.1);this.chair(.5,3.9);
+      for(const dx of [-.4,.4])for(const dz of [-.4,.4])this.round(.5+dx,3+dz,.08,.08,.8,'#c99b68');this.box(.5,3,1.5,1.5,.15,'#f7f4e8',.8);this.round(.5,3,.5,.5,.025,'#e1b2da',.96);this.chair(.5,2.1);this.chair(.5,3.9,Math.PI);
       this.floor(3.8,2,2.7,4.2,'#d4ecf4',.015);this.box(2.55,2.7,.13,3.7,.68,'#e8eadf');this.box(4.3,.4,1.2,1.1,.12,'#ffffff');this.box(4.83,.4,.07,1.1,1.7,'#bddbd8');this.round(4.7,.4,.08,.08,1.8,'#9bacad');this.round(4.45,.4,.5,.35,.09,'#bcced0',1.8);
       this.toilet(4.1,3.05);
       this.plant(-4.3,-.8);this.plant(4.35,-1.2,.8);
@@ -394,7 +395,7 @@ export class World {
     const pos=need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:1.5}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
     if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride){this.ride(this.state.trip.ride,p.x,p.z,p.axis);this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),...this.body(this.state)});this.actor={x:p.x,z:p.z,pose:null};}return;}
     if(this.state.ride){if(this.interior())this.ride(this.state.ride,-2.5,7.4,'x');else this.ride(this.state.ride,-7.1,2.6,'z');}
-    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),...this.body(this.state),walk:this.moving,pose,heading:pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:0,smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
+    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes),...this.body(this.state),walk:this.moving,pose,heading:pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??0,smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
     this.actor={...pos,pose};
     // Mishap props: a growing puddle, or stink clouds drifting up.
     if(mishap?.need==='bladder'&&!need){const r=Math.min(1,mishap.age/2500);this.round(pos.x,pos.z+.15,.25+.75*r,.2+.6*r,.008,'#e3cc45',.004);}
