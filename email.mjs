@@ -1,5 +1,5 @@
-// Sends sign-in codes. Production uses Resend (RESEND_API_KEY + EMAIL_FROM). Without a key, the local
-// Node server prints codes to its own log so development works; the Netlify function refuses instead.
+// Sends sign-in codes through Resend (RESEND_API_KEY + EMAIL_FROM). Without a key the game falls back
+// to the fixed code 123456 (see service.mjs) until email is configured.
 export function resendSender(apiKey, from) {
   if (!apiKey) return null;
   return async ({ to, subject, text }) => {
@@ -11,4 +11,3 @@ export function resendSender(apiKey, from) {
     if (!response.ok) throw new Error(`Email provider rejected the message (${response.status}).`);
   };
 }
-export const consoleSender = async ({ to, code }) => { console.log(`[dev email] Sign-in code for ${to}: ${code}`); };

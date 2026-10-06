@@ -177,7 +177,9 @@ function battlesFor(playerId,s,now){
 }
 // Accounts: email + one-time code, no passwords. A code proves the email; the account then owns this
 // browser's character (or the one already linked to that email when logging in on a new device).
-const CODE_TTL=10*60_000,CODE_RESEND=60_000,CODE_ATTEMPTS=5;
+// Until an email provider is configured, every code is FALLBACK_CODE so the game stays playable. This is
+// weak (anyone who knows an email can sign in as it) and switches off automatically once email is set up.
+const CODE_TTL=10*60_000,CODE_RESEND=60_000,CODE_ATTEMPTS=5,FALLBACK_CODE='123456';
 const cleanEmail=v=>String(v||'').trim().toLowerCase(),validEmail=v=>/^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,24}$/.test(v);
 function accountOf(playerId){const a=db.prepare('SELECT email,username,name FROM accounts WHERE player_id=?').get(playerId);return a?{username:a.username,name:a.name,email:a.email.replace(/^(.).*(@.*)$/,'$1•••$2')}:null;}
 async function authAction(playerId,token,input,now,res){
@@ -194,11 +196,11 @@ async function authAction(playerId,token,input,now,res){
       payload={username,name};
     }
     const exists=purpose==='login'?db.prepare('SELECT 1 FROM accounts WHERE email=?').get(email):true;
-    const code=String(randomBytes(4).readUInt32BE(0)%1_000_000).padStart(6,'0');
+    const code=sendEmail?String(randomBytes(4).readUInt32BE(0)%1_000_000).padStart(6,'0'):FALLBACK_CODE;
     db.prepare('INSERT INTO codes VALUES(?,?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,purpose=excluded.purpose,payload=excluded.payload,expires=excluded.expires,attempts=0,sent=excluded.sent').run(email,hash(email+':'+code),purpose,JSON.stringify(payload),now+CODE_TTL,0,now);
     // Login never reveals whether an email is registered; unknown emails simply receive nothing.
-    if(exists){fail(sendEmail,'Email sign-in isn’t set up on this server yet.');await sendEmail({to:email,subject:`Your Celebrity Games code: ${code}`,text:`Your Celebrity Games code is ${code}. It expires in 10 minutes. If you didn't ask for it, ignore this email.`,code});}
-    return [200,{sent:true,email}];
+    if(exists&&sendEmail){await sendEmail({to:email,subject:`Your Celebrity Games code: ${code}`,text:`Your Celebrity Games code is ${code}. It expires in 10 minutes. If you didn't ask for it, ignore this email.`,code});}
+    return [200,{sent:true,email,fallback:!sendEmail}];
   }
   if(input.type==='verifyCode'){
     const email=cleanEmail(input.email),row=db.prepare('SELECT * FROM codes WHERE email=?').get(email);
