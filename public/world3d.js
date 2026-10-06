@@ -124,6 +124,7 @@ export class Figure {
     this.beads = [.068, .082].map((r, i) => { const b = part(new T.TorusGeometry(r, .013, 6, 24), this.torso); b.position.set(0, .555 - i * .025, .02 + i * .006); b.rotation.x = Math.PI / 2 - .3; return b; });
     this.watch = part(UNIT_BOX, this.arms[0].fore, .056, .03, .062); this.watch.position.y = -.23;
     this.phone = part(UNIT_BOX, this.arms[1].fore, .05, .1, .01); this.phone.position.set(0, -.33, .035); this.phone.rotation.x = .3;
+    this.headset = part(UNIT_BOX, this.head, .2, .085, .1); this.headset.position.set(0, .03, .09); this.camera = part(UNIT_BOX, this.head, .15, .1, .09); this.camera.position.set(0, .0, .2); this.lens = part(new T.CylinderGeometry(.035, .04, .07, 14), this.head); this.lens.rotation.x = Math.PI / 2; this.lens.position.set(.03, 0, .27);
     this.bag = part(UNIT_BOX, this.arms[1].fore, .2, .16, .07); this.bag.position.set(0, -.44, 0);
     this.strap = part(UNIT_BOX, this.arms[1].fore, .012, .14, .012); this.strap.position.set(0, -.31, 0);
     this.hair = new T.Group(); this.head.add(this.hair); this.hairKey = '';
@@ -241,6 +242,9 @@ export class Figure {
   emote(pose, time, reduced) {
     const t = reduced ? 0 : time, [left, right] = this.arms;
     this.phone.visible = pose === 'selfie' || pose === 'scroll'; this.phone.material = mat('#1d1f22', 'gloss');
+    this.headset.visible = pose === 'vr'; this.headset.material = mat('#f2f2f0', 'gloss'); this.camera.visible = this.lens.visible = pose === 'photo'; this.camera.material = this.lens.material = mat('#1d1f22', 'gloss');
+    if (pose === 'vr') { for (const arm of this.arms) { arm.rotation.set(-1 + Math.sin(t * 2 + arm.side) * .3, 0, arm.side * .35); arm.fore.rotation.set(-.4, 0, 0); } this.head.rotation.set(-.1, Math.sin(t * .9) * .5, 0); }
+    if (pose === 'photo') { for (const arm of this.arms) { arm.rotation.set(-1.25, 0, -arm.side * .3); arm.fore.rotation.set(-1.75, 0, 0); } }
     if (pose === 'wave') { right.rotation.set(-.15, 0, 2.5); right.fore.rotation.set(0, 0, .35 + Math.sin(t * 9) * .45); this.head.rotation.z = -.08; }
     if (pose === 'dance') {
       for (const arm of this.arms) { arm.rotation.set(-.3, 0, arm.side * (1.3 + Math.sin(t * 6 + arm.side) * .6)); arm.fore.rotation.set(-.6, 0, 0); }
@@ -385,7 +389,7 @@ export class World3D extends World {
     const day = this.daylight(); this.light(day);
     const inside = this.interior();
     this.island.visible = inside; this.city.visible = !inside; this.scene3.fog = inside ? null : this.fog;
-    if (!inside) { const key = [this.location, day.night, this.ownersKey, this.state.home, !!this.state.trip, festivalAt(Date.now())].join('|'); if (key !== this.cityKey) { this.cityKey = key; this.buildCity(day.night); } }
+    if (!inside) { const key = [this.location, day.night, this.ownersKey, this.state.home, !!this.state.trip, festivalAt(Date.now()), !!this.state.vip?.yacht].join('|'); if (key !== this.cityKey) { this.cityKey = key; this.buildCity(day.night); } }
     for (const p of [this.boxes, this.balls, this.figures, this.toilets]) p.begin();
     this.meshes = []; if (!inside) this.townLife(); this.scene();
     for (const p of [this.boxes, this.balls, this.figures, this.toilets]) p.end();

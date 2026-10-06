@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -70,7 +70,7 @@ export function reconcile(s, now) {
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
     item.level=item.upgrade.target; item.upgrade=null; log(s,`${ITEMS[key].name} reached level ${item.level}.`,now);
   }
-  if(s.trip && now>=s.trip.arrives){s.location=s.trip.to;s.position3d=arrivalSpot(s.trip.to);s.visiting=null;log(s,`Arrived at ${LOCATIONS[s.trip.to].name}.`,now);s.trip=null;}
+  if(s.trip && now>=s.trip.arrives){if(s.trip.ride==='limo'&&LOT(s.trip.to)!=='home'&&now-(s.limoAt||0)>=10*60_000){s.limoAt=now;addFame(s,10);log(s,'🚘 Fans spotted your limousine pulling up. +10 fame.',now);}s.location=s.trip.to;s.position3d=arrivalSpot(s.trip.to);s.visiting=null;log(s,`Arrived at ${LOCATIONS[s.trip.to].name}.`,now);s.trip=null;}
   if(s.recovery?.watch)watchInsights(s,s.recovery,Math.min(now,s.recovery.endsAt));
   if(s.recovery && now>=s.recovery.endsAt)finishRecovery(s,s.recovery.endsAt);
   if(s.active?.kind==='practice' && now>=s.active.readyAt) {
@@ -112,6 +112,7 @@ export function finishRecovery(s,now){
   const r=s.recovery,start=r.startedAt??r.endsAt-B.recovery[r.need][1],share=Math.max(0,Math.min(1,(now-start)/(r.endsAt-start))),amount=r.amount??B.recovery[r.need][0];
   s.needs[r.need]=clamp(s.needs[r.need]+amount*share);for(const [k,v] of Object.entries(r.extra||{}))s.needs[k]=clamp(s.needs[k]+v*share);s.recovery=null;
   if(r.watch){watchInsights(s,r,now);if(r.watch.given)s.watchLearnAt=now;}
+  if(r.item&&ITEMS[r.item]?.use?.post&&share>=.5&&now-(s.postedAt||0)>=10*60_000){s.postedAt=now;const gain=Math.max(5,Math.round((s.fame||0)*.002));addFame(s,gain);log(s,`📷 Your photos got likes. +${gain} fame.`,now);}
   const train=r.item&&ITEMS[r.item]?.use?.learn;if(train&&CAREERS[s.career].family===train.family&&share>=.5)learn(s,s.career,CAREERS[s.career].focus,Math.round(train.points*share),`item:${r.id}`);
   log(s,share>=1?`${r.label} completed.`:`${r.label}: stopped early, +${Math.round(amount*share)} ${r.need}.`,now);
 }
@@ -199,7 +200,7 @@ function start(s,input,now,rng) {
   requireRule(s.needs.energy>=20&&s.needs.hunger>=20,'You need at least 20 energy and hunger.');
   const key=s.career,c=s.careers[key],def=CAREERS[key],kind=input.kind;
   requireRule(['practice','produce','live','trial','build','launch','collab'].includes(kind),'Unknown activity.');
-  requireRule(s.location===def.location || (kind==='practice'&&s.location==='home'&&s.inventory.gear),`Go to ${LOCATIONS[def.location].name} to start this activity.`);
+  requireRule(s.location===def.location || (kind==='practice'&&s.location==='home'&&s.inventory.gear) || (kind==='practice'&&!s.trip&&s.inventory.laptop&&def.family==='tech'),`Go to ${LOCATIONS[def.location].name} to start this activity.`);
   if(kind==='practice')requireRule(def.skills.includes(input.skill),'Choose a career skill.');
   if(kind==='trial')requireRule(discovery(c,def),'Complete three local activities and reach level 2 in your focus skill, or practise after a failed trial.');
   if(['build','launch'].includes(kind))requireRule(['founder','web3'].includes(key),'Only founders and Web3 builders own launchable products.');
@@ -237,7 +238,7 @@ function settle(s,a,now) {
   const contract=c.affiliation;
   if(qualifies&&contract)gain=Math.floor(gain*(1+(contract.boost??B.contractBoost)));
   gain=Math.floor(gain*a.audienceShare);
-  const fame=Math.round(fameFor(gain)*(1+(perksFor(s).fame||0)/100));c.audience+=gain;addFame(s,fame);c.completed++;
+  const fame=Math.round(fameFor(gain)*(1+((perksFor(s).fame||0)+(s.inventory.drone&&CAREERS[s.career].family==='creator'?5:0))/100));c.audience+=gain;addFame(s,fame);c.completed++;
   if(qualifies)c.engagement=clamp(c.engagement+(quality-50)/10);
   if(contract&&qualifies)c.reputation=clamp(c.reputation+(quality>=60?2:-2));
   if(a.kind==='trial') {
@@ -259,7 +260,12 @@ export function act(s,input,now,rng=Math.random) {
   switch(input.type) {
     case 'travel':
       requireRule(LOCATIONS[input.location],'Unknown destination.');requireRule(!s.active&&!s.recovery,'Finish your activity before travelling.');
-      if(input.location!==s.location&&!s.visiting&&LOT(input.location)!==LOT(s.location)){let ms=tripMs(s.location,input.location,s.ride||'walk');const rain=weatherAt(now)==='rain',jam=!!s.ride&&goSlowAt(now);if(rain)ms=Math.round(ms*1.2);if(jam)ms=Math.round(ms*1.4);s.trip={from:s.location,to:input.location,ride:s.ride||null,departs:now,arrives:now+ms,delays:[...(rain?['rain']:[]),...(jam?['go-slow']:[])]};log(s,`${s.ride?'Driving':'Walking'} to ${LOCATIONS[input.location].name} · ${Math.ceil(ms/60000)} min.${jam?' Go-slow on the road!':''}${rain?' Flooded streets slow you down.':''}`,now);break;}
+      if(input.location!==s.location&&!s.visiting&&LOT(input.location)!==LOT(s.location)){
+        // How you travel: your own ride, walking, or public transport (danfo, keke, okada, ride-hailing).
+        const pref=input.mode||s.travelMode||'own',mode=pref==='own'?(s.ride||'walk'):pref;
+        if(TRANSIT[mode])requireRule(mode!=='taxi'||(s.phone&&s.phone!=='basic'),'Ride-hailing needs a smartphone. Upgrade your phone.');
+        let ms=Math.round(tripMs(s.location,input.location,mode)*(1-(mode===s.ride?TUNING[(s.tune?.[mode]||0)-1]?.cut||0:0)/100));
+        const rain=weatherAt(now)==='rain'&&!NO_RAIN.includes(mode),jam=!NO_JAM.includes(mode)&&goSlowAt(now);if(rain)ms=Math.round(ms*1.2);if(jam)ms=Math.round(ms*1.4);s.trip={from:s.location,to:input.location,ride:mode==='walk'?null:mode,departs:now,arrives:now+ms,delays:[...(rain?['rain']:[]),...(jam?['go-slow']:[])]};log(s,`${mode==='walk'?'Walking':TRANSIT[mode]?`Taking a ${TRANSIT[mode].name.toLowerCase()}`:mode==='helicopter'?'Flying':mode==='bicycle'?'Cycling':'Driving'} to ${LOCATIONS[input.location].name} · ${Math.ceil(ms/60000)} min.${jam?' Go-slow on the road!':''}${rain?' Flooded streets slow you down.':''}`,now);break;}
       s.location=input.location;s.position3d=arrivalSpot(input.location);break;
     case 'move':
       requireRule(walkable(s.location,input.x,input.z,s.visiting?[]:s.furniture),'That destination is blocked. Choose open ground.');
@@ -355,13 +361,25 @@ export function act(s,input,now,rng=Math.random) {
       else requireRule(false,'Choose feed, play or cuddle.');break;
     }
     case 'rehomePet': {requireRule(s.pet,'You have no pet.');log(s,`${s.pet.name} went to a loving new home.`,now);s.pet=null;break;}
+    case 'travelMode': {requireRule(input.mode==='own'||input.mode==='walk'||TRANSIT[input.mode],'Choose how to travel.');s.travelMode=input.mode;break;}
+    case 'tune': {
+      requireRule(s.location==='plaza','Visit Palm Motors at Palm plaza.');requireRule(s.ride&&RIDE_SPEED[s.ride]&&s.ride!=='bicycle','Tune a ride you own.');
+      s.tune??={};const level=s.tune[s.ride]||0,next=TUNING[level];requireRule(next,'Your ride is fully tuned.');requireRule((s.fame||0)>=next.fame,`Tuning level ${level+1} needs ${next.fame.toLocaleString('en-US')} fame.`);
+      s.tune[s.ride]=level+1;log(s,`🔧 Tuned your ride to level ${level+1}: trips ${next.cut}% faster.`,now);break;
+    }
+    case 'wash': {requireRule(s.location==='plaza','Visit Palm Motors at Palm plaza.');requireRule(s.ride,'You have no ride to wash.');requireRule(now-(s.washedAt||0)>=30*60_000,'Your ride is still sparkling.');s.washedAt=now;s.needs.fun=clamp(s.needs.fun+5);log(s,'🧽 Your ride is sparkling clean. (+5 fun)',now);break;}
+    case 'yachtParty': {
+      requireRule(s.vip?.yacht,'Claim the yacht sponsorship first.');requireRule(s.location==='street'&&!s.trip,'Your yacht is moored by your street.');requireRule(!s.active&&!s.recovery,'Finish your activity first.');
+      s.recovery={id:id(),need:'fun',label:'Yacht party on the lagoon',startedAt:now,endsAt:now+90_000,amount:50,extra:{social:30},yacht:true};break;
+    }
     case 'takeOff': {requireRule(s.wear?.[input.slot],'Nothing to take off there.');delete s.wear[input.slot];break;}
     case 'useItem': {
       // Use a placed home item: it fills a need over time like the built-in objects.
       const def=ITEMS[input.item],use=def?.use;requireRule(use,'That item has no use.');
       requireRule(!s.active&&!s.recovery,'Finish or cancel your activity first.');
-      requireRule(s.location==='home'&&!s.visiting,'Use your items at home.');
-      requireRule(s.inventory[input.item]&&s.furniture.some(f=>f.item===input.item),'Place that item at home first.');
+      if(def.gadget){requireRule(s.inventory[input.item],'Claim it first.');requireRule(!s.trip,'Wait until you arrive.');}
+      else{requireRule(s.location==='home'&&!s.visiting,'Use your items at home.');
+      requireRule(s.inventory[input.item]&&s.furniture.some(f=>f.item===input.item),'Place that item at home first.');}
       requireRule(!(POWERED.includes(input.item)&&noPower(s,now)),'NEPA took light. Wait for power, or get a generator.');
       s.recovery={id:id(),need:use.need,label:use.verb,startedAt:now,endsAt:now+use.ms,amount:use.amount,extra:use.extra||{},item:input.item};break;
     }
@@ -387,7 +405,7 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(s.location==='plaza','Visit Palm Motors at Palm plaza to claim sponsorships.');
       s.vip??={};requireRule(!s.vip[input.item],'You already claimed this sponsorship.');
       requireRule((s.fame||0)>=deal.fame,`${deal.sponsor} sponsors players with ${deal.fame.toLocaleString('en-US')} fame.`);
-      s.vip[input.item]={at:now};if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')s.home=input.item;else s.equipped.clothes=input.item;
+      s.vip[input.item]={at:now};if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')s.home=input.item;else if(deal.kind==='style')s.equipped.clothes=input.item;
       log(s,`${deal.sponsor} sponsorship claimed: ${deal.name}. Free, and yours to keep.`,now);break;
     }
     case 'talk': {
