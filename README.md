@@ -4,7 +4,11 @@ A playable browser life simulation set in Palm City, implemented from the suppli
 
 Create a character, explore six locations, recover daily needs, train skills, play career decisions, publish credited outputs, grow an audience, join affiliations, and improve your home. The city uses a small, dependency-free orthographic 3D renderer with cutaway interiors, camera rotation, click-to-walk movement and obstacle routing.
 
-## Run
+## Deploy on Netlify
+
+The full game supports Netlify Functions and Netlify Database (Postgres). Connect this repository, deploy the implementation branch, and use the committed `netlify.toml` settings. Database provisioning and migrations run automatically. See [docs/netlify.md](docs/netlify.md) for deployment, verification and operating limits.
+
+## Run locally
 
 Install Node.js **24 or newer**, then run:
 
@@ -45,7 +49,7 @@ The shared activity engine supplies career-specific narratives and skill mapping
 
 This is a first playable implementation, not a production MMO service. See [docs/implementation.md](docs/implementation.md) for the requirements mapping and remaining content work.
 
-- Players belong to this server and browser session. There is no email/password login, cross-device recovery, account deletion interface or cloud deployment.
+- Players belong to this server and browser session. There is no email/password login, cross-device recovery, account deletion interface; cloud hosting is supported through Netlify.
 - Other players appear in the same location through four-second polling. This is not authoritative real-time movement synchronization. NPCs support solo play.
 - All 15 careers are playable, with deeper sport-specific rules for football, tennis and wrestling. Creator, acting and technology scenes use stylized contextual panels; additional career-specific animation, full leagues/tournaments, tours and sponsorship catalogues remain expansion work.
 - Seasonal awards compare eligible characters on this server only. The first season starts when the server first runs, lasts 28 days, and publishes its cutoff and weights in Profile. Awards require at least one qualifying seasonal output and 100 audience. Eligibility tiers lock on first qualification. Reports are persisted for manual operator review; there is no moderation dashboard yet.
@@ -61,7 +65,7 @@ This is a first playable implementation, not a production MMO service. See [docs
 | `DATA_DIR` | `./data` | SQLite storage directory |
 | `SECURE_COOKIE` | unset | Set to `1` behind HTTPS so session cookies use Secure |
 
-For a hosted installation, terminate HTTPS at a reverse proxy, preserve the Host header, persist the data directory, set Secure cookies, and configure a public-service security and moderation policy. This repository does not automatically deploy or change hosting settings.
+For a hosted installation, terminate HTTPS at a reverse proxy, preserve the Host header, persist the data directory, set Secure cookies, and configure a public-service security and moderation policy. Netlify deployment uses the committed configuration and a separate cloud database; local saves are not uploaded.
 
 ## Project layout
 
