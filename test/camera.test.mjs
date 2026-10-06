@@ -12,7 +12,7 @@ test('ground taps map back to the same position after zoom, orbit and tilt',()=>
       assert.ok(Math.abs(ground.x-point.x)<1e-9&&Math.abs(ground.z-point.z)<1e-9);
     }
   }
-  assert.equal(clampZoom(.01),.3);assert.equal(clampZoom(9),3);
+  assert.equal(clampZoom(.01),.16);assert.equal(clampZoom(9),3);
 });
 test('character turns across the angle boundary without spinning the long way',()=>{
   const heading=turnToward(Math.PI-.1,-Math.PI+.1,.02);

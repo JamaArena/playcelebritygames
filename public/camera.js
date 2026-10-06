@@ -1,4 +1,4 @@
-export const clampZoom=value=>Math.min(3,Math.max(.3,value));
+export const clampZoom=value=>Math.min(3,Math.max(.16,value));
 export function projectPoint(x,y,z,{width,height,scale,angle,pitch}){
   const c=Math.cos(angle),s=Math.sin(angle);
   return {x:width/2+(x*c-z*s)*scale,y:height*.59+(x*s+z*c)*scale*pitch-y*scale};

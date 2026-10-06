@@ -25,7 +25,7 @@ async function refresh(){
 function receive(data){snapshot=data;state=data.state;offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();
   $('#loading').hidden=true;
   if(!state){if(modalPage!=='create')creation();return;}
-  $('#app').hidden=false;render();world.update(state,data.scenePlayers||[],data.visitedHome);
+  $('#app').hidden=false;render();world.update(state,data.scenePlayers||[],data.visitedHome,data.townPlayers||[],data.players||[],state.friends);
 }
 async function send(input,{keepModal=false,quiet=false}={}){
   if(busy)return;busy=true;$('#connection').textContent='Saving…';
@@ -59,7 +59,11 @@ const world=new World($('#world'),position=>{closeTray();send({type:'move',...po
   if(object.placement){send({type:'place',...object.placement}).then(data=>{if(data){world.placement=null;world.draw();}});return;}
   if(object.decision!==undefined){chooseDecision(object.decision);return;}
   if(object.travel){closeTray();send({type:'travel',location:object.travel});return;}
+  if(object.person){const p=object.person,friend=state.friends.includes(p.id);selectedObject=null;pie(object,[[`${CAREERS[p.career]?.icon||'☺'} ${escape(CAREERS[p.career]?.name||'Player')} <small>${escape(B.tiers[p.tier||0][0])}</small>`,'page','data-page="phone"'],friend?['✉ Message','directMessage',`data-player="${p.id}"`]:['♡ Add friend','friend',`data-player="${p.id}"`],['💬 Local chat','page','data-page="phone"']]);return;}
+  if(object.house){const p=object.house,friend=state.friends.includes(p.id);pie(object,[friend?['✉ Ask for an invite','directMessage',`data-player="${p.id}"`]:['♡ Add friend','friend',`data-player="${p.id}"`],['♧ Contacts','page','data-page="phone"']]);toast(`Visiting ${p.name}’s home needs their invitation.`);return;}
   selectedObject=object;$('#objects').hidden=true;const def=CAREERS[state.career],c=state.careers[state.career];
+  // Venue spots only serve the careers based there; point everyone else to their own venue.
+  if((object.action==='practice'||object.action==='career')&&state.location!=='home'&&state.location!==def.location){pie(object,[[`↗ ${escape(LOCATIONS[def.location].name)} <small>for ${escape(def.name)}</small>`,'travel',`data-location="${def.location}"`],['↗ Go here','goObject']]);toast(`${object.name} isn’t used by ${def.name.toLowerCase()}s. Your venue is ${LOCATIONS[def.location].name}.`);return;}
   if(object.action==='practice'){
     if(state.location==='home'&&!state.inventory.gear){pie(object,[['↗ Practise at venue','travel',`data-location="${def.location}"`],['◇ Buy equipment','travel','data-location="plaza"']]);return;}
     pie(object,def.skills.map(skill=>[`✧ ${escape(skill)} <small>Lv ${c.skills[skill].level}</small>`,'startPractice',`data-skill="${escape(skill)}"`]));return;
@@ -120,9 +124,9 @@ function creation(){
 function updateCreationCareer(key){
   const def=CAREERS[key];$('#createForm [name=career]').value=key;$('#origin').innerHTML=def.origins.map((o,i)=>`<option value="${i}">${escape(o)}</option>`).join('');
   document.querySelectorAll('.career-option').forEach(b=>b.classList.toggle('selected',b.dataset.career===key));
-  $('#careerExtras').innerHTML=key==='football'?'<div class="field"><label for="position">Outfield position</label><select id="position" name="position"><option value="striker">Striker</option><option value="midfielder">Midfielder</option><option value="defender">Defender</option></select></div>':key==='musician'?'<div class="field"><label for="technique">Primary technique</label><select id="technique" name="technique"><option value="vocals">Vocals</option><option value="instrument">Instrument</option></select></div>':key==='adult'?'<label class="check"><input type="checkbox" name="adult" required> My character and all participants are adults. Projects are represented without graphic scenes.</label>':'';
+  $('#careerExtras').innerHTML=key==='football'?'<div class="field"><label for="position">Outfield position</label><select id="position" name="position"><option value="striker">Striker</option><option value="midfielder">Midfielder</option><option value="defender">Defender</option></select></div>':key==='musician'?'<div class="field"><label for="technique">Primary technique</label><select id="technique" name="technique"><option value="vocals">Vocals</option><option value="instrument">Instrument</option></select></div>':key==='adult'?'<label class="check"><input type="checkbox" name="adult" required> 18+ career. My character and everyone in their projects are adults. Expect flirty, suggestive themes; nothing explicit is shown.</label>':'';
 }
-function map(){world.flyTo(.36);showTray('↗ Palm City','<div class="city-tiles">'+Object.entries(LOCATIONS).map(([key,l])=>button('<span>'+TOWN[key].pin+'</span>'+escape(l.name),'travel','data-location="'+key+'"','city-tile')).join('')+'</div><small>Tap a pin on the map or a place here to head over.</small>');}
+function map(){world.flyTo(.22);showTray('↗ Palm City','<div class="city-tiles">'+Object.entries(LOCATIONS).map(([key,l])=>button('<span>'+TOWN[key].pin+'</span>'+escape(l.name),'travel','data-location="'+key+'"','city-tile')).join('')+'</div><small>Tap a pin on the map or a place here to head over.</small>');}
 function practice(){const def=CAREERS[state.career];if(state.location==='home'&&!state.inventory.gear){showTray('✧ Practise','<div class="tray-options">'+button('↗ Go to venue','travel','data-location="'+def.location+'"','primary')+button('◇ Buy home equipment','travel','data-location="plaza"')+'</div>');return;}showTray('✧ Practise','<div class="tray-options skills-options">'+def.skills.map(skill=>button(escape(skill)+' <small>Lv '+state.careers[state.career].skills[skill].level+'</small>','startPractice','data-skill="'+escape(skill)+'"')).join('')+'</div><small>ϟ 1 · 3:00 · +7 XP</small>');}
 function prepare(kind){const def=CAREERS[state.career];kind??=['founder','web3'].includes(state.career)?'build':'produce';if(kind==='launch'||kind==='collab'){prepareDetails(kind);return;}showTray(def.icon+' '+def.output,'<div class="tray-options">'+button('▶ Start · ϟ 1','quickStart','data-kind="'+kind+'"','primary')+button('Options','prepareDetails','data-kind="'+kind+'"')+'</div><small>'+duration(def.family==='sport'?B.sportMs:B.activityMs)+' · '+(def.family==='sport'?6:3)+' choices</small>');}
 function prepareDetails(kind){
@@ -238,5 +242,7 @@ document.addEventListener('submit',async event=>{
   if(form.id==='collabForm')await send({type:'collabInvite',...values},{keepModal:true});
 });
 await refresh();
+// Real-time: the local server pushes a ping after any player's action; polling remains the heartbeat and fallback.
+let liveTimer;try{const live=new EventSource('/api/live');live.onmessage=()=>{clearTimeout(liveTimer);liveTimer=setTimeout(()=>{if(!busy)refresh();},150);};let opened=false;live.onopen=()=>opened=true;live.onerror=()=>{if(!opened)live.close();};}catch{}
 setInterval(async()=>{await refresh();if(modalPage==='phone'&&phoneTab==='local'&&$('#chatLog'))$('#chatLog').innerHTML=chatMessages();},4000);
 setInterval(()=>{if(state&&!busy){renderActivity();clock();const next=$('#chargeRefill');if(next&&state.refillAnchor!==null)next.textContent=`Next charge in ${duration(state.refillAnchor+B.refillMs-now())}`;}},1000);

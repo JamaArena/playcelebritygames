@@ -36,6 +36,11 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   assert.ok((await b.call()).data.messages.some(m=>m.body==='Private home message'));
   await b.call({type:'leaveVisit'});await b.call({type:'travel',location:'home'});
   assert.equal((await a.call()).data.scenePlayers.length,0,'departed guests disappear');
+  assert.equal((await a.call()).data.townPlayers.length,0,'players at home are never shown around town');
+  await b.call({type:'travel',location:'plaza'});
+  assert.deepEqual((await a.call()).data.townPlayers.map(p=>[p.id,p.location]),[[bId,'plaza']],'players in public places are visible from anywhere');
+  assert.equal((await a.call()).data.townPlayers[0].token_hash,undefined);
+  await b.call({type:'travel',location:'home'});
   fixture(bId,s=>s.invitations=[]);database.prepare('UPDATE messages SET at=?').run(Date.now()-2000);
   assert.equal((await a.call()).data.state.name,'River');
   assert.equal((await a.call({type:'create',name:'Again',career:'football',origin:0})).status,400);

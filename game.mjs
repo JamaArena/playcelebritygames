@@ -126,7 +126,8 @@ export function choices(s) {
   const skill=a.kind==='launch'?def.skills[[2,1,0][i%3]] : a.career==='tennis'?['serve','forehand','backhand','footwork','serve','forehand'][i%6] : a.career==='musician'?['songwriting','technique','production'][i%3] : a.career==='adult'?['business','presentation','production'][i%3] : a.career==='streamer'?['engagement','production','commentary'][i%3] : def.skills[i%def.skills.length];
   const labels = a.career==='musician' ? [
     ['A familiar melody','An original chorus','A surprising key change'],['Simplify the passage','Record the planned take','Attempt a demanding run'],['Keep the mix simple','Balance the arrangement','Try a bold production idea']][i%3] : a.career==='developer'?[
-    ['Reproduce the bug first','Trace the failing path','Refactor the affected module'],['Apply a focused repair','Add regression coverage','Rebuild the component'],['Explain a smaller scope','Deliver with documented tests','Propose a broader release']][i%3] : ['Use a proven approach','Commit to your own approach','Try an ambitious approach'];
+    ['Reproduce the bug first','Trace the failing path','Refactor the affected module'],['Apply a focused repair','Add regression coverage','Rebuild the component'],['Explain a smaller scope','Deliver with documented tests','Propose a broader release']][i%3] : a.career==='adult'?[
+    ['Sign the standard contract','Negotiate a bigger cut','Hold out for top billing'],['Keep it classy and teasing','Turn up the heat','Go bold and leave them breathless'],['Reschedule and keep it professional','Rework the scene with the crew','Improvise a sizzling solo set']][i%3] : ['Use a proven approach','Commit to your own approach','Try an ambitious approach'];
   const list=labels.map((label,j)=>({label,skill,risk:['safe','balanced','risky'][j],action:'general'}));
   if(a.career==='hacker')list.push({label:'Stop the operation',skill:'risk judgement',risk:'safe',action:'stop'});
   return list;
