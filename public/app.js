@@ -113,14 +113,14 @@ const onWorldObject=object=>{
   const watch=object.name==='Television'&&!state.visiting?[[`📺 ${escape(WATCH[def.family].title)} <small>learn a little</small>`,'watchObject']]:[];
   pie(object,[...watch,[`${object.icon} ${escape(object.verb||'Use')}${object.need?` <small>+${B.recovery[object.need][0]} ${escape(needs[object.need][0])}, stop any time</small>`:''}`,'useObject'],['↗ Go here','goObject']]);
 };
-// The world view: 3D (WebGL) inside places, the 2D renderer for the street, trips and the city map.
+// The world view is 3D (WebGL) everywhere: places, the street, trips and the city map.
 // Add ?renderer=2d to the address to force the 2D view. Without WebGL the game stays 2D.
 function makeWorld(){
   const flat=new World($('#world'),onWorldMove,onWorldObject);let deep=null;
   try{if(!/[?&]renderer=2d/.test(location.search))deep=new World3D($('#world3d'),$('#world3dGL'),onWorldMove,onWorldObject);}catch(error){console.warn('3D view unavailable; using 2D.',error);}
   if(!deep)return flat;
   const views=[flat,deep];let active=flat;deep.paused=true;
-  const swap=()=>{const next=deep.interior()?deep:flat;if(next===active)return;
+  const swap=()=>{const next=deep;if(next===active)return;
     for(const key of ['player','target','heading','pose','moving','waypoints','pending','speed','people','speech','zoom','angle','pitch','lift','pan','npcTalkUntil','lampOff','fridgeOpen','windowOpen','placement'])next[key]=active[key];
     active.paused=true;next.paused=false;active=next;$('#world').style.display=active===flat?'':'none';$('#world3dWrap').style.display=active===deep?'':'none';active.draw();};
   return new Proxy({},{
