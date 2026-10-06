@@ -7,9 +7,11 @@ export const BALANCE = {
   // Reach per output (views, streams, fans cheering, users) before quality; 1,000 reach = 1 fame point.
   reaches: [10_000, 100_000, 1_000_000, 10_000_000], famePerReach: 1 / 1000, seasonMinReach: 10_000, contractBoost: .25,
   tiers: [['Newcomer', 0, 1], ['Emerging', 100, 2], ['Established', 1000, 4], ['Star', 10000, 6], ['Icon', 100000, 8]],
-  milestones: [100, 1000, 10000, 100000], seasonMs: 28 * 86400_000, driveMsPerBlock: 60_000,
+  milestones: [100, 1000, 10000, 100000], seasonMs: 28 * 86400_000, walkMsPerBlock: 25_000, walkCapMs: 90_000,
 };
-const career = (name, icon, family, skills, origins, location, output, beats, focus = skills[0]) => ({name, icon, family, skills, origins, location, output, beats, focus, audience: family === 'tech' ? 'users' : family === 'music' ? 'streams' : family === 'sport' ? 'fans cheering' : 'views'});
+// Careers sit under four umbrellas. Origins are [humble start, best start]; the start is drawn at random.
+export const UMBRELLAS = {sport: 'Sports', creator: 'Content creation', music: 'Entertainment', acting: 'Entertainment', tech: 'Technology', risk: 'Technology'};
+const career = (name, icon, family, skills, origins, location, output, beats, focus = skills[0]) => ({name, icon, family, umbrella: UMBRELLAS[family], skills, origins, location, output, beats, focus, audience: family === 'tech' ? 'users' : family === 'music' ? 'streams' : family === 'sport' ? 'fans cheering' : 'views'});
 export const CAREERS = {
   football: career('Footballer', '⚽', 'sport', ['passing', 'dribbling', 'shooting', 'defending'], ['Street footballer', 'Academy prodigy'], 'sports', 'Match', ['Find space behind the defence.', 'A defender closes down your passing lane.', 'The ball breaks near your penalty area.', 'You have a clear view of goal.', 'Track the runner on the flank.', 'One final attack could change the game.'], 'passing'),
   musician: career('Musician', '♫', 'music', ['technique', 'songwriting', 'production', 'stage presence'], ['Street musician', 'Childhood prodigy'], 'studio', 'Song', ['Find the melody that makes this song yours.', 'The vocal passage reaches beyond your planned range.', 'Choose the final arrangement and mix.']),
@@ -25,7 +27,7 @@ export const CAREERS = {
   founder: career('Founder', '⬡', 'tech', ['product judgement', 'leadership', 'sales', 'finance'], ['Bootstrapped founder', 'Mentored builder'], 'tech', 'Product', ['Choose a feature after customer feedback.', 'Allocate a limited production budget.', 'Resolve a problem before delivery.']),
   developer: career('Developer', '⌘', 'tech', ['coding', 'debugging', 'architecture', 'communication'], ['Self-taught freelancer', 'Mentored coding prodigy'], 'tech', 'Client project', ['Inspect a fictional bug in the client project.', 'Choose a repair that preserves stability.', 'Communicate a delivery tradeoff.']),
   web3: career('Web3 builder', '⬢', 'tech', ['product', 'community', 'research', 'technical skill'], ['Independent newcomer', 'Community-connected talent'], 'tech', 'Product', ['Pick a useful fictional product direction.', 'Respond to community concerns.', 'Handle a launch-readiness decision.']),
-  hacker: career('Fictional operator', '⌁', 'risk', ['technical skill', 'deception', 'planning', 'risk judgement'], ['Underground newcomer', 'Fictional crew recruit'], 'tech', 'Operation', ['Choose a route through an invented simulation.', 'An invented complication raises exposure.', 'Decide whether to complete the simulation or stop.']),
+  hacker: career('Fraudster', '⌁', 'risk', ['technical skill', 'deception', 'planning', 'risk judgement'], ['Small-time hustler', 'Crew recruit'], 'tech', 'Operation', ['Choose a route through an invented simulation.', 'An invented complication raises exposure.', 'Decide whether to complete the simulation or stop.']),
 };
 export const LOCATIONS = {
   home: {name: 'Your apartment', subtitle: 'A little room for big dreams', icon: '⌂', color: '#edc594'},
@@ -61,22 +63,25 @@ export const SPONSORSHIPS = {
   villa: {name: 'Lagoon villa', sponsor: 'Coastline Estates', fame: 25_000, kind: 'home', icon: '🏝️', color: '#3a8fa8', rest: .8, description: 'Marble, sea light and a statement chandelier. Home recovery 20% faster.'},
   mansion: {name: 'Island mansion', sponsor: 'Isle Royale', fame: 150_000, kind: 'home', icon: '🏰', color: '#b8932f', rest: .7, description: 'Gold trim, a grand piano and room for the whole entourage. Home recovery 30% faster.'},
 };
-// Travel follows the roads. One 16-unit block takes BALANCE.driveMsPerBlock, scaled by the ride's
-// speed factor; without a ride you walk at RIDE_SPEED.walk. Home and its street are next door.
+// Travel follows the roads. Walking takes BALANCE.walkMsPerBlock per 16-unit block, never more than
+// BALANCE.walkCapMs; every ride is a fraction of the walking time. Home and its street are next door.
+// Walkers keep to the sidewalk; cars drive in a lane.
 // Walking is the slowest way around; the street outside your door shares your home's lot.
-export const RIDE_SPEED = {walk: 1.6, scooter: 1, suv: .8, coupe: .7, hypercar: .5};
+export const RIDE_SPEED = {walk: 1, scooter: .75, hatchback: .65, suv: .55, coupe: .5, hypercar: .35};
+// Best-start characters begin with a family car; sponsored rides come from fame.
+export const STARTER_RIDE = 'hatchback';
 export const LOT = location => location === 'street' ? 'home' : location;
 export const arrivalSpot = location => location === 'street' ? {x: 0, z: 6.2} : {x: 0, z: 1};
-export function route(from, to) {
+export function route(from, to, mode = 'walk') {
   // Homes are entered and left by the front door on the street; venues are walked into.
-  const a = TOWN[LOT(from)], b = TOWN[LOT(to)], road = lot => lot.z + 8, door = (key, lot) => LOT(key) === 'home' ? {x: lot.x, z: lot.z + 6.2} : {x: lot.x, z: lot.z};
+  const edge = mode === 'walk' ? 1.9 : .75, a = TOWN[LOT(from)], b = TOWN[LOT(to)], road = lot => lot.z + 8 - edge, door = (key, lot) => LOT(key) === 'home' ? {x: lot.x, z: lot.z + 6.2} : {x: lot.x, z: lot.z};
   const points = [door(from, a), {x: a.x, z: road(a)}];
-  if (road(a) !== road(b)) { const side = a.x + (b.x >= a.x ? 8 : -8); points.push({x: side, z: road(a)}, {x: side, z: road(b)}); }
+  if (road(a) !== road(b)) { const side = a.x + (b.x >= a.x ? 8 - edge : edge - 8); points.push({x: side, z: road(a)}, {x: side, z: road(b)}); }
   points.push({x: b.x, z: road(b)}, door(to, b));
   return points;
 }
 export const routeLength = points => points.slice(1).reduce((n, p, i) => n + Math.abs(p.x - points[i].x) + Math.abs(p.z - points[i].z), 0);
-export const tripMs = (from, to, ride) => Math.round(routeLength(route(from, to)) / 16 * BALANCE.driveMsPerBlock * (RIDE_SPEED[ride] ?? 1));
+export const tripMs = (from, to, ride = 'walk') => Math.round(Math.min(BALANCE.walkCapMs, routeLength(route(from, to)) / 16 * BALANCE.walkMsPerBlock) * (RIDE_SPEED[ride] ?? 1));
 export function along(points, f) {
   const total = routeLength(points); let left = Math.max(0, Math.min(1, f)) * total;
   for (let i = 1; i < points.length; i++) { const a = points[i - 1], b = points[i], d = Math.abs(b.x - a.x) + Math.abs(b.z - a.z);
@@ -84,6 +89,14 @@ export function along(points, f) {
     left -= d; }
   return {...points.at(-1), axis: 'z', heading: 0};
 }
+// Your phone holds every menu. Better models unlock with fame (free, never spent).
+export const PHONES = {
+  basic: {name: 'Starter phone', fame: 0, color: '#3b4a42', screen: '#f4f7f1', perk: 'All the essentials.'},
+  smart: {name: 'Glow smartphone', fame: 300, color: '#2f6fb3', screen: '#eef5fc', perk: 'Shows friends online on the home screen.'},
+  pro: {name: 'Pro edition', fame: 5_000, color: '#7b4fa3', screen: '#f5effa', perk: 'Adds your season standing and next unlock to the home screen.'},
+  gold: {name: 'Gold edition', fame: 50_000, color: '#b8932f', screen: '#fbf6e8', perk: 'A gold phone everyone notices. Shown on your public profile.'},
+};
+export const RIDES = {hatchback: {name: 'Family hatchback', icon: '🚗', color: '#5f8f8a'}, ...Object.fromEntries(Object.entries(SPONSORSHIPS).filter(([, d]) => d.kind === 'ride'))};
 export const NPCS = [
   {id:'nova', name:'Nova', career:'musician', location:'studio', role:'Producer', color:'#b4a7d9'},
   {id:'kai', name:'Kai', career:'football', location:'sports', role:'Scout', color:'#88bda5'},

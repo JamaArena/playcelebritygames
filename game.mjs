@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, NPCS, LOCATIONS, SPONSORSHIPS, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, CAREERS, ITEMS, NPCS, LOCATIONS, SPONSORSHIPS, PHONES, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -13,8 +13,7 @@ export function createCharacter(input, now) {
   requireRule([0,1].includes(input.origin), 'Select an origin.');
   requireRule(text(input.name).length >= 2, 'Use a name of at least two characters.');
   requireRule(input.career !== 'adult' || input.adult === true, 'Confirm that your character is an adult.');
-  const position = ['striker', 'midfielder', 'defender'].includes(input.position) ? input.position : 'midfielder';
-  return {version:3, name:text(input.name,30), color: /^#[\da-f]{6}$/i.test(input.color) ? input.color : '#d49872', hair: input.hair === 'short' ? 'short' : 'curls', position, technique: input.technique === 'instrument' ? 'instrument' : 'vocals', career:input.career, careers:{[input.career]:newCareer(input.career,input.origin)}, location:'home', position3d:{x:0,z:1}, fame:0, needs:Object.fromEntries(Object.keys(B.decay).map(n=>[n,80])), lastSeen:now, charges:10, refillAnchor:null, active:null, recovery:null, inventory:{bed:{level:1}, shower:{level:1}, toilet:{level:1}}, furniture:[], outputs:[], events:[], learningEvents:[], awards:[], results:[], friends:[], blocks:[], invitations:[], equipped:{}, seasonStart:now, appearance:{}, collaborations:[]};
+  return {version:3, name:text(input.name,30), color: /^#[\da-f]{6}$/i.test(input.color) ? input.color : '#d49872', hair: input.hair === 'short' ? 'short' : 'curls', technique: input.technique === 'instrument' ? 'instrument' : 'vocals', career:input.career, careers:{[input.career]:newCareer(input.career,input.origin)}, location:'home', position3d:{x:0,z:1}, fame:0, needs:Object.fromEntries(Object.keys(B.decay).map(n=>[n,80])), lastSeen:now, charges:10, refillAnchor:null, active:null, recovery:null, inventory:{bed:{level:1}, shower:{level:1}, toilet:{level:1}}, furniture:[], outputs:[], events:[], learningEvents:[], awards:[], results:[], friends:[], blocks:[], invitations:[], equipped:{}, seasonStart:now, appearance:{}, collaborations:[], ride: input.origin === 1 ? STARTER_RIDE : null, phone:'basic'};
 }
 // Fame is one character-wide total earned from reach in any career. Battles can also move it.
 export const fameFor = reach => Math.floor(reach * B.famePerReach);
@@ -302,6 +301,10 @@ export function act(s,input,now,rng=Math.random) {
       requireRule((s.fame||0)>=deal.fame,`${deal.sponsor} sponsors players with ${deal.fame.toLocaleString('en-US')} fame.`);
       s.vip[input.item]={at:now};if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')s.home=input.item;else s.equipped.clothes=input.item;
       log(s,`${deal.sponsor} sponsorship claimed: ${deal.name}. Free, and yours to keep.`,now);break;
+    }
+    case 'phoneUpgrade': {
+      const model=PHONES[input.item];requireRule(model,'Unknown phone.');requireRule((s.fame||0)>=model.fame,`The ${model.name} unlocks at ${model.fame.toLocaleString('en-US')} fame.`);
+      s.phone=input.item;log(s,`Switched to the ${model.name}.`,now);break;
     }
     case 'useVip': {
       const deal=SPONSORSHIPS[input.item];requireRule(deal&&s.vip?.[input.item],'Claim this sponsorship first.');

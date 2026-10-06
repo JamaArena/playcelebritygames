@@ -67,7 +67,7 @@ function captureEligibility(s,now){
 }
 const TOWN_PLAYER_LIMIT=120;
 const roomFor=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
-function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,home:s.home||null,trip:s.trip||null,tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<20_000};}
+function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<20_000};}
 function snapshot(playerId,s,now){
   if(!s)return {state:null,serverNow:now};
   const players=db.prepare('SELECT id,state FROM players WHERE id!=?').all(playerId).flatMap(row=>{const p=JSON.parse(row.state);return p?[publicProfile(row.id,p)]:[];}).filter(p=>!s.blocks.includes(p.id));
@@ -280,7 +280,8 @@ try {
         const s=transact(()=>{
           let state=load(playerId);
           if(db.prepare('SELECT 1 FROM requests WHERE player_id=? AND request_id=?').get(playerId,input.requestId))return state;
-          if(input.type==='create'){fail(!state,'Your character already exists.');state=createCharacter(input,now);}
+          // The starting story is drawn here, not chosen: a humble start or the best start (with a car).
+          if(input.type==='create'){fail(!state,'Your character already exists.');state=createCharacter({...input,origin:Math.random()<.5?0:1},now);}
           else {
             fail(state,'Create your character first.');reconcile(state,now);captureEligibility(state,now);
             if(state.visiting)fail(['chat','recover','leaveVisit','move','report','block','friend'].includes(input.type),'Visitors can socialise but cannot modify a home or claim its rewards.');

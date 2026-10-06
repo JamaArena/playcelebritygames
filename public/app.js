@@ -1,4 +1,4 @@
-import { CAREERS, LOCATIONS, ITEMS, NPCS, TOWN, SPONSORSHIPS, BALANCE as B, effort, canPlace } from './content.js';
+import { CAREERS, LOCATIONS, ITEMS, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, BALANCE as B, effort, canPlace } from './content.js';
 import { World, worldObjects } from './world.js';
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -12,7 +12,7 @@ const button=(label,action,attrs='',style='secondary')=>`<button class="${style}
 const careerOptions=(selected)=>Object.entries(CAREERS).map(([key,def])=>`<option value="${key}" ${key===selected?'selected':''}>${escape(def.name)}</option>`).join('');
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,5500);}
 function showModal(page,html,closable=true){
-  if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;$('#modalContent').innerHTML=html;
+  if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;$('#modalContent').innerHTML=(closable&&!['phoneHome','create'].includes(page)?button('‹ Phone','backToPhone','','phone-back'):'')+html;$('#modal').classList.toggle('as-phone',page==='phoneHome');
   const title=$('#modalContent h2');if(title)title.id='modalTitle';
   setTimeout(()=>$('#modalContent input, #modalContent button, #closeModal')?.focus(),0);
 }
@@ -54,7 +54,7 @@ async function send(input,{keepModal=false,quiet=false}={}){
     const data=await response.json();if(!response.ok)throw new Error(data.error||'Action unavailable.');
     if(!keepModal&&modalPage!=='create')closeModal();
     closeTray();receive(data,true);$('#connection').textContent='Saved to your city';
-    if(keepModal){if(modalPage==='phone')phone(phoneTab);else if(modalPage==='shop')shop();else if(modalPage==='inventory')inventory();else if(modalPage==='career')career();else if(modalPage==='vip')vip();else if(modalPage==='battle')battleView();}
+    if(keepModal){if(modalPage==='phone')phone(phoneTab);else if(modalPage==='shop')shop();else if(modalPage==='inventory')inventory();else if(modalPage==='career')career();else if(modalPage==='vip')vip();else if(modalPage==='phones')phoneStore();else if(modalPage==='battle')battleView();}
     if(!quiet&&input.type==='report')toast('Report recorded for the city operator.');
     return data;
   }catch(error){toast(error.message||'Could not connect. Your last saved progress is safe.');}
@@ -77,7 +77,7 @@ const world=new World($('#world'),position=>{closeTray();send({type:'move',...po
   if(object.placement){send({type:'place',...object.placement}).then(data=>{if(data){world.placement=null;world.draw();}});return;}
   if(object.decision!==undefined){chooseDecision(object.decision);return;}
   if(object.travel){closeTray();send({type:'travel',location:object.travel});return;}
-  if(object.person){const p=object.person,friend=state.friends.includes(p.id);selectedObject=null;if(p.ride&&SPONSORSHIPS[p.ride])toast(`${SPONSORSHIPS[p.ride].icon} ${p.name} drives a ${SPONSORSHIPS[p.ride].name}.`);pie(object,[[`${CAREERS[p.career]?.icon||'☺'} ${escape(CAREERS[p.career]?.name||'Player')} <small>${escape(B.tiers[p.tier||0][0])}</small>`,'page','data-page="phone"'],friend?['✉ Message','directMessage',`data-player="${p.id}"`]:['♡ Add friend','friend',`data-player="${p.id}"`],['💬 Local chat','page','data-page="phone"'],['⚔ Challenge 1v1','battleCreate',`data-mode="1" data-opponent="${p.id}"`]]);return;}
+  if(object.person){const p=object.person,friend=state.friends.includes(p.id);selectedObject=null;if(p.ride&&RIDES[p.ride])toast(`${RIDES[p.ride].icon} ${p.name} drives a ${RIDES[p.ride].name}.`);pie(object,[[`${CAREERS[p.career]?.icon||'☺'} ${escape(CAREERS[p.career]?.name||'Player')} <small>${escape(B.tiers[p.tier||0][0])}</small>`,'page','data-page="phone"'],friend?['✉ Message','directMessage',`data-player="${p.id}"`]:['♡ Add friend','friend',`data-player="${p.id}"`],['💬 Local chat','page','data-page="phone"'],['⚔ Challenge 1v1','battleCreate',`data-mode="1" data-opponent="${p.id}"`]]);return;}
   if(object.house){const p=object.house,friend=state.friends.includes(p.id);pie(object,[friend?['✉ Ask for an invite','directMessage',`data-player="${p.id}"`]:['♡ Add friend','friend',`data-player="${p.id}"`],['♧ Contacts','page','data-page="phone"']]);toast(`Visiting ${p.name}’s home needs their invitation.`);return;}
   selectedObject=object;$('#objects').hidden=true;const def=CAREERS[state.career],c=state.careers[state.career];
   // Venue spots only serve the careers based there; point everyone else to their own venue.
@@ -105,10 +105,11 @@ async function startAtObject(input){
 }
 let tripTimer;
 function render(){
+  if(!modalPage||modalPage!=='create')tip(state.location==='home'?'home':'city');
   clearTimeout(tripTimer);if(state.trip)tripTimer=setTimeout(()=>refresh(),Math.max(500,state.trip.arrives-now()+400));
   const c=state.careers[state.career],def=CAREERS[state.career],location=LOCATIONS[state.location];
   $('#navigation').innerHTML=[['city','⌂','Home'],['career','✧','Career'],['phone','♧','Social'],['inventory','◇','My home'],['profile','♙','Profile']].map(([page,icon,label])=>`<button class="nav-button ${page==='city'?'active':''}" data-action="${page==='city'?(state.visiting?'leaveVisit':'travel'):'page'}" data-location="home" data-page="${page}"><span>${icon}</span>${label}</button>`).join('');
-  $('#topStats').innerHTML=`<div class="stat-chip"><span class="stat-icon">ϟ</span><div><strong>${state.charges} / 10 <small>career charges</small></strong><div class="charges">${Array.from({length:10},(_,i)=>`<span class="charge ${i<state.charges?'full':''}"></span>`).join('')}</div><small id="chargeRefill" class="refill-time">${state.refillAnchor===null?'Fully charged':`Next charge in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></div></div><div class="stat-chip"><span class="stat-icon">✦</span><div><strong>${fmt(state.fame||0)} <small>fame</small></strong><small>${B.tiers[state.careers[state.career].tier][0]}</small></div></div><div class="stat-chip"><span class="stat-icon">☀</span><div><strong>Day ${Math.max(1,Math.floor((now()-state.seasonStart)/86400000)+1)}</strong><small>Your new chapter</small></div></div>`;
+  $('#topStats').innerHTML=phoneWidget();
   $('#locationTitle').textContent=state.visiting?`${snapshot.players.find(p=>p.id===state.visiting)?.name||'Friend'}’s home`:state.location==='home'&&SPONSORSHIPS[state.home]?`Your ${SPONSORSHIPS[state.home].name.toLowerCase()}`:location.name;
   $('#locationSubtitle').textContent=location.subtitle;
   $('#locationEyebrow').textContent=state.location==='home'?'YOUR NEIGHBOURHOOD':'OUT IN PALM CITY';
@@ -129,7 +130,7 @@ function clock(){const hour=world.daylight().hour,day=Math.max(1,Math.floor((now
 function progress(start,end){const value=Math.min(100,Math.max(0,(now()-start)/(end-start)*100));return '<div class="sim-progress"><i style="width:'+value+'%"></i></div>';}
 function renderActivity(){
   const a=state.active,r=state.recovery,def=CAREERS[state.career],t=state.trip;let html='';
-  if(t)html='<div class="sim-status"><span>'+(SPONSORSHIPS[t.ride]?.icon||'🚶')+'</span><strong>'+(t.ride?'Driving':'Walking')+' to '+escape(LOCATIONS[t.to].name)+'</strong><time>'+duration(t.arrives-now())+'</time></div>'+progress(t.departs,t.arrives);
+  if(t)html='<div class="sim-status"><span>'+(RIDES[t.ride]?.icon||'🚶')+'</span><strong>'+(t.ride?'Driving':'Walking')+' to '+escape(LOCATIONS[t.to].name)+'</strong><time>'+duration(t.arrives-now())+'</time></div>'+progress(t.departs,t.arrives);
   else if(r)html='<div class="sim-status"><span>'+needs[r.need][1]+'</span><strong>'+escape(r.label)+'</strong><time>'+duration(r.endsAt-now())+'</time>'+button('×','cancel','aria-label="Cancel recovery"','tray-close')+'</div>'+progress(r.startedAt??r.endsAt-B.recovery[r.need][1],r.endsAt);
   else if(a?.kind==='practice')html='<div class="sim-status"><span>'+def.icon+'</span><strong>'+escape(a.skill)+'</strong><small>+7 XP</small><time>'+duration(a.readyAt-now())+'</time>'+button('×','cancel','aria-label="Cancel practice"','tray-close')+'</div>'+progress(a.startedAt,a.readyAt);
   else if(a){
@@ -142,13 +143,23 @@ function renderActivity(){
   $('#activityCard').innerHTML=html;
 }
 async function chooseDecision(index){const a=state.active;if(!a)return;const chosen=a.choices[index];const data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});if(data&&motion)world.respond(chosen.action,data.state.active?.outcomes.at(-1)?.success);}
+// Character creation is two steps: your look, then your career. The starting story is drawn at random.
+const SKINS=['#f1d0b5','#e0b08c','#c88f69','#a46a4a','#7d5642','#5a3a2a'];
 function creation(){
-  showModal('create',`<div class="creation-hero"><span class="eyebrow">WELCOME TO PALM CITY</span><h2>A little life.<br>A lot of possibility.</h2><p>Find your craft, make your people, and turn everyday moments into a life worth remembering.</p></div><form id="createForm"><div class="form-grid"><div class="field"><label for="name">What should we call you?</label><input id="name" name="name" placeholder="Your character’s name" minlength="2" maxlength="30" required autocomplete="nickname"></div><div class="field"><label for="color">Skin tone</label><input id="color" name="color" type="color" value="#c88f69"></div><div class="field"><label for="hair">Hair</label><select id="hair" name="hair"><option value="curls">Soft curls</option><option value="short">Short crop</option></select></div><div class="field"><label for="origin">Your starting story</label><select id="origin" name="origin"></select></div></div><span class="eyebrow">CHOOSE YOUR FIRST CHAPTER</span><input type="hidden" name="career" value="football"><div class="career-grid">${Object.entries(CAREERS).map(([key,d])=>`<button type="button" class="career-option ${key==='football'?'selected':''}" data-action="selectCareer" data-career="${key}"><span>${d.icon}</span><strong>${escape(d.name)}</strong></button>`).join('')}</div><div id="careerExtras"></div><div class="notice">Your independent origin starts at level 1. A connected origin starts its focus skill at level 2. Both can reach Icon. You begin with a furnished home and 10 career charges. Everything else is unlocked with fame.</div><button class="primary wide" type="submit">Begin your life in Palm City ↗</button><p class="empty">Your character is saved on this city server. Keep this browser’s cookie to return to the same character.</p></form>`,false);updateCreationCareer('football');
+  showModal('create',`<div class="creation-hero"><span class="eyebrow">WELCOME TO PALM CITY</span><h2>A little life.<br>A lot of possibility.</h2><p>Find your craft, make your people, and turn everyday moments into a life worth remembering.</p></div><form id="createForm"><div class="steps"><span class="step on">1 · Your look</span><span class="step" id="stepTwoLabel">2 · Your career</span></div>
+  <section id="stepLook"><div class="look-preview" id="lookPreview"><span class="look-head"></span><span class="look-body"></span></div><div class="field"><label for="name">What should we call you?</label><input id="name" name="name" placeholder="Your character’s name" minlength="2" maxlength="30" required autocomplete="nickname"></div>
+  <div class="field"><label>Skin tone</label><div class="swatches">${SKINS.map((c,i)=>`<button type="button" class="swatch ${i===2?'on':''}" style="--c:${c}" data-action="pickSkin" data-color="${c}" aria-label="Skin tone ${i+1}"></button>`).join('')}<input id="color" name="color" type="color" value="${SKINS[2]}" aria-label="Custom skin tone"></div></div>
+  <div class="field"><label>Hair</label><div class="choice-row"><button type="button" class="choice on" data-action="pickHair" data-hair="curls">Soft curls</button><button type="button" class="choice" data-action="pickHair" data-hair="short">Short crop</button></div><input type="hidden" id="hair" name="hair" value="curls"></div>
+  <button class="primary wide" type="button" data-action="creationNext">Next: choose your career ↗</button></section>
+  <section id="stepCareer" hidden><input type="hidden" name="career" value="football">${['Sports','Content creation','Entertainment','Technology'].map(u=>`<span class="eyebrow umbrella">${u.toUpperCase()}</span><div class="career-grid">${Object.entries(CAREERS).filter(([,d])=>d.umbrella===u).map(([key,d])=>`<button type="button" class="career-option ${key==='football'?'selected':''}" data-action="selectCareer" data-career="${key}"><span>${d.icon}</span><strong>${escape(d.name)}</strong></button>`).join('')}</div>`).join('')}
+  <div id="careerExtras"></div><div class="notice">🎲 <strong>Your starting story is drawn at random.</strong> The best start (e.g. academy prodigy) begins with a focus skill at level 2 and a family car. The humble start (e.g. street footballer) walks everywhere and starts every skill at level 1. Both can reach Icon.</div>
+  <div class="actions"><button class="secondary" type="button" data-action="creationBack">← Back</button><button class="primary" type="submit">Roll my story &amp; begin ↗</button></div><p class="empty">Your character is saved on this city server. Keep this browser’s cookie to return to the same character.</p></section></form>`,false);updateCreationCareer('football');paintLook();
 }
+function paintLook(){const p=$('#lookPreview');if(p){p.style.setProperty('--skin',$('#color').value);p.dataset.hair=$('#hair').value;}}
 function updateCreationCareer(key){
-  const def=CAREERS[key];$('#createForm [name=career]').value=key;$('#origin').innerHTML=def.origins.map((o,i)=>`<option value="${i}">${escape(o)}</option>`).join('');
+  const def=CAREERS[key];$('#createForm [name=career]').value=key;
   document.querySelectorAll('.career-option').forEach(b=>b.classList.toggle('selected',b.dataset.career===key));
-  $('#careerExtras').innerHTML=key==='football'?'<div class="field"><label for="position">Outfield position</label><select id="position" name="position"><option value="striker">Striker</option><option value="midfielder">Midfielder</option><option value="defender">Defender</option></select></div>':key==='musician'?'<div class="field"><label for="technique">Primary technique</label><select id="technique" name="technique"><option value="vocals">Vocals</option><option value="instrument">Instrument</option></select></div>':key==='adult'?'<label class="check"><input type="checkbox" name="adult" required> 18+ career. My character and everyone in their projects are adults. Expect flirty, suggestive themes; nothing explicit is shown.</label>':'';
+  $('#careerExtras').innerHTML=`<div class="career-pick"><strong>${def.icon} ${escape(def.name)}</strong><small>${escape(def.umbrella)} · stories: ${def.origins.map(escape).join(' or ')}</small></div>`+(key==='musician'?'<div class="field"><label for="technique">Primary technique</label><select id="technique" name="technique"><option value="vocals">Vocals</option><option value="instrument">Instrument</option></select></div>':key==='adult'?'<label class="check"><input type="checkbox" name="adult" required> 18+ career. My character and everyone in their projects are adults. Expect flirty, suggestive themes; nothing explicit is shown.</label>':key==='hacker'?'<p class="empty">Fraudster schemes are fictional and abstract: no real methods, victims or instructions.</p>':'');
 }
 function map(){if(state.location!=='home')world.flyTo(.22);showTray('↗ Palm City','<div class="city-tiles">'+Object.entries(LOCATIONS).map(([key,l])=>button('<span>'+(TOWN[key]?.pin||'🚪')+'</span>'+escape(l.name),'travel','data-location="'+key+'"','city-tile')).join('')+'</div><small>Tap a pin on the map or a place here to head over.</small>');}
 function practice(){const def=CAREERS[state.career];if(state.location==='home'&&!state.inventory.gear){showTray('✧ Practise','<div class="tray-options">'+button('↗ Go to venue','travel','data-location="'+def.location+'"','primary')+button('◇ Buy home equipment','travel','data-location="plaza"')+'</div>');return;}showTray('✧ Practise','<div class="tray-options skills-options">'+def.skills.map(skill=>button(escape(skill)+' <small>Lv '+state.careers[state.career].skills[skill].level+'</small>','startPractice','data-skill="'+escape(skill)+'"')).join('')+'</div><small>ϟ 1 · 3:00 · +7 XP</small>');}
@@ -195,7 +206,7 @@ function phone(tab='local'){
 function chatMessages(){return snapshot.messages.map(m=>`<div class="message"><strong>${escape(m.name)}</strong> <small>${m.recipient?'· direct':'· local'}</small><br>${escape(m.body)} <button class="text-button" data-action="report" data-message="${m.id}" aria-label="Report message by ${escape(m.name)}">Report</button></div>`).join('')||'<p class="empty">A quiet moment. Be the first to say hello.</p>';}
 function directMessage(playerId){const p=snapshot.players.find(p=>p.id===playerId);showModal('direct',`<span class="eyebrow">FRIENDS</span><h2>Message ${escape(p.name)}</h2><form id="directForm"><input type="hidden" name="recipient" value="${playerId}"><div class="field"><label for="directBody">Your message</label><input id="directBody" name="body" maxlength="300" required></div><button class="primary close-action" type="submit">Send message</button></form>`);}
 // Palm Motors: fame unlocks free sponsored rides and looks. Fame is never spent.
-function vip(){
+function vip(){tip('vip');
   const fame=state.fame||0,claimed=state.vip||{};
   showModal('vip',`<span class="eyebrow">PALM MOTORS · SPONSORSHIPS</span><h2>Fame opens doors. And garages.</h2><p class="modal-intro">You have <strong>✦ ${fmt(fame)} fame</strong>. Sponsors give these to famous players for free. Fame isn't spent, and what you claim stays yours.</p><div class="item-grid">${Object.entries(SPONSORSHIPS).map(([key,d])=>{
     const owned=claimed[key],using=d.kind==='ride'?state.ride===key:d.kind==='home'?state.home===key:state.equipped.clothes===key,ready=fame>=d.fame,verb={ride:['Driving ✓','Drive it'],home:['Living here ✓','Move in'],style:['Wearing ✓','Wear it']}[d.kind];
@@ -205,7 +216,7 @@ function vip(){
 }
 // Battles: a lobby while teams fill up, then a turn-based arena with HP bars and a live log.
 let battleId=null;
-function battleView(){
+function battleView(){tip('battle');
   const b=(snapshot.battles||[]).find(x=>x.id===battleId);if(!b){if(modalPage==='battle')closeModal();return;}
   const me=snapshot.playerId,mine=b.teams.findIndex(t=>t.includes(me)),myTurn=b.status==='running'&&b.order[b.turn]===me,turnName=b.status==='running'?b.fighters[b.order[b.turn]].name:'';
   const team=(t)=>{if(b.status==='open'){const names=b.teamNames[t];return `<div class="battle-team"><h3>Team ${t?'B':'A'}</h3>${Array.from({length:b.mode},(_,i)=>names[i]?`<div class="fighter"><strong>${escape(names[i].name)}</strong>${names[i].id===b.host?'<small>host</small>':''}</div>`:`<div class="fighter empty">Open slot${mine<0&&(!b.invited||t===0||me===b.invited)?button('Join','battleJoin',`data-battle="${b.id}" data-team="${t}"`,'primary'):''}</div>`).join('')}</div>`;}
@@ -220,7 +231,38 @@ function battleView(){
   showModal('battle',`<span class="eyebrow">⚔ ${b.mode}V${b.mode} BATTLE · ${escape(LOCATIONS[b.location].name.toUpperCase())}</span><h2>${b.status==='open'?'Who’s in?':b.status==='done'?'Battle over':'Fight!'}</h2>${body}<div class="battle-teams">${team(0)}<div class="versus">VS</div>${team(1)}</div><div class="actions">${controls}</div><div class="battle-log">${b.log.slice(0,8).map(l=>`<p>${escape(l.text)}</p>`).join('')}</div>`);
 }
 function openBattle(id){battleId=id;battleView();}
-function openPage(page){({city:map,career,phone,inventory,profile,shop,vip}[page]||map)();}
+// First-time explainers: each screen explains itself once per browser.
+const TIPS={
+  home:['🏠 Your home','Tap furniture to use it: the bed restores energy, the fridge hunger, the shower hygiene, the sofa fun. Need bars sit on the left. The front door takes you out to your street.'],
+  city:['🏙️ Out in Palm City','Tap the ground to walk. Tap a pin to head somewhere (walking takes up to 1:30, a car is faster). Tap people to say hi, add friends or challenge them to a battle.'],
+  career:['✦ Your career','Practise to level skills, then play activities: every choice you make shapes the quality. Good work earns reach (views, streams, fans) and fame. Each major activity uses 1 of your 10 charges.'],
+  phone:['💬 Social','Chat with people nearby, add friends, message them, open 1v1, 3v3 or 5v5 battles, and collaborate.'],
+  inventory:['◇ My home','Everything you own. Place furniture, change your look, and upgrade gear as your fame grows.'],
+  profile:['♙ Profile','Your fame, awards, season results and career history.'],
+  shop:['🛍️ Market','No coins here: items unlock with fame and are free to claim.'],
+  vip:['🏁 Palm Motors','Fame unlocks free sponsored cars, looks and homes. Fame is never spent, and what you claim stays yours.'],
+  battle:['⚔ Battles','Turn-based. On your turn: strike, use your signature move, guard or hype your team. Winners take fame from the losers.'],
+};
+let tipQueue=[],tipsSeen={};try{tipsSeen=JSON.parse(localStorage.getItem('celebritygames-tips')||'{}');}catch{}
+function tip(key){if(tipsSeen[key]||!TIPS[key])return;tipsSeen[key]=1;try{localStorage.setItem('celebritygames-tips',JSON.stringify(tipsSeen));}catch{}tipQueue.push(key);if(tipQueue.length===1)showTip();}
+function showTip(){const key=tipQueue[0];if(!key){$('#tipCard').hidden=true;return;}const [title,body]=TIPS[key];$('#tipCard').innerHTML=`<strong>${title}</strong><p>${body}</p>${button('Got it','closeTip','','primary')}`;$('#tipCard').hidden=false;}
+function closeTip(){tipQueue.shift();showTip();}
+// The phone at the top of the screen holds every menu. Tap it to open the home screen of apps.
+function alerts(){const me=snapshot.playerId;return state.invitations.filter(i=>i.expiresAt>now()).length+(snapshot.battles||[]).filter(b=>b.invited===me&&b.status==='open').length;}
+function phoneWidget(){const model=PHONES[state.phone]||PHONES.basic,count=alerts();
+  return `<button class="phone-widget" data-action="openPhone" style="--phone:${model.color}" aria-label="Open your phone${count?`, ${count} alerts`:''}"><span class="phone-mini">📱${count?`<i>${count}</i>`:''}</span><span class="phone-line"><strong>✦ ${fmt(state.fame||0)}</strong><small>fame · ${B.tiers[state.careers[state.career].tier][0]}</small></span><span class="phone-line"><strong>ϟ ${state.charges}/10</strong><small id="chargeRefill">${state.refillAnchor===null?'charged':`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></span></button>`;}
+const APPS=[['map','🗺️','Map'],['career','✦','Career'],['phone','💬','Social'],['battles','⚔','Battles'],['inventory','🏠','My stuff'],['shop','🛍️','Market'],['vip','🏁','Palm Motors'],['profile','♙','Profile'],['life','♡','My life'],['nearby','◇','Nearby'],['tips','💡','Tips'],['upgrade','📲','Upgrade']];
+function phoneHome(){
+  const model=PHONES[state.phone]||PHONES.basic,me=snapshot.playerId,online=snapshot.players.filter(p=>p.online&&state.friends.includes(p.id)).length,next=Object.values(SPONSORSHIPS).filter(d=>d.fame>(state.fame||0)).sort((x,y)=>x.fame-y.fame)[0];
+  const widgets=[(state.phone||'basic')!=='basic'?`<div class="phone-card">👥 ${online} friend${online===1?'':'s'} online</div>`:'',['pro','gold'].includes(state.phone)&&next?`<div class="phone-card">🔓 Next unlock: ${next.icon} ${escape(next.name)} at ${fmt(next.fame)} fame</div>`:''].join('');
+  showModal('phoneHome',`<div class="phone-device" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-status"><span>${new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</span><span>${escape(model.name)}</span><span>●●● 🔋</span></div><div class="phone-hello"><strong>${escape(state.name)}</strong><small>✦ ${fmt(state.fame||0)} fame · ${escape(LOCATIONS[state.location].name)}</small></div>${widgets}<div class="app-grid">${APPS.map(([key,icon,label])=>`<button class="app" data-action="app" data-app="${key}"><span>${icon}</span><small>${label}${key==='phone'&&alerts()?` <i>${alerts()}</i>`:''}</small></button>`).join('')}</div></div>`);
+}
+function openApp(key){({map,phone:()=>phone('local'),battles:()=>phone('battles'),career,inventory,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,upgrade:phoneStore}[key]||phoneHome)();}
+function lifePanel(){showModal('life',`<span class="eyebrow">YOUR DAILY LIFE</span><h2>How you're doing</h2>${$('#profileCard').innerHTML}<hr>${$('#needsCard').innerHTML}<hr>${$('#skillsCard').innerHTML}<hr><h3>Recent moments</h3>${$('#feed').innerHTML}`);}
+function nearby(){closeModal();$('#objects').hidden=false;$('#objects').scrollIntoView({block:'nearest'});toast('Tap anything nearby to use it.');}
+function tipsApp(){showModal('tips',`<span class="eyebrow">💡 TIPS</span><h2>How Palm City works</h2><div class="tips-list">${Object.values(TIPS).map(([title,body])=>`<div class="tip-item"><strong>${title}</strong><p>${body}</p></div>`).join('')}</div>`);}
+function phoneStore(){const fame=state.fame||0;showModal('phones',`<span class="eyebrow">📲 PHONE UPGRADES</span><h2>A better phone, on the house.</h2><p class="modal-intro">Phones unlock with fame and are free. You have ✦ ${fmt(fame)} fame.</p><div class="item-grid">${Object.entries(PHONES).map(([key,m])=>`<div class="item-card"><div class="vip-icon" style="--tone:${m.color}">📱</div><h3>${escape(m.name)}</h3><p>${escape(m.perk)}</p>${(state.phone||'basic')===key?button('In your pocket ✓','noop','disabled'):fame>=m.fame?button('Switch to this','phoneUpgrade',`data-item="${key}"`,'primary'):button(`🔒 ${fmt(m.fame)} fame`,'noop','disabled')}</div>`).join('')}</div>`);}
+function openPage(page){tip(page);({city:map,career,phone,inventory,profile,shop,vip,tips:tipsApp}[page]||map)();}
 $('#mapButton').addEventListener('click',map);$('#cameraButton').addEventListener('click',()=>toast(`📷 ${world.rotate()}`));$('#closeModal').addEventListener('click',closeModal);
 $('#zoomIn').addEventListener('click',()=>world.setZoom(world.zoom*1.2));$('#zoomOut').addEventListener('click',()=>world.setZoom(world.zoom/1.2));$('#resetCamera').addEventListener('click',()=>world.resetCamera());
 $('.modal-backdrop').addEventListener('click',closeModal);$('#motionButton').addEventListener('click',()=>{motion=!motion;world.reduced=!motion;$('#motionButton').textContent=motion?'Motion on':'Motion reduced';});
@@ -240,6 +282,11 @@ document.addEventListener('click',async event=>{
     case 'lifePanel':showModal('life',`<span class="eyebrow">YOUR DAILY LIFE</span><h2>How you're doing</h2>${$('#profileCard').innerHTML}<hr>${$('#needsCard').innerHTML}<hr>${$('#skillsCard').innerHTML}<hr><h3>Recent moments</h3>${$('#feed').innerHTML}`);break;
     case 'page':openPage(d.page);break;
     case 'selectCareer':updateCreationCareer(d.career);break;
+    case 'pickSkin':$('#color').value=d.color;document.querySelectorAll('.swatch').forEach(b=>b.classList.toggle('on',b===target));paintLook();break;
+    case 'pickHair':$('#hair').value=d.hair;document.querySelectorAll('.choice[data-hair]').forEach(b=>b.classList.toggle('on',b===target));paintLook();break;
+    case 'creationNext':if(!$('#name').reportValidity())break;$('#stepLook').hidden=true;$('#stepCareer').hidden=false;$('#stepTwoLabel').classList.add('on');break;
+    case 'creationBack':$('#stepLook').hidden=false;$('#stepCareer').hidden=true;$('#stepTwoLabel').classList.remove('on');break;
+    case 'closeTip':closeTip();break;
     case 'travel':await send({type:'travel',location:d.location});break;
     case 'object':world.walkToObject(d.name);break;
     case 'goObject':case 'useObject':{
@@ -273,6 +320,10 @@ document.addEventListener('click',async event=>{
     case 'battleCreate':{const data=await send({type:'battleCreate',mode:Number(d.mode),opponent:d.opponent||undefined});if(data?.state.battle)openBattle(data.state.battle);break;}
     case 'battleJoin':case 'battleStart':case 'battleLeave':case 'battleMove':battleId=d.battle;await send({type:d.action,battleId:d.battle,team:d.team===undefined?undefined:Number(d.team),move:d.move,target:d.target},{keepModal:true});break;
     case 'openBattle':openBattle(d.battle);break;
+    case 'openPhone':phoneHome();break;
+    case 'app':openApp(d.app);break;
+    case 'backToPhone':phoneHome();break;
+    case 'phoneUpgrade':await send({type:'phoneUpgrade',item:d.item},{keepModal:true});break;
     case 'buy':case 'equip':case 'claim':case 'useVip':await send({type:d.action,item:d.item},{keepModal:true});break;
     case 'previewUpgrade':upgrade(d.item);break;
     case 'upgrade':await send({type:'upgrade',item:d.item});break;
@@ -290,7 +341,7 @@ document.addEventListener('click',async event=>{
 });
 document.addEventListener('submit',async event=>{
   event.preventDefault();const form=event.target,values=Object.fromEntries(new FormData(form));
-  if(form.id==='createForm'){values.origin=Number(values.origin);values.adult=values.adult==='on';const data=await send({type:'create',...values});if(data){modalPage=null;$('#modal').hidden=true;toast('Welcome to Palm City. Your next chapter starts at home.');}}
+  if(form.id==='createForm'){values.adult=values.adult==='on';const data=await send({type:'create',...values});if(data){modalPage=null;$('#modal').hidden=true;const c=data.state.careers[data.state.career];toast(c.origin===1?`🎲 Best start: ${CAREERS[data.state.career].origins[1]}. You have a family car 🚗`:`🎲 Humble start: ${CAREERS[data.state.career].origins[0]}. You'll walk for now. Fame buys rides.`);}}
   if(form.id==='prepareForm')await send({type:'start',...values});
   if(form.id==='switchForm')await send({type:'switch',...values,adult:values.adult==='on'});
   if(form.id==='chatForm'){await send({type:'chat',...values},{keepModal:true});}
@@ -304,4 +355,4 @@ let liveTimer,pulseAt=null;const soon=()=>{clearTimeout(liveTimer);liveTimer=set
 const pollPulse=()=>setInterval(async()=>{if(document.hidden)return;try{const r=await fetch('/api/pulse');if(!r.ok)return;const {at}=await r.json();if(pulseAt!==null&&at!==pulseAt)soon();pulseAt=at;}catch{}},1500);
 try{const live=new EventSource('/api/live');let opened=false;live.onmessage=soon;live.onopen=()=>opened=true;live.onerror=()=>{if(!opened){live.close();pollPulse();}};}catch{pollPulse();}
 setInterval(async()=>{await refresh();if(modalPage==='phone'&&phoneTab==='local'&&$('#chatLog'))$('#chatLog').innerHTML=chatMessages();},4000);
-setInterval(()=>{if(state&&!busy){renderActivity();clock();const bt=$('#battleTimer'),bb=(snapshot.battles||[]).find(x=>x.id===battleId);if(bt&&bb)bt.textContent=duration(bb.turnEndsAt-now());const next=$('#chargeRefill');if(next&&state.refillAnchor!==null)next.textContent=`Next charge in ${duration(state.refillAnchor+B.refillMs-now())}`;}},1000);
+setInterval(()=>{if(state&&!busy){renderActivity();clock();const bt=$('#battleTimer'),bb=(snapshot.battles||[]).find(x=>x.id===battleId);if(bt&&bb)bt.textContent=duration(bb.turnEndsAt-now());const next=$('#chargeRefill');if(next&&state.refillAnchor!==null)next.textContent=`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`;}},1000);
