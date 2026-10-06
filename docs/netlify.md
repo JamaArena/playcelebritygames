@@ -1,12 +1,12 @@
 # Netlify deployment
 
-The repository now deploys the full game: `public/` is the website, `netlify/functions/game.mts` serves `/api/state` and `/api/action`, and Netlify Database persists the city in Postgres. The Node 24 runtime is required. `netlify.toml` specifies the build and publish settings.
+The repository deploys the full game: `public/` is the website, `netlify/functions/game.mts` serves `/api/state`, `/api/action` and `/api/pulse`, and Netlify Database persists the city in Postgres. The Node 24 runtime is required. `netlify.toml` specifies the build and publish settings.
 
 ## Deploy from GitHub
 
-Connect `JamaArena/playcelebritygames` to your Netlify project and select the branch containing this implementation. The current development branch is `codex/celebrity-life-game`; merging its PR makes the code available on `main`. The repository configuration overrides the UI build command and publish directory. Deploy the branch to test, then publish the tested deploy or deploy your production branch.
+Connect `JamaArena/playcelebritygames` to your Netlify project with `main` as the production branch. Pull requests get deploy previews. The repository configuration overrides the UI build command and publish directory. Deploy the branch to test, then publish the tested deploy or deploy your production branch.
 
-Installing `@netlify/database` enables automatic database provisioning. Netlify applies `netlify/database/migrations/0001_celebrity-city/migration.sql` before the deploy goes live. No credentials belong in GitHub or browser code. Database availability and usage depend on the account's Netlify plan and credit limits.
+Installing `@netlify/database` enables automatic database provisioning. Netlify applies the migrations in `netlify/database/migrations/` in order before the deploy goes live: `0001` creates the city tables, `0002` adds the live-update pulse and `0003` adds battles. No credentials belong in GitHub or browser code. Database availability and usage depend on the account's Netlify plan and credit limits.
 
 Deploy previews use an isolated database branch. Characters created in a preview do not become production characters. Local SQLite characters also remain local; this change does not upload local saves, cookies or chat history.
 
@@ -20,8 +20,8 @@ For CLI deployment, authenticate with `pnpm exec netlify login`, link with `pnpm
 
 Each function acquires a transaction-scoped Postgres advisory lock for the city, reads its relational tables into a request-local in-memory SQL working copy, resolves the same rules as standalone mode, and writes only changed rows back. Commit succeeds before any success response or new session cookie is returned. Failures roll back; retries keep the existing idempotency keys. The working copy is never a persistent Lambda file. Rewards, collaborations, sessions and seasonal cutoff settlement therefore survive cold starts and redeploys.
 
-This is designed for a small first-playable city. Requests serialize through one city lock and read the current city tables; large populations require direct per-player Postgres queries, narrower locks, pagination and retention. Browser polling still runs every four seconds. Database and function usage accrue against Netlify's limits. Add account recovery, moderation operations and public-service rate limits before a broad launch.
+This is designed for a small first-playable city. Requests serialize through one city lock and read the current city tables; large populations require direct per-player Postgres queries, narrower locks, pagination and retention. Browsers poll full state every four seconds as a heartbeat and poll `/api/pulse` (a single-row read with no city lock) every 1.5 seconds, fetching full state as soon as another player's action bumps it. The standalone Node server pushes the same signal over `/api/live`. Database and function usage accrue against Netlify's limits. Add account recovery, moderation operations and public-service rate limits before a broad launch.
 
 ## Check after deployment
 
-Confirm `/api/state` returns JSON and a Secure, HttpOnly session cookie. Create a character, travel, start an activity, and reload: name, location, charges and activity should persist. Verify a separate browser gets a separate character. The initial unavailable screen indicates an API/database problem, rather than a successful game deployment. Inspect Netlify's deploy log for provisioning/migration errors and function logs for storage error codes.
+Confirm `/api/state` returns JSON and a Secure, HttpOnly session cookie. Confirm `/api/pulse` returns `{"at":...}`. Create a character, walk to a venue, start an activity, and reload: name, location, trip, charges and activity should persist. Verify a separate browser gets a separate character. The initial unavailable screen indicates an API/database problem, rather than a successful game deployment. Inspect Netlify's deploy log for provisioning/migration errors and function logs for storage error codes.
