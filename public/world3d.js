@@ -33,29 +33,59 @@ class Pool {
   end() { for (let i = this.used; i < this.items.length; i++) (this.items[i].root || this.items[i]).visible = false; }
 }
 
-// One person with realistic proportions: capsule limbs on joints, layered clothes (a suit with shirt
-// and tie, a sports kit, or a tee), a face, a hairstyle and an optional crown. Scaled by build and height.
+// Sculpted body parts: each is a lathe (a profile spun round), so the torso has hips, a waist, a chest
+// and shoulders, and limbs taper like real muscles. Profiles are [radius, y] pairs, built once and shared.
+// Profiles must run bottom to top so faces point outward; limb profiles are written top down, so flip them.
+const lathe = points => new T.LatheGeometry((points[0][1] > points.at(-1)[1] ? [...points].reverse() : points).map(([r, y]) => new T.Vector2(r, y)), 20);
+const SHAPES = {
+  pants: lathe([[0, -.07], [.1, -.068], [.148, -.035], [.16, .02], [.158, .1], [.152, .17], [0, .17]]),
+  shirt: lathe([[0, .03], [.176, .03], [.172, .1], [.163, .17], [.149, .25], [.156, .33], [.171, .42], [.18, .49], [.165, .545], [.12, .575], [.06, .59], [0, .59]]),
+  thigh: lathe([[0, .01], [.072, 0], [.076, -.05], [.072, -.15], [.066, -.3], [.054, -.41], [0, -.43]]),
+  shorts: lathe([[0, .02], [.08, .01], [.084, -.06], [.08, -.16], [.075, -.23], [0, -.23]]),
+  shin: lathe([[0, .01], [.052, 0], [.058, -.07], [.059, -.13], [.047, -.26], [.036, -.38], [.034, -.42], [0, -.43]]),
+  upperArm: lathe([[0, .02], [.05, 0], [.053, -.06], [.047, -.17], [.039, -.29], [0, -.3]]),
+  sleeve: lathe([[0, .03], [.06, .01], [.064, -.06], [.06, -.13], [0, -.13]]),
+  foreArm: lathe([[0, .01], [.039, 0], [.042, -.06], [.034, -.19], [.027, -.26], [0, -.27]]),
+  neck: lathe([[0, -.02], [.054, -.02], [.05, .06], [.052, .14], [0, .14]]),
+  // An egg-shaped head with a jaw and chin, slightly deeper than wide.
+  head: lathe([[0, -.115], [.04, -.112], [.068, -.09], [.084, -.055], [.093, -.01], [.098, .04], [.096, .09], [.082, .13], [.05, .155], [0, .162]]),
+};
+
+// One person with natural proportions: a sculpted torso and tapered limbs, layered clothes (a suit with
+// lapels, shirt and tie; a sports kit with shorts and socks; or a tee and trousers), a face, a hairstyle
+// and an optional crown. Scaled by build and height.
 class Figure {
   constructor() {
     const mesh = (geo, color = '#888', finish) => { const m = new T.Mesh(geo, mat(color, finish)); m.castShadow = true; return m; };
-    const joint = (geo, len) => { const pivot = new T.Group(), bone = mesh(geo); bone.position.y = -len / 2; pivot.add(bone); pivot.bone = bone; return pivot; };
+    const joint = (geo, len) => { const pivot = new T.Group(), bone = mesh(geo); pivot.add(bone); pivot.bone = bone; pivot.len = len; return pivot; };
     this.root = new T.Group(); this.body = new T.Group(); this.root.add(this.body);
-    this.pelvis = mesh(UNIT_BALL); this.waist = mesh(new T.CylinderGeometry(.19, .16, .5, 20)); this.chest = mesh(UNIT_BALL);
-    this.shirt = mesh(UNIT_BOX); this.tie = mesh(UNIT_BOX); this.collar = [-1, 1].map(() => mesh(UNIT_BOX)); this.neck = mesh(new T.CylinderGeometry(.058, .064, .16, 14));
-    this.body.add(this.pelvis, this.waist, this.chest, this.shirt, this.tie, this.neck, ...this.collar);
-    this.legs = [-1, 1].map(side => { const thigh = joint(capsule(.075, .3), .42), shin = joint(capsule(.06, .32), .42), shoe = mesh(capsule(.055, .14)), sock = mesh(new T.CylinderGeometry(.064, .064, .12, 12));
-      shin.position.y = -.42; shoe.rotation.x = Math.PI / 2; shoe.position.set(0, -.38, .05); sock.position.y = -.3; shin.add(shoe, sock); thigh.add(shin); Object.assign(thigh, { shin, shoe, sock, side }); this.body.add(thigh); return thigh; });
-    this.arms = [-1, 1].map(side => { const upper = joint(capsule(.052, .2), .28), fore = joint(capsule(.044, .2), .28), hand = mesh(UNIT_BALL), shoulder = mesh(UNIT_BALL);
-      fore.position.y = -.28; hand.scale.set(.085, .11, .06); hand.position.y = -.31; fore.add(hand); shoulder.scale.set(.1, .085, .1); shoulder.position.set(-side * .012, -.025, 0); upper.add(fore, shoulder); Object.assign(upper, { fore, hand, shoulder, side }); this.body.add(upper); return upper; });
-    // Head: skull and jaw, nose, ears, eyes with whites and irises, brows and a mouth.
-    this.head = new T.Group(); this.head.scale.setScalar(1.12); this.root.add(this.head);
-    this.skull = mesh(UNIT_BALL); this.skull.scale.set(.22, .27, .24); this.jaw = mesh(UNIT_BALL); this.jaw.scale.set(.17, .15, .17); this.jaw.position.set(0, -.065, .025);
-    this.nose = mesh(UNIT_BALL); this.nose.scale.set(.04, .05, .05); this.nose.position.set(0, -.01, .118);
-    this.ears = [-1, 1].map(side => { const ear = mesh(UNIT_BALL); ear.scale.set(.03, .06, .045); ear.position.set(side * .112, 0, 0); return ear; });
-    this.eyes = [-1, 1].map(side => { const white = mesh(UNIT_BALL, '#fbf8f3', 'gloss'), iris = mesh(UNIT_BALL, '#2a2320', 'gloss'); white.scale.set(.046, .032, .02); white.position.set(side * .045, .025, .104); iris.scale.setScalar(.022); iris.position.set(side * .045, .024, .113); return [white, iris]; }).flat();
-    this.brows = [-1, 1].map(side => { const brow = mesh(UNIT_BOX); brow.scale.set(.05, .011, .012); brow.position.set(side * .046, .062, .108); brow.rotation.z = side * -.12; return brow; });
-    this.mouth = mesh(UNIT_BOX, '#8e4c42'); this.mouth.scale.set(.05, .012, .01); this.mouth.position.set(0, -.07, .11);
-    this.head.add(this.skull, this.jaw, this.nose, this.mouth, ...this.ears, ...this.eyes, ...this.brows);
+    this.torso = new T.Group(); this.body.add(this.torso);
+    this.pelvis = mesh(SHAPES.pants); this.chest = mesh(SHAPES.shirt); this.neck = mesh(SHAPES.neck); this.neck.position.y = .55;
+    this.shirt = mesh(UNIT_BOX); this.tie = mesh(UNIT_BOX); this.collar = [-1, 1].map(() => mesh(UNIT_BOX)); this.lapels = [-1, 1].map(() => mesh(UNIT_BOX));
+    this.torso.add(this.pelvis, this.chest, this.neck, this.shirt, this.tie, ...this.collar, ...this.lapels);
+    this.legs = [-1, 1].map(side => {
+      const thigh = joint(SHAPES.thigh, .42), shin = joint(SHAPES.shin, .42), shorts = mesh(SHAPES.shorts), sock = mesh(new T.CylinderGeometry(.043, .04, .14, 14)), shoe = mesh(capsule(.048, .15)), sole = mesh(UNIT_BOX, '#e9e4da');
+      shin.position.y = -.42; sock.position.y = -.33; shoe.rotation.x = Math.PI / 2; shoe.scale.set(1, 1, .62); shoe.position.set(0, -.405, .045); sole.scale.set(.1, .018, .25); sole.position.set(0, -.432, .045);
+      shin.add(sock, shoe, sole); thigh.add(shin, shorts); Object.assign(thigh, { shin, shorts, sock, shoe, sole, side }); this.body.add(thigh); return thigh;
+    });
+    this.arms = [-1, 1].map(side => {
+      const upper = joint(SHAPES.upperArm, .29), fore = joint(SHAPES.foreArm, .27), sleeve = mesh(SHAPES.sleeve), hand = mesh(UNIT_BALL), thumb = mesh(UNIT_BALL);
+      fore.position.y = -.29; hand.scale.set(.05, .085, .028); hand.position.set(0, -.3, .005); thumb.scale.set(.02, .042, .02); thumb.position.set(-side * .022, -.285, .018); thumb.rotation.z = side * .4;
+      fore.add(hand, thumb); upper.add(fore, sleeve); Object.assign(upper, { fore, sleeve, hand, thumb, side }); this.body.add(upper); return upper;
+    });
+    // Head: an egg-shaped skull with ears, a nose, eyes set into the face, brows and two-tone lips.
+    this.head = new T.Group(); this.root.add(this.head);
+    this.skull = mesh(SHAPES.head); this.skull.scale.set(1, 1, 1.1);
+    this.nose = mesh(UNIT_BALL); this.nose.scale.set(.026, .048, .034); this.nose.position.set(0, -.008, .105); this.nose.rotation.x = -.2;
+    this.ears = [-1, 1].map(side => { const ear = mesh(UNIT_BALL); ear.scale.set(.018, .046, .03); ear.position.set(side * .094, .005, -.005); return ear; });
+    this.eyes = [-1, 1].map(side => {
+      const white = mesh(UNIT_BALL, '#f4efe8', 'gloss'), iris = mesh(UNIT_BALL, '#3a2a20', 'gloss'), lid = mesh(UNIT_BALL);
+      white.scale.set(.03, .017, .014); white.position.set(side * .036, .025, .095); iris.scale.set(.016, .016, .006); iris.position.set(side * .036, .024, .1015);
+      lid.scale.set(.033, .01, .016); lid.position.set(side * .036, .034, .096); this.lids ||= []; this.lids.push(lid); return [white, iris, lid];
+    }).flat();
+    this.brows = [-1, 1].map(side => { const brow = mesh(UNIT_BOX); brow.scale.set(.036, .007, .01); brow.position.set(side * .037, .05, .1); brow.rotation.z = side * -.1; return brow; });
+    this.lips = [mesh(UNIT_BALL), mesh(UNIT_BALL)]; this.lips[0].scale.set(.036, .011, .016); this.lips[0].position.set(0, -.05, .091); this.lips[1].scale.set(.032, .013, .016); this.lips[1].position.set(0, -.062, .088);
+    this.head.add(this.skull, this.nose, ...this.ears, ...this.eyes, ...this.brows, ...this.lips);
     this.hair = new T.Group(); this.head.add(this.hair); this.hairKey = '';
     this.crown = this.makeCrown(); this.head.add(this.crown);
   }
@@ -95,40 +125,50 @@ class Figure {
   apply(x, z, skin, o, time, reduced) {
     const shape = BUILDS[o.build] || BUILDS.average, W = shape.w, H = shape.hip, S = shape.shoulders || W, pose = o.pose, fit = o.fit || 'tee', suit = fit === 'suit', kit = fit === 'kit';
     const seated = ['sit', 'dine', 'tv', 'work'].includes(pose), tall = seated || pose === 'sleep' ? 1 : (HEIGHTS[o.height]?.h || 1);
-    const phase = o.walk && !reduced ? Math.sin(o.gait) : pose === 'sport' && !reduced ? Math.sin(time * 7) : 0, bob = o.walk && !reduced ? Math.abs(Math.cos(o.gait)) * .025 : 0;
-    const hip = seated ? .6 : .86 * tall + bob, top = o.outfit, skinMat = mat(skin, 'skin');
+    const phase = o.walk && !reduced ? Math.sin(o.gait) : pose === 'sport' && !reduced ? Math.sin(time * 7) : 0, bob = o.walk && !reduced ? Math.abs(Math.cos(o.gait)) * .02 : 0;
+    // Standing still people breathe and shift their weight a little.
+    const idle = !o.walk && !pose && !reduced, breath = idle ? Math.sin(time * 1.7 + x) : 0, sway = idle ? Math.sin(time * .6 + z) : 0;
+    const hip = seated ? .58 : .9 * tall + bob, top = o.outfit, skinMat = mat(skin, 'skin'), pants = mat(o.pants);
     this.root.position.set(x, 0, z); this.root.rotation.set(0, pose && pose !== 'gesture' ? 0 : o.heading || 0, 0);
-    this.pelvis.material = mat(o.pants); this.pelvis.scale.set(.32 * H, .2, .21 * H); this.pelvis.position.set(0, hip, 0);
-    this.waist.material = mat(top); this.waist.scale.set(W, tall, .74 * W); this.waist.position.set(0, hip + .26 * tall, 0);
-    this.chest.material = mat(top); this.chest.scale.set(.46 * S, .23 * tall, .28 * W); this.chest.position.set(0, hip + .44 * tall, 0);
-    this.neck.material = skinMat; this.neck.position.set(0, hip + .6 * tall, 0);
-    // Suits show a white shirt front, collar and tie; tees and kits don't.
-    this.shirt.visible = this.tie.visible = suit; for (const c of this.collar) c.visible = suit;
+    this.torso.position.set(sway * .012, hip, 0); this.torso.scale.set(1, tall, 1); this.torso.rotation.set(o.walk ? .05 : 0, 0, sway * .015);
+    this.pelvis.material = pants; this.pelvis.scale.set(.96 * H, 1, .58 * H);
+    this.chest.material = mat(top); this.chest.scale.set(S, 1 + breath * .006, .62 * W);
+    this.neck.material = skinMat;
+    // Suits: open jacket lapels over a white shirt, collar and tie.
+    for (const m of [this.shirt, this.tie, ...this.collar, ...this.lapels]) m.visible = suit;
     if (suit) {
-      this.shirt.material = mat('#f4f2ee'); this.shirt.scale.set(.09, .26 * tall, .02); this.shirt.position.set(0, hip + .42 * tall, .138 * W);
-      this.tie.material = mat(o.accent || '#7a2433', 'gloss'); this.tie.scale.set(.034, .24 * tall, .02); this.tie.position.set(0, hip + .4 * tall, .15 * W);
-      this.collar.forEach((c, i) => { const side = i ? 1 : -1; c.material = mat('#f4f2ee'); c.scale.set(.06, .05, .025); c.position.set(side * .035, hip + .55 * tall, .1); c.rotation.set(.3, 0, side * .55); });
+      this.shirt.material = mat('#f4f2ee'); this.shirt.scale.set(.075, .24, .01); this.shirt.position.set(0, .43, .104 * W); this.shirt.rotation.x = -.12;
+      this.tie.material = mat(o.accent || '#7a2433', 'gloss'); this.tie.scale.set(.028, .21, .012); this.tie.position.set(0, .42, .11 * W); this.tie.rotation.x = -.12;
+      this.collar.forEach((c, i) => { const side = i ? 1 : -1; c.material = mat('#f4f2ee'); c.scale.set(.045, .04, .02); c.position.set(side * .03, .55, .075); c.rotation.set(.35, 0, side * .6); });
+      this.lapels.forEach((l, i) => { const side = i ? 1 : -1; l.material = mat(mix(top, '#000', .25), 'gloss'); l.scale.set(.03, .22, .012); l.position.set(side * .05, .44, .106 * W); l.rotation.set(-.12, 0, side * -.22); });
     }
     for (const leg of this.legs) {
-      const stride = phase * leg.side; leg.position.set(leg.side * .095 * H, hip - .02, 0); leg.scale.set(H, tall, H);
-      leg.rotation.set(seated ? -1.5 : stride * .55, 0, 0); leg.shin.rotation.set(seated ? 1.5 : Math.max(0, -stride) * .55, 0, 0);
-      leg.bone.material = mat(o.pants); leg.shin.bone.material = kit ? skinMat : mat(o.pants);
-      leg.sock.visible = kit; leg.sock.material = mat('#f4f2ee'); leg.shoe.material = mat(o.shoes, suit ? 'gloss' : 'matte');
+      const stride = phase * leg.side; leg.position.set(leg.side * .078 * H, hip - .02, 0); leg.scale.set(H, tall, H);
+      leg.rotation.set(seated ? -1.5 : stride * .5, 0, idle ? leg.side * .03 : 0); leg.shin.rotation.set(seated ? 1.5 : Math.max(0, -stride) * .6 + (o.walk ? .08 : 0), 0, 0);
+      // Kits show bare knees between shorts and socks; trousers cover the whole leg.
+      leg.bone.material = kit ? skinMat : pants; leg.shin.bone.material = kit ? skinMat : pants; leg.shorts.visible = kit; leg.shorts.material = pants;
+      leg.sock.visible = kit; leg.sock.material = mat('#f4f2ee'); leg.shoe.material = mat(o.shoes, suit ? 'gloss' : 'matte'); leg.sole.material = mat(suit ? '#151312' : '#e9e4da');
     }
     const using = ['work', 'cook', 'perform', 'water', 'chat'].includes(pose), talking = pose === 'gesture';
     for (const arm of this.arms) {
       const wave = reduced ? 0 : Math.sin(time * 7 + arm.side * 1.9);
-      arm.position.set(arm.side * .2 * S, hip + .52 * tall, 0); arm.scale.set(1, tall, 1);
-      if (talking) arm.rotation.set(-1.05 - Math.max(0, wave) * .45, 0, arm.side * (.3 + wave * .14));
-      else if (using) arm.rotation.set(-.95 + (reduced ? 0 : Math.sin(time * 5 + arm.side) * .08), 0, arm.side * .05);
-      else arm.rotation.set(seated ? -.35 : -phase * arm.side * .55, 0, arm.side * .09);
-      arm.fore.rotation.set(talking || using ? -.65 : seated ? -.55 : -.12, 0, 0);
-      arm.bone.material = arm.shoulder.material = mat(top); arm.fore.bone.material = suit ? mat(top) : skinMat; arm.hand.material = skinMat;
+      arm.position.set(arm.side * .175 * S + sway * .012, hip + .5 * tall, 0); arm.scale.set(1, tall, 1);
+      if (talking) arm.rotation.set(-1.0 - Math.max(0, wave) * .45, 0, arm.side * (.28 + wave * .14));
+      else if (using) arm.rotation.set(-.9 + (reduced ? 0 : Math.sin(time * 5 + arm.side) * .08), 0, arm.side * .06);
+      else arm.rotation.set(seated ? -.35 : -phase * arm.side * .5 + breath * .015, 0, arm.side * .07);
+      arm.fore.rotation.set(talking || using ? -.7 : seated ? -.55 : -.18, 0, 0);
+      // Suits have full jacket sleeves; tees and kits have short sleeves over bare arms.
+      arm.bone.material = suit ? mat(top) : skinMat; arm.fore.bone.material = suit ? mat(top) : skinMat; arm.sleeve.material = mat(top); arm.sleeve.visible = !suit;
+      arm.hand.material = arm.thumb.material = skinMat;
     }
-    this.head.position.set(0, hip + .8 * tall, 0);
-    for (const m of [this.skull, this.jaw, this.nose, ...this.ears]) m.material = skinMat;
-    for (const b of this.brows) b.material = mat(mix(o.hair || '#2b211c', '#000', .2));
-    this.mouth.scale.set(.05, (o.smile ?? 1) > .5 ? .014 : .008, .01);
+    this.head.position.set(sway * .015, hip + .8 * tall, 0); this.head.rotation.set(o.walk ? .04 : 0, idle ? Math.sin(time * .4 + x) * .12 : 0, 0);
+    this.skull.material = this.nose.material = skinMat; for (const m of this.ears) m.material = skinMat;
+    for (const lid of this.lids) lid.material = mat(mix(skin, '#000', .12), 'skin');
+    for (const b of this.brows) b.material = mat(mix(o.hair || '#2b211c', '#000', .25));
+    this.lips[0].material = mat(mix(skin, '#7a3b3b', .45), 'skin'); this.lips[1].material = mat(mix(skin, '#9a4a48', .4), 'skin');
+    this.lips[1].scale.y = (o.smile ?? 1) > .5 ? .013 : .009;
+    // An occasional blink.
+    const blink = !reduced && (time + x * 3) % 4.2 < .12; for (const e of this.eyes) if (e !== this.lids[0] && e !== this.lids[1]) e.visible = !blink;
     this.crown.visible = !!o.crown;
     this.styleHair(o.style || 'curls', o.hair || '#2b211c', skin);
     // Sleeping: lie the whole figure down along the bed, head toward the headboard.
