@@ -109,7 +109,7 @@ async function startAtObject(input){
 }
 let tripTimer;
 function render(){
-  if(!modalPage||modalPage!=='create')tip(state.location==='home'?'home':'city');
+  if(!modalPage||modalPage!=='create')tip(state.location==='home'?'home':state.location==='street'||state.trip?'city':'venue');
   clearTimeout(tripTimer);if(state.trip)tripTimer=setTimeout(()=>refresh(),Math.max(500,state.trip.arrives-now()+400));
   const c=state.careers[state.career],def=CAREERS[state.career],location=LOCATIONS[state.location];
   $('#navigation').innerHTML=[['city','⌂','Home'],['career','✧','Career'],['phone','♧','Social'],['inventory','◇','My home'],['profile','♙','Profile']].map(([page,icon,label])=>`<button class="nav-button ${page==='city'?'active':''}" data-action="${page==='city'?(state.visiting?'leaveVisit':'travel'):'page'}" data-location="home" data-page="${page}"><span>${icon}</span>${label}</button>`).join('');
@@ -238,6 +238,7 @@ function openBattle(id){battleId=id;battleView();}
 // First-time explainers: each screen explains itself once per browser.
 const TIPS={
   home:['🏠 Your home','Tap furniture to use it: the bed restores energy, the fridge hunger, the shower hygiene, the sofa fun. Need bars sit on the left. The front door takes you out to your street.'],
+  venue:['📍 Inside a place','Each place you enter stands on its own. Drag to look around, tap things to use them, and tap people to say hi or challenge them. To go somewhere else, use the Exit or the Map app on your phone.'],
   city:['🏙️ Out in Palm City','Tap the ground to walk. Tap a pin to head somewhere (walking takes up to 1:30, a car is faster). Tap people to say hi, add friends or challenge them to a battle.'],
   career:['✦ Your career','Practise to level skills, then play activities: every choice you make shapes the quality. Good work earns reach (views, streams, fans) and fame. Each major activity uses 1 of your 10 charges.'],
   phone:['💬 Social','Chat with people nearby, add friends, message them, open 1v1, 3v3 or 5v5 battles, and collaborate.'],
