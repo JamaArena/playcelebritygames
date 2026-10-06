@@ -5,7 +5,7 @@ const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&
 const fmt=value=>Math.floor(value).toLocaleString();
 const duration=ms=>{const seconds=Math.max(0,Math.ceil(ms/1000));return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;};
 const needs={hunger:['Hunger','♨'],energy:['Energy','☾'],fun:['Fun','✧'],social:['Social','♡'],hygiene:['Hygiene','♧'],bladder:['Bladder','◡']};
-let snapshot,state,busy=false,modalPage=null,previousFocus,toastTimer,offset=0,phoneTab='local';
+let snapshot,state,busy=false,modalPage=null,previousFocus,toastTimer,offset=0,phoneTab='local',selectedObject;
 let motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;
 const now=()=>Date.now()+offset;
 const button=(label,action,attrs='',style='secondary')=>`<button class="${style}" data-action="${action}" ${attrs}>${label}</button>`;
@@ -43,9 +43,9 @@ async function send(input,{keepModal=false,quiet=false}={}){
   finally{busy=false;}
 }
 const world=new World($('#world'),position=>send({type:'move',...position},{keepModal:true,quiet:true}),object=>{
-  if(object.blocked){toast('That destination is blocked. Choose open ground.');return;}
+  if(object.blocked){toast(object.message||'That destination is blocked. Choose open ground.');return;}
   // Movement persistence and interaction are serialized, without charging walking.
-  const perform=()=>{if(object.need)recover(object.need);else if(object.action==='practice')practice();else openPage(object.action);};
+  const perform=()=>{if(state.location==='home'){selectedObject=object;showModal('object',`<span class="eyebrow">YOUR DOLLHOUSE</span><h2>${escape(object.name)}</h2><p class="modal-intro">Choose what your character does.</p><div class="choice-grid">${button(`1 · ${escape(object.verb||'Use')}`,'useObject','','choice')}${button('2 · Go to','goObject','','choice')}</div>`);}else if(object.need)recover(object.need);else if(object.action==='practice')practice();else openPage(object.action);};
   if(busy){const timer=setInterval(()=>{if(!busy){clearInterval(timer);perform();}},50);}else perform();
 });
 function render(){
@@ -55,7 +55,7 @@ function render(){
   $('#locationTitle').textContent=state.visiting?`${snapshot.players.find(p=>p.id===state.visiting)?.name||'Friend'}’s apartment`:location.name;
   $('#locationSubtitle').textContent=location.subtitle;
   $('#locationEyebrow').textContent=state.location==='home'?'YOUR NEIGHBOURHOOD':'OUT IN PALM CITY';
-  $('#objects').innerHTML=worldObjects(state.location).map(o=>button(`${o.icon} ${escape(o.name)}`,'object',`data-name="${escape(o.name)}"`,'object-button')).join('')+(state.location==='home'?button('♧ Socialise','recover','data-need="social"','object-button'):'');
+  $('#objects').innerHTML=worldObjects(state.location,snapshot.visitedHome?.furniture||state.furniture).map(o=>button(`${o.icon} ${escape(o.name)}`,'object',`data-name="${escape(o.name)}"`,'object-button')).join('')+(state.location==='home'?button('♧ Socialise','recover','data-need="social"','object-button'):'');
   if(state.visiting)$('#objects').innerHTML=button('♡ Socialise','recover','data-need="social"','object-button')+button('↗ Leave visit','leaveVisit','','object-button');
   $('#profileCard').innerHTML=`<div class="profile-cover"></div><div class="avatar" style="background:${state.color}">${escape(state.name.slice(0,1).toUpperCase())}</div><h2>${escape(state.name)}</h2><p class="profile-career">${def.icon} ${def.name} · ${c.origin===1?'Connected origin':'Independent origin'}</p><span class="tier-pill">✦ ${B.tiers[c.tier][0]}</span><div class="profile-numbers"><div><strong>${fmt(c.audience)}</strong><small>${def.audience}</small></div><div><strong>${state.awards.length}</strong><small>awards</small></div><div><strong>${Math.round(c.reputation)}</strong><small>reputation</small></div></div>`;
   const mood=Object.values(state.needs).reduce((a,b)=>a+b,0)/6;
@@ -149,10 +149,31 @@ document.addEventListener('click',async event=>{
   const target=event.target.closest('[data-action]');if(!target||target.disabled)return;const d=target.dataset;
   switch(d.action){
     case 'retry':refresh();break;
+    case 'lifePanel':showModal('life',`<span class="eyebrow">YOUR DAILY LIFE</span><h2>How you're doing</h2>${$('#profileCard').innerHTML}<hr>${$('#needsCard').innerHTML}<hr>${$('#skillsCard').innerHTML}<hr><h3>Recent moments</h3>${$('#feed').innerHTML}`);break;
     case 'page':openPage(d.page);break;
     case 'selectCareer':updateCreationCareer(d.career);break;
     case 'travel':await send({type:'travel',location:d.location});break;
     case 'object':world.walkToObject(d.name);break;
+    case 'goObject':case 'useObject':{
+      const object=selectedObject,use=d.action==='useObject';closeModal();
+      world.approach(object,()=>{
+        if(!use)return;
+        const perform=async()=>{
+          if(object.need){const data=await send({type:'recover',need:object.need});if(!data)return;}
+          if(object.pose){const x=object.pose==='dine'?.5:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?-3.5:object.vx??object.x;const z=object.pose==='dine'?2.1:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?1.5:object.vz??object.z;world.pose={kind:object.pose,x,z};}
+          if(object.name==='Bedside lamp')world.lampOff=!world.lampOff;
+          if(object.name==='Fridge')world.fridgeOpen=!world.fridgeOpen;
+          if(object.name==='Window')world.windowOpen=!world.windowOpen;
+          if(object.name.includes('plant'))world.pose={kind:'water',x:object.x,z:object.z};
+          if(object.name==='Shower')world.pose={kind:'shower',x:4.3,z:.4};
+          if(object.name==='Kitchen')world.pose={kind:'cook',x:-3.2,z:-3.25};
+          if(object.name==='Fridge')toast(`Fridge opened · ${state.inventory.food.quantity} meals ready. Select Kitchen to cook and eat.`);
+          else toast(`${object.name} · ${object.verb}${object.need?' — recovery started':''}`);
+          world.draw();
+        };
+        if(busy){const timer=setInterval(()=>{if(!busy){clearInterval(timer);perform();}},50);}else perform();
+      });break;
+    }
     case 'practice':practice();break;
     case 'prepare':prepare(d.kind);break;
     case 'startPractice':await send({type:'start',kind:'practice',skill:d.skill});break;
