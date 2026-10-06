@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -65,6 +65,7 @@ export function reconcile(s, now) {
   if(dt<=30_000)for(const [need,rate] of Object.entries(B.decay))s.needs[need]=clamp(s.needs[need]-rate*(1-(perks[need]||0)/100)*dt/3600_000);
   if(s.pet&&dt<=30_000)for(const [k,rate] of Object.entries(PET_CARE.decay))s.pet[k]=clamp(s.pet[k]-rate*dt/3600_000);
   mishaps(s,now);
+  if(dt<=30_000)lifeEvents(s,now);
   s.lastSeen=now;
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
     item.level=item.upgrade.target; item.upgrade=null; log(s,`${ITEMS[key].name} reached level ${item.level}.`,now);
@@ -91,6 +92,22 @@ export function mishaps(s,now){
     s.mishap={id:id(),need,at:now,lost};log(s,`${m.icon} ${m.title}. ${m.text} −${lost.toLocaleString('en-US')} fame.`,now);return;
   }
 }
+// Random life moments while you play: good luck, small embarrassments, fan gifts, and power cuts at home.
+export function lifeEvents(s,now,rng=Math.random){
+  if(s.nextEventAt==null){s.nextEventAt=now+LIFE_EVENT.firstMs;return;}
+  if(now<s.nextEventAt||s.trip)return;
+  const family=CAREERS[s.career]?.family,home=s.location==='home'&&!s.visiting;
+  const options=Object.entries(LIFE_EVENTS).filter(([,e])=>(!e.family||e.family===family)&&(!e.where||(e.where==='home')===home));
+  const total=options.reduce((n,[,e])=>n+e.weight,0);let pick=rng()*total,key=options[0][0];
+  for(const [k,e] of options){pick-=e.weight;if(pick<=0){key=k;break;}}
+  const e=LIFE_EVENTS[key];let delta=0,text=e.text;
+  if(e.fame){const [share,min]=e.fame,raw=share>0?Math.max(min,(s.fame||0)*share):Math.min(min,(s.fame||0)*share);delta=Math.round(raw<0?raw*(1-(perksFor(s).scandal||0)/100):raw);if(delta<0)delta=Math.max(delta,-(s.fame||0));addFame(s,delta);}
+  for(const [k,v] of Object.entries(e.needs||{}))s.needs[k]=clamp(s.needs[k]+v);
+  if(key==='powerCut'){if(upgradesFor(s).generator)text='Power cut! Your generator kicked in, so nothing stopped.';else s.powerCut={until:now+LIFE_EVENT.powerCutMs};}
+  s.lifeEvent={id:id(),kind:key,at:now,delta,text};log(s,`${e.icon} ${e.title}. ${text}${delta?` ${delta>0?'+':'−'}${Math.abs(delta).toLocaleString('en-US')} fame.`:''}`,now);
+  const [lo,hi]=LIFE_EVENT.gapMs;s.nextEventAt=now+lo+Math.round(rng()*(hi-lo));
+}
+const noPower=(s,now)=>s.powerCut?.until>now&&!upgradesFor(s).generator&&s.location==='home'&&!s.visiting;
 export function finishRecovery(s,now){
   const r=s.recovery,start=r.startedAt??r.endsAt-B.recovery[r.need][1],share=Math.max(0,Math.min(1,(now-start)/(r.endsAt-start))),amount=r.amount??B.recovery[r.need][0];
   s.needs[r.need]=clamp(s.needs[r.need]+amount*share);for(const [k,v] of Object.entries(r.extra||{}))s.needs[k]=clamp(s.needs[k]+v*share);s.recovery=null;
@@ -242,7 +259,7 @@ export function act(s,input,now,rng=Math.random) {
   switch(input.type) {
     case 'travel':
       requireRule(LOCATIONS[input.location],'Unknown destination.');requireRule(!s.active&&!s.recovery,'Finish your activity before travelling.');
-      if(input.location!==s.location&&!s.visiting&&LOT(input.location)!==LOT(s.location)){const ms=tripMs(s.location,input.location,s.ride||'walk');s.trip={from:s.location,to:input.location,ride:s.ride||null,departs:now,arrives:now+ms};log(s,`${s.ride?'Driving':'Walking'} to ${LOCATIONS[input.location].name} · ${Math.ceil(ms/60000)} min.`,now);break;}
+      if(input.location!==s.location&&!s.visiting&&LOT(input.location)!==LOT(s.location)){let ms=tripMs(s.location,input.location,s.ride||'walk');const rain=weatherAt(now)==='rain',jam=!!s.ride&&goSlowAt(now);if(rain)ms=Math.round(ms*1.2);if(jam)ms=Math.round(ms*1.4);s.trip={from:s.location,to:input.location,ride:s.ride||null,departs:now,arrives:now+ms,delays:[...(rain?['rain']:[]),...(jam?['go-slow']:[])]};log(s,`${s.ride?'Driving':'Walking'} to ${LOCATIONS[input.location].name} · ${Math.ceil(ms/60000)} min.${jam?' Go-slow on the road!':''}${rain?' Flooded streets slow you down.':''}`,now);break;}
       s.location=input.location;s.position3d=arrivalSpot(input.location);break;
     case 'move':
       requireRule(walkable(s.location,input.x,input.z,s.visiting?[]:s.furniture),'That destination is blocked. Choose open ground.');
@@ -304,6 +321,7 @@ export function act(s,input,now,rng=Math.random) {
       const family=CAREERS[s.career].family,watching=input.watch&&input.need==='fun'&&s.location==='home';
       const watch=watching?{learn:s.watchLearnAt==null||now-s.watchLearnAt>=WATCH_COOLDOWN,given:0,seed:Math.floor(Math.random()*12)}:null;
       // A dish from the kitchen menu: its own amount, time and side effects.
+      requireRule(!(watching&&noPower(s,now)),'NEPA took light. The TV is off until power comes back.');
       const food=input.need==='hunger'&&input.food!=null?FOODS[input.food]:null;
       if(input.food!=null){requireRule(food,'That dish is not on the menu.');requireRule(s.location==='home','Cook at home.');requireRule((s.fame||0)>=(food.fame||0),`${food.name} unlocks at ${(food.fame||0).toLocaleString('en-US')} fame.`);}
       if(food){s.recovery={id:id(),need:'hunger',label:`Eating ${food.name.toLowerCase()}`,startedAt:now,endsAt:now+Math.round(food.ms*rest),amount:food.hunger,extra:food.extra||{},food:input.food};break;}
@@ -344,6 +362,7 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(!s.active&&!s.recovery,'Finish or cancel your activity first.');
       requireRule(s.location==='home'&&!s.visiting,'Use your items at home.');
       requireRule(s.inventory[input.item]&&s.furniture.some(f=>f.item===input.item),'Place that item at home first.');
+      requireRule(!(POWERED.includes(input.item)&&noPower(s,now)),'NEPA took light. Wait for power, or get a generator.');
       s.recovery={id:id(),need:use.need,label:use.verb,startedAt:now,endsAt:now+use.ms,amount:use.amount,extra:use.extra||{},item:input.item};break;
     }
     case 'buy': {
