@@ -403,7 +403,7 @@ document.addEventListener('click',async event=>{
         if(!use)return;
         const perform=async()=>{
           if(object.need){const data=await send({type:'recover',need:object.need,watch});if(!data)return;}
-          if(object.pose){const x=object.pose==='dine'?.5:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?-3.5:object.vx??object.x;const z=object.pose==='dine'?2.1:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?1.5:object.vz??object.z;world.pose={kind:object.pose,x,z};}
+          if(object.pose){const x=object.pose==='dine'?.5:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?-3.5:object.vx??object.x;const z=object.pose==='dine'?2.1:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?1.5:object.vz??object.z;world.pose={kind:object.pose,x,z,face:object.face};}
           if(object.name==='Bedside lamp')world.lampOff=!world.lampOff;
           if(object.name==='Fridge')world.fridgeOpen=!world.fridgeOpen;
           if(object.name==='Window')world.windowOpen=!world.windowOpen;

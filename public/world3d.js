@@ -129,7 +129,7 @@ class Figure {
     // Standing still people breathe and shift their weight a little.
     const idle = !o.walk && !pose && !reduced, breath = idle ? Math.sin(time * 1.7 + x) : 0, sway = idle ? Math.sin(time * .6 + z) : 0;
     const hip = seated ? .58 : .9 * tall + bob, top = o.outfit, skinMat = mat(skin, 'skin'), pants = mat(o.pants);
-    this.root.position.set(x, 0, z); this.root.rotation.set(0, !pose || ['gesture', 'toilet', 'pee', 'doze', 'stink'].includes(pose) ? o.heading || 0 : 0, 0);
+    this.root.position.set(x, 0, z); this.root.rotation.set(0, o.heading || 0, 0);
     this.torso.position.set(sway * .012, hip, 0); this.torso.scale.set(1, tall, 1); this.torso.rotation.set(o.walk ? .05 : 0, 0, sway * .015);
     this.pelvis.material = pants; this.pelvis.scale.set(.96 * H, 1, .58 * H);
     this.chest.material = mat(top); this.chest.scale.set(S, 1 + breath * .006, .62 * W);
