@@ -205,21 +205,54 @@ export class World3D extends World {
     const edge = new T.Mesh(new T.CylinderGeometry(10.4, 9.6, 1.4, 64), mat('#9c8a6e')); edge.position.y = -1;
     this.island.add(lawn, edge); this.lawn = lawn; this.scene3.add(this.island);
     this.world3 = new T.Group(); this.scene3.add(this.world3);
+    // The open city (street, trips, map) is static: it is built once into instanced batches, one per
+    // shape and colour, and rebuilt only when the place, day/night or neighbours change. Fog hides the edge.
+    this.city = new T.Group(); this.scene3.add(this.city); this.fog = new T.Fog('#d6e6f2', 80, 260);
     this.boxes = new Pool(this.world3, () => { const m = new T.Mesh(UNIT_BOX, mat('#fff')); m.castShadow = true; m.receiveShadow = true; return m; });
     this.balls = new Pool(this.world3, () => { const m = new T.Mesh(UNIT_BALL, mat('#fff')); m.castShadow = true; m.receiveShadow = true; return m; });
     this.figures = new Pool(this.world3, () => new Figure()); this.toilets = new Pool(this.world3, makeToilet);
     this.raycaster = new T.Raycaster(); this.ground = new T.Vector3();
   }
   // Drawing primitives used by the shared scene descriptions, now as 3D meshes.
-  box(x, z, w, d, h, color, y = 0) { const m = this.boxes.next(); m.material = mat(color, GLASS.has(color) ? 'glass' : 'matte'); m.scale.set(Math.max(w, .001), Math.max(h, .001), Math.max(d, .001)); m.position.set(x, y + h / 2, z); }
-  round(x, z, w, d, h, color, y = 0) { const m = this.balls.next(); m.material = mat(color, 'gloss'); m.scale.set(Math.max(w, .001), Math.max(h, .001), Math.max(d, .001)); m.position.set(x, y + h / 2, z); }
+  box(x, z, w, d, h, color, y = 0) { if (this.capture) { this.capture.push(['box', color, x, y + h / 2, z, w, h, d]); return; } const m = this.boxes.next(); m.material = mat(color, GLASS.has(color) ? 'glass' : 'matte'); m.scale.set(Math.max(w, .001), Math.max(h, .001), Math.max(d, .001)); m.position.set(x, y + h / 2, z); }
+  round(x, z, w, d, h, color, y = 0) { if (this.capture) { this.capture.push(['ball', color, x, y + h / 2, z, w, h, d]); return; } const m = this.balls.next(); m.material = mat(color, 'gloss'); m.scale.set(Math.max(w, .001), Math.max(h, .001), Math.max(d, .001)); m.position.set(x, y + h / 2, z); }
   // Room-sized floors indoors are tiled; paths, lawns and streets stay plain.
-  floor(x, z, w, d, color, y = 0) { const m = this.boxes.next(); m.material = this.interior() && w >= 8 && d >= 8 && w <= 12 && d <= 12 ? tileMat(color, w, d) : mat(color); m.scale.set(w, .03, d); m.position.set(x, y - .01, z); }
-  polygon() {} limb() {} shadowRect() {} paintIsland() {}
+  floor(x, z, w, d, color, y = 0) { if (this.capture) { this.capture.push(['box', color, x, y - .01, z, w, .03, d]); return; } const m = this.boxes.next(); m.material = this.interior() && w >= 8 && d >= 8 && w <= 12 && d <= 12 ? tileMat(color, w, d) : mat(color); m.scale.set(w, .03, d); m.position.set(x, y - .01, z); }
+  // Flat ground shapes (ponds) in the city; other 2D-only drawing has no 3D counterpart.
+  polygon(points, color) {
+    if (!this.capture || points.length < 3) return;
+    const shape = new T.Shape(points.map(([x, , z]) => new T.Vector2(x, -z))), m = new T.Mesh(new T.ShapeGeometry(shape), mat(color));
+    m.rotation.x = -Math.PI / 2; m.position.y = (points[0][1] || 0) + .012; m.receiveShadow = true; this.capture.push(['mesh', m]);
+  }
+  limb() {} shadowRect() {} paintIsland() {}
+  // Towers get windows on every side in 3D, since the camera can orbit all the way round.
+  facades() { return this.face || { x: 1, z: 1 }; }
+  tower(t, x, z, night) { this.face = { x: 1, z: 1 }; super.tower(t, x, z, night); this.face = { x: -1, z: -1 }; super.tower(t, x, z, night); this.face = null; }
+  buildCity(night) {
+    for (const child of [...this.city.children]) { this.city.remove(child); if (child.isInstancedMesh) child.dispose(); else child.geometry?.dispose(); }
+    const zoom = this.zoom; this.capture = []; this.cullPad = 1e7; this.zoom = 1;
+    try { this.town(); } finally { this.zoom = zoom; this.cullPad = 0; }
+    const groups = new Map(), m4 = new T.Matrix4(), q = new T.Quaternion(), v = new T.Vector3(), sc = new T.Vector3();
+    for (const e of this.capture) { if (e[0] === 'mesh') { this.city.add(e[1]); continue; } const key = e[0] + e[1]; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(e); }
+    for (const list of groups.values()) {
+      const [kind, color] = list[0], geo = kind === 'box' ? UNIT_BOX : UNIT_BALL;
+      const im = new T.InstancedMesh(geo, mat(color, GLASS.has(color) || (night && color === '#ffd98a') ? 'glass' : kind === 'ball' ? 'gloss' : 'matte'), list.length);
+      list.forEach(([, , x, y, z, w, h, d], i) => im.setMatrixAt(i, m4.compose(v.set(x, y, z), q, sc.set(Math.max(w, .001), Math.max(h, .001), Math.max(d, .001)))));
+      // Flat ground (roads, lawns, water) only receives shadows; casting onto itself causes striping.
+      im.receiveShadow = true; im.castShadow = list.some(e => e[6] > .05); im.computeBoundingSphere(); this.city.add(im);
+    }
+    this.capture = null;
+  }
   toilet(x, z) { this.toilets.next().position.set(x, 0, z); }
   human(x, z, skin, o = {}) {
     const f = this.figures.next(); o = { hair: '#2b211c', style: 'curls', outfit: '#8ea9a4', pants: '#34435e', shoes: '#f4f1ea', gait: this.gait, ...o };
     f.apply(x, z, skin, o, performance.now() / 1000, this.reduced);
+  }
+  // On your street the camera follows you; zooming out eases it over to the city overview.
+  focus() {
+    const base = super.focus(); if (this.location !== 'street' || this.state?.trip || !this.player) return base;
+    const t = Math.max(0, Math.min(1, (.9 - this.zoom) / .65)), p = this.player;
+    return { x: base.x + p.x * (1 - t), z: base.z + p.z * (1 - t) };
   }
   // Screen <-> world, through the 3D camera.
   project(x, y, z) { const v = new T.Vector3(x, y, z).project(this.camera); return { x: (v.x + 1) / 2 * this.width, y: (1 - v.y) / 2 * this.height }; }
@@ -229,7 +262,8 @@ export class World3D extends World {
   }
   placeCamera() {
     // Keep a pleasant overhead view: between ~30° and ~80° up, never closer than 7 units.
-    const f = this.focusPoint, el = .52 + (this.pitch - .3) / .63 * .88, dist = Math.max(7, 19 / this.zoom);
+    // Outdoors the camera pulls further back so streets and buildings fit around you.
+    const f = this.focusPoint, el = .52 + (this.pitch - .3) / .63 * .88, dist = Math.max(7, 19 / this.zoom) * (this.interior() ? 1 : 1.9);
     this.camera.position.set(f.x + Math.sin(this.angle) * Math.cos(el) * dist, Math.sin(el) * dist, f.z + Math.cos(this.angle) * Math.cos(el) * dist);
     this.camera.lookAt(f.x, .6, f.z); this.camera.updateMatrixWorld();
     this.scale = this.height / (2 * dist * Math.tan(T.MathUtils.degToRad(this.camera.fov / 2)));
@@ -239,7 +273,10 @@ export class World3D extends World {
     this.hemi.intensity = .55 * k + .08; this.sun.intensity = 2.4 * k; this.fill.intensity = .45 * k + .1; this.lamp.intensity = day.dark * 6; this.scene3.environmentIntensity = .55 * k + .12;
     this.fill.position.set(this.focusPoint.x - 8, 6, this.focusPoint.z - 6);
     this.sun.position.set(this.focusPoint.x + 7, 13, this.focusPoint.z + 9); this.sun.target.position.set(this.focusPoint.x, 0, this.focusPoint.z); this.sun.target.updateMatrixWorld();
-    this.scene3.background = new T.Color(day.night ? '#24324d' : '#d6e6f2');
+    const sky = day.night ? '#24324d' : '#d6e6f2'; this.scene3.background = new T.Color(sky); this.fog.color.set(sky);
+    // Shadows follow the camera: tight indoors, wider (and softer) across the city.
+    const reach = this.interior() ? 11 : 28, cam = this.sun.shadow.camera;
+    if (cam.right !== reach) { Object.assign(cam, { left: -reach, right: reach, top: reach, bottom: -reach, far: 90 }); cam.updateProjectionMatrix(); this.sun.shadow.normalBias = reach > 11 ? .08 : .02; this.sun.shadow.bias = reach > 11 ? -.001 : -.0004; }
     const lawn = { plaza: '#ddd6b0', sports: '#b5d3a2', studio: '#cfc9e2', creator: '#ead0c4', tech: '#c2dbe2' }[this.location] || '#c6d8b0';
     this.lawn.material = mat(day.night ? mix(lawn, '#24324d', .5) : lawn);
   }
@@ -251,13 +288,16 @@ export class World3D extends World {
     const size = this.renderer.getSize(new T.Vector2()); if (size.x !== Math.round(r.width) || size.y !== Math.round(r.height)) { this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); this.renderer.setSize(r.width, r.height, false); this.camera.aspect = r.width / r.height; this.camera.updateProjectionMatrix(); }
     this.focusPoint = this.focus(); this.placeCamera();
     const day = this.daylight(); this.light(day);
+    const inside = this.interior();
+    this.island.visible = inside; this.city.visible = !inside; this.scene3.fog = inside ? null : this.fog;
+    if (!inside) { const key = [this.location, day.night, this.ownersKey, this.state.home, !!this.state.trip].join('|'); if (key !== this.cityKey) { this.cityKey = key; this.buildCity(day.night); } }
     for (const p of [this.boxes, this.balls, this.figures, this.toilets]) p.begin();
-    this.meshes = []; this.scene();
+    this.meshes = []; if (!inside) this.townLife(); this.scene();
     for (const p of [this.boxes, this.balls, this.figures, this.toilets]) p.end();
     this.renderer.render(this.scene3, this.camera);
     // Labels, bubbles and rings stay crisp on the 2D layer above the 3D view.
     const ctx = this.ctx; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, r.width, r.height);
-    this.paintRoutine(); this.paintLabels(); this.paintSpeech();
+    this.paintRoutine(); this.paintLabels(); if (!inside) this.paintPins(); this.paintSpeech();
     if (this.moving) { const t = this.project(this.target.x, .03, this.target.z); ctx.strokeStyle = '#fff8'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.ellipse(t.x, t.y, 7, 3.5, 0, 0, Math.PI * 2); ctx.stroke(); }
     this.hits = worldObjects(this.location, this.visitedHome?.furniture || this.state.furniture).map(object => ({ ...object, screen: this.project(object.vx ?? object.x, .6, object.vz ?? object.z) }));
     this.hitRadius = Math.max(14, Math.min(30, this.scale * .42));
