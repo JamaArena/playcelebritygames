@@ -1,12 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createCharacter, act, reconcile, refill, learn, shot, shootingProbability, generalProbability, choices, view, tennisPoint, tennisScore } from '../game.mjs';
-import { BALANCE as B, CAREERS, effort } from '../public/content.js';
+import { createCharacter, act, reconcile, refill, learn, shot, shootingProbability, generalProbability, choices, view, tennisPoint, tennisScore, evaluate } from '../game.mjs';
+import { BALANCE as B, CAREERS, effort, tripMs } from '../public/content.js';
 import { worldObjects } from '../public/world.js';
 import { walkable } from '../public/content.js';
 const T=1_000_000;
 const make=(career='football',origin=0)=>createCharacter({name:'River',career,origin,adult:true},T);
-const go=s=>act(s,{type:'travel',location:CAREERS[s.career].location},T);
+// Trips take real time; tests about other rules arrive immediately.
+const arrive=s=>{if(s.trip){s.location=s.trip.to;s.position3d={x:0,z:1};s.trip=null;}};
+const go=s=>{act(s,{type:'travel',location:CAREERS[s.career].location},T);arrive(s);};
 function complete(s,kind='produce',rng=()=>0){
   const start=T+1;act(s,{type:'start',kind,title:'First light'},start,rng);
   const activity=s.active.id;
@@ -16,13 +18,13 @@ function complete(s,kind='produce',rng=()=>0){
 test('all 15 career definitions have two valid starts and four skills',()=>{
   assert.equal(Object.keys(CAREERS).length,15);
   for(const key of Object.keys(CAREERS))for(const origin of [0,1]){
-    const s=make(key,origin),c=s.careers[key];assert.equal(Object.keys(c.skills).length,4);assert.equal(s.money,500);assert.equal(s.charges,10);assert.equal(c.skills[CAREERS[key].focus].level,origin?2:1);
+    const s=make(key,origin),c=s.careers[key];assert.equal(Object.keys(c.skills).length,4);assert.equal(s.money,undefined,'there are no coins');assert.equal(s.charges,10);assert.equal(c.skills[CAREERS[key].focus].level,origin?2:1);
   }
 });
 test('football is outfield only; switching retains one shared charge bar and history',()=>{
   const s=createCharacter({name:'River',career:'football',origin:0,position:'goalkeeper'},T);assert.equal(s.position,'midfielder');
   s.charges=3;s.refillAnchor=T;learn(s,'football','shooting',38,'one');act(s,{type:'switch',career:'musician'},T+100);
-  assert.equal(s.charges,3);assert.equal(s.refillAnchor,T);assert.equal(s.careers.football.skills.shooting.level,2);assert.equal(s.money,500);
+  assert.equal(s.charges,3);assert.equal(s.refillAnchor,T);assert.equal(s.careers.football.skills.shooting.level,2);assert.equal(s.fame,0);
   act(s,{type:'switch',career:'football'},T+200);assert.equal(s.careers.football.origin,0);
 });
 test('arithmetic then geometric thresholds match every PRD level',()=>assert.deepEqual(Array.from({length:9},(_,i)=>effort(i+1)),[35,70,105,140,280,560,1120,2240,4480]));
@@ -49,8 +51,8 @@ test('spending again does not reset refill clock; no surplus time banks at capac
   act(s,{type:'start',kind:'practice',skill:'passing'},T+201*60_000);assert.equal(s.refillAnchor,T+201*60_000);
 });
 test('zero charges allow travel, purchases and recovery but block career starts without debit',()=>{
-  const s=make();s.charges=0;s.refillAnchor=T;act(s,{type:'travel',location:'plaza'},T);
-  act(s,{type:'buy',item:'food'},T);assert.equal(s.money,485);act(s,{type:'travel',location:'home'},T);
+  const s=make();s.charges=0;s.refillAnchor=T;act(s,{type:'travel',location:'plaza'},T);arrive(s);
+  s.fame=50;act(s,{type:'buy',item:'gear'},T);assert.equal(s.inventory.gear.level,1);act(s,{type:'travel',location:'home'},T);arrive(s);
   act(s,{type:'recover',need:'energy'},T);assert.equal(s.charges,0);reconcile(s,T+300_000);assert.equal(s.needs.energy,100);
   go(s);assert.throws(()=>act(s,{type:'start',kind:'produce'},T+300_000),/No career charges/);assert.equal(s.active,null);
 });
@@ -74,9 +76,9 @@ test('commentary pauses prevent early decisions and final settlement',()=>{
   assert.throws(()=>act(s,{type:'decision',activityId:a.id,beat:0,choice:0},T+1),/Commentary/);
   assert.throws(()=>act(s,{type:'finish',activityId:a.id},T+1),/Complete every/);assert.equal(s.charges,9);
 });
-test('published output settles money and audience once; retries cannot release again',()=>{
-  const s=make('musician');go(s);const activity=complete(s);assert.equal(s.outputs.length,1);assert.equal(s.outputs[0].released,true);assert.equal(s.outputs[0].quality,60);assert.equal(s.money,530);assert.equal(s.careers.musician.audience,60);
-  assert.throws(()=>act(s,{type:'finish',activityId:activity},T+300_000),/No activity/);assert.equal(s.money,530);assert.equal(s.careers.musician.audience,60);
+test('published output settles money, reach and fame once; retries cannot release again',()=>{
+  const s=make('musician');go(s);const activity=complete(s);assert.equal(s.outputs.length,1);assert.equal(s.outputs[0].released,true);assert.equal(s.outputs[0].quality,60);assert.equal(s.careers.musician.audience,6000);assert.equal(s.fame,6);assert.equal(s.outputs[0].fame,6);assert.equal(s.outputs[0].payout,undefined);
+  assert.throws(()=>act(s,{type:'finish',activityId:activity},T+300_000),/No activity/);assert.equal(s.careers.musician.audience,6000);assert.equal(s.fame,6);
 });
 test('maximum football skill improves distance-sensitive accuracy without guaranteeing goals',()=>{
   assert.ok(Math.abs(shootingProbability(6,24,0,0,0)-.396)<1e-12);
@@ -89,30 +91,30 @@ test('defensive football beats offer context-valid actions; passing trains passi
   act(s,{type:'decision',activityId:a.id,beat:0,choice:1},a.readyAt,()=>0);assert.equal(s.careers.football.skills.passing.points,5);assert.equal(s.careers.football.skills.shooting.points,0);
   act(s,{type:'decision',activityId:a.id,beat:1,choice:1},a.readyAt,()=>0);assert.ok(choices(s).every(c=>c.skill==='defending'));
 });
-test('upgrades cost increasing time and money, finish offline once, preserve ownership and grant no learning',()=>{
-  const s=make();s.location='plaza';act(s,{type:'buy',item:'gear'},T);const before=s.money;act(s,{type:'upgrade',item:'gear'},T);
-  assert.equal(s.money,before-100);assert.equal(s.inventory.gear.level,1);assert.equal(s.inventory.gear.upgrade.endsAt,T+B.upgradeMs);
+test('upgrades need rising fame and time, finish offline once, preserve ownership and grant no learning',()=>{
+  const s=make();s.location='plaza';assert.throws(()=>act(s,{type:'buy',item:'gear'},T),/50 fame/);s.fame=100;act(s,{type:'buy',item:'gear'},T);act(s,{type:'upgrade',item:'gear'},T);
+  assert.equal(s.fame,100,'fame is not spent');assert.equal(s.inventory.gear.level,1);assert.equal(s.inventory.gear.upgrade.endsAt,T+B.upgradeMs);
   assert.throws(()=>act(s,{type:'upgrade',item:'gear'},T),/running/);reconcile(s,T+B.upgradeMs);assert.equal(s.inventory.gear.level,2);
   reconcile(s,T+2*B.upgradeMs);assert.equal(s.inventory.gear.level,2);assert.equal(s.learningEvents.length,0);
-  s.money=500;act(s,{type:'upgrade',item:'gear'},T+2*B.upgradeMs);assert.equal(s.inventory.gear.upgrade.endsAt,T+4*B.upgradeMs);assert.equal(s.money,300);
+  assert.throws(()=>act(s,{type:'upgrade',item:'gear'},T+2*B.upgradeMs),/200 fame/);s.fame=200;act(s,{type:'upgrade',item:'gear'},T+2*B.upgradeMs);assert.equal(s.inventory.gear.upgrade.endsAt,T+4*B.upgradeMs);
 });
-test('food is consumed only on completion; cancelled recovery grants nothing',()=>{
-  const s=make();s.needs.hunger=10;act(s,{type:'recover',need:'hunger'},T);act(s,{type:'cancel'},T+20_000);assert.equal(s.inventory.food.quantity,3);assert.ok(s.needs.hunger<=10);
-  act(s,{type:'recover',need:'hunger'},T+20_000);reconcile(s,T+80_000);assert.equal(s.inventory.food.quantity,2);const hunger=s.needs.hunger;reconcile(s,T+140_000);assert.equal(s.inventory.food.quantity,2);assert.equal(s.needs.hunger,hunger);
+test('meals need no groceries; cancelled recovery grants nothing and completion applies once',()=>{
+  const s=make();s.needs.hunger=10;act(s,{type:'recover',need:'hunger'},T);act(s,{type:'cancel'},T+20_000);assert.ok(s.needs.hunger<=10);
+  act(s,{type:'recover',need:'hunger'},T+20_000);reconcile(s,T+80_000);assert.ok(s.needs.hunger>=45);const hunger=s.needs.hunger;reconcile(s,T+140_000);assert.equal(s.needs.hunger,hunger);
 });
 test('build and launch consume separate charges and cannot launch a product twice',()=>{
-  const s=make('founder');go(s);complete(s,'build');const product=s.outputs[0];assert.equal(product.released,false);assert.equal(s.careers.founder.audience,0);assert.equal(s.money,500);
+  const s=make('founder');go(s);complete(s,'build');const product=s.outputs[0];assert.equal(product.released,false);assert.equal(s.careers.founder.audience,0);assert.equal(s.fame,0);
   act(s,{type:'start',kind:'launch',productId:product.id},T+300_000,()=>0);const a=s.active;
   for(let n=0;n<3;n++)act(s,{type:'decision',activityId:a.id,beat:n,choice:0},a.readyAt,()=>0);
   act(s,{type:'finish',activityId:a.id},a.readyAt,()=>0);assert.equal(product.released,true);assert.equal(s.charges,8);
   assert.throws(()=>act(s,{type:'start',kind:'launch',productId:product.id},a.readyAt),/unreleased/);assert.equal(s.charges,8);
 });
 test('milestone awards are permanent once-only entitlements',()=>{
-  const s=make('musician');go(s);complete(s);complete(s);assert.equal(s.awards.filter(a=>a.id==='milestone:musician:100').length,1);
+  const s=make('musician');go(s);s.fame=95;complete(s);complete(s);assert.ok(s.fame>=100);assert.equal(s.awards.filter(a=>a.id==='milestone:fame:100').length,1);
 });
 test('connected trials create explicit contracts, independent trial discovery requires effort',()=>{
   const s=make('musician',1);go(s);complete(s,'trial');assert.ok(s.careers.musician.offer);assert.equal(s.careers.musician.audience,0);
-  act(s,{type:'acceptOffer'},T+500_000);assert.equal(s.careers.musician.affiliation.share,.2);
+  act(s,{type:'acceptOffer'},T+500_000);assert.equal(s.careers.musician.affiliation.boost,.25,'contracts boost reach instead of paying coins');
   const independent=make('musician');go(independent);assert.throws(()=>act(independent,{type:'start',kind:'trial'},T),/Complete three/);
 });
 test('general probability is bounded under fatigue and difficulty',()=>{
@@ -127,11 +129,11 @@ test('tennis uses deuce, advantage, two-game sets, tiebreaks and best-of-three',
 });
 test('adult path requires explicit adult confirmation; fictional risk can be stopped',()=>{
   assert.throws(()=>createCharacter({name:'River',career:'adult',origin:0},T),/adult/);
-  const s=make('hacker');go(s);act(s,{type:'start',kind:'produce'},T);const a=s.active;act(s,{type:'decision',activityId:a.id,beat:0,choice:3},a.readyAt);assert.equal(s.active,null);assert.equal(s.money,500);
+  const s=make('hacker');go(s);act(s,{type:'start',kind:'produce'},T);const a=s.active;act(s,{type:'decision',activityId:a.id,beat:0,choice:3},a.readyAt);assert.equal(s.active,null);assert.equal(s.fame,0);
 });
 test('interaction points are walkable and blocked moves or placements spend nothing',()=>{
   for(const location of ['home','sports','studio','creator','tech','plaza'])for(const o of worldObjects(location))assert.ok(walkable(location,o.x,o.z),`${location}: ${o.name}`);
-  const s=make(),money=s.money;assert.throws(()=>act(s,{type:'move',x:2.5,z:-3.5},T),/blocked/);assert.equal(s.money,money);assert.equal(s.charges,10);
+  const s=make();assert.throws(()=>act(s,{type:'move',x:2.5,z:-3.5},T),/blocked/);assert.equal(s.charges,10);
   s.inventory.chair={level:1};assert.throws(()=>act(s,{type:'place',item:'chair',x:2,z:-3},T),/free position/);assert.equal(s.furniture.length,0);
   act(s,{type:'place',item:'chair',x:1,z:0},T);assert.equal(s.furniture.length,1);
 });
@@ -140,4 +142,38 @@ test('every career completes its own sequence and saves its credited output',()=
     const s=make(key);go(s);complete(s,['founder','web3'].includes(key)?'build':'produce');
     assert.equal(s.active,null,key);assert.equal(s.outputs.length,1,key);assert.deepEqual(s.outputs[0].credits,['River'],key);assert.equal(s.charges,9,key);
   }
+});
+
+test('fame is shared across careers, sets tiers, and older saves convert once',()=>{
+  const s=make('musician');s.fame=1000;for(const skill of Object.values(s.careers.musician.skills))skill.level=4;evaluate(s,'musician');assert.equal(s.careers.musician.tier,2);
+  assert.ok(s.awards.some(a=>a.id==='milestone:fame:1000'));
+  act(s,{type:'switch',career:'football'},T);assert.equal(s.fame,1000);
+  const old=make('musician');old.version=1;delete old.fame;old.careers.musician.audience=80;reconcile(old,T);
+  assert.equal(old.careers.musician.audience,8000);assert.equal(old.fame,8);reconcile(old,T+1000);assert.equal(old.fame,8);
+});
+
+test('fame unlocks free sponsorships at Palm Motors, once, without spending fame or money',()=>{
+  const s=make('musician');
+  assert.throws(()=>act(s,{type:'claim',item:'hypercar'},T),/Palm Motors/);
+  act(s,{type:'travel',location:'plaza'},T);arrive(s);
+  assert.throws(()=>act(s,{type:'claim',item:'hypercar'},T),/100,000 fame/);
+  s.fame=100_000;act(s,{type:'claim',item:'hypercar'},T);
+  assert.equal(s.ride,'hypercar');assert.equal(s.fame,100_000);
+  assert.throws(()=>act(s,{type:'claim',item:'hypercar'},T),/already claimed/);
+  act(s,{type:'claim',item:'designer'},T);assert.equal(s.equipped.clothes,'designer');
+  assert.throws(()=>act(s,{type:'useVip',item:'suv'},T),/Claim this/);
+});
+
+test('a sponsored ride drives along the roads for a distance-based time; homes speed up recovery',()=>{
+  const s=make('football');s.vip={hypercar:{at:T},villa:{at:T}};s.ride='hypercar';s.home='villa';
+  act(s,{type:'travel',location:'tech'},T);
+  assert.equal(s.location,'home');assert.equal(s.trip.to,'tech');const scooter=tripMs('home','tech','scooter');assert.ok(scooter>180_000&&scooter<240_000,'home to tech is about 3.6 blocks');assert.equal(s.trip.arrives-T,Math.round(scooter*.5),'the hypercar halves the time');
+  assert.throws(()=>act(s,{type:'start',kind:'practice',skill:'passing'},T+1000),/on the road/);
+  act(s,{type:'travel',location:'tech'},s.trip.arrives);assert.equal(s.location,'tech');assert.equal(s.trip,null);
+  s.ride='scooter';const back=T+200_000;act(s,{type:'travel',location:'home'},back);assert.equal(s.trip.arrives-back,tripMs('tech','home','scooter'));
+  reconcile(s,s.trip.arrives);assert.equal(s.location,'home');
+  act(s,{type:'recover',need:'energy'},T+500_000);assert.equal(s.recovery.endsAt-s.recovery.startedAt,Math.round(B.recovery.energy[1]*.8));
+  const walker=make('football');act(walker,{type:'travel',location:'tech'},T);assert.equal(walker.trip.ride,null);assert.equal(walker.trip.arrives-T,Math.round(scooter*1.6),'walking is slowest');
+  const local=make('football');act(local,{type:'travel',location:'street'},T);assert.equal(local.location,'street','home and its street are next door');assert.deepEqual(local.position3d,{x:0,z:6.2});
+  assert.throws(()=>act(local,{type:'move',x:0,z:2},T),/blocked/);act(local,{type:'move',x:3,z:6.5},T);act(local,{type:'travel',location:'home'},T);assert.equal(local.location,'home');
 });

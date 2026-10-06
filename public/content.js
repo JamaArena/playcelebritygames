@@ -4,11 +4,12 @@ export const BALANCE = {
   recovery: { hunger: [40, 60_000], energy: [60, 300_000], fun: [30, 120_000], social: [30, 120_000], hygiene: [50, 60_000], bladder: [80, 30_000] },
   decay: { hunger: 12, energy: 8, fun: 6, social: 6, hygiene: 8, bladder: 15 },
   activityMs: 120_000, sportMs: 300_000, upgradeMs: 30 * 60_000,
-  reaches: [100, 500, 2000, 10000], fees: [50, 250, 1000, 5000],
+  // Reach per output (views, streams, fans cheering, users) before quality; 1,000 reach = 1 fame point.
+  reaches: [10_000, 100_000, 1_000_000, 10_000_000], famePerReach: 1 / 1000, seasonMinReach: 10_000, contractBoost: .25,
   tiers: [['Newcomer', 0, 1], ['Emerging', 100, 2], ['Established', 1000, 4], ['Star', 10000, 6], ['Icon', 100000, 8]],
-  milestones: [100, 1000, 10000, 100000], seasonMs: 28 * 86400_000,
+  milestones: [100, 1000, 10000, 100000], seasonMs: 28 * 86400_000, driveMsPerBlock: 60_000,
 };
-const career = (name, icon, family, skills, origins, location, output, beats, focus = skills[0]) => ({name, icon, family, skills, origins, location, output, beats, focus, audience: family === 'tech' ? 'users' : family === 'creator' ? 'subscribers' : 'fans'});
+const career = (name, icon, family, skills, origins, location, output, beats, focus = skills[0]) => ({name, icon, family, skills, origins, location, output, beats, focus, audience: family === 'tech' ? 'users' : family === 'music' ? 'streams' : family === 'sport' ? 'fans cheering' : 'views'});
 export const CAREERS = {
   football: career('Footballer', '⚽', 'sport', ['passing', 'dribbling', 'shooting', 'defending'], ['Street footballer', 'Academy prodigy'], 'sports', 'Match', ['Find space behind the defence.', 'A defender closes down your passing lane.', 'The ball breaks near your penalty area.', 'You have a clear view of goal.', 'Track the runner on the flank.', 'One final attack could change the game.'], 'passing'),
   musician: career('Musician', '♫', 'music', ['technique', 'songwriting', 'production', 'stage presence'], ['Street musician', 'Childhood prodigy'], 'studio', 'Song', ['Find the melody that makes this song yours.', 'The vocal passage reaches beyond your planned range.', 'Choose the final arrangement and mix.']),
@@ -20,7 +21,7 @@ export const CAREERS = {
   skitmaker: career('Skitmaker', '☺', 'creator', ['comedy', 'acting', 'writing', 'timing'], ['Street comedy performer', 'Theatre-trained talent'], 'creator', 'Skit', ['Make the setup clear and funny.', 'Your scene partner changes a line.', 'Deliver the punchline at the right moment.']),
   streamer: career('Streamer', '◍', 'creator', ['commentary', 'engagement', 'production', 'format skill'], ['Bedroom beginner', 'Performance talent'], 'creator', 'Stream', ['Chat is asking for something unexpected.', 'A technical fault interrupts the stream.', 'Choose how to finish the segment.']),
   actor: career('Actor', '◇', 'acting', ['acting', 'expression', 'improvisation', 'charisma'], ['Independent theatre performer', 'Recognised young talent'], 'studio', 'Performance', ['Interpret your character’s motivation.', 'The director requests a restrained reaction.', 'Respond to your scene partner’s surprise.']),
-  adult: career('Adult entertainment', '◆', 'acting', ['performance', 'presentation', 'production', 'business'], ['Independent adult creator', 'Adult studio newcomer'], 'studio', 'Project', ['Agree on project terms and boundaries.', 'Choose the presentation for an abstract project.', 'Resolve a production scheduling issue.'], 'performance'),
+  adult: career('Adult entertainment', '◆', 'acting', ['performance', 'presentation', 'production', 'business'], ['Independent subscription creator', 'Adult studio newcomer'], 'studio', 'After-dark release', ['Late-night negotiations: your rate, your limits, and who gets the final cut.', 'The lights dim and the camera rolls. Set the mood for tonight’s steamy shoot.', 'Your co-star cancels last minute and the set is getting heated.'], 'performance'),
   founder: career('Founder', '⬡', 'tech', ['product judgement', 'leadership', 'sales', 'finance'], ['Bootstrapped founder', 'Mentored builder'], 'tech', 'Product', ['Choose a feature after customer feedback.', 'Allocate a limited production budget.', 'Resolve a problem before delivery.']),
   developer: career('Developer', '⌘', 'tech', ['coding', 'debugging', 'architecture', 'communication'], ['Self-taught freelancer', 'Mentored coding prodigy'], 'tech', 'Client project', ['Inspect a fictional bug in the client project.', 'Choose a repair that preserves stability.', 'Communicate a delivery tradeoff.']),
   web3: career('Web3 builder', '⬢', 'tech', ['product', 'community', 'research', 'technical skill'], ['Independent newcomer', 'Community-connected talent'], 'tech', 'Product', ['Pick a useful fictional product direction.', 'Respond to community concerns.', 'Handle a launch-readiness decision.']),
@@ -33,14 +34,56 @@ export const LOCATIONS = {
   creator: {name: 'Creator quarter', subtitle: 'Make something worth sharing', icon: '▷', color: '#e0a28f'},
   tech: {name: 'Innovation hub', subtitle: 'Start small. Build something lasting.', icon: '⌘', color: '#85b9ca'},
   plaza: {name: 'Palm plaza', subtitle: 'Meet the city. Find your people.', icon: '◈', color: '#c3c48c'},
+  street: {name: 'Your street', subtitle: 'Step out into Palm City', icon: '🚪', color: '#c9d6bf'},
 };
+// Every location is an 11×11 lot in one open neighbourhood; x/z are lot centres in world units.
+export const TOWN = {
+  home: {x: -16, z: 0, pin: '🏠', height: 4.5}, plaza: {x: 0, z: 0, pin: '🛍️', height: 2.6}, studio: {x: 16, z: 0, pin: '🎙️', height: 3.9},
+  sports: {x: -16, z: -16, pin: '🏟️', height: 2.4}, creator: {x: 0, z: -16, pin: '🎬', height: 3.3}, tech: {x: 16, z: -16, pin: '💡', height: 7.6},
+};
+export const lotAt = (x, z) => Object.keys(TOWN).find(key => Math.abs(x - TOWN[key].x) <= 5.5 && Math.abs(z - TOWN[key].z) <= 5.5);
 export const ITEMS = {
-  food: {name: 'Fresh groceries', price: 15, description: 'One meal. Restores 40 hunger after eating.'},
-  gear: {name: 'Career equipment', price: 150, description: 'Practice at home. Production quality +5 per level above 1.', upgradable: true, slot: 'gear'},
-  jacket: {name: 'Signature jacket', price: 75, description: 'An emerald layer for your everyday look.', slot: 'clothes'},
-  chair: {name: 'Lounge chair', price: 80, description: 'Place it in a free apartment position.', furniture: true},
-  trophyShelf: {name: 'Award shelf', price: 100, description: 'A place for the milestones you earn.', furniture: true},
+  // There are no coins: items unlock at a fame level and are free to claim. Fame is never spent.
+  chair: {name: 'Lounge chair', fame: 25, description: 'Place it in a free spot at home.', furniture: true},
+  gear: {name: 'Career equipment', fame: 50, description: 'Practise at home. Production quality +5 per level above 1. Higher levels need more fame.', upgradable: true, slot: 'gear'},
+  jacket: {name: 'Signature jacket', fame: 150, description: 'An emerald layer for your everyday look.', slot: 'clothes'},
+  trophyShelf: {name: 'Award shelf', fame: 1000, description: 'A place for the milestones you earn.', furniture: true},
 };
+// VIP sponsorship deals: free items unlocked by fame, claimed at Palm Motors in Palm plaza.
+// Fame is not spent and claimed items stay yours. Brand names are fictional.
+export const SPONSORSHIPS = {
+  scooter: {name: 'City e-scooter', sponsor: 'Volt Mobility', fame: 100, kind: 'ride', icon: '🛵', color: '#3d9a7a', description: 'Zip between lots in style. Your first sponsor believes in you.'},
+  designer: {name: 'Designer look', sponsor: 'Maison Palme', fame: 500, kind: 'style', icon: '🕶️', color: '#1f1f24', description: 'A tailored black-and-gold outfit for red carpets.'},
+  coupe: {name: 'Rossa sports coupé', sponsor: 'Rossa Motori', fame: 5_000, kind: 'ride', icon: '🏎️', color: '#c9302c', description: 'Low, loud and very red.'},
+  suv: {name: 'Atlas luxury SUV', sponsor: 'Atlas Autos', fame: 20_000, kind: 'ride', icon: '🚙', color: '#23262f', description: 'Tinted windows for when the paparazzi find you.'},
+  hypercar: {name: 'Vitesse hypercar', sponsor: 'Vitesse', fame: 100_000, kind: 'ride', icon: '🏁', color: '#1d4fa8', description: 'A hand-built hypercar for Icons only. A sponsorship deal, free to claim.'},
+  townhouse: {name: 'Palm Heights townhouse', sponsor: 'Palm Realty', fame: 2_000, kind: 'home', icon: '🏡', color: '#b86b52', rest: .9, description: 'Warm wood floors and art on the walls. Home recovery 10% faster.'},
+  villa: {name: 'Lagoon villa', sponsor: 'Coastline Estates', fame: 25_000, kind: 'home', icon: '🏝️', color: '#3a8fa8', rest: .8, description: 'Marble, sea light and a statement chandelier. Home recovery 20% faster.'},
+  mansion: {name: 'Island mansion', sponsor: 'Isle Royale', fame: 150_000, kind: 'home', icon: '🏰', color: '#b8932f', rest: .7, description: 'Gold trim, a grand piano and room for the whole entourage. Home recovery 30% faster.'},
+};
+// Travel follows the roads. One 16-unit block takes BALANCE.driveMsPerBlock, scaled by the ride's
+// speed factor; without a ride you walk at RIDE_SPEED.walk. Home and its street are next door.
+// Walking is the slowest way around; the street outside your door shares your home's lot.
+export const RIDE_SPEED = {walk: 1.6, scooter: 1, suv: .8, coupe: .7, hypercar: .5};
+export const LOT = location => location === 'street' ? 'home' : location;
+export const arrivalSpot = location => location === 'street' ? {x: 0, z: 6.2} : {x: 0, z: 1};
+export function route(from, to) {
+  // Homes are entered and left by the front door on the street; venues are walked into.
+  const a = TOWN[LOT(from)], b = TOWN[LOT(to)], road = lot => lot.z + 8, door = (key, lot) => LOT(key) === 'home' ? {x: lot.x, z: lot.z + 6.2} : {x: lot.x, z: lot.z};
+  const points = [door(from, a), {x: a.x, z: road(a)}];
+  if (road(a) !== road(b)) { const side = a.x + (b.x >= a.x ? 8 : -8); points.push({x: side, z: road(a)}, {x: side, z: road(b)}); }
+  points.push({x: b.x, z: road(b)}, door(to, b));
+  return points;
+}
+export const routeLength = points => points.slice(1).reduce((n, p, i) => n + Math.abs(p.x - points[i].x) + Math.abs(p.z - points[i].z), 0);
+export const tripMs = (from, to, ride) => Math.round(routeLength(route(from, to)) / 16 * BALANCE.driveMsPerBlock * (RIDE_SPEED[ride] ?? 1));
+export function along(points, f) {
+  const total = routeLength(points); let left = Math.max(0, Math.min(1, f)) * total;
+  for (let i = 1; i < points.length; i++) { const a = points[i - 1], b = points[i], d = Math.abs(b.x - a.x) + Math.abs(b.z - a.z);
+    if (left <= d || i === points.length - 1) { const t = d ? Math.min(1, left / d) : 1; return {x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, axis: b.x !== a.x ? 'x' : 'z', heading: Math.atan2(b.x - a.x, b.z - a.z)}; }
+    left -= d; }
+  return {...points.at(-1), axis: 'z', heading: 0};
+}
 export const NPCS = [
   {id:'nova', name:'Nova', career:'musician', location:'studio', role:'Producer', color:'#b4a7d9'},
   {id:'kai', name:'Kai', career:'football', location:'sports', role:'Scout', color:'#88bda5'},
@@ -56,11 +99,12 @@ export function obstacles(location, furniture=[]) {
     studio:[[-2.2,-3.3,3.6,1.35],[-2.2,-1.9,.6,.6],[-.7,3.5,2.2,1],[0,2.2,1.3,.9]],
     creator:[[-2.2,-3.3,3.6,1.35],[-2.2,-1.9,.6,.6],[-.7,3.5,2.2,1],[0,2.2,1.3,.9]],
     tech:[[-2.2,-3.3,3.6,1.35],[-2.2,-1.9,.6,.6],[-.7,3.5,2.2,1],[0,2.2,1.3,.9]],
-    plaza:[[-3.1,-3.3,3.2,2.35],[3.1,-3.3,3.2,2.35],[-3,2.4,2,.75],[2.7,1.8,1.1,1.1]],
+    plaza:[[-3.1,-3.3,3.2,2.35],[3.1,-3.3,3.2,2.35],[-3,2.4,2,.75],[2.7,1.8,1.1,1.1],[3.3,3.9,2.4,1.3]],
   }[location]||[];
   return [...rects,...(location==='home'?furniture.map(f=>[f.x,f.z,.85,.85]):[])];
 }
 export function walkable(location,x,z,furniture=[]){
+  if(location==='street')return Number.isFinite(x)&&Number.isFinite(z)&&Math.abs(x)<=7&&z>=5.7&&z<=7.3;
   return Number.isFinite(x)&&Number.isFinite(z)&&Math.abs(x)<=4.8&&Math.abs(z)<=4.8&&!obstacles(location,furniture).some(([cx,cz,w,d])=>Math.abs(x-cx)<w/2+.16&&Math.abs(z-cz)<d/2+.16);
 }
 export function canPlace(furniture,item,x,z){

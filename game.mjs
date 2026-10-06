@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, CAREERS, ITEMS, NPCS, LOCATIONS, clamp, effort, walkable, canPlace } from './public/content.js';
+import { BALANCE as B, CAREERS, ITEMS, NPCS, LOCATIONS, SPONSORSHIPS, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -14,8 +14,11 @@ export function createCharacter(input, now) {
   requireRule(text(input.name).length >= 2, 'Use a name of at least two characters.');
   requireRule(input.career !== 'adult' || input.adult === true, 'Confirm that your character is an adult.');
   const position = ['striker', 'midfielder', 'defender'].includes(input.position) ? input.position : 'midfielder';
-  return {version:1, name:text(input.name,30), color: /^#[\da-f]{6}$/i.test(input.color) ? input.color : '#d49872', hair: input.hair === 'short' ? 'short' : 'curls', position, technique: input.technique === 'instrument' ? 'instrument' : 'vocals', career:input.career, careers:{[input.career]:newCareer(input.career,input.origin)}, location:'home', position3d:{x:0,z:1}, needs:Object.fromEntries(Object.keys(B.decay).map(n=>[n,80])), lastSeen:now, money:500, charges:10, refillAnchor:null, active:null, recovery:null, inventory:{food:{quantity:3}, bed:{level:1}, shower:{level:1}, toilet:{level:1}}, furniture:[], outputs:[], events:[], learningEvents:[], awards:[], results:[], friends:[], blocks:[], invitations:[], equipped:{}, seasonStart:now, appearance:{}, collaborations:[]};
+  return {version:3, name:text(input.name,30), color: /^#[\da-f]{6}$/i.test(input.color) ? input.color : '#d49872', hair: input.hair === 'short' ? 'short' : 'curls', position, technique: input.technique === 'instrument' ? 'instrument' : 'vocals', career:input.career, careers:{[input.career]:newCareer(input.career,input.origin)}, location:'home', position3d:{x:0,z:1}, fame:0, needs:Object.fromEntries(Object.keys(B.decay).map(n=>[n,80])), lastSeen:now, charges:10, refillAnchor:null, active:null, recovery:null, inventory:{bed:{level:1}, shower:{level:1}, toilet:{level:1}}, furniture:[], outputs:[], events:[], learningEvents:[], awards:[], results:[], friends:[], blocks:[], invitations:[], equipped:{}, seasonStart:now, appearance:{}, collaborations:[]};
 }
+// Fame is one character-wide total earned from reach in any career. Battles can also move it.
+export const fameFor = reach => Math.floor(reach * B.famePerReach);
+export function addFame(s, amount) { s.fame = Math.max(0, (s.fame || 0) + amount); }
 export function log(s, message, now) { s.events.unshift({id:id(),message,at:now}); s.events = s.events.slice(0,100); }
 export function refill(s, now) {
   if (s.charges >= B.capacity) { s.charges=B.capacity; s.refillAnchor=null; return; }
@@ -36,11 +39,10 @@ export function learn(s, careerKey, skill, points, eventId) {
 export function evaluate(s, key=s.career) {
   const c=s.careers[key], def=CAREERS[key];
   const average=Object.values(c.skills).reduce((a,b)=>a+b.level,0)/def.skills.length;
-  const audience=def.family==='tech'?Math.floor(c.audience*c.engagement/100):c.audience;
-  B.tiers.forEach(([,fans,level],i)=>{if(audience>=fans&&average>=level)c.tier=Math.max(c.tier,i);});
+  B.tiers.forEach(([,fame,level],i)=>{if((s.fame||0)>=fame&&average>=level)c.tier=Math.max(c.tier,i);});
   for (const threshold of B.milestones) {
-    const awardId=`milestone:${key}:${threshold}`;
-    if(c.audience>=threshold&&!s.awards.some(a=>a.id===awardId))s.awards.push({id:awardId,name:`${threshold.toLocaleString()} ${def.audience}`,career:key,at:s.lastSeen});
+    const awardId=`milestone:fame:${threshold}`;
+    if((s.fame||0)>=threshold&&!s.awards.some(a=>a.id===awardId))s.awards.push({id:awardId,name:`${threshold.toLocaleString()} fame`,career:key,at:s.lastSeen});
   }
 }
 function discovery(c,def) {
@@ -51,6 +53,10 @@ export function opportunities(s) {
   return {trial:discovery(c,def), launch:s.outputs.some(o=>o.career===s.career&&o.kind==='build'&&!o.released), affiliation:c.offer};
 }
 export function reconcile(s, now) {
+  // Saves from before fame points: rescale reach to the new venue sizes and derive fame once.
+  if((s.version||1)<2){let reach=0;for(const c of Object.values(s.careers)){c.audience*=100;reach+=c.audience;}s.fame=(s.fame||0)+fameFor(reach);for(const o of s.outputs)o.gain*=100;s.version=2;}
+  // Coins were removed: drop balances and groceries; contracts now boost reach instead of paying fees.
+  if(s.version<3){delete s.money;delete s.inventory.food;for(const c of Object.values(s.careers))for(const deal of [c.affiliation,c.offer])if(deal){deal.boost=B.contractBoost;delete deal.fee;delete deal.share;}s.version=3;}
   refill(s,now);
   // Only heartbeat gaps <= 20 seconds count as active. Offline needs never decay.
   const dt=Math.max(0,now-s.lastSeen);
@@ -59,9 +65,9 @@ export function reconcile(s, now) {
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
     item.level=item.upgrade.target; item.upgrade=null; log(s,`${ITEMS[key].name} reached level ${item.level}.`,now);
   }
+  if(s.trip && now>=s.trip.arrives){s.location=s.trip.to;s.position3d=arrivalSpot(s.trip.to);s.visiting=null;log(s,`Arrived at ${LOCATIONS[s.trip.to].name}.`,now);s.trip=null;}
   if(s.recovery && now>=s.recovery.endsAt) {
     const r=s.recovery;
-    if(r.need==='hunger')s.inventory.food.quantity--;
     s.needs[r.need]=clamp(s.needs[r.need]+B.recovery[r.need][0]);
     s.recovery=null;log(s,`${r.label} completed.`,now);
   }
@@ -126,7 +132,8 @@ export function choices(s) {
   const skill=a.kind==='launch'?def.skills[[2,1,0][i%3]] : a.career==='tennis'?['serve','forehand','backhand','footwork','serve','forehand'][i%6] : a.career==='musician'?['songwriting','technique','production'][i%3] : a.career==='adult'?['business','presentation','production'][i%3] : a.career==='streamer'?['engagement','production','commentary'][i%3] : def.skills[i%def.skills.length];
   const labels = a.career==='musician' ? [
     ['A familiar melody','An original chorus','A surprising key change'],['Simplify the passage','Record the planned take','Attempt a demanding run'],['Keep the mix simple','Balance the arrangement','Try a bold production idea']][i%3] : a.career==='developer'?[
-    ['Reproduce the bug first','Trace the failing path','Refactor the affected module'],['Apply a focused repair','Add regression coverage','Rebuild the component'],['Explain a smaller scope','Deliver with documented tests','Propose a broader release']][i%3] : ['Use a proven approach','Commit to your own approach','Try an ambitious approach'];
+    ['Reproduce the bug first','Trace the failing path','Refactor the affected module'],['Apply a focused repair','Add regression coverage','Rebuild the component'],['Explain a smaller scope','Deliver with documented tests','Propose a broader release']][i%3] : a.career==='adult'?[
+    ['Sign the standard contract','Negotiate a bigger cut','Hold out for top billing'],['Keep it classy and teasing','Turn up the heat','Go bold and leave them breathless'],['Reschedule and keep it professional','Rework the scene with the crew','Improvise a sizzling solo set']][i%3] : ['Use a proven approach','Commit to your own approach','Try an ambitious approach'];
   const list=labels.map((label,j)=>({label,skill,risk:['safe','balanced','risky'][j],action:'general'}));
   if(a.career==='hacker')list.push({label:'Stop the operation',skill:'risk judgement',risk:'safe',action:'stop'});
   return list;
@@ -157,7 +164,7 @@ function start(s,input,now,rng) {
   if(kind==='collab')requireRule(NPCS.some(n=>n.id===input.npc),'Choose an NPC collaborator.');
   const tier=Math.min(c.tier,3),beats=sport(key)?6:3,duration=sport(key)?B.sportMs:B.activityMs;
   s.charges--;if(s.refillAnchor===null)s.refillAnchor=now;
-  s.active={id:id(),kind,career:key,skill:input.skill,title:text(input.title)||`${def.output} ${s.outputs.filter(o=>o.career===key).length+1}`,genre:text(input.genre,30)||'Original',beat:0,totalBeats:beats,readyAt:now+(kind==='practice'?B.practiceMs:duration/(beats+1)),interval:duration/(beats+1),status:kind==='practice'?'practising':'commentary',outcomes:[],tier,startedAt:now,playerScore:0,opponentScore:0,playerStamina:100,opponentStamina:100,exposure:0,engagement:50,stability:50,productId:product?.id,collaborator:kind==='collab'?input.npc:null,moneyShare:kind==='collab'?.7:1,audienceShare:kind==='collab'?.6:1,seed:rng()};
+  s.active={id:id(),kind,career:key,skill:input.skill,title:text(input.title)||`${def.output} ${s.outputs.filter(o=>o.career===key).length+1}`,genre:text(input.genre,30)||'Original',beat:0,totalBeats:beats,readyAt:now+(kind==='practice'?B.practiceMs:duration/(beats+1)),interval:duration/(beats+1),status:kind==='practice'?'practising':'commentary',outcomes:[],tier,startedAt:now,playerScore:0,opponentScore:0,playerStamina:100,opponentStamina:100,exposure:0,engagement:50,stability:50,productId:product?.id,collaborator:kind==='collab'?input.npc:null,audienceShare:kind==='collab'?.6:1,seed:rng()};
   if(key==='tennis')s.active.tennis={points:[0,0],games:[0,0],sets:[0,0],history:[],tiebreak:false,winner:null};
   if(key==='football')s.active.possession='player';
   log(s,`Started ${kind==='practice'?`${input.skill} practice`:s.active.title}. One charge used.`,now);
@@ -181,13 +188,11 @@ function settle(s,a,now) {
     win=a.tennis.winner===0?'Win':'Loss';a.playerScore=a.tennis.sets[0];a.opponentScore=a.tennis.sets[1];
   }
   const qualifies=!['trial','build'].includes(a.kind);
-  let gain=qualifies?Math.floor(B.reaches[a.tier]*quality/100/(1+c.audience/100000)*(win==='Win'?1.25:1)):0;
-  let gross=qualifies?Math.floor(B.fees[a.tier]*quality/100):0;
+  let gain=qualifies?Math.floor(B.reaches[a.tier]*quality/100*(win==='Win'?1.25:1)):0;
   const contract=c.affiliation;
-  if(qualifies&&contract)gross=contract.fee;
-  const payout=Math.floor(gross*(1-(contract?.share||0))*a.moneyShare);
+  if(qualifies&&contract)gain=Math.floor(gain*(1+(contract.boost??B.contractBoost)));
   gain=Math.floor(gain*a.audienceShare);
-  s.money+=payout;c.audience+=gain;c.completed++;
+  const fame=fameFor(gain);c.audience+=gain;addFame(s,fame);c.completed++;
   if(qualifies)c.engagement=clamp(c.engagement+(quality-50)/10);
   if(contract&&qualifies)c.reputation=clamp(c.reputation+(quality>=60?2:-2));
   if(a.career==='hacker')c.exposure=a.exposure;
@@ -195,21 +200,23 @@ function settle(s,a,now) {
     if(quality>=60){
       const pool=def.family==='sport'?['Palm City Club','Harbour Athletic','Emerald United']:def.family==='music'?['Emerald Records','Palm Sound','Horizon Music']:def.family==='tech'?['Horizon Ventures','Palm Innovation','City Builders']:['City Talent Agency','Emerald Talent','Horizon Studio'];
       const next=pool.find(name=>!c.affiliation?.name.startsWith(name))||pool[0];
-      c.offer={id:id(),name:`${next} · ${B.tiers[c.tier][0]}`,share:.2,fee:B.fees[a.tier]+25,expiresAt:now+86400_000,exitAfter:3};
+      c.offer={id:id(),name:`${next} · ${B.tiers[c.tier][0]}`,boost:B.contractBoost,expiresAt:now+86400_000,exitAfter:3};
     }
     else c.failedTrialAt=c.practices;
   }
-  const output={id:a.id,career:a.career,kind:a.kind,title:a.title,genre:a.genre,quality,released:a.kind!=='build',at:now,credits:[s.name,...(a.collaborator?[NPCS.find(n=>n.id===a.collaborator).name]:[])],gain,payout,tier:a.tier};
+  const output={id:a.id,career:a.career,kind:a.kind,title:a.title,genre:a.genre,quality,released:a.kind!=='build',at:now,credits:[s.name,...(a.collaborator?[NPCS.find(n=>n.id===a.collaborator).name]:[])],gain,fame,tier:a.tier};
   s.outputs.unshift(output);s.results.unshift({...output,win,score:sport(a.career)?`${a.playerScore}–${a.opponentScore}`:null,learning:a.outcomes.length*5});
   if(contract&&qualifies)contract.delivered++;
-  s.active=null;evaluate(s,a.career);log(s,`${a.title} completed · quality ${quality} · +${gain} ${def.audience} · +${payout} coins.`,now);
+  s.active=null;evaluate(s,a.career);log(s,`${a.title} completed · quality ${quality} · ${gain.toLocaleString('en-US')} ${def.audience} · +${fame} fame.`,now);
 }
 export function act(s,input,now,rng=Math.random) {
   reconcile(s,now);
+  if(s.trip)requireRule(!['travel','move','start','recover','buy','claim','place','upgrade','switch'].includes(input.type),`You're on the road to ${LOCATIONS[s.trip.to].name}. Hang tight until you arrive.`);
   switch(input.type) {
     case 'travel':
       requireRule(LOCATIONS[input.location],'Unknown destination.');requireRule(!s.active&&!s.recovery,'Finish your activity before travelling.');
-      s.location=input.location;s.position3d={x:0,z:1};break;
+      if(input.location!==s.location&&!s.visiting&&LOT(input.location)!==LOT(s.location)){const ms=tripMs(s.location,input.location,s.ride||'walk');s.trip={from:s.location,to:input.location,ride:s.ride||null,departs:now,arrives:now+ms};log(s,`${s.ride?'Driving':'Walking'} to ${LOCATIONS[input.location].name} · ${Math.ceil(ms/60000)} min.`,now);break;}
+      s.location=input.location;s.position3d=arrivalSpot(input.location);break;
     case 'move':
       requireRule(walkable(s.location,input.x,input.z,s.visiting?[]:s.furniture),'That destination is blocked. Choose open ground.');
       s.position3d={x:input.x,z:input.z};break;
@@ -220,7 +227,7 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(input.activityId===a.id&&input.beat===a.beat,'That decision has already been resolved.');
       requireRule(now>=a.readyAt,'Commentary is still running.');
       const choice=choices(s)[input.choice];requireRule(choice,'Choose a valid action.');
-      if(choice.action==='stop'){s.careers[a.career].exposure=a.exposure;s.active=null;log(s,'Operation stopped without a completion payout.',now);break;}
+      if(choice.action==='stop'){s.careers[a.career].exposure=a.exposure;s.active=null;log(s,'Operation stopped. No reach or fame.',now);break;}
       const scene=beat(s,a),c=s.careers[a.career],fatigue=(100-s.needs.energy)/100;
       let skill=c.skills[choice.skill].level;
       if(choice.action==='signature')skill=(skill+c.skills.stamina.level)/2;
@@ -251,7 +258,7 @@ export function act(s,input,now,rng=Math.random) {
       }
       a.engagement=clamp(a.engagement+(outcome.success?15:-10));
       if(choice.skill==='production')a.stability=clamp(a.stability+(outcome.success?15:-15));
-      if(a.career==='hacker'){a.exposure+=(!outcome.success?25:0)+(choice.risk==='risky'?10:0);if(a.exposure>=100){c.exposure=a.exposure;c.reputation=clamp(c.reputation-10);s.active=null;log(s,'Operation failed at 100 exposure. No payout.',now);break;}}
+      if(a.career==='hacker'){a.exposure+=(!outcome.success?25:0)+(choice.risk==='risky'?10:0);if(a.exposure>=100){c.exposure=a.exposure;c.reputation=clamp(c.reputation-10);s.active=null;log(s,'Operation failed at 100 exposure. No reach or fame.',now);break;}}
       a.beat++;a.readyAt=now+a.interval;a.status=a.beat>=a.totalBeats?'finishing':'commentary';
       evaluate(s,a.career);break;
     }
@@ -267,19 +274,19 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(B.recovery[input.need],'Unknown need.');
       const where=s.location==='home'||(input.need==='social'&&s.location!=='home')||(input.need==='fun'&&s.location==='plaza');
       requireRule(where,'Go home to use this recovery object.');
-      if(input.need==='hunger')requireRule(s.inventory.food.quantity>0,'Buy groceries first.');
       const labels={hunger:'Eating',energy:'Sleeping',fun:'Relaxing',social:'Socialising',hygiene:'Washing',bladder:'Using the toilet'};
-      s.recovery={id:id(),need:input.need,label:labels[input.need],endsAt:now+B.recovery[input.need][1]};break;
+      const rest=s.location==='home'&&!s.visiting?SPONSORSHIPS[s.home]?.rest??1:1;
+      s.recovery={id:id(),need:input.need,label:labels[input.need],startedAt:now,endsAt:now+Math.round(B.recovery[input.need][1]*rest)};break;
     }
     case 'buy': {
       const item=ITEMS[input.item];requireRule(item,'Unknown item.');requireRule(s.location==='plaza','Visit Palm plaza to shop.');
-      requireRule(input.item==='food'||!s.inventory[input.item],'You already own this item.');requireRule(s.money>=item.price,'Not enough coins.');
-      s.money-=item.price;if(input.item==='food')s.inventory.food.quantity++;else s.inventory[input.item]={level:1};log(s,`Bought ${item.name}.`,now);break;
+      requireRule(!s.inventory[input.item],'You already have this item.');requireRule((s.fame||0)>=item.fame,`${item.name} unlocks at ${item.fame.toLocaleString('en-US')} fame.`);
+      s.inventory[input.item]={level:1};log(s,`Claimed ${item.name}. Free with your fame.`,now);break;
     }
     case 'upgrade': {
       const item=s.inventory[input.item];requireRule(item&&ITEMS[input.item]?.upgradable,'This item cannot be upgraded.');
-      requireRule(!item.upgrade&&item.level<10,'An upgrade is running or this item is maxed.');const cost=effort(item.level,100);
-      requireRule(s.money>=cost,`This upgrade costs ${cost} coins.`);s.money-=cost;item.upgrade={target:item.level+1,endsAt:now+effort(item.level,B.upgradeMs)};break;
+      requireRule(!item.upgrade&&item.level<10,'An upgrade is running or this item is maxed.');const needed=effort(item.level,100);
+      requireRule((s.fame||0)>=needed,`Level ${item.level+1} needs ${needed.toLocaleString('en-US')} fame.`);item.upgrade={target:item.level+1,endsAt:now+effort(item.level,B.upgradeMs)};break;
     }
     case 'equip':requireRule(s.inventory[input.item]&&ITEMS[input.item]?.slot,'You do not own usable equipment.');s.equipped[ITEMS[input.item].slot]=input.item;break;
     case 'place': {
@@ -287,6 +294,18 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(canPlace(s.furniture,input.item,input.x,input.z),'Choose a free position away from furniture and interaction points.');
       requireRule(!s.furniture.some(f=>f.item!==input.item&&f.x===input.x&&f.z===input.z),'That position is occupied.');
       s.furniture=s.furniture.filter(f=>f.item!==input.item);s.furniture.push({item:input.item,x:input.x,z:input.z});break;
+    }
+    case 'claim': {
+      const deal=SPONSORSHIPS[input.item];requireRule(deal,'Unknown sponsorship.');
+      requireRule(s.location==='plaza','Visit Palm Motors at Palm plaza to claim sponsorships.');
+      s.vip??={};requireRule(!s.vip[input.item],'You already claimed this sponsorship.');
+      requireRule((s.fame||0)>=deal.fame,`${deal.sponsor} sponsors players with ${deal.fame.toLocaleString('en-US')} fame.`);
+      s.vip[input.item]={at:now};if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')s.home=input.item;else s.equipped.clothes=input.item;
+      log(s,`${deal.sponsor} sponsorship claimed: ${deal.name}. Free, and yours to keep.`,now);break;
+    }
+    case 'useVip': {
+      const deal=SPONSORSHIPS[input.item];requireRule(deal&&s.vip?.[input.item],'Claim this sponsorship first.');
+      if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')s.home=input.item;else s.equipped.clothes=input.item;break;
     }
     case 'switch':requireRule(CAREERS[input.career]&&!s.active&&!s.recovery,'Finish your activity and choose a valid career.');requireRule(input.career!=='adult'||input.adult===true,'Confirm an adult character.');if(!s.careers[input.career])s.careers[input.career]=newCareer(input.career,0);s.career=input.career;break;
     case 'acceptOffer': {

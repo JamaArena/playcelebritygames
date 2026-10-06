@@ -2,7 +2,7 @@
 
 A playable browser life simulation set in Palm City, implemented from the supplied **Celebrity Life Game Mechanics Specification**, dated 6 October 2026.
 
-Create a character, explore six locations, recover daily needs, train skills, play career decisions, publish credited outputs, grow an audience, join affiliations, and improve your home. The city uses a small, dependency-free orthographic 3D renderer with cutaway interiors, camera rotation, click-to-walk movement and obstacle routing.
+Create a character, explore six locations, recover daily needs, train skills, play career decisions, publish credited outputs, grow an audience, join affiliations, and improve your home. The city uses a small, dependency-free orthographic 3D renderer with an open neighbourhood of six lots, cutaway interiors, a local day/night sky, camera rotation, click-to-walk movement and obstacle routing.
 
 ## Deploy on Netlify
 
@@ -27,7 +27,7 @@ Tests cover core mechanics and a real HTTP server with an isolated temporary SQL
 ## Playing
 
 - Choose one of 15 careers and two starting origins. Football offers outfield positions; music offers vocals or instrument technique. Adult entertainment contains only abstract project decisions and requires an adult character.
-- **City** travels between your apartment, sports arena, studio, creator quarter, technology workspace and Palm plaza. Select objects or their buttons to walk to an interaction. Arrow keys and WASD also move the character.
+- **City** is one open neighbourhood: your apartment, sports arena, studio, creator quarter, technology workspace and Palm plaza sit on lots around the lagoon. Tap a pin or a neighbouring lot to head there; **Explore city** zooms out to the whole map. Select an object to open its pie menu, then choose an interaction to walk over and start it. Arrow keys and WASD also move the character. The bottom-left panel shows your mood plumbob and labelled needs; tap a need to recover it.
 - **Career** starts practice, fixtures, productions, live music performances, trials, NPC collaborations, and product builds or launches. Every start previews requirements and rewards. Activities pause at decisions without a response deadline.
 - **My home** shows your inventory, equipment, upgrade previews and furniture placement. Buy groceries, gear, clothing and furniture at the plaza shop.
 - **Social** contains local chat, player contacts, direct messages, blocks, reports, home invitations and accepted collaboration agreements. A second browser profile creates a second player on the same running server.
@@ -39,7 +39,7 @@ Normal production has three beats over two real minutes of commentary; sports us
 
 SQLite stores characters, activity decisions, session hashes, messages, reports, agreements, seasons and idempotency keys under `data/celebrity.sqlite`. Back up the database and its WAL consistently. Keep the browser's session cookie to return to your character. Session cookies are HttpOnly and SameSite Strict; bearer tokens are hashed at rest.
 
-All clocks, random outcomes, charge debits, learning, purchases and reward settlement run on the server. Transactions serialize starts and shared settlements. Each write carries an idempotency key; a retry cannot debit or settle again. Reconnecting preserves the activity ID, chosen actions and outcomes. Career changes preserve skills, possessions, money and the shared charge bar.
+All clocks, random outcomes, charge debits, learning, purchases and reward settlement run on the server. Transactions serialize starts and shared settlements. Each write carries an idempotency key; a retry cannot debit or settle again. Reconnecting preserves the activity ID, chosen actions and outcomes. Career changes preserve skills, possessions, fame and the shared charge bar. There are no coins: items, upgrades and sponsorships unlock with fame.
 
 Confirmed PRD rules include 10 charges, one refill every 36 minutes, football's four skills, shooting capped at 10, distance-sensitive shooting, origins and the arithmetic-then-geometric effort curve. Suggested rates and content are centralized in `public/content.js`. Skill thresholds are 35, 70, 105, 140, 280, 560, 1,120, 2,240 and 4,480. Practice gives 7 points; a relevant decision gives 5 even on failure. Equipment grants quality bonuses, never learning levels.
 
