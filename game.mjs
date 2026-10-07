@@ -559,6 +559,11 @@ export function act(s,input,now,rng=Math.random) {
       const deal=SPONSORSHIPS[input.item];requireRule(deal&&s.vip?.[input.item],'Claim this sponsorship first.');
       if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')moveHome(s,input.item,now);else s.equipped.clothes=input.item;break;
     }
+    case 'gymGrab': {
+      // Taking a machine someone is using: they tell everyone, and your reputation takes a small hit.
+      requireRule(s.location==='gym'&&!s.trip,'Only at the gym.');const loss=Math.max(5,Math.round((s.fame||0)*.002));
+      addFame(s,-loss,'Rude at the gym',now);s.needs.social=clamp(s.needs.social-5);log(s,`😠 You took a machine someone was using. Word got around: −${loss.toLocaleString('en-US')} fame.`,now);break;
+    }
     case 'chatRegular': {
       // Socialise with someone at a venue: how they feel about you depends on your fame.
       const [place,index]=String(input.npc||'').split(':');requireRule(place===s.location&&s.location!=='home'&&/^\d+$/.test(index||''),'Walk over to them first.');

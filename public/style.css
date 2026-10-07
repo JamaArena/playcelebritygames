@@ -685,3 +685,9 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 .map-sheet .city-tile.here small{color:#3fa52b}
 .map-sheet .city-tile:not(:disabled):active{transform:translateY(2px)}
 .map-hint{display:block;margin-top:8px;font-size:11px;color:#6a7d6c}
+
+/* Choice popups */
+.choice-buttons{display:grid;gap:10px}
+.choice-buttons .game-btn{width:100%;padding:13px 20px;animation:none}
+.choice-btn{width:100%;padding:12px 18px;border:2px solid #fff;border-radius:999px;background:linear-gradient(#fff,#e7f3fb);color:#24506b;font-family:var(--fun);font-weight:600;font-size:16px;box-shadow:inset 0 -3px 0 #c6dcea,0 3px 8px #24506b22;cursor:pointer}
+.choice-btn:active{transform:translateY(2px)}

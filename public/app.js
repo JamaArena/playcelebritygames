@@ -2,7 +2,7 @@ import { fanClubSize, PROMPTS, RIVAL, TEAM, TAILOR_COLORS, TATTOOS, VENUE_ACTS, 
 import { World, worldObjects } from './world.js';
 import { World3D } from './world3d.js';
 import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS } from './sound.js';
-import { OPINIONS } from './content.js';
+import { OPINIONS, npcOpinion, npcName } from './content.js';
 import { skillName, learnLine } from './careerText.js';
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -226,12 +226,26 @@ function pumpQueue(){
 }
 setInterval(pumpQueue,500);
 // Using a world object: walk over, then sit, eat, watch or act there.
+// A choice popup (same look as life events) with a few buttons.
+function showChoice(icon,title,text,options){
+  let el=$('#choice');if(!el){el=document.createElement('div');el.id='choice';el.className='reward-overlay notice-overlay';document.body.appendChild(el);}
+  el.innerHTML=`<div class="notice-card" role="alertdialog" aria-modal="true" aria-labelledby="choiceTitle"><div class="gem gem-pink notice-gem" aria-hidden="true">${icon}</div><h2 id="choiceTitle">${escape(title)}</h2><p>${escape(text)}</p><div class="choice-buttons">${options.map(([label,action,attrs='',primary])=>`<button class="${primary?'game-btn':'choice-btn'}" data-action="${action}" ${attrs}>${label}</button>`).join('')}</div></div>`;
+  el.hidden=false;chime('ding');setTimeout(()=>el.querySelector('button')?.focus(),50);
+}
+function closeChoice(){const el=$('#choice');if(el)el.hidden=true;}
+// Gym machines: if someone is on it, warn first.
+const MACHINE_NAMES={treadmillRun:'treadmill',benchPress:'bench',squats:'squat rack',dumbbells:'dumbbells',spinBike:'spin bike',punchBag:'punching bag',rower:'rowing machine',stretch:'mat',gymWater:'water cooler',workout:'workout spot'};
+let wantedMachine=null;
 function useObject(object,use,watch){
+  if(use&&object.act&&state.location==='gym'){const who=world.occupant(object);
+    if(who){wantedMachine={object,watch,n:who.n};const name=npcName('gym',who.n);
+      showChoice('🚫',`${name} is on this one`,`${name} is using the ${MACHINE_NAMES[object.act]||'machine'}. Ask to swap, find another, or take it anyway (people will talk).`,[['🙏 Ask to swap','gymAsk','',true],['😤 Take it anyway','gymTake'],['Find another','choiceClose']]);return;}
+    world.reserved={key:object.key,until:performance.now()/1000+15};}
       (object.remote?cb=>cb():cb=>world.approach(object,cb))(()=>{
         if(!use)return;
         const perform=async()=>{
           if(object.useItem){const data=await send({type:'useItem',item:object.item,...(object.piece?{id:object.piece}:{})});if(data){world.pose=null;world.draw();}return;}
-          if(object.act){world.actAt={act:object.act,x:object.x,z:object.z,vx:object.vx??object.x,vz:object.vz??object.z,face:object.face};const data=await send({type:'venueAct',act:object.act});if(data){world.pose=null;world.draw();}return;}
+          if(object.act){world.actAt={key:object.key,act:object.act,x:object.x,z:object.z,vx:object.vx??object.x,vz:object.vz??object.z,face:object.face};const data=await send({type:'venueAct',act:object.act});if(data){world.pose=null;world.draw();}return;}
           if(object.need){const data=await send({type:'recover',need:object.need,watch,...(object.food?{food:object.food}:{}),...(object.spot?{spot:object.spot}:{})});if(!data)return;}
           if(object.pose){const x=object.pose==='dine'?.5:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?-3.5:object.vx??object.x;const z=object.pose==='dine'?2.1:object.name==='Television'?2.1:object.name==='Coffee table'||object.name==='Sofa'?1.5:object.vz??object.z;world.pose={kind:object.pose,x,z,face:object.face};}
           if(object.name==='Bedside lamp')world.lampOff=!world.lampOff;
@@ -631,16 +645,16 @@ let battleId=null;
 function battleView(){tip('battle');
   const b=(snapshot.battles||[]).find(x=>x.id===battleId);if(!b){if(modalPage==='battle')closeModal();return;}
   const me=snapshot.playerId,mine=b.teams.findIndex(t=>t.includes(me)),myTurn=b.status==='running'&&b.order[b.turn]===me,turnName=b.status==='running'?b.fighters[b.order[b.turn]].name:'';
-  const team=(t)=>{if(b.status==='open'){const names=b.teamNames[t];return `<div class="battle-team"><h3>Team ${t?'B':'A'}</h3>${Array.from({length:b.mode},(_,i)=>names[i]?`<div class="fighter"><strong>${escape(names[i].name)}</strong>${names[i].id===b.host?'<small>host</small>':''}</div>`:`<div class="fighter empty">Open slot${mine<0&&(!b.invited||t===0||me===b.invited)?button('Join','battleJoin',`data-battle="${b.id}" data-team="${t}"`,'primary'):''}</div>`).join('')}</div>`;}
-    return `<div class="battle-team"><h3>Team ${t?'B':'A'}</h3>${b.teams[t].map(id=>{const f=b.fighters[id];return `<div class="fighter ${f.ko?'ko':''} ${b.status==='running'&&b.order[b.turn]===id?'turn':''}"><div><strong>${escape(f.name)}${id===me?' (you)':''}</strong><small>${CAREERS[f.career]?.icon||''} power ${f.power}${f.guard?' · 🛡':''}${f.fameChange!==undefined?` · ${f.fameChange>=0?'+':''}${f.fameChange} fame`:''}</small></div><div class="hp"><i style="width:${f.hp/f.max*100}%;--hue:${Math.round(f.hp/f.max*120)}"></i></div><small>${f.ko?'Knocked out':`${f.hp} / ${f.max} HP`}</small></div>`;}).join('')}</div>`;};
+  const team=(t)=>{if(b.status==='open'||b.status==='cancelled'||!b.fighters||!Object.keys(b.fighters).length){const names=b.teamNames?.[t]||[];return `<div class="battle-team"><h3>Team ${t?'B':'A'}</h3>${Array.from({length:b.mode},(_,i)=>names[i]?`<div class="fighter"><strong>${escape(names[i].name)}</strong>${names[i].id===b.host?'<small>host</small>':''}</div>`:`<div class="fighter empty">Open slot${mine<0&&(!b.invited||t===0||me===b.invited)?button('Join','battleJoin',`data-battle="${b.id}" data-team="${t}"`,'primary'):''}</div>`).join('')}</div>`;}
+    return `<div class="battle-team"><h3>Team ${t?'B':'A'}</h3>${b.teams[t].map(id=>{const f=b.fighters[id];if(!f)return `<div class="fighter"><strong>${escape((b.teamNames?.[t]||[]).find(n=>n.id===id)?.name||'Player')}</strong><small>left the battle</small></div>`;return `<div class="fighter ${f.ko?'ko':''} ${b.status==='running'&&b.order[b.turn]===id?'turn':''}"><div><strong>${escape(f.name)}${id===me?' (you)':''}</strong><small>${CAREERS[f.career]?.icon||''} power ${f.power}${f.guard?' · 🛡':''}${f.fameChange!==undefined?` · ${f.fameChange>=0?'+':''}${f.fameChange} fame`:''}</small></div><div class="hp"><i style="width:${f.hp/f.max*100}%;--hue:${Math.round(f.hp/f.max*120)}"></i></div><small>${f.ko?'Knocked out':`${f.hp} / ${f.max} HP`}</small></div>`;}).join('')}</div>`;};
   const enemies=mine<0?[]:b.teams[1-mine].filter(id=>b.fighters[id]&&!b.fighters[id].ko),attack=(move,label)=>`<div class="battle-move"><span>${label}</span>${enemies.map(id=>button('→ '+escape(b.fighters[id].name),'battleMove',`data-battle="${b.id}" data-move="${move}" data-target="${id}"`,move==='signature'?'primary':'secondary')).join('')}</div>`;
   const f=b.fighters?.[me];
-  let body=b.status==='open'?`<p class="modal-intro">${b.invited?`${escape(b.teamNames[0][0]?.name)} challenged ${escape((snapshot.players.find(p=>p.id===b.invited)||{name:'you'}).name)}.`:'Waiting for fighters.'} Winners +${b.stake} fame each, losers −${b.stake}.</p>`
+  let body=b.status==='cancelled'?`<div class="battle-result">Called off. Nobody gains or loses fame.</div>`:b.status==='open'?`<p class="modal-intro">${b.invited?`${escape(b.teamNames[0][0]?.name)} challenged ${escape((snapshot.players.find(p=>p.id===b.invited)||{name:'you'}).name)}.`:'Waiting for fighters.'} Winners +${b.stake} fame each, losers −${b.stake}.</p>`
     :b.status==='done'?`<div class="battle-result ${mine===b.winner?'win':'loss'}">${mine<0?`Team ${b.winner?'B':'A'} won`:mine===b.winner?`Victory! +${f?.fameChange??b.stake} fame`:`Defeat · ${f?.fameChange??-b.stake} fame`}</div>`
     :`<div class="battle-turn ${myTurn?'mine':''}">${myTurn?'Your move':`${escape(turnName)} is moving`} · <span id="battleTimer">${duration(b.turnEndsAt-now())}</span> · round ${b.round}</div>`;
   if(myTurn)body+=`<div class="battle-moves">${attack('strike','👊 Strike · reliable')}${attack('signature',`✦ ${escape(f.signature)} · big hit, riskier`)}<div class="battle-move">${button('🛡 Guard · halve damage, +4 HP','battleMove',`data-battle="${b.id}" data-move="guard"`)}${button('📣 Hype · next team hit +25%','battleMove',`data-battle="${b.id}" data-move="hype"`)}</div></div>`;
-  const controls=b.status==='open'?(b.host===me?button(`Start battle`,'battleStart',`data-battle="${b.id}"`,'primary')+button('Call it off','battleLeave',`data-battle="${b.id}"`,'quiet'):mine>=0?button('Leave lobby','battleLeave',`data-battle="${b.id}"`,'quiet'):''):b.status==='running'&&mine>=0&&!f?.ko?button('Forfeit','battleLeave',`data-battle="${b.id}"`,'quiet'):'';
-  showModal('battle',`<span class="eyebrow">⚔ ${b.mode}V${b.mode} BATTLE · ${escape(LOCATIONS[b.location].name.toUpperCase())}</span><h2>${b.status==='open'?'Who’s in?':b.status==='done'?'Battle over':'Fight!'}</h2>${body}<div class="battle-teams">${team(0)}<div class="versus">VS</div>${team(1)}</div><div class="actions">${controls}</div><div class="battle-log">${b.log.slice(0,8).map(l=>`<p>${escape(l.text)}</p>`).join('')}</div>`);
+  const controls=b.status==='open'?(b.host===me?button(`Start battle`,'battleStart',`data-battle="${b.id}"`,'primary')+button('Call it off','battleLeave',`data-battle="${b.id}"`,'quiet'):mine>=0?button('Leave lobby','battleLeave',`data-battle="${b.id}"`,'quiet'):''):b.status==='running'&&mine>=0&&!f?.ko?button('Forfeit','battleLeave',`data-battle="${b.id}"`,'quiet'):button('Done','battleClose','','primary');
+  showModal('battle',`<span class="eyebrow">⚔ ${b.mode}V${b.mode} BATTLE · ${escape(LOCATIONS[b.location].name.toUpperCase())}</span><h2>${b.status==='open'?'Who’s in?':b.status==='cancelled'?'Called off':b.status==='done'?'Battle over':'Fight!'}</h2>${body}<div class="battle-teams">${team(0)}<div class="versus">VS</div>${team(1)}</div><div class="actions">${controls}</div><div class="battle-log">${b.log.slice(0,8).map(l=>`<p>${escape(l.text)}</p>`).join('')}</div>`);
 }
 function openBattle(id){battleId=id;battleView();}
 // First-time explainers: each screen explains itself once per browser.
@@ -778,6 +792,13 @@ document.addEventListener('click',async event=>{
     case 'logoutGuest':try{await auth({type:'logout',deleteGuest:true});}catch(e){toast(e.message);break;}location.reload();break;
     case 'collectReward':{const el=$('#reward');if(el)el.hidden=true;floatReward('✨ Collected!');chime('coin');break;}
     case 'noticeOkay':notices.shift();nextNotice();break;
+    case 'choiceClose':closeChoice();wantedMachine=null;break;
+    case 'gymAsk':{closeChoice();const w=wantedMachine;if(!w)break;const name=npcName('gym',w.n),voice=voiceFor(`gym:${w.n}`),{kind}=npcOpinion(`gym:${w.n}`,state.fame||0,Math.floor((Date.now()+offset)/86_400_000));
+      if(kind==='love'||kind==='neutral'){world.evict(w.n,kind==='love'?'For you? Of course, superstar!':'Sure, go ahead.');babble('Sure go ahead',voice);setTimeout(()=>useObject(w.object,true,w.watch),1400);}
+      else{world.say(`crowd:${w.n}`,kind==='hate'?'Wait your turn. 🙄':'Who are you? Wait your turn.');babble('Wait your turn',voice);express('ugh',voice);toast(`${name} won't budge. Try another machine.`);}
+      wantedMachine=null;break;}
+    case 'gymTake':{closeChoice();const w=wantedMachine;if(!w)break;const voice=voiceFor(`gym:${w.n}`);world.evict(w.n,'Oi! I was using that! 😠',true);babble('Oi I was using that',voice);express('ugh',voice);
+      await send({type:'gymGrab'},{keepModal:true});setTimeout(()=>useObject(w.object,true,w.watch),900);wantedMachine=null;break;}
     case 'chatRegular':{closeTray();const target={regular:true,x:Number(d.x),z:Number(d.z),vx:Number(d.x),vz:Number(d.z)};
       world.approach(target,()=>whenIdle(async()=>{const data=await send({type:'chatRegular',npc:d.npc},{keepModal:true});const c=data?.state?.lastChat;if(!c)return;const o=OPINIONS[c.kind],line=c.line.replace(/\{you\}/g,state.name).replace(/\{career\}/g,(CAREERS[state.career]?.name||'star').toLowerCase());
         world.chatWith={id:d.npc,until:performance.now()+8000};world.draw();babble(line,voiceFor(d.npc));setTimeout(()=>express(o.sound==='hmm'?'huh':o.sound,voiceFor(d.npc)),900);showNotice(o.icon,o.title(d.name),`“${line}”`,null);}));break;}
@@ -804,6 +825,7 @@ document.addEventListener('click',async event=>{
     case 'battleCreate':{const data=await send({type:'battleCreate',mode:Number(d.mode),opponent:d.opponent||undefined});if(data?.state.battle)openBattle(data.state.battle);break;}
     case 'battleJoin':case 'battleStart':case 'battleLeave':case 'battleMove':battleId=d.battle;await send({type:d.action,battleId:d.battle,team:d.team===undefined?undefined:Number(d.team),move:d.move,target:d.target},{keepModal:true});break;
     case 'openBattle':openBattle(d.battle);break;
+    case 'battleClose':battleId=null;phoneHome();break;
     case 'openPhone':phoneHome();break;
     case 'app':openApp(d.app);break;
     case 'anrClose':phoneHome();break;
