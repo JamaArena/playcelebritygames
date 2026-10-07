@@ -65,6 +65,7 @@ function makeToilet() {
   return g;
 }
 
+const JOINT = new T.Vector3();
 // One person with natural proportions: a sculpted torso and tapered limbs, layered clothes (a suit with
 // lapels, shirt and tie; a sports kit with shorts and socks; or a tee and trousers), a face and a
 // hairstyle. Scaled by build and height.
@@ -241,7 +242,18 @@ export class Figure {
     // Workouts: squats, presses, curls, jabs, pedalling and rowing, each with its own rhythm.
     if (!reduced) this.workout(pose, time, hip, tall);
     this.emote(pose, time, reduced);
+    this.followTorso();
     this.root.updateMatrixWorld();
+  }
+  // The head and arms hang off the torso: when a pose leans or twists it (rowing, cycling, squats, jabs,
+  // dancing), carry them round the hip pivot with it so the shoulders and neck stay joined.
+  followTorso() {
+    const t = this.torso, q = t.quaternion;
+    if (!t.rotation.x && !t.rotation.y && !t.rotation.z) return;
+    for (const part of [this.head, ...this.arms]) {
+      JOINT.copy(part.position).sub(t.position).applyQuaternion(q);
+      part.position.copy(t.position).add(JOINT); part.quaternion.premultiply(q);
+    }
   }
   workout(pose, time, hip, tall) {
     const s = .5 + .5 * Math.sin(time * 3.2);
