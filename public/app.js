@@ -211,6 +211,14 @@ function makeWorld(){
 }
 const world=makeWorld();
 world.onGround=closeTray;
+// Pop-ups get out of the way: a tap anywhere else closes the action menu or tray, and tapping outside a centre pop-up dismisses it.
+document.addEventListener('pointerdown',event=>{const t=event.target;if(!(t instanceof Element))return;
+  const menuOpen=!$('#pieMenu').hidden,trayOpen=!$('#objectTray').hidden&&!world.placement;
+  if((menuOpen||trayOpen)&&!t.closest('#pieMenu,#objectTray,canvas,#modal,.reward-overlay'))closeTray();
+},true);
+document.addEventListener('click',event=>{const t=event.target;if(!(t instanceof Element)||!t.classList.contains('reward-overlay'))return;
+  if(t.id==='notice'){notices.shift();nextNotice();}else if(t.id==='choice'){closeChoice();wantedMachine=null;}else if(t.id==='reward'){t.hidden=true;floatReward('✨ Collected!');chime('coin');}
+});
 // Speech bubbles come with a gibberish voice, pitched per character.
 world.onSpeak=(id,text)=>babble(text,voiceFor(id==='me'?state?.name:id==='npc'?NPCS.find(n=>n.location===state?.location)?.name:id,id==='me'&&['curvy','petite'].includes(state?.build)?'high':undefined));
 world.onPlacement=fits=>{const b=$('#placeHere');if(b){b.disabled=!fits;b.innerHTML=fits?'✓ Place here':'✕ Doesn’t fit here';}};

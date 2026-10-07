@@ -1,6 +1,6 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, VENUE_ACTS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt, homeRooms, extensionSpot, npcName } from './content.js';
+import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, VENUE_ACTS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt, homeRooms, extensionSpot, npcName, obstacles } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 // On the sofa you face the room; watching TV you sit at the end and turn toward the screen.
@@ -120,6 +120,8 @@ export const worldObjects = (location,furniture=[],owned=[],home) => ({
   street:[{name:'Front door',icon:'🚪',x:0,z:5.9,action:'enter'}],
   plaza:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:'Palm Realty estate agent',icon:'🏡',x:-1.2,z:3.8,action:'estate'},{name:'City shop',icon:'🛍️',x:-3,z:-1.7,action:'shop'},{name:'Palm Motors',icon:'🏁',x:3.3,z:2.75,action:'vip'},{name:'Café',icon:'☕',x:3,z:-1.7,need:'social'},{name:'Park bench',icon:'🪑',x:-2.5,z:1.6,need:'fun'},{name:'Creator Mika',icon:'🧑',x:2.5,z:2.6,action:'phone'}],
 }[location]||[]).map(o=>({...o,key:o.key||o.name,label:OBJECT_LABELS[o.name]||o.name}));
+// How tall things are, for tapping them on screen.
+const OBJECT_HEIGHTS={Fridge:1.9,Wardrobe:2,Bookshelf:1.9,Television:1.4,Shower:2,'Trophy cabinet':1.7,Mirror:1.8,'Ring light':1.6,Lamp:1.5,Bed:1.1,Sofa:1,Closet:2,Screen:1.8,treadmillRun:1.2,squats:2.1,punchBag:2.2,spinBike:1.1,gymWater:1.3,'Front door':2.1,Kitchen:1.2,Window:1.8};
 // Things are called what they are: a chair is a chair, wherever it stands.
 const OBJECT_LABELS={'Dining chair':'Chair','Guest chair':'Chair','Dining table':'Table','Coffee table':'Table','Bedside lamp':'Lamp','Living plant':'Plant','Bedroom plant':'Plant','Work desk':'Desk','Front door':'Door','Television':'TV'};
 const shades=new Map(),shade=(hex,factor)=>{const key=hex+factor;let out=shades.get(key);if(!out){const value=parseInt(hex.slice(1),16),c=v=>Math.min(255,Math.round(v*factor));out=`rgb(${c(value>>16)},${c((value>>8)&255)},${c(value&255)})`;shades.set(key,out);}return out;};
@@ -1013,6 +1015,14 @@ export class World {
     // Only a tap on the object itself opens it; anywhere else is a walk.
     const object=[...this.hits].sort((a,b)=>Math.hypot(a.screen.x-x,a.screen.y-y)-Math.hypot(b.screen.x-x,b.screen.y-y)).find(o=>Math.hypot(o.screen.x-x,o.screen.y-y)<this.hitRadius);
     if(object){this.onObject(object);return;}
+    // Tapping the thing itself: each object's footprint (from the room's layout) raised to a typical height and projected
+    // to the screen; the tap counts if it lands inside that outline. The smallest matching outline wins.
+    {const rects=this.interior()?obstacles(this.location,this.visitedHome?.furniture||this.state.furniture,this.homeKey()):[];
+      const box=[...this.hits].filter(o=>o.name&&!o.person&&!o.travel&&o.action!=='leave').map(o=>{const cx=o.vx??o.x,cz=o.vz??o.z,r=rects.filter(([rx,rz,w,d])=>Math.abs(cx-rx)<=w/2+.3&&Math.abs(cz-rz)<=d/2+.3).sort((a,b)=>a[2]*a[3]-b[2]*b[3])[0]||[cx,cz,.8,.8],h=OBJECT_HEIGHTS[o.act||o.name]||(o.action==='phone'?1.8:1);
+        const pts=[];for(const sx of [-1,1])for(const sz of [-1,1])for(const y of [0,h])pts.push(this.project(r[0]+sx*r[2]/2,y,r[1]+sz*r[3]/2));
+        const xs=pts.map(p=>p.x),ys=pts.map(p=>p.y),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+        return {o,inside:x>=x0&&x<=x1&&y>=y0&&y<=y1,area:(x1-x0)*(y1-y0),d:Math.hypot(x-(x0+x1)/2,y-(y0+y1)/2)};}).filter(b=>b.inside).sort((a,b)=>a.area-b.area||a.d-b.d)[0];
+      if(box){this.onObject(box.o);return;}}
     if(this.interior()){const p=this.unproject(x,y),near=[...this.hits].filter(o=>o.act||o.need||o.useItem||o.pose||o.action==='career'||o.action==='practice').map(o=>({o,d:Math.hypot((o.vx??o.x)-p.x,(o.vz??o.z)-p.z)})).sort((a,b)=>a.d-b.d)[0];if(near&&near.d<.95){this.onObject(near.o);return;}}
     this.onGround?.();const point=this.unproject(x,y),here=TOWN[this.location]||TOWN.home,lot=lotAt(point.x+here.x,point.z+here.z);
     if(lot&&lot!==this.location&&!this.interior()){this.onObject({travel:lot});return;}
