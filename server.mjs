@@ -7,9 +7,14 @@ import { createGameService } from './service.mjs';
 import { resendSender } from './email.mjs';
 
 const root=path.dirname(fileURLToPath(import.meta.url));
-const data=process.env.DATA_DIR || path.join(root,'data');mkdirSync(data,{recursive:true});
-const db=new DatabaseSync(path.join(data,'celebrity.sqlite'));
-const handle=createGameService(db,{secureCookies:process.env.SECURE_COOKIE==='1',sendEmail:resendSender(process.env.RESEND_API_KEY,process.env.EMAIL_FROM)});
+const cloud=process.env.VERCEL==='1';
+let handle;
+if(cloud)handle=(await import('./vercel-storage.mjs')).cloudRequest;
+if(!cloud){
+  const data=process.env.DATA_DIR || path.join(root,'data');mkdirSync(data,{recursive:true});
+  const db=new DatabaseSync(path.join(data,'celebrity.sqlite'));
+  handle=createGameService(db,{secureCookies:process.env.SECURE_COOKIE==='1',sendEmail:resendSender(process.env.RESEND_API_KEY,process.env.EMAIL_FROM)});
+}
 // Live channel: every successful action pings all connected browsers, which then fetch their own
 // authorised state. The ping carries no player data. Netlify keeps using polling instead.
 const listeners=new Set();
@@ -22,8 +27,8 @@ const server=http.createServer(async(req,res)=>{
   res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
   try {
     const url=new URL(req.url,'http://'+req.headers.host);
-    if(url.pathname==='/api/pulse'&&req.method==='GET'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({at:pulse}));return;}
-    if(url.pathname==='/api/live'&&req.method==='GET'){
+    if(!cloud&&url.pathname==='/api/pulse'&&req.method==='GET'){res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'});res.end(JSON.stringify({at:pulse}));return;}
+    if(!cloud&&url.pathname==='/api/live'&&req.method==='GET'){
       if(listeners.size>=5000){res.writeHead(503);res.end();return;}
       res.writeHead(200,{'Content-Type':'text/event-stream','Cache-Control':'no-store','Connection':'keep-alive','X-Accel-Buffering':'no'});res.write('retry: 3000\n\n');
       listeners.add(res);req.on('close',()=>listeners.delete(res));return;
@@ -44,3 +49,4 @@ const server=http.createServer(async(req,res)=>{
 });
 const port=Number(process.env.PORT||3000),host=process.env.HOST||'127.0.0.1';
 server.listen(port,host,()=>console.log(`Celebrity Life is ready at http://${host}:${server.address().port}`));
+export default server;

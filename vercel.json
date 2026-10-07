@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pnpm install --prod --frozen-lockfile",
+  "builds": [{
+    "src": "server.mjs",
+    "use": "@vercel/node",
+    "config": { "includeFiles": ["public/**", "netlify/database/migrations/**"] }
+  }],
+  "routes": [{ "src": "/(.*)", "dest": "/server.mjs" }]
+}
