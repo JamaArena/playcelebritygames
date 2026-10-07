@@ -22,9 +22,29 @@ function phoneStatus(model){const time=new Date();if(model.key!=='basic')return 
 function phoneFrame(body){const model=phoneModel();return `<div class="phone-device skin-${model.key}${model.key==='basic'?'':' ios'}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen phone-app-screen">${phoneStatus(model)}<div class="phone-app">${body}</div><button class="phone-homebar" data-action="backToPhone" aria-label="Back to the home screen"></button></div></div>`;}
 // Phone app kit: a sticky header (round back chevron + app name), avatars, list rows, segmented tabs.
 const CHEVRON='<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 4.5 7.5 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const PAGE_TITLES={prepare:'Career',wallet:'Wallet',phone:'Social',thread:'Messages',chat:'Messages',shop:'Market',inventory:'My stuff',vip:'Palm Motors',phones:'Upgrade',tips:'Tips',life:'My life',estate:'Palm Realty',barber:'Barber & Salon',tattoo:'Tattoos',tailor:'Tailor',gift:'Send a gift',upgrade:'Upgrade',retire:'Retirement',battle:'Fame Clash',battles:'Battles',graphicsOffer:'Graphics'};
+const PAGE_TITLES={prepare:'Career',wallet:'Fame wallet',phone:'Social',thread:'Messages',chat:'Messages',shop:'Market',inventory:'My stuff',vip:'Palm Motors',phones:'Upgrade',tips:'Tips',life:'My life',estate:'Palm Realty',barber:'Barber & Salon',tattoo:'Tattoos',tailor:'Tailor',gift:'Send a gift',upgrade:'Upgrade',retire:'Retirement',battle:'Fame Clash',battles:'Battles',graphicsOffer:'Graphics'};
 const appHead=(title,slot='',back='data-action="backToPhone" aria-label="Back to the home screen"')=>`<header class="app-head"><button class="app-back" ${back}>${CHEVRON}</button><h2>${title}</h2><span class="app-head-slot">${slot}</span></header>`;
-const avatar=(p,cls='')=>`<span class="pav ${cls}" style="--pc:${escape(p?.color||'#5b6476')}">${escape((p?.name||'?')[0].toUpperCase())}${p?.online?'<i></i>':''}</span>`;
+// Hair for a head centred at (x,y) with radius r: [behind the head, over the head].
+function hairSvg(style,x,y,r,c){
+  if(style==='bald')return ['',''];
+  const cap=`<path d="M${x-r} ${y}q0 ${-1.18*r} ${r} ${-1.18*r}t${r} ${1.18*r}q${-.27*r} ${-.55*r} ${-r} ${-.55*r}t${-r} ${.55*r}Z" fill="${c}"${['buzz','fade'].includes(style)?' fill-opacity=".7"':''}/>`;
+  const long=(to,w=1.08)=>`<rect x="${x-r*w}" y="${y-r*.7}" width="${2*r*w}" height="${r*(.7+to)}" rx="${r*.6}" fill="${c}"/>`;
+  const back={afro:`<circle cx="${x}" cy="${y-r*.2}" r="${r*1.42}" fill="${c}"/>`,long:long(1.5),braids:long(1.6),locs:long(1.6,1.14),bob:long(.75,1.12),ponytail:`<ellipse cx="${x+r*1.05}" cy="${y+r*.35}" rx="${r*.38}" ry="${r*.85}" fill="${c}"/>`,bun:`<circle cx="${x}" cy="${y-r*1.2}" r="${r*.48}" fill="${c}"/>`}[style]||'';
+  const extra=style==='curls'?[-.7,-.25,.25,.7].map(d=>`<circle cx="${x+d*r}" cy="${y-r*(1-.3*Math.abs(d))}" r="${r*.32}" fill="${c}"/>`).join(''):['braids','locs','cornrows'].includes(style)?[-.45,0,.45].map(d=>`<path d="M${x+d*r} ${y-r*1.05}v${r*.5}" stroke="#fff" stroke-opacity=".25" stroke-width="${r*.08}"/>`).join(''):'';
+  return [back,cap+extra];
+}
+const wornColor=(p,slot)=>{const k=p.wear?.[slot];return k&&WEAR[k]?(p.wear.tint?.[k]||WEAR[k].color):null;};
+// Character busts: a head-and-shoulders drawing from the player's look, cached per look. NPCs get a hairstyle from their name.
+const BUST_HAIR=['short','curls','afro','braids','bun','locs','fade','bob'],bustCache=new Map();
+function bustSvg(p){
+  const hair=p.hair||BUST_HAIR[[...(p.name||'')].reduce((n,ch)=>n+ch.codePointAt(0),0)%BUST_HAIR.length],key=[p.color,hair,p.hairColor,JSON.stringify(p.wear||'')].join('|');
+  if(bustCache.has(key))return bustCache.get(key);
+  const skin=escape(p.color),hc=escape(HAIR_COLORS[p.hairColor]||'#1d1714'),top=escape(wornColor(p,'top')||'#8ea9a4'),head=wornColor(p,'head'),face=wornColor(p,'face'),[back,front]=hairSvg(hair,32,27,12.5,hc);
+  const svg=`<svg viewBox="0 0 64 64" aria-hidden="true">${back}<path d="M7 66q0-19 25-19t25 19Z" fill="${top}"/><path d="M14 58q4-8 18-9" stroke="#fff" stroke-opacity=".25" stroke-width="3" fill="none" stroke-linecap="round"/><rect x="27.5" y="36" width="9" height="12" rx="4" fill="${skin}"/><circle cx="32" cy="27" r="12.5" fill="${skin}"/><ellipse cx="27" cy="22" rx="4" ry="2.6" fill="#fff" fill-opacity=".22"/>${front}<circle cx="27.6" cy="28.5" r="1.6" fill="#2b1d16"/><circle cx="36.4" cy="28.5" r="1.6" fill="#2b1d16"/><path d="M28.5 33q3.5 2.6 7 0" stroke="#2b1d16" stroke-width="1.5" fill="none" stroke-linecap="round"/>${face?`<rect x="23" y="25.5" width="18" height="5" rx="2.5" fill="${escape(face)}"/>`:''}${head?`<path d="M19 23q1-11 13-11t13 11Z" fill="${escape(head)}"/><rect x="31" y="20.5" width="17" height="3.5" rx="1.75" fill="${escape(head)}"/>`:''}</svg>`;
+  bustCache.set(key,svg);return svg;
+}
+const avatar=(p,cls='')=>`<span class="pav ${cls}${p?.color?' has-bust':''}" style="--pc:${escape(p?.color||'#5b6476')}">${p?.color?`<b class="pav-bust">${bustSvg(p)}</b>`:escape((p?.name||'?')[0].toUpperCase())}${p?.online?'<i></i>':''}</span>`;
+const myLook=()=>({id:me(),name:state.name,color:state.color,hair:state.hair,hairColor:state.hairColor,wear:state.wear,fame:state.fame||0,online:true});
 const prow=(left,title,sub='',side='',attrs='')=>`<div class="prow" ${attrs}>${left}<div class="prow-main"><strong>${title}</strong>${sub?`<small>${sub}</small>`:''}</div>${side?`<div class="prow-side">${side}</div>`:''}</div>`;
 const ico=(emoji,c='')=>`<span class="prow-ico"${c?` style="--c:${c}"`:''}>${emoji}</span>`;
 const tint=(c,extra='')=>`tint ${extra}" style="--c:${c}`;
@@ -36,7 +56,7 @@ function showModal(page,html,closable=true,slot=''){
   const phoneApp=closable&&!NOT_PHONE.includes(page),inPhone=phoneApp&&Boolean(state),body=(phoneApp&&!html.includes('class="app-head')?appHead(escape(PAGE_TITLES[page]||APP_NAMES[page]||'Phone'),slot):'')+html;
   $('#modalContent').innerHTML=inPhone?phoneFrame(body):body;$('#modal').classList.toggle('as-phone',page==='phoneHome'||inPhone);
   // Motion: the phone slides up when it opens, apps push in from the home screen, and home settles back.
-  if(motion&&(page==='phoneHome'||inPhone)){if(!wasPhone)$('#modalContent .phone-device')?.classList.add('phone-up');else if(from==='phoneHome'&&inPhone)$('#modalContent .phone-app')?.classList.add('enter-push');else if(page==='phoneHome'&&from!=='phoneHome')$('#modalContent .home-scroll')?.classList.add('home-in');}const onPhone=page==='phoneHome'||inPhone;$('#closeModal').textContent=onPhone?'✕ Close':'×';$('#closeModal').setAttribute('aria-label',onPhone?'Close phone':'Close dialog');$('#modal').classList.toggle('phone-app-view',inPhone);
+  if(motion&&(page==='phoneHome'||inPhone)){if(!wasPhone||page==='phoneHome'&&from!=='phoneHome')$('#modalContent .app-grid')?.classList.add('tiles-in');if(!wasPhone)$('#modalContent .phone-device')?.classList.add('phone-up');else if(from==='phoneHome'&&inPhone)$('#modalContent .phone-app')?.classList.add('enter-push');else if(page==='phoneHome'&&from!=='phoneHome')$('#modalContent .home-scroll')?.classList.add('home-in');}const onPhone=page==='phoneHome'||inPhone;$('#closeModal').textContent=onPhone?'✕ Close':'×';$('#closeModal').setAttribute('aria-label',onPhone?'Close phone':'Close dialog');$('#modal').classList.toggle('phone-app-view',inPhone);
   const title=$('#modalContent h2');if(title)title.id='modalTitle';
   setTimeout(()=>$('#modalContent input, #modalContent button, #closeModal')?.focus(),0);
 }
@@ -466,8 +486,11 @@ function shop(){const fame=state.fame||0;markSeen('shop',marketUnlocked());
 let wardrobeSlot='top',wardrobePreview=null;
 function lookSvg(wear,preview){
   const pick=slot=>{const k=preview&&WEAR[preview]?.slot===slot?preview:wear[slot];return k&&WEAR[k]?(wear.tint?.[k]||WEAR[k].color):null;};
-  const skin=escape(state.color||'#c98d64'),hair=HAIR_COLORS[state.hairColor]||'#1d1714',top=pick('top')||'#8ea9a4',bottom=pick('bottom')||'#34435e',shoes=pick('shoes')||'#f4f1ea',head=pick('head'),face=pick('face'),bag=pick('bag'),neck=pick('neck');
-  return `<svg class="look" viewBox="0 0 120 210" aria-hidden="true"><ellipse cx="60" cy="204" rx="34" ry="5" fill="#0002"/><rect x="44" y="128" width="14" height="66" rx="6" fill="${bottom}"/><rect x="62" y="128" width="14" height="66" rx="6" fill="${bottom}"/><rect x="40" y="190" width="20" height="10" rx="5" fill="${shoes}"/><rect x="60" y="190" width="20" height="10" rx="5" fill="${shoes}"/><rect x="26" y="76" width="12" height="52" rx="6" fill="${top}"/><rect x="82" y="76" width="12" height="52" rx="6" fill="${top}"/><circle cx="32" cy="130" r="6" fill="${skin}"/><circle cx="88" cy="130" r="6" fill="${skin}"/><rect x="36" y="70" width="48" height="66" rx="16" fill="${top}"/><rect x="53" y="60" width="14" height="14" rx="5" fill="${skin}"/>${neck?`<path d="M48 74q12 14 24 0" stroke="${neck}" stroke-width="3" fill="none"/>`:''}<circle cx="60" cy="42" r="22" fill="${skin}"/><path d="M37 42q0-26 23-26t23 26q-6-12-23-12t-23 12Z" fill="${hair}"/><circle cx="52" cy="45" r="2.4" fill="#2b1d16"/><circle cx="68" cy="45" r="2.4" fill="#2b1d16"/><path d="M53 54q7 5 14 0" stroke="#2b1d16" stroke-width="2" fill="none" stroke-linecap="round"/>${face?`<rect x="44" y="40" width="32" height="8" rx="4" fill="${face}"/>`:''}${head?`<path d="M36 34q2-20 24-20t24 20Z" fill="${head}"/><rect x="58" y="30" width="32" height="6" rx="3" fill="${head}"/>`:''}${bag?`<rect x="86" y="104" width="22" height="26" rx="6" fill="${bag}"/><path d="M90 104q7-14 14 0" stroke="${bag}" stroke-width="3" fill="none"/>`:''}</svg>`;
+  const skin=escape(state.color||'#c98d64'),hair=escape(HAIR_COLORS[state.hairColor]||'#1d1714'),top=pick('top')||'#8ea9a4',bottom=pick('bottom')||'#34435e',shoes=pick('shoes')||'#f4f1ea',head=pick('head'),face=pick('face'),bag=pick('bag'),neck=pick('neck'),[back,front]=hairSvg(state.hair||'short',60,40,21,hair);
+  // Soft highlights on the limbs and body so the figure reads round, not flat.
+  const shine='<linearGradient id="lookShine" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#000" stop-opacity=".14"/></linearGradient>';
+  const limb=(x,y,w,h,c)=>`<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${w/2}" fill="${c}"/><rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${w/2}" fill="url(#lookShine)"/>`;
+  return `<svg class="look" viewBox="0 0 120 214" aria-hidden="true"><defs>${shine}</defs><ellipse class="look-shadow" cx="60" cy="206" rx="32" ry="5" fill="#0002"/><g class="look-body">${limb(44,126,15,68,bottom)}${limb(61,126,15,68,bottom)}<rect x="39" y="188" width="22" height="12" rx="6" fill="${shoes}"/><rect x="59" y="188" width="22" height="12" rx="6" fill="${shoes}"/><g transform="rotate(8 32 80)">${limb(25,74,13,54,top)}<circle cx="31.5" cy="130" r="6.5" fill="${skin}"/></g><g transform="rotate(-8 88 80)">${limb(82,74,13,54,top)}<circle cx="88.5" cy="130" r="6.5" fill="${skin}"/></g><rect x="36" y="68" width="48" height="68" rx="20" fill="${top}"/><rect x="36" y="68" width="48" height="68" rx="20" fill="url(#lookShine)"/><rect x="53" y="56" width="14" height="16" rx="6" fill="${skin}"/>${neck?`<path d="M47 72q13 14 26 0" stroke="${neck}" stroke-width="3" fill="none"/>`:''}${back}<circle cx="60" cy="40" r="21" fill="${skin}"/><ellipse cx="52" cy="32" rx="7" ry="4.5" fill="#fff" fill-opacity=".2"/>${front}<circle cx="52.5" cy="43" r="2.6" fill="#2b1d16"/><circle cx="67.5" cy="43" r="2.6" fill="#2b1d16"/><circle cx="48" cy="49" r="3" fill="#f472b6" fill-opacity=".25"/><circle cx="72" cy="49" r="3" fill="#f472b6" fill-opacity=".25"/><path d="M54 51q6 5 12 0" stroke="#2b1d16" stroke-width="2" fill="none" stroke-linecap="round"/>${face?`<rect x="44" y="38" width="32" height="8" rx="4" fill="${face}"/>`:''}${head?`<path d="M37 33q2-21 23-21t23 21Z" fill="${head}"/><rect x="58" y="29" width="32" height="6" rx="3" fill="${head}"/>`:''}${bag?`<rect x="88" y="104" width="22" height="26" rx="7" fill="${bag}"/><path d="M92 104q7-14 14 0" stroke="${bag}" stroke-width="3" fill="none"/>`:''}</g></svg>`;
 }
 function wardrobe(){
   const fame=state.fame||0,wear=state.wear||{},closet=state.closet||{},perks=Object.entries(wearPerks(wear)),atPlaza=state.location==='plaza',preview=wardrobePreview&&WEAR[wardrobePreview]?wardrobePreview:null;
@@ -476,7 +499,7 @@ function wardrobe(){
     const owned=(w.fame===0&&!w.exclusive)||closet[key],worn=wear[w.slot]===key;
     const action=worn?button('Take off','takeOff',`data-slot="${w.slot}"`,'secondary small'):owned?button('Wear','wear',`data-item="${key}"`,'primary small'):fame<w.fame?button(`🔒 ${fmt(w.fame-fame)} to go`,'noop','disabled','secondary small'):atPlaza?button('Claim free','claimWear',`data-item="${key}"`,'primary small'):button('Claim at plaza','travel','data-location="plaza"','secondary small');
     return product({emoji:wearIcon(w),name:escape(w.name),tone:'wear',tag:w.perk?escape(PERKS[w.perk[0]].label(w.perk[1])):'',price:w.fame?`✦ ${fmt(w.fame)}${owned?' · Owned':''}`:'Free basic',locked:!owned&&fame<w.fame,action,extra:`<b class="swatch-dot" style="--c:${escape(wear.tint?.[key]||w.color)}"></b>`,attrs:`data-action="wardrobePreview" data-item="${key}"`}).replace('class="product ',`class="product ${worn?'worn ':''}${preview===key?'previewing ':''}`);}).join('');
-  showModal('wardrobe',`<div class="dress-stage">${lookSvg(wear,preview)}<span class="stage-pill">${preview?`Previewing: ${escape(WEAR[preview].name)}`:'Today’s look'}</span>${preview?button('Reset','wardrobePreview','data-item=""','stage-reset'):''}</div>
+  showModal('wardrobe',`<div class="dress-stage">${preview?lookSvg(wear,preview).replace('class="look"','class="look pop"'):lookSvg(wear,preview)}<span class="stage-pill">${preview?`Previewing: ${escape(WEAR[preview].name)}`:'Today’s look'}</span>${preview?button('Reset','wardrobePreview','data-item=""','stage-reset'):''}</div>
   <div class="slot-tabs">${tabs}</div>
   <details class="perk-chips"><summary>✦ Active perks (${perks.length})</summary><div class="chip-scroll">${perks.map(([key,v])=>`<span class="perk-chip">${escape(PERKS[key].label(v))}</span>`).join('')||'<span class="perk-chip none">No perks yet. Claim clothes at Palm Boutique and wear them.</span>'}</div></details>
   <div class="product-grid">${cards}</div>`);
@@ -500,7 +523,7 @@ function chatThread(id){
 }
 function friendsApp(){
   const proposals=(state.proposals||[]).filter(p=>playerById(p.from)||p.name);
-  const rows=state.friends.map(id=>{const p=playerById(id);if(!p)return '';return prow(avatar(p),`${escape(p.name)}${p.verified?' <b class="tick">✔</b>':''}${p.spouse?` <small>💍 ${escape(p.spouse)}</small>`:''}`,`${escape(CAREERS[p.career]?.name||'')} · ✦ ${fmt(p.fame||0)} · ${escape(LOCATIONS[p.location]?.name||'')}`,button('Message','directMessage',`data-player="${id}"`,tint('#2f7de1'))+button('⋯','friendMenu',`data-player="${id}" aria-label="More for ${escape(p.name)}"`,'more-btn'));}).join('');
+  const rows=state.friends.map(id=>{const p=playerById(id);if(!p)return '';return prow(avatar(p),`${escape(p.name)}${p.verified?' <b class="tick">✔</b>':''}${p.spouse?` <small>💍 ${escape(p.spouse)}</small>`:''}`,`${escape(CAREERS[p.career]?.name||'')} · ✦ ${fmt(p.fame||0)} · ${escape(LOCATIONS[p.location]?.name||'')}`,button('💬','directMessage',`data-player="${id}" aria-label="Message ${escape(p.name)}"`,tint('#2f7de1','round'))+button('⋯','friendMenu',`data-player="${id}" aria-label="More for ${escape(p.name)}"`,'more-btn'));}).join('');
   showModal('friends',`${seg([['chat','Chats'],['friends','Friends']],'friends','app','app')}
   ${state.spouse?`<div class="promo-card love"><span class="promo-icon">💍</span><div><strong>Married to ${escape(state.spouse.name)}</strong><small>You each earn 10% of the fame the other makes.</small></div>${button('End marriage','divorceAsk','','danger small')}</div>`:''}
   ${proposals.map(p=>`<div class="promo-card love"><span class="promo-icon">💍</span><div><strong>${escape(p.name)} proposed!</strong><small>Married celebrities share 10% of each other's fame gains.</small></div><div class="promo-actions">${button('Say yes','acceptProposal',`data-player="${p.from}"`,'primary small')}${button('No','declineProposal',`data-player="${p.from}"`,'secondary small')}</div></div>`).join('')}
@@ -516,7 +539,7 @@ function friendMenu(id){
 let feedFilter='latest';
 const FEED_IDEAS=['Studio day 🎧','Out in Palm City 🌴','Big news soon 👀','Thank you fans ❤️'];
 function feedApp(){
-  const friends=new Set(state.friends);let posts=[...(state.posts||[]).map(p=>({...p,name:state.name,color:state.color,mine:true,verified:(state.fame||0)>=50_000})),...snapshot.players.filter(p=>p.id!==me()&&(feedFilter!=='friends'||friends.has(p.id))).flatMap(p=>(p.posts||[]).map(x=>({...x,name:p.name,color:p.color,online:p.online,verified:p.verified})))];
+  const friends=new Set(state.friends);let posts=[...(state.posts||[]).map(p=>({...p,...myLook(),online:false,mine:true,verified:(state.fame||0)>=50_000})),...snapshot.players.filter(p=>p.id!==me()&&(feedFilter!=='friends'||friends.has(p.id))).flatMap(p=>(p.posts||[]).map(x=>({...x,name:p.name,color:p.color,hair:p.hair,hairColor:p.hairColor,wear:p.wear,online:p.online,verified:p.verified})))];
   posts=posts.sort(feedFilter==='trending'?(a,b)=>(b.likes||0)-(a.likes||0)||b.at-a.at:(a,b)=>b.at-a.at).slice(0,40);
   showModal('feed',`<form id="postForm" class="composer"><textarea name="body" maxlength="280" required placeholder="Share an update with your fans…" aria-label="New post"></textarea><div class="chip-scroll">${FEED_IDEAS.map(t=>`<button type="button" class="chip" data-action="feedIdea" data-text="${escape(t)}">${t}</button>`).join('')}</div><div class="composer-foot"><small><span id="postCount">0</span>/280 · posting lifts social and earns a little fame</small><button class="primary small" type="submit">Post</button></div></form>
   <div class="chip-scroll filters">${[['latest','Latest'],['trending','Trending 🔥'],['friends','Friends']].map(([k,l])=>`<button class="chip ${k===feedFilter?'on':''}" data-action="feedFilter" data-filter="${k}" aria-pressed="${k===feedFilter}">${l}</button>`).join('')}</div>
@@ -544,14 +567,15 @@ function musicApp(){
 }
 // Fame wallet: a balance card, gained and lost tiles, and the ledger grouped by day with an icon per kind of entry.
 const LEDGER_KINDS=[[/quest/i,'🎯','#f5b942'],[/luck|lucky|found/i,'🍀','#2fa84f'],[/mishap|slip|fell|lost|fine|oops/i,'💥','#e5484d'],[/clash|battle|beef|diss/i,'⚔️','#f97316'],[/award|medal|trophy/i,'🏆','#f5b942'],[/gift/i,'🎁','#7c3aed'],[/marri|spouse|wedding/i,'💍','#db2777'],[/post|fan|feed/i,'📣','#2f7de1'],[/gig|show|release|work|practi|fixture|match/i,'🎬','#0f766e']];
+let walletAll=false;
 function walletApp(){
   const log=state.fameLog||[],gained=log.filter(e=>e.delta>0).reduce((n,e)=>n+e.delta,0),lost=log.filter(e=>e.delta<0).reduce((n,e)=>n-e.delta,0);
   const rank=snapshot.players.filter(p=>p.id!==me()&&(p.fame||0)>(state.fame||0)).length+1,today=new Date().toDateString();
   const entry=e=>{const [,icon,c]=LEDGER_KINDS.find(([re])=>re.test(e.reason))||[0,e.delta>0?'✦':'↘',e.delta>0?'#2fa84f':'#e5484d'];return prow(ico(icon,c).replace('prow-ico','prow-ico round'),escape(e.reason),ago(e.at),`<b class="amount ${e.delta>0?'up':'down'}">${e.delta>0?'+':'−'}${fmt(Math.abs(e.delta))}</b>`);};
-  const groups=[['Today',log.filter(e=>new Date(e.at).toDateString()===today)],['Earlier',log.filter(e=>new Date(e.at).toDateString()!==today)]].filter(([,l])=>l.length);
+  const shown=walletAll?log:log.slice(0,8),groups=[['Today',shown.filter(e=>new Date(e.at).toDateString()===today)],['Earlier',shown.filter(e=>new Date(e.at).toDateString()!==today)]].filter(([,l])=>l.length);
   showModal('wallet',`<div class="kit-hero hero-wallet"><small>Fame balance</small><strong class="big-number">✦ ${fmt(state.fame||0)}</strong><span>${rank?`Rank #${rank} in Palm City`:'Palm City'} · ${B.tiers[state.careers[state.career].tier][0]}</span></div>
   <div class="stat-pair"><div class="stat-tile"><span class="disc" style="--c:#2fa84f">↗</span><strong>+${fmt(gained)}</strong><small>Gained recently</small></div><div class="stat-tile"><span class="disc" style="--c:#e5484d">↘</span><strong>−${fmt(lost)}</strong><small>Lost recently</small></div></div>
-  ${groups.map(([label,list])=>`<p class="app-label">${label}</p><div class="pcard">${list.map(entry).join('')}</div>`).join('')||'<p class="empty">Your fame history starts with your next win (or mishap).</p>'}`);
+  ${groups.map(([label,list])=>`<p class="app-label">${label}</p><div class="pcard">${list.map(entry).join('')}</div>`).join('')||'<p class="empty">Your fame history starts with your next win (or mishap).</p>'}${log.length>8?button(walletAll?'Show less':`Show all ${log.length}`,'walletAll','','secondary wide'):''}`);
 }
 function newsApp(){
   const top=[...snapshot.players].sort((a,b)=>(b.fame||0)-(a.fame||0))[0],items=[...(state.headlines||[]),...snapshot.players.filter(p=>p.id!==me()).flatMap(p=>p.headlines||[])].sort((a,b)=>b.at-a.at).slice(0,25);
@@ -689,7 +713,7 @@ async function placement(item,id=null){closeModal();if(state.location!=='home'){
 function arrangeRoom(){inventory();}
 function profile(){const season=snapshot.season,c=state.careers[state.career],def=CAREERS[state.career],medals=state.awards.slice().reverse();
   const gem=(icon,value,label,c)=>`<div class="gem-tile"><span class="gem-ico" style="--c:${c}">${icon}</span><strong>${value}</strong><small>${label}</small></div>`;
-  showModal('profile',`${hero(avatar({name:state.name,color:state.color,online:true},'xxl ring'),escape(state.name),[`${def.icon} ${def.name}`,B.tiers[c.tier][0],...((state.fame||0)>=50_000?['✔ Verified']:[]),...(state.spouse?[`💍 ${escape(state.spouse.name)}`]:[]),...(state.crew?[`${escape(state.crew.badge)} ${escape(state.crew.name)}`]:[])],'transparent','hero-profile')}
+  showModal('profile',`${hero(avatar(myLook(),'xxl ring'),escape(state.name),[`${def.icon} ${def.name}`,B.tiers[c.tier][0],...((state.fame||0)>=50_000?['✔ Verified']:[]),...(state.spouse?[`💍 ${escape(state.spouse.name)}`]:[]),...(state.crew?[`${escape(state.crew.badge)} ${escape(state.crew.name)}`]:[])],'transparent','hero-profile')}
   <div class="gem-grid">${gem('✦',fmt(state.fame||0),'Fame','#f5b942')}${gem('👥',fmt(fanClubSize(state.fame||0)),'Fan club','#db2777')}${gem('🎬',state.outputs.length,'Works','#2f7de1')}${gem('💪',Math.floor(state.fitness||0),'Fitness','#2fa84f')}</div>
   <section class="v2-section"><h3>Awards <small>${state.awards.length}</small></h3><div class="medals">${medals.map(a=>`<div class="medal"><span>${awardIcon(a.name)}</span><small>${escape(a.name)}</small></div>`).join('')}${Array.from({length:Math.max(1,4-medals.length)},()=>'<div class="medal locked"><span>🏆</span><small>Still to win</small></div>').join('')}</div></section>
   <section class="v2-section"><h3>Career history <small>latest</small></h3>${outputs(state.outputs)}</section>
@@ -700,7 +724,7 @@ function profile(){const season=snapshot.season,c=state.careers[state.career],de
   ${snapshot.account?prow(ico('👤'),'@'+escape(snapshot.account.username),escape(snapshot.account.email),button('Log out','app','data-app="logout"',tint('#2f7de1'))):prow(ico('👤'),'Playing as a guest','Save your character to play on any device.',button('Save','authTab','data-tab="signup"','primary small')+button('Log out','app','data-app="logout"','quiet small'))}
   ${snapshot.account?prow(ico('🌱','#e5484d'),'New life','Erase this character and start over.',button('New life','newLife','','danger small')):''}</div>`);}
 function phone(tab='people'){
-  if(tab==='local')tab='people';if(tab==='battles'){battlesApp();return;}
+  if(tab==='local')tab='people';if(tab==='battles'){battlesFrom='social';battlesApp();return;}
   phoneTab=tab;let html=seg([['people','People'],['battles','Battles'],['collabs','Collabs']],tab,'phoneTab','tab');
   if(tab==='people'){
     const friend=id=>state.friends.includes(id),invites=state.invitations.filter(i=>i.expiresAt>now());
@@ -717,11 +741,12 @@ function phone(tab='people'){
   showModal('phone',html);
 }
 // Battles: a dark arena with you versus the star just above you, a big Fame Clash button and the fame podium.
+let battlesFrom=null;
 function battlesApp(){
-  phoneTab='battles';const you={id:me(),name:state.name,color:state.color,fame:state.fame||0,online:true},ranked=[...snapshot.players.filter(p=>p.id!==me()),you].sort((a,b)=>(b.fame||0)-(a.fame||0)),mine=ranked.indexOf(you),rank=mine+1,rec=state.clashRecord||{},rival=ranked[mine-1]||ranked[mine+1];
+  phoneTab='battles';const you=myLook(),ranked=[...snapshot.players.filter(p=>p.id!==me()),you].sort((a,b)=>(b.fame||0)-(a.fame||0)),mine=ranked.indexOf(you),rank=mine+1,rec=state.clashRecord||{},rival=ranked[mine-1]||ranked[mine+1];
   const lobby=snapshot.battles||[];
   const spot=i=>{const p=ranked[i];return p?`<div class="podium-spot p${i+1}">${i===0?'<span class="crown">👑</span>':''}${avatar(p,'lg')}<strong>${escape(p.name)}</strong><small>✦ ${fmt(p.fame||0)}</small><div class="podium-block"><b>${i+1}</b></div></div>`:'';};
-  showModal('battles',`<div class="arena">${appHead('Battles')}
+  showModal('battles',`<div class="arena">${appHead('Battles','',battlesFrom==='social'?'data-action="phoneTab" data-tab="people" aria-label="Back to Social"':undefined)}
   <div class="vs-hero"><div class="vs-side">${avatar(you,'xl')}<strong>You</strong><small>✦ ${fmt(state.fame||0)}</small></div><div class="vs-badge">VS</div><div class="vs-side">${avatar(rival||{name:'?'},'xl')}<strong>${escape(rival?.name||'Anyone')}</strong>${rival?`<small>✦ ${fmt(rival.fame||0)}</small>`:''}</div></div>
   <div class="vs-chips"><span>🏅 Rank #${rank||'–'}</span><span>✅ ${rec.won||0} won</span><span>❌ ${Math.max(0,(rec.fought||0)-(rec.won||0))} lost</span></div>
   ${button('⚔️ Start a Fame Clash','battleCreate','data-mode="1"','battle-cta')}
@@ -815,11 +840,11 @@ function phoneHome(){
   // One glass widget: friends online and the next fame unlock, with a pill to go and look.
   const glance=model.key==='basic'?'':`<div class="phone-card home-widget"><div><span>👥 ${online} friend${online===1?'':'s'} online</span>${next?`<span>🔓 Next: ${next.icon} ${escape(next.name)} · ✦ ${fmt(next.fame)}</span>`:''}</div>${next?button('View','app','data-app="vip"','widget-pill'):button('Chat','app','data-app="chat"','widget-pill')}</div>`;
   const widgets=[big?`<div class="phone-clock"><strong>${clockText.replace(/s?[AP]M$/i,'')}</strong><small>${dateText}</small></div>`:'',glance,model.nag&&Math.random()<model.nag?`<div class="phone-nag">⚠ Storage almost full. Delete some photos?</div>`:''].join('');
-  const dock=['phone','career','map','tips'],apps=big?APPS.filter(([k])=>!dock.includes(k)):APPS,icon=([key,icon,label])=>`<button class="app" data-action="app" data-app="${key}"><span style="--a:${APP_COLORS[key]||'#5b7cfa'}">${icon}${badge(key)}</span><small>${model.key==='basic'&&label.length>8?label.slice(0,7)+'…':label}</small></button>`;
-  showModal('phoneHome',`<div class="phone-device skin-${model.key}${model.key==='basic'?'':' ios'}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen home-screen">${model.key==='basic'?'':SKYLINE}${phoneStatus(model)}<div class="home-scroll">${big?'':`<div class="phone-hello"><strong>${escape(state.name)}</strong><small>✦ ${fmt(state.fame||0)} fame · ${escape(LOCATIONS[state.location].name)}</small></div>`}${widgets}<div class="app-grid">${apps.map(icon).join('')}</div></div>${big?`<div class="phone-dock">${APPS.filter(([k])=>dock.includes(k)).map(icon).join('')}</div>`:''}${model.key==='basic'?'':'<div class="ios-homebar" aria-hidden="true"></div>'}<div class="phone-overlay" id="phoneOverlay" hidden></div></div></div>`);
+  const dock=['phone','career','map','tips'],apps=big?APPS.filter(([k])=>!dock.includes(k)):APPS,icon=([key,icon,label],i=0)=>`<button class="app" data-action="app" data-app="${key}" style="--r:${Math.floor(i/4)}"><span style="--a:${APP_COLORS[key]||'#5b7cfa'}">${icon}${badge(key)}</span><small>${model.key==='basic'&&label.length>8?label.slice(0,7)+'…':label}</small></button>`;
+  showModal('phoneHome',`<div class="phone-device skin-${model.key}${model.key==='basic'?'':' ios'}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen home-screen">${model.key==='basic'?'':SKYLINE}${phoneStatus(model)}<div class="home-scroll"><i class="home-fade" aria-hidden="true"></i>${big?'':`<div class="phone-hello"><strong>${escape(state.name)}</strong><small>✦ ${fmt(state.fame||0)} fame · ${escape(LOCATIONS[state.location].name)}</small></div>`}${widgets}<div class="app-grid">${apps.map(icon).join('')}</div></div>${big?`<div class="phone-dock">${APPS.filter(([k])=>dock.includes(k)).map(icon).join('')}</div>`:''}${model.key==='basic'?'':'<div class="ios-homebar" aria-hidden="true"></div>'}<div class="phone-overlay" id="phoneOverlay" hidden></div></div></div>`);
 }
 const APP_NAMES=Object.fromEntries([...APPS,...HIDDEN_APPS].map(([key,,label])=>[key,label]));
-function launch(key){if(key==='logout'){confirmLogout();return;}({map:()=>{closeModal();map();},phone:()=>phone('people'),battles:battlesApp,career,inventory,wardrobe,chat:chatApp,friends:friendsApp,team:teamApp,crews:crewsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,quests:questsApp,upgrade:phoneStore}[key]||phoneHome)();}
+function launch(key){if(key==='logout'){confirmLogout();return;}({map:()=>{closeModal();map();},phone:()=>phone('people'),battles:()=>{battlesFrom=null;battlesApp();},career,inventory,wardrobe,chat:chatApp,friends:friendsApp,team:teamApp,crews:crewsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,quests:questsApp,upgrade:phoneStore}[key]||phoneHome)();}
 // Budget phones make you wait, and now and then the app hangs. You can always wait or close it.
 function openApp(key){
   // Links between apps (not from the phone's home screen) open straight away, without the phone's loading lag.
@@ -832,7 +857,7 @@ function openApp(key){
     launch(key);
   },delay);
 }
-function lifePanel(){const c=state.careers[state.career],mood=Math.round(Object.values(state.needs).reduce((a,b)=>a+b,0)/6);showModal('life',`${hero(avatar({name:state.name,color:state.color,online:true},'xxl ring'),escape(state.name),[mood>=75?'😄 Very happy':mood>=55?'🙂 Content':mood>=30?'😕 Uncomfortable':'😣 Miserable',`Mood ${mood}%`],'transparent','hero-life')}
+function lifePanel(){const c=state.careers[state.career],mood=Math.round(Object.values(state.needs).reduce((a,b)=>a+b,0)/6);showModal('life',`${hero(avatar(myLook(),'xxl ring'),escape(state.name),[mood>=75?'😄 Very happy':mood>=55?'🙂 Content':mood>=30?'😕 Uncomfortable':'😣 Miserable',`Mood ${mood}%`],'transparent','hero-life')}
   <section class="v2-section"><h3>Needs <small>tap to recover</small></h3><div class="v2-rings">${Object.entries(needs).map(([key,[label,icon]])=>ring(state.needs[key],icon,label,`data-action="recover" data-need="${key}"`)).join('')}</div></section>
   <section class="v2-section"><h3>Skills <small>${escape(CAREERS[state.career].name)}</small></h3>${skillRings(c)}</section>
   <section class="v2-section"><h3>Recent moments</h3><div class="v2-list">${state.events.slice(0,6).map(e=>`<div class="v2-row"><span>✨</span><div><strong>${escape(e.message)}</strong><small>${new Date(e.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</small></div></div>`).join('')}</div></section>`);}
@@ -842,11 +867,13 @@ function phoneStore(){const fame=state.fame||0;showModal('phones',`<p class="mod
 function openPage(page){tip(page);({estate:estateAgent,city:map,career,phone,inventory,wardrobe,profile,shop,vip,tips:tipsApp,barber:barberShop,tattoo:tattooShop,tailor:tailorShop,phones:phoneStore,shopping:shoppingApp}[page]||map)();}
 $('#mapButton')?.addEventListener('click',map);$('#cameraButton')?.addEventListener('click',()=>toast(`📷 ${world.rotate()}`));$('#closeModal').addEventListener('click',closeModal);
 $('#zoomIn')?.addEventListener('click',()=>world.setZoom(world.zoom*1.2));$('#zoomOut')?.addEventListener('click',()=>world.setZoom(world.zoom/1.2));$('#resetCamera').addEventListener('click',()=>world.resetCamera());
-$('.modal-backdrop').addEventListener('click',closeModal);$('#motionButton').addEventListener('click',()=>{motion=!motion;world.reduced=!motion;$('#motionButton').textContent=motion?'Motion on':'Motion reduced';});
+$('.modal-backdrop').addEventListener('click',closeModal);$('#motionButton').addEventListener('click',()=>{motion=!motion;world.reduced=!motion;document.body.classList.toggle('reduce-motion',!motion);$('#motionButton').textContent=motion?'Motion on':'Motion reduced';});
 document.addEventListener('keydown',event=>{
   if(event.key==='Escape'){closeModal();closeTray();}
   if(event.key==='Tab'&&modalPage){const focusable=[...$('#modal').querySelectorAll('button:not([disabled]):not([hidden]),input:not([type=hidden]),select,a[href]')];const first=focusable[0],last=focusable.at(-1);if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}
 });
+// Entrance animations drop their class when done, so nothing stays on its own compositing layer.
+document.addEventListener('animationend',event=>{if(['phoneUp','push','homeIn'].includes(event.animationName))event.target.classList.remove('phone-up','enter-push','home-in');});
 // Live search pills filter their list; the post composer counts characters.
 document.addEventListener('input',event=>{const el=event.target;if(el.dataset?.filter){const q=el.value.trim().toLowerCase();for(const row of document.querySelectorAll(`[data-list="${el.dataset.filter}"] [data-name]`))row.hidden=Boolean(q)&&!row.dataset.name.includes(q);}if(el.closest?.('#postForm')&&$('#postCount'))$('#postCount').textContent=el.value.length;});
 document.addEventListener('click',async event=>{
@@ -869,6 +896,7 @@ document.addEventListener('click',async event=>{
     case 'closeTip':closeTip();break;
     case 'wardrobeSlot':wardrobeSlot=d.slot;wardrobe();break;
     case 'wardrobePreview':wardrobePreview=d.item&&d.item!==wardrobePreview?d.item:null;wardrobe();break;
+    case 'walletAll':walletAll=!walletAll;walletApp();break;
     case 'shopCat':shopCat=d.cat;shoppingApp();break;
     case 'feedFilter':feedFilter=d.filter;feedApp();break;
     case 'feedIdea':{const box=$('#postForm textarea');if(box){box.value=(box.value?box.value.trimEnd()+' ':'')+d.text;box.dispatchEvent(new Event('input',{bubbles:true}));box.focus();}break;}
