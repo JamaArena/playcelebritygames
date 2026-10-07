@@ -155,7 +155,7 @@ export class Figure {
     const shape = BUILDS[o.build] || BUILDS.average, W = shape.w, H = shape.hip, S = shape.shoulders || W, pose = o.pose, fit = o.fit || 'tee', suit = fit === 'suit', kit = fit === 'kit', cut = o.cut || (kit ? 'shorts' : 'trousers');
     // Sleeve length by cut: long for suits, jackets, hoodies, pyjamas and robes; none for tanks and gowns.
     const sleeves = ['suit', 'jacket', 'hoodie', 'pyjama', 'robe'].includes(fit) ? 'long' : ['tank', 'gown'].includes(fit) ? 'none' : 'short';
-    const seated = ['sit', 'dine', 'tv', 'work', 'toilet', 'sitFloor'].includes(pose), tall = seated || pose === 'sleep' ? 1 : (HEIGHTS[o.height]?.h || 1);
+    const seated = ['sit', 'dine', 'tv', 'work', 'toilet', 'sitFloor', 'pedal', 'row'].includes(pose), tall = seated || pose === 'sleep' ? 1 : (HEIGHTS[o.height]?.h || 1);
     const phase = o.walk && !reduced ? Math.sin(o.gait) : pose === 'sport' && !reduced ? Math.sin(time * 7) : 0, bob = o.walk && !reduced ? Math.abs(Math.cos(o.gait)) * .02 : 0;
     // Standing still people breathe and shift their weight a little.
     const idle = !o.walk && !pose && !reduced, breath = idle ? Math.sin(time * 1.7 + x) : 0, sway = idle ? Math.sin(time * .6 + z) : 0;
@@ -238,8 +238,25 @@ export class Figure {
       for (const arm of this.arms) { arm.rotation.set(-.35, 0, -arm.side * .32); arm.fore.rotation.set(-.55, 0, 0); }
       for (const leg of this.legs) { leg.rotation.set(-.12, 0, -leg.side * .06); leg.shin.rotation.set(.25, 0, 0); }
     }
+    // Workouts: squats, presses, curls, jabs, pedalling and rowing, each with its own rhythm.
+    if (!reduced) this.workout(pose, time, hip, tall);
     this.emote(pose, time, reduced);
     this.root.updateMatrixWorld();
+  }
+  workout(pose, time, hip, tall) {
+    const s = .5 + .5 * Math.sin(time * 3.2);
+    if (pose === 'squat') { const dip = s * .32; this.torso.position.y = hip - dip; this.head.position.y = hip - dip + .74 * tall; this.torso.rotation.x = .25 * s;
+      for (const leg of this.legs) { leg.position.y = hip - dip - .02; leg.rotation.set(-1.35 * s, 0, leg.side * .08); leg.shin.rotation.set(2.1 * s, 0, 0); }
+      for (const arm of this.arms) { arm.position.y = hip - dip + .5 * tall; arm.rotation.set(-1.45, 0, arm.side * .1); arm.fore.rotation.set(-.2, 0, 0); } }
+    if (pose === 'press') for (const arm of this.arms) { arm.rotation.set(0, 0, arm.side * (1.55 + 1.25 * s)); arm.fore.rotation.set(0, 0, -arm.side * (1.4 * (1 - s))); }
+    if (pose === 'curl') for (const arm of this.arms) { const c = .5 + .5 * Math.sin(time * 3.2 + (arm.side > 0 ? 0 : Math.PI)); arm.rotation.set(-.1, 0, arm.side * .12); arm.fore.rotation.set(-.15 - 1.9 * c, 0, 0); }
+    if (pose === 'punch') { for (const arm of this.arms) { const jab = Math.max(0, Math.sin(time * 7 + (arm.side > 0 ? 0 : Math.PI))); arm.rotation.set(-1.25 - jab * .3, 0, arm.side * (.35 - jab * .3)); arm.fore.rotation.set(-1.6 + jab * 1.55, 0, 0); }
+      this.torso.rotation.y = Math.sin(time * 7) * .18; for (const leg of this.legs) leg.rotation.set(leg.side * .25, 0, leg.side * .1); }
+    if (pose === 'pedal') { for (const leg of this.legs) { const c = Math.sin(time * 7 + (leg.side > 0 ? 0 : Math.PI)); leg.rotation.set(-1.05 + c * .35, 0, 0); leg.shin.rotation.set(1.35 - c * .3, 0, 0); }
+      for (const arm of this.arms) { arm.rotation.set(-1.1, 0, arm.side * .12); arm.fore.rotation.set(-.35, 0, 0); } this.torso.rotation.x = .35; }
+    if (pose === 'row') { const pull = s; this.torso.rotation.x = -.35 + .7 * (1 - pull);
+      for (const arm of this.arms) { arm.rotation.set(-1.4 + pull * .9, 0, arm.side * .12); arm.fore.rotation.set(-1.7 * pull, 0, 0); }
+      for (const leg of this.legs) { leg.rotation.set(-1.4 + pull * .9, 0, 0); leg.shin.rotation.set(2 - pull * 1.6, 0, 0); } }
   }
   // Emote animations, layered over the base pose. Arm rotation z = side * angle raises an arm outward.
   emote(pose, time, reduced) {
@@ -335,6 +352,7 @@ export class World3D extends World {
   }
   toilet(x, z) { this.toilets.next().position.set(x, 0, z); }
   human(x, z, skin, o = {}) {
+    if (o.pose === 'run') o = { ...o, pose: null, walk: true, gait: performance.now() / 1000 * 11 };
     if (o.pose === 'sit' || o.pose === 'work') { const f = this.seatAt(x, z); if (f != null) o = { ...o, heading: f }; }
     const f = this.figures.next(); o = { hair: '#2b211c', style: 'curls', outfit: '#8ea9a4', pants: '#34435e', shoes: '#f4f1ea', gait: this.gait, ...o };
     f.apply(x, z, skin, o, performance.now() / 1000, this.reduced);

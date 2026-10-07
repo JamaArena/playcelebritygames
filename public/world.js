@@ -18,7 +18,7 @@ const OPEN_RIDES=['bicycle','motorbike','okada','scooter'];
 // Where the parrot's perch stands at home.
 const PERCH=[3.4,-1.6];
 // The 2D view approximates emotes with its existing poses.
-const EMOTE_2D={wave:'gesture',victory:'gesture',selfie:'gesture',facepalm:'gesture',dance:'perform',shoki:'perform',laugh:'chat',cry:'chat',scroll:'chat',sitFloor:'sit'};
+const EMOTE_2D={squat:'sport',press:'gesture',curl:'gesture',punch:'gesture',pedal:'sit',row:'sit',wave:'gesture',victory:'gesture',selfie:'gesture',facepalm:'gesture',dance:'perform',shoki:'perform',laugh:'chat',cry:'chat',scroll:'chat',sitFloor:'sit'};
 // What a character does when a need runs critically low (see MISHAPS in content.js).
 const MISHAP_POSES={bladder:'pee',hunger:'faint',energy:'doze',hygiene:'stink',fun:'chat',social:'gesture'};
 const MISHAP_LINES={bladder:'Oh no… not here 💦',hunger:'😵 Everything’s spinning…',energy:'💤 zzz…',hygiene:'🤢 Is that smell… me?',fun:'📱 Going live at 3am!!',social:'🪴 You get me, Fern.'};
@@ -53,7 +53,7 @@ const REGULARS={
   tvStation:[{career:'actor',x:-1,z:-2.8,heading:0,pose:'gesture'},{career:'developer',x:-3,z:-.1,heading:Math.PI,pose:'chat'},{career:'vlogger',x:-1.5,z:3.4,heading:Math.PI,pose:'sit',seat:.6}],
   radio:[{career:'musician',x:0,z:-3.6,heading:Math.PI,pose:'gesture'}],
   market:[{career:'musician',x:-3.4,z:-2.1,heading:Math.PI,pose:'chat'},{career:'actor',x:3.4,z:1.9,heading:0,pose:'gesture'},{career:'vlogger',x:-1,z:2.8,heading:2.6},{career:'football',x:1.6,z:-1.5,heading:-1.2}],
-  gym:[{career:'football',x:1.8,z:-3.6,heading:Math.PI,pose:'sport'},{career:'wrestling',x:-3.5,z:1.5,heading:0,pose:'sport'},{career:'tennis',x:-1.8,z:-3.6,heading:Math.PI,pose:'sport'}],
+  gym:[{career:'football',x:1.8,z:-3.6,heading:Math.PI,pose:'run'},{career:'wrestling',x:-3.5,z:1.5,heading:0,pose:'press'},{career:'tennis',x:-1.8,z:-3.6,heading:Math.PI,pose:'run'}],
   hospital:[{career:'developer',x:-3,z:1.8,heading:Math.PI,pose:'chat'},{career:'actor',x:1.9,z:3.6,heading:Math.PI,pose:'sit',seat:.5},{career:'founder',x:0,z:-3.6,heading:0,pose:'sleep'}],
   worship:[{career:'musician',x:-2.4,z:0,heading:Math.PI,pose:'sit',seat:.5},{career:'founder',x:2.4,z:1.4,heading:Math.PI,pose:'sit',seat:.5},{career:'actor',x:0,z:-3.6,heading:0,pose:'gesture'}],
   eventHall:[{career:'musician',x:-.8,z:.6,heading:.5,pose:'shoki'},{career:'actor',x:.9,z:-.5,heading:-.5,pose:'dance'},{career:'founder',x:-3.5,z:-1.05,heading:0,pose:'sit',seat:.5},{career:'vlogger',x:3.5,z:2.95,heading:Math.PI,pose:'sit',seat:.5}],
@@ -105,7 +105,7 @@ export const worldObjects = (location,furniture=[],owned=[],home) => ({
   radio:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.albumRelease.name,icon:VENUE_ACTS.albumRelease.icon,x:0.4,z:-1.2,act:'albumRelease',face:3.1416},{name:VENUE_ACTS.airplay.name,icon:VENUE_ACTS.airplay.icon,x:-1.2,z:-2.4,act:'airplay',face:3.1416},{name:VENUE_ACTS.callIn.name,icon:VENUE_ACTS.callIn.icon,x:1.8,z:-2.4,act:'callIn',face:3.1416}],
   market:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.tailor.name,icon:VENUE_ACTS.tailor.icon,x:-3.4,z:-1.9,act:'tailor',face:3.1416},{name:VENUE_ACTS.bukka.name,icon:VENUE_ACTS.bukka.icon,x:0,z:2.4,act:'bukka',face:3.1416},{name:VENUE_ACTS.stalls.name,icon:VENUE_ACTS.stalls.icon,x:0,z:-0.6,act:'stalls',face:3.1416},{name:VENUE_ACTS.snack.name,icon:VENUE_ACTS.snack.icon,x:3,z:2.2,act:'snack',face:3.1416}],
   gym:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.workout.name,icon:VENUE_ACTS.workout.icon,x:0,z:-1,act:'workout',face:3.1416},
-    ...[[3.6,'treadmillRun',-2.6,Math.PI,3.6,-3.45],[2.9,'benchPress',1.7,0,3.5,1.7],[-3.7,'dumbbells',-.8,-Math.PI/2],[3.15,'squats',-.6,-Math.PI/2,3.6,-.6],[-3.15,'spinBike',3.45,0,-3.8,3.45],[3.1,'punchBag',3.1,Math.PI/4],[2.75,'rower',4.1,Math.PI,2,4.05],[.8,'stretch',1.5,0],[4.05,'gymWater',-2.3,Math.PI/2]].map(([x,act,z,face,vx=x,vz=z])=>({name:VENUE_ACTS[act].name,icon:VENUE_ACTS[act].icon,x,z,vx,vz,act,face}))],
+    ...[...[-3.6,-1.8,0,1.8,3.6].map(tx=>[tx,'treadmillRun',-2.6,Math.PI,tx,-3.45]),[2.9,'benchPress',1.7,0,3.5,1.7],[-2.9,'benchPress',1.7,0,-3.5,1.7],[-3.7,'dumbbells',-.8,-Math.PI/2],[3.15,'squats',-.6,-Math.PI/2,3.6,-.6],[-3.15,'spinBike',3.2,0,-3.8,3.45],[-2.05,'spinBike',3.2,0,-2.6,3.45],[3.1,'punchBag',3.1,Math.PI/4],[2.75,'rower',4.1,Math.PI,2,4.05],[.8,'stretch',1.5,0],[4.05,'gymWater',-2.3,Math.PI/2]].map(([x,act,z,face,vx=x,vz=z])=>({key:`${act}@${vx},${vz}`,name:VENUE_ACTS[act].name,icon:VENUE_ACTS[act].icon,x,z,vx,vz,act,face}))],
   hospital:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.volunteer.name,icon:VENUE_ACTS.volunteer.icon,x:-1.2,z:-1.4,act:'volunteer',face:3.1416},{name:VENUE_ACTS.checkup.name,icon:VENUE_ACTS.checkup.icon,x:2.6,z:-2.4,act:'checkup',face:0}],
   worship:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.reflect.name,icon:VENUE_ACTS.reflect.icon,x:0,z:1.2,act:'reflect',face:3.1416}],
   eventHall:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.awardShow.name,icon:VENUE_ACTS.awardShow.icon,x:-3.5,z:2.95,act:'awardShow',face:3.1416},{name:VENUE_ACTS.tourHall.name,icon:VENUE_ACTS.tourHall.icon,x:0,z:-3.5,act:'tourHall',face:0},{name:VENUE_ACTS.titleBelt.name,icon:VENUE_ACTS.titleBelt.icon,x:-1.6,z:-2.6,act:'titleBelt',face:0},{name:VENUE_ACTS.owambe.name,icon:VENUE_ACTS.owambe.icon,x:0,z:0,act:'owambe',face:3.1416}],
@@ -392,6 +392,7 @@ export class World {
   walls(h,toneZ,toneX,edge=5.35,t=.18){const c=Math.cos(this.angle),s=Math.sin(this.angle),stub=.18;
     this.box(0,-edge,11,t,c>0?h:stub,toneZ);this.box(0,edge,11,t,c<0?h:stub,toneZ);this.box(-edge,0,t,11,s>0?h:stub,toneX);this.box(edge,0,t,11,s<0?h:stub,toneX);}
   human(x,z,skin,{hair='#2b211c',style='curls',outfit='#8ea9a4',pants='#34435e',shoes='#f4f1ea',walk=false,pose=null,heading=0,gait=this.gait,smile=1,build='average',height='average'}={}){
+    if(pose==='run'){pose=null;walk=true;gait=performance.now()/1000*11;}
     pose=EMOTE_2D[pose]||pose;if(pose==='sit'||pose==='work'){const f=this.seatAt(x,z);if(f!=null)heading=f;}
     // Build widens or narrows the body (hips and shoulders separately); height stretches standing poses.
     const ctx=this.ctx,shape=BUILDS[build]||BUILDS.average,W=shape.w,H=shape.hip,S=shape.shoulders||W;
@@ -679,7 +680,7 @@ export class World {
     let mishap=this.freshMishap(),need=using||this.state.recovery?.act?null:this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=(usedDef?usedDef.pose||'watch':null)||(mishap&&!need?MISHAP_POSES[mishap.need]:null)||({energy:'sleep',fun:this.state.recovery?.yacht?'dance':this.pose?.kind==='sit'?'sit':'tv',hygiene:'shower',bladder:'toilet',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
     const emote=this.emote&&performance.now()<this.emote.until&&!this.moving&&!this.state.recovery&&!this.state.active?this.emote.kind:null;
     if(emote&&!using)pose=EMOTES[emote]?.pose||emote;
-    const actDef=this.state.recovery?.act&&VENUE_ACTS[this.state.recovery.act],actSpot=actDef&&worldObjects(this.location).find(o=>o.act===this.state.recovery.act);if(actDef)pose=actDef.pose;
+    const actDef=this.state.recovery?.act&&VENUE_ACTS[this.state.recovery.act],actSpot=actDef&&(this.actAt?.act===this.state.recovery.act?this.actAt:worldObjects(this.location).find(o=>o.act===this.state.recovery.act));if(actDef)pose=actDef.pose;
     const roomSpot=this.state.recovery?.spot&&this.location==='home'&&!this.visitedHome?homeRooms(this.state.home).find(r=>r.slot===this.state.recovery.spot)?.object:null;if(roomSpot)pose=roomSpot.pose;
     if(this.state.recovery?.yacht){pose='dance';}
     const pos=roomSpot?{x:roomSpot.vx,z:roomSpot.vz}:actSpot?{x:actSpot.vx??actSpot.x,z:actSpot.vz??actSpot.z}:this.state.recovery?.yacht?{x:4,z:7.1}:usedSpot?.face!=null?{x:usedSpot.x,z:usedSpot.z}:usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
@@ -991,6 +992,7 @@ export class World {
     // Only a tap on the object itself opens it; anywhere else is a walk.
     const object=[...this.hits].sort((a,b)=>Math.hypot(a.screen.x-x,a.screen.y-y)-Math.hypot(b.screen.x-x,b.screen.y-y)).find(o=>Math.hypot(o.screen.x-x,o.screen.y-y)<this.hitRadius);
     if(object){this.onObject(object);return;}
+    if(this.interior()){const p=this.unproject(x,y),near=[...this.hits].filter(o=>o.act||o.need||o.useItem||o.pose||o.action==='career'||o.action==='practice').map(o=>({o,d:Math.hypot((o.vx??o.x)-p.x,(o.vz??o.z)-p.z)})).sort((a,b)=>a.d-b.d)[0];if(near&&near.d<.95){this.onObject(near.o);return;}}
     this.onGround?.();const point=this.unproject(x,y),here=TOWN[this.location]||TOWN.home,lot=lotAt(point.x+here.x,point.z+here.z);
     if(lot&&lot!==this.location&&!this.interior()){this.onObject({travel:lot});return;}
     this.walk(point.x,point.z);

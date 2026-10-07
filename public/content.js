@@ -86,7 +86,7 @@ export const ITEMS = {
   gamingConsole: {name: 'Gaming console', fame: 400, description: 'Big fun, a little tiring.', furniture: true, use: {verb: 'Play games', icon: '🎮', need: 'fun', amount: 40, ms: 60_000, pose: 'work', seat: .4, extra: {energy: -5}}},
   soundSystem: {name: 'Sound system', fame: 500, description: 'Turn it up and dance.', furniture: true, use: {verb: 'Dance', icon: '🔊', need: 'fun', amount: 35, ms: 45_000, pose: 'perform', extra: {energy: -5}}},
   aquarium: {name: 'Aquarium', fame: 600, description: 'Calming fish to watch.', furniture: true, use: {verb: 'Watch the fish', icon: '🐠', need: 'fun', amount: 12, ms: 20_000, pose: null}},
-  treadmill: {name: 'Treadmill', fame: 800, description: 'Run at home: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Run', icon: '🏃', need: 'fun', amount: 20, ms: 40_000, pose: 'sport', onItem: true, extra: {energy: -10, hygiene: -15}}},
+  treadmill: {name: 'Treadmill', fame: 800, description: 'Run at home: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Run', icon: '🏃', need: 'fun', amount: 20, ms: 40_000, pose: 'run', onItem: true, extra: {energy: -10, hygiene: -15}}},
   // Home extensions, built on the lawn around your house. Tap them at home to use them.
   garden: {name: 'Garden', fame: 300, description: 'Vegetable beds and flowers to tend.', extension: {x: -6.6, z: 6.4, face: 3.1416}, use: {verb: 'Tend the garden', icon: '🌱', need: 'fun', amount: 20, ms: 30_000, pose: 'water', extra: {hunger: 10}}},
   terrace: {name: 'Rooftop terrace', fame: 800, description: 'A deck with lights for hangouts.', extension: {x: -7.6, z: -1.6, face: 1.5708}, use: {verb: 'Hang out on the terrace', icon: '🌇', need: 'fun', amount: 25, ms: 40_000, pose: 'sit', seat: .45, extra: {social: 10}}},
@@ -115,7 +115,7 @@ export const ITEMS = {
   bathtub: {name: 'Bathtub', fame: 700, description: 'Slower than a shower, but relaxing.', furniture: true, use: {verb: 'Take a bath', icon: '🛁', need: 'hygiene', amount: 60, ms: 60_000, pose: 'sitFloor', onItem: true, extra: {fun: 10}}},
   studioMic: {name: 'Mic', fame: 800, description: 'Record at home. Musicians train as they record.', furniture: true, use: {verb: 'Record vocals', icon: '🎙️', need: 'fun', amount: 15, ms: 40_000, pose: 'perform', learn: {family: 'music', points: 6}}},
   trophyCabinet: {name: 'Trophy cabinet', fame: 1500, description: 'Shows off the awards you have won.', furniture: true, use: {verb: 'Admire your trophies', icon: '🏆', need: 'fun', amount: 10, ms: 10_000, pose: null}},
-  weights: {name: 'Weight bench', fame: 1000, description: 'Lift weights: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Lift weights', icon: '🏋️', need: 'fun', amount: 20, ms: 40_000, pose: 'sport', extra: {energy: -10, hygiene: -15}}},
+  weights: {name: 'Weight bench', fame: 1000, description: 'Lift weights: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Lift weights', icon: '🏋️', need: 'fun', amount: 20, ms: 40_000, pose: 'press', extra: {energy: -10, hygiene: -15}}},
 };
 // The wardrobe: clothes and accessories by slot. Each unlocks with fame (claimed free at Palm Boutique,
 // Palm plaza) and most carry one perk. Wearing changes how you look; perks change the rules a little.
@@ -331,7 +331,7 @@ export const VENUE_ACTS = {
   tourStadium: {venue: 'stadium', name: 'Tour stop: stadium show', icon: '🎤', need: 'fun', amount: 25, ms: 75_000, extra: {energy: -15}, pose: 'perform', family: 'music', tour: true},
   stalls: {venue: 'market', name: 'Browse the stalls', icon: '🧺', need: 'fun', amount: 15, ms: 30_000, extra: {social: 10}, pose: 'chat', groceries: 5},
   snack: {venue: 'market', name: 'Buy puff-puff', icon: '🍩', need: 'hunger', amount: 20, ms: 15_000, extra: {fun: 5}, pose: 'chat'},
-  workout: {venue: 'gym', name: 'Work out', icon: '🏋️', need: 'fun', amount: 15, ms: 45_000, extra: {energy: -12, hygiene: -15}, pose: 'sport', fitness: 1},
+  workout: {venue: 'gym', name: 'Work out', icon: '🏋️', need: 'fun', amount: 15, ms: 45_000, extra: {energy: -12, hygiene: -15}, pose: 'squat', fitness: 1},
   checkup: {venue: 'hospital', name: 'Get a check-up', icon: '🩺', need: 'energy', amount: 50, ms: 60_000, extra: {hunger: 25, hygiene: 20}, pose: 'sit', seat: .55},
   reflect: {venue: 'worship', name: 'Pray and reflect', icon: '🕊️', need: 'fun', amount: 15, ms: 45_000, extra: {social: 20}, pose: 'sit', seat: .48},
   owambe: {venue: 'eventHall', name: 'Party at an owambe', icon: '🎉', need: 'social', amount: 40, ms: 90_000, extra: {fun: 30, hunger: 15}, pose: 'shoki'},
@@ -346,14 +346,14 @@ export const VENUE_ACTS = {
 };
 // Gym equipment and things to do at the workplaces: anyone can use them.
 Object.assign(VENUE_ACTS, {
-  treadmillRun: {venue: 'gym', name: 'Run on the treadmill', icon: '🏃', need: 'fun', amount: 12, ms: 40_000, extra: {energy: -10, hygiene: -12}, pose: 'sport', fitness: 1},
-  benchPress: {venue: 'gym', name: 'Bench press', icon: '🏋️', need: 'fun', amount: 12, ms: 40_000, extra: {energy: -12, hygiene: -12}, pose: 'sport', fitness: 1},
-  squats: {venue: 'gym', name: 'Squats at the rack', icon: '🦵', need: 'fun', amount: 12, ms: 40_000, extra: {energy: -12, hygiene: -12}, pose: 'sport', fitness: 1},
-  dumbbells: {venue: 'gym', name: 'Dumbbell curls', icon: '💪', need: 'fun', amount: 10, ms: 30_000, extra: {energy: -8, hygiene: -8}, pose: 'sport', fitness: 1},
-  spinBike: {venue: 'gym', name: 'Spin bike', icon: '🚴', need: 'fun', amount: 14, ms: 40_000, extra: {energy: -10, hygiene: -12}, pose: 'sit', fitness: 1},
-  punchBag: {venue: 'gym', name: 'Hit the punching bag', icon: '🥊', need: 'fun', amount: 16, ms: 30_000, extra: {energy: -10, hygiene: -10}, pose: 'sport', fitness: 1},
-  rower: {venue: 'gym', name: 'Rowing machine', icon: '🚣', need: 'fun', amount: 12, ms: 40_000, extra: {energy: -10, hygiene: -12}, pose: 'sit', fitness: 1},
-  stretch: {venue: 'gym', name: 'Stretch on the mat', icon: '🧘', need: 'fun', amount: 8, ms: 25_000, extra: {energy: 4}, pose: 'sit'},
+  treadmillRun: {venue: 'gym', name: 'Run on the treadmill', icon: '🏃', need: 'fun', amount: 12, ms: 40_000, extra: {energy: -10, hygiene: -12}, pose: 'run', fitness: 1},
+  benchPress: {venue: 'gym', name: 'Bench press', icon: '🏋️', need: 'fun', amount: 12, ms: 40_000, extra: {energy: -12, hygiene: -12}, pose: 'press', fitness: 1},
+  squats: {venue: 'gym', name: 'Squats at the rack', icon: '🦵', need: 'fun', amount: 12, ms: 40_000, extra: {energy: -12, hygiene: -12}, pose: 'squat', fitness: 1},
+  dumbbells: {venue: 'gym', name: 'Dumbbell curls', icon: '💪', need: 'fun', amount: 10, ms: 30_000, extra: {energy: -8, hygiene: -8}, pose: 'curl', fitness: 1},
+  spinBike: {venue: 'gym', name: 'Spin bike', icon: '🚴', need: 'fun', amount: 14, ms: 40_000, extra: {energy: -10, hygiene: -12}, pose: 'pedal', fitness: 1},
+  punchBag: {venue: 'gym', name: 'Hit the punching bag', icon: '🥊', need: 'fun', amount: 16, ms: 30_000, extra: {energy: -10, hygiene: -10}, pose: 'punch', fitness: 1},
+  rower: {venue: 'gym', name: 'Rowing machine', icon: '🚣', need: 'fun', amount: 12, ms: 40_000, extra: {energy: -10, hygiene: -12}, pose: 'row', fitness: 1},
+  stretch: {venue: 'gym', name: 'Stretch on the mat', icon: '🧘', need: 'fun', amount: 8, ms: 25_000, extra: {energy: 4}, pose: 'sitFloor'},
   gymWater: {venue: 'gym', name: 'Grab some water', icon: '💧', need: 'energy', amount: 6, ms: 8_000, pose: 'chat'},
   juggle: {venue: 'sports', name: 'Juggle the ball', icon: '⚽', need: 'fun', amount: 10, ms: 25_000, extra: {energy: -5}, pose: 'sport', learn: 3, family: 'sport'},
   pitchWater: {venue: 'sports', name: 'Grab some water', icon: '💧', need: 'energy', amount: 6, ms: 8_000, pose: 'chat'},
