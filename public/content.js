@@ -344,6 +344,26 @@ export const VENUE_ACTS = {
   sunbathe: {venue: 'beach', name: 'Relax on the sand', icon: '🏖️', need: 'fun', amount: 30, ms: 45_000, extra: {energy: 5}, pose: 'sitFloor'},
   beachBall: {venue: 'beach', name: 'Beach football', icon: '⚽', need: 'fun', amount: 25, ms: 40_000, extra: {energy: -10, social: 10}, pose: 'sport', family: 'sport', learn: 3},
 };
+// Gym equipment and things to do at the workplaces: anyone can use them.
+Object.assign(VENUE_ACTS, {
+  treadmillRun: {venue: 'gym', name: 'Run on the treadmill', icon: '🏃', need: 'fun', amount: 12, ms: 40_000, extra: {energy: -10, hygiene: -12}, pose: 'sport', fitness: 1},
+  benchPress: {venue: 'gym', name: 'Bench press', icon: '🏋️', need: 'fun', amount: 12, ms: 40_000, extra: {energy: -12, hygiene: -12}, pose: 'sport', fitness: 1},
+  squats: {venue: 'gym', name: 'Squats at the rack', icon: '🦵', need: 'fun', amount: 12, ms: 40_000, extra: {energy: -12, hygiene: -12}, pose: 'sport', fitness: 1},
+  dumbbells: {venue: 'gym', name: 'Dumbbell curls', icon: '💪', need: 'fun', amount: 10, ms: 30_000, extra: {energy: -8, hygiene: -8}, pose: 'sport', fitness: 1},
+  spinBike: {venue: 'gym', name: 'Spin bike', icon: '🚴', need: 'fun', amount: 14, ms: 40_000, extra: {energy: -10, hygiene: -12}, pose: 'sit', fitness: 1},
+  punchBag: {venue: 'gym', name: 'Hit the punching bag', icon: '🥊', need: 'fun', amount: 16, ms: 30_000, extra: {energy: -10, hygiene: -10}, pose: 'sport', fitness: 1},
+  rower: {venue: 'gym', name: 'Rowing machine', icon: '🚣', need: 'fun', amount: 12, ms: 40_000, extra: {energy: -10, hygiene: -12}, pose: 'sit', fitness: 1},
+  stretch: {venue: 'gym', name: 'Stretch on the mat', icon: '🧘', need: 'fun', amount: 8, ms: 25_000, extra: {energy: 4}, pose: 'sit'},
+  gymWater: {venue: 'gym', name: 'Grab some water', icon: '💧', need: 'energy', amount: 6, ms: 8_000, pose: 'chat'},
+  juggle: {venue: 'sports', name: 'Juggle the ball', icon: '⚽', need: 'fun', amount: 10, ms: 25_000, extra: {energy: -5}, pose: 'sport', learn: 3, family: 'sport'},
+  pitchWater: {venue: 'sports', name: 'Grab some water', icon: '💧', need: 'energy', amount: 6, ms: 8_000, pose: 'chat'},
+  ...Object.fromEntries(['studio', 'creator', 'tech'].flatMap(v => [
+    [`${v}Sofa`, {venue: v, name: 'Chill on the sofa', icon: '🛋️', need: 'fun', amount: 12, ms: 30_000, pose: 'sit'}],
+    [`${v}Coffee`, {venue: v, name: 'Grab a coffee', icon: '☕', need: 'energy', amount: 10, ms: 15_000, pose: 'chat'}],
+    [`${v}Browse`, {venue: v, name: 'Use the spare workstation', icon: '🖥️', need: 'fun', amount: 8, ms: 20_000, pose: 'work', learn: 3}],
+    [`${v}Speakers`, {venue: v, name: 'Vibe to the big speakers', icon: '🔊', need: 'fun', amount: 10, ms: 25_000, pose: 'dance'}],
+  ])),
+});
 // Shops: tailor colours for your tops, and tattoo spots.
 export const TAILOR_COLORS = ['#e05a47', '#e8a23a', '#f2c230', '#2fae6b', '#3d9a7a', '#2f6fb3', '#7b4fa3', '#d9573f', '#111111', '#f4f2ee', '#c9a227', '#9b1b30'];
 export const TATTOOS = {arm: 'Upper-arm band', neck: 'Neck script', hand: 'Hand star'};
@@ -553,7 +573,7 @@ export function extensionSpot(key,home){
 export function obstacles(location, furniture=[], home) {
   const rects={
     home:[[-2.8,-4,4.2,1],[-.7,-4.25,.8,.9],[.5,-4.2,1.3,.8],[2.5,-3.5,1.95,2.5],[4.1,-4,.7,.65],[-3.6,1.5,1.2,3.2],[-1.7,1.5,1.2,1.5],[-2.8,4.4,2.9,.65],[4.1,3.2,.6,1.1],[2.55,2.7,.13,3.7],[.5,3,1.5,1.5],[.5,2.1,.7,.7],[.5,3.9,.7,.7]],
-    sports:[[-4.1,-3.6,1.9,2.2],[4.3,0,.9,5]],
+    sports:[[-4.1,-3.6,1.9,2.2],[4.3,0,.9,5],[4.5,3.9,.4,.4]],
     studio:[[-2.2,-3.3,3.6,1.35],[-2.2,-1.9,.6,.6],[-.7,3.5,2.2,1],[0,2.2,1.3,.9]],
     creator:[[-2.2,-3.3,3.6,1.35],[-2.2,-1.9,.6,.6],[-.7,3.5,2.2,1],[0,2.2,1.3,.9]],
     tech:[[-2.2,-3.3,3.6,1.35],[-2.2,-1.9,.6,.6],[-.7,3.5,2.2,1],[0,2.2,1.3,.9]],
@@ -564,7 +584,7 @@ export function obstacles(location, furniture=[], home) {
     tvStation:[[-1,-3.4,1.4,.6],[0,2.6,7,.7],[0,3.4,7,.7],[0,4.2,7,.7]],
     radio:[[0,-4.2,4,1],[3.6,2.6,1.6,.8]],
     market:[[-3.4,-3,2.2,1.2],[0,-3,2.2,1.2],[3.4,-3,2.2,1.2],[-3.4,1,2.2,1.2],[0,1.2,2.2,1.2],[3.4,1,2.2,1.2],[3,3,1.2,.8]],
-    gym:[[-3.6,-3.6,.7,1.4],[-1.8,-3.6,.7,1.4],[0,-3.6,.7,1.4],[1.8,-3.6,.7,1.4],[3.6,-3.6,.7,1.4]],
+    gym:[[-3.6,-3.6,.7,1.4],[-1.8,-3.6,.7,1.4],[0,-3.6,.7,1.4],[1.8,-3.6,.7,1.4],[3.6,-3.6,.7,1.4],[-3.5,1.5,.5,1.2],[3.5,1.5,.5,1.2],[-4.45,-.8,.6,1.8],[4.1,-.6,1.2,1],[-3.8,3.7,.5,.9],[-2.6,3.7,.5,.9],[3.6,3.6,.5,.5],[2,3.9,.6,1.4],[4.55,-2.3,.4,.4]],
     hospital:[[-2.6,-3.6,1,1.9],[0,-3.6,1,1.9],[-3,2.5,2.8,1]],
     worship:[[-2.4,-1.4,3,.6],[2.4,-1.4,3,.6],[-2.4,0,3,.6],[2.4,0,3,.6],[-2.4,1.4,3,.6],[2.4,2.8,3,.6],[-2.4,2.8,3,.6],[0,-4.4,2.5,1.1]],
     eventHall:[[-3.5,-2,1.3,1.3],[3.5,-2,1.3,1.3],[-3.5,2,1.3,1.3],[3.5,2,1.3,1.3],[0,3.6,1.3,1.3],[0,-4.4,5,1.2]],

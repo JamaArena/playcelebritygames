@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { WORK_SCENES } from './public/careerText.js';
 import { FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace, homeRooms, npcOpinion, OPINIONS, NPC_NAMES } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
@@ -200,7 +201,9 @@ const sport = key => CAREERS[key].family==='sport';
 function beat(s,a) {
   const c=s.careers[a.career],def=CAREERS[a.career];
   const i=a.beat;
-  const base={text:a.kind==='trial'?`Trial · ${def.beats[i%def.beats.length]}`:def.beats[i%def.beats.length],difficulty:Math.min(10,3+c.tier*2),pressure:.3+c.tier*.1, distance:[24,18,30,12,22,16][i%6],angle:.1,goalkeeper:5,defensive:a.career==='football'&&(a.possession==='opponent'||[2,4].includes(i))};
+  // Careers with a scene list draw a random situation each step (seeded per activity, so it stays put on refresh).
+  const scenes=WORK_SCENES[a.career],scene=scenes&&scenes[(Math.floor((a.seed||0)*997)+i*7)%scenes.length],line=scene?scene[0]:def.beats[i%def.beats.length];
+  const base={text:a.kind==='trial'?`Trial · ${line}`:line,difficulty:Math.min(10,3+c.tier*2),pressure:.3+c.tier*.1, distance:[24,18,30,12,22,16][i%6],angle:.1,goalkeeper:5,defensive:a.career==='football'&&(a.possession==='opponent'||[2,4].includes(i))};
   if(base.defensive)base.text='The opposition has possession. Protect the passing lane and win the ball back.';
   return base;
 }
@@ -219,7 +222,8 @@ export function choices(s) {
   if(a.career==='basketball')return [{label:'Jump shot · 3 points',skill:'shooting',risk:'risky',action:'shot',points:3},{label:'Drive to the hoop',skill:'handling',risk:'balanced',action:'drive',points:2},{label:'Pass to the open teammate',skill:'passing',risk:'safe',action:'pass',points:2}];
   if(a.career==='wrestling')return [{label:'Grapple',skill:'strength',risk:'balanced',action:'grapple'},{label:'Counter',skill:'technique',risk:'safe',action:'counter'},{label:a.opponentStamina<=30?'Signature move · pin attempt':'Signature move',skill:'technique',risk:'risky',action:'signature'},{label:'Work the crowd',skill:'charisma',risk:'safe',action:'crowd'}];
   const skill=a.kind==='launch'?def.skills[[2,1,0][i%3]] : a.career==='tennis'?['serve','forehand','backhand','footwork','serve','forehand'][i%6] : a.career==='musician'?['songwriting','technique','production'][i%3] : a.career==='adult'?['business','presentation','production'][i%3] : a.career==='streamer'?['engagement','production','commentary'][i%3] : def.skills[i%def.skills.length];
-  const labels = a.career==='musician' ? [
+  const workScenes=WORK_SCENES[a.career],workScene=workScenes&&workScenes[(Math.floor((a.seed||0)*997)+i*7)%workScenes.length];
+  const labels = workScene ? workScene[1] : a.career==='musician' ? [
     ['A familiar melody','An original chorus','A surprising key change'],['Simplify the passage','Record the planned take','Attempt a demanding run'],['Keep the mix simple','Balance the arrangement','Try a bold production idea']][i%3] : a.career==='developer'?[
     ['Reproduce the bug first','Trace the failing path','Refactor the affected module'],['Apply a focused repair','Add regression coverage','Rebuild the component'],['Explain a smaller scope','Deliver with documented tests','Propose a broader release']][i%3] : a.career==='adult'?[
     ['Sign the standard contract','Negotiate a bigger cut','Hold out for top billing'],['Keep it classy and teasing','Turn up the heat','Go bold and leave them breathless'],['Reschedule and keep it professional','Rework the scene with the crew','Improvise a sizzling solo set']][i%3] : ['Use a proven approach','Commit to your own approach','Try an ambitious approach'];

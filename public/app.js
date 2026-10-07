@@ -3,6 +3,7 @@ import { World, worldObjects } from './world.js';
 import { World3D } from './world3d.js';
 import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS } from './sound.js';
 import { OPINIONS } from './content.js';
+import { skillName, learnLine } from './careerText.js';
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=value=>Math.floor(value).toLocaleString();
@@ -44,14 +45,17 @@ function rewardsBetween(a,b){
   if(fame>0)out.push({gem:'gold',icon:'⭐',value:`+${fmt(fame)}`,label:'Fame'});
   if(xp>0)out.push({gem:'blue',icon:'💎',value:`+${fmt(xp)}`,label:'Skill XP'});
   if(fans>0)out.push({gem:'pink',icon:'👥',value:`+${fmt(fans)}`,label:'Fans'});
-  for(const [k,c] of Object.entries(b.careers||{}))for(const [skill,v] of Object.entries(c.skills))if(v.level>(a.careers?.[k]?.skills?.[skill]?.level??v.level))out.push({gem:'green',icon:'⬆️',value:`Level ${v.level}`,label:skill});
+  for(const [k,c] of Object.entries(b.careers||{}))for(const [skill,v] of Object.entries(c.skills))if(v.level>(a.careers?.[k]?.skills?.[skill]?.level??v.level))out.push({gem:'green',icon:'⬆️',value:`Level ${v.level}`,label:skillName(k,skill)});
   for(const award of (b.awards||[]).slice((a.awards||[]).length))out.push({gem:'purple',icon:awardIcon(award.name),value:'Unlocked!',label:award.name});
   return out;
 }
 function celebrate(a,b){
   const made=(b.outputs||[]).find(o=>!(a.outputs||[]).some(p=>p.id===o.id)),practised=a.active?.kind==='practice'&&!b.active,moment=a.recovery?.act&&!b.recovery,award=(b.awards||[]).length>(a.awards||[]).length,rewards=rewardsBetween(a,b);
   if((made||practised||moment||award)&&rewards.length){
-    const why=made?`${made.title||'Your work'} is out!`:practised?`${a.active.skill} practice complete`:moment?`${VENUE_ACTS[a.recovery.act]?.name||'Done'}`:'A new achievement';
+    // Say what you learnt: a line for the skill that grew the most.
+    let grew=null,most=0;for(const [k,c] of Object.entries(b.careers||{}))for(const [skill,v] of Object.entries(c.skills)){const before=a.careers?.[k]?.skills?.[skill],gain=xpOf({skills:{x:v}})-xpOf({skills:{x:before||v}});if(gain>most){most=gain;grew=[k,skill];}}
+    const learnt=grew?learnLine(grew[0],grew[1])+'!':null;
+    const why=learnt||(made?`${made.title||'Your work'} is out!`:practised?`${skillName(a.active.career,a.active.skill)} practice complete`:moment?`${VENUE_ACTS[a.recovery.act]?.name||'Done'}`:'A new achievement');
     showReward(CHEERS[Math.floor(Math.random()*CHEERS.length)],why,rewards);return;
   }
   if(a.recovery&&!b.recovery){const n=a.recovery.need,gained=Math.round((b.needs[n]||0)-(a.needs[n]||0));if(gained>0){floatReward(`${needs[n][1]} +${gained} ${needs[n][0]}`);return;}}
@@ -165,7 +169,7 @@ const onWorldObject=object=>{
   if((object.action==='practice'||object.action==='career')&&state.location!=='home'&&state.location!==def.location){pie(object,[[`📍 ${escape(LOCATIONS[def.location].name)} <small>for ${escape(def.name)}</small>`,'travel',`data-location="${def.location}"`],['🚶 Go here','goObject']]);toast(`${object.name} isn’t used by ${def.name.toLowerCase()}s. Your venue is ${LOCATIONS[def.location].name}.`);return;}
   if(object.action==='practice'){
     if(state.location==='home'&&!state.inventory.gear){pie(object,[['📍 Practise at venue','travel',`data-location="${def.location}"`],['🛒 Buy equipment','travel','data-location="plaza"']]);return;}
-    pie(object,def.skills.map(skill=>[`🎯 ${escape(skill)} <small>Lv ${c.skills[skill].level}</small>`,'startPractice',`data-skill="${escape(skill)}"`]));return;
+    pie(object,def.skills.map(skill=>[`🎯 ${escape(skillName(state.career,skill))} <small>Lv ${c.skills[skill].level}</small>`,'startPractice',`data-skill="${escape(skill)}"`]));return;
   }
   if(object.action==='career'){const kind=['founder','web3'].includes(state.career)?'build':'produce';pie(object,[[`${def.icon} ${escape(def.output)} <small>⚡ 1</small>`,'quickStart',`data-kind="${kind}"`],['📝 Plan it first','prepareDetails',`data-kind="${kind}"`],['🚶 Go here','goObject']]);return;}
   if(object.action==='shop'){pie(object,[['🛍️ Browse shop','page','data-page="shop"'],['👗 Palm Boutique','page','data-page="wardrobe"'],['🚶 Go here','goObject']]);return;}
@@ -282,13 +286,13 @@ function renderActivity(){
   const a=state.active,r=state.recovery,def=CAREERS[state.career],t=state.trip;let html='';
   if(t)html='<div class="sim-status"><span>'+(RIDES[t.ride]?.icon||TRANSIT[t.ride]?.icon||'🚶')+'</span><strong>'+tripVerb(t.ride)+' to '+escape(LOCATIONS[t.to].name)+'</strong><time>'+duration(t.arrives-now())+'</time></div>'+progress(t.departs,t.arrives);
   else if(r){const start=r.startedAt??r.endsAt-B.recovery[r.need][1],gained=Math.round(B.recovery[r.need][0]*Math.min(1,Math.max(0,(now()-start)/(r.endsAt-start))));html='<div class="sim-status"><span>'+(r.watch?'📺':needs[r.need][1])+'</span><strong>'+escape(r.label)+'</strong><small>+'+gained+' '+escape(needs[r.need][0])+(r.watch?.learn?` · ${r.watch.given||0}/5 insights`:r.watch?' · just for fun (learning cooldown)':'')+'</small>'+button('Get up','getUp','','secondary')+'</div>'+progress(start,r.endsAt);}
-  else if(a?.kind==='practice')html='<div class="sim-status"><span>'+def.icon+'</span><strong>'+escape(a.skill)+'</strong><small>+7 XP</small><time>'+duration(a.readyAt-now())+'</time>'+button('×','cancel','aria-label="Cancel practice"','tray-close')+'</div>'+progress(a.startedAt,a.readyAt);
+  else if(a?.kind==='practice')html='<div class="sim-status"><span>'+def.icon+'</span><strong>'+escape(skillName(a.career,a.skill))+'</strong><small>+7 XP</small><time>'+duration(a.readyAt-now())+'</time>'+button('×','cancel','aria-label="Cancel practice"','tray-close')+'</div>'+progress(a.startedAt,a.readyAt);
   else if(a){
     const waiting=now()<a.readyAt,complete=a.beat>=a.totalBeats;
     html='<div class="sim-status"><span>'+def.icon+'</span><strong>'+escape(a.title)+'</strong><small>'+Math.min(a.beat+1,a.totalBeats)+' / '+a.totalBeats+'</small>'+(waiting?'<time>'+duration(a.readyAt-now())+'</time>':'')+button('×','cancel','aria-label="Cancel activity"','tray-close')+'</div>';
     if(waiting)html+=progress(a.readyAt-a.interval,a.readyAt);
     else if(complete)html+=button('🎁 Collect result','finish','data-id="'+a.id+'"','primary');
-    else html+='<div class="sim-choices">'+a.choices.map((choice,index)=>button('<b>'+(({shoot:'⚽',shot:'🎯',pass:'➜',dribble:'↝',tackle:'↘',intercept:'✋',mark:'◎',drive:'↝',general:['💡','✨','⚡'][index%3],stop:'■'})[choice.action]||def.icon)+'</b><span>'+escape(choice.label)+'</span><small>'+Math.round(choice.probability*100)+'%</small>','decision','data-index="'+index+'" data-beat="'+a.beat+'" data-id="'+a.id+'" title="'+escape(choice.skill)+' · '+escape(choice.risk)+'"','sim-choice')).join('')+'</div>';
+    else html+='<div class="sim-choices">'+a.choices.map((choice,index)=>button('<b>'+(({shoot:'⚽',shot:'🎯',pass:'➜',dribble:'↝',tackle:'↘',intercept:'✋',mark:'◎',drive:'↝',general:['💡','✨','⚡'][index%3],stop:'■'})[choice.action]||def.icon)+'</b><span>'+escape(choice.label)+'</span><small>'+Math.round(choice.probability*100)+'%</small>','decision','data-index="'+index+'" data-beat="'+a.beat+'" data-id="'+a.id+'" title="'+escape(skillName(a.career,choice.skill))+' · '+escape(choice.risk)+'"','sim-choice')).join('')+'</div>';
   }else html='<div class="idle-actions">'+button(def.icon+' '+(state.location===def.location?'Start work':'Go to work'),state.location===def.location?'prepare':'travel',state.location===def.location?'':'data-location="'+def.location+'"','primary')+button('🎯 Practise','practice')+'</div>';
   if(taskQueue.length)html+='<div class="task-queue"><small>Up next</small>'+taskQueue.map((t,i)=>button(`${escape(t.icon||'•')} ${escape(t.label)} <b aria-hidden="true">×</b>`,'unqueue',`data-index="${i}" aria-label="Remove ${escape(t.label)} from queue"`,'queue-chip')).join('')+'</div>';
   $('#activityCard').innerHTML=html;
@@ -361,7 +365,7 @@ function eta(key){const pref=state.travelMode||'own',mode=pref==='own'?(state.ri
 const tripVerb=ride=>!ride?'Walking':TRANSIT[ride]?`Taking a ${TRANSIT[ride].name.toLowerCase()}`:ride==='helicopter'?'Flying':ride==='bicycle'?'Cycling':'Driving';
 // How you travel: your own ride, walking, or public transport.
 function travelModes(){const mode=state.travelMode||'own',own=state.ride?`${RIDES[state.ride]?.icon||'🚗'} ${RIDES[state.ride]?.name||'Your ride'}`:'🚶 Walk';return '<div class="travel-modes"><strong>How you travel</strong><div>'+[['own',own],...(state.ride?[['walk','🚶 Walk']]:[]),...Object.entries(TRANSIT).map(([k,t])=>[k,`${t.icon} ${t.name}`])].map(([k,label])=>`<button class="chip ${k===mode?'on':''}" data-action="travelMode" data-mode="${k}">${escape(label)}</button>`).join('')+'</div></div>';}
-function practice(){const def=CAREERS[state.career];if(state.location==='home'&&!state.inventory.gear){showTray('🎯 Practise','<div class="tray-options">'+button('📍 Go to venue','travel','data-location="'+def.location+'"','primary')+button('🛒 Buy home equipment','travel','data-location="plaza"')+'</div>');return;}showTray('🎯 Practise','<div class="tray-options skills-options">'+def.skills.map(skill=>button(escape(skill)+' <small>Lv '+state.careers[state.career].skills[skill].level+'</small>','startPractice','data-skill="'+escape(skill)+'"')).join('')+'</div><small>⚡ 1 · '+duration(B.practiceMs)+' · +7 XP</small>');}
+function practice(){const def=CAREERS[state.career];if(state.location==='home'&&!state.inventory.gear){showTray('🎯 Practise','<div class="tray-options">'+button('📍 Go to venue','travel','data-location="'+def.location+'"','primary')+button('🛒 Buy home equipment','travel','data-location="plaza"')+'</div>');return;}showTray('🎯 Practise','<div class="tray-options skills-options">'+def.skills.map(skill=>button(escape(skillName(state.career,skill))+' <small>Lv '+state.careers[state.career].skills[skill].level+'</small>','startPractice','data-skill="'+escape(skill)+'"')).join('')+'</div><small>⚡ 1 · '+duration(B.practiceMs)+' · +7 XP</small>');}
 function prepare(kind){const def=CAREERS[state.career];kind??=['founder','web3'].includes(state.career)?'build':'produce';if(kind==='launch'||kind==='collab'){prepareDetails(kind);return;}showTray(def.icon+' '+def.output,'<div class="tray-options">'+button('▶ Start · ⚡ 1','quickStart','data-kind="'+kind+'"','primary')+button('Options','prepareDetails','data-kind="'+kind+'"')+'</div><small>'+duration(def.family==='sport'?B.sportMs:B.activityMs)+' · '+(def.family==='sport'?6:3)+' choices</small>');}
 function prepareDetails(kind){
   const def=CAREERS[state.career],c=state.careers[state.career];kind??=['founder','web3'].includes(state.career)?'build':'produce';
@@ -387,7 +391,7 @@ function outputs(list){return list.length?`<div class="v2-list">${list.slice(0,2
 function hero(avatar,title,chips=[],color='#ffffff33'){return `<div class="v2-hero"><div class="v2-avatar" style="--c:${color}">${avatar}</div><div><h2>${title}</h2><div class="v2-chips">${chips.filter(Boolean).map(c=>`<span class="v2-chip">${c}</span>`).join('')}</div></div></div>`;}
 function tiles(list){return `<div class="v2-tiles">${list.map(([icon,value,label])=>`<div class="v2-tile"><span>${icon}</span><strong>${value}</strong><small>${escape(String(label))}</small></div>`).join('')}</div>`;}
 function ring(value,center,label,attrs=''){const v=Math.max(0,Math.min(100,Math.round(value)));return `<button class="v2-ring" ${attrs} aria-label="${escape(label)} ${v} percent"><i style="--v:${v};--tone:hsl(${Math.round(v*1.2)} 55% 45%)"><b>${center}</b></i><small>${escape(label)}</small></button>`;}
-function skillRings(c){return `<div class="v2-rings">${Object.entries(c.skills).map(([key,sk])=>ring(sk.level===10?100:sk.level*10+sk.points/effort(sk.level)*10,`Lv ${sk.level}`,key)).join('')}</div>`;}
+function skillRings(c,career=state.career){return `<div class="v2-rings">${Object.entries(c.skills).map(([key,sk])=>ring(sk.level===10?100:sk.level*10+sk.points/effort(sk.level)*10,`Lv ${sk.level}`,skillName(career,key))).join('')}</div>`;}
 const awardIcon=name=>/champ|trophy|slam|belt|winner/i.test(name)?'🏆':/married/i.test(name)?'💍':/tour/i.test(name)?'🎤':/cover/i.test(name)?'📰':/fund/i.test(name)?'💼':/legacy/i.test(name)?'👋':/palm award/i.test(name)?'🏅':'⭐';
 
 async function recover(need){if(need==='social'){showTray('💬 Socialise','<div class="tray-options">'+button('💬 Chat','quickSocial')+button('📇 Contacts','page','data-page="phone"')+'</div>');return;}if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast(`${tripVerb(data.state.trip.ride)} home. Recover when you arrive.`);return;}}const object=worldObjects('home',state.furniture,Object.keys(state.inventory||{}),state.home).find(o=>o.need===need);if(object)world.onObject(object);}
