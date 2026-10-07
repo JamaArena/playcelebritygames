@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace, homeRooms } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -293,6 +293,12 @@ function settle(s,a,now) {
   if(contract&&qualifies)contract.delivered++;
   s.active=null;evaluate(s,a.career);log(s,`${a.title} completed · quality ${quality} · ${gain.toLocaleString('en-US')} ${def.audience} · +${fame} fame.`,now);
 }
+// Moving house: furniture standing where the new home has no floor goes into storage.
+function moveHome(s,home,now){
+  s.home=home;const kept=s.furniture.filter(f=>walkable('home',f.x,f.z,[],home)||Math.abs(f.x)<=4.8&&Math.abs(f.z)<=4.8);
+  if(kept.length<s.furniture.length)log(s,`📦 ${s.furniture.length-kept.length} piece${s.furniture.length-kept.length>1?'s':''} of furniture went into storage: your new place has no room for them.`,now);
+  s.furniture=kept;if(s.location==='home'&&!walkable('home',s.position3d?.x,s.position3d?.z,s.furniture,home))s.position3d={x:0,z:1};
+}
 export function act(s,input,now,rng=Math.random) {
   reconcile(s,now);
   if(s.trip)requireRule(!['travel','move','start','recover','buy','claim','place','upgrade','switch'].includes(input.type),`You're on the road to ${LOCATIONS[s.trip.to].name}. Hang tight until you arrive.`);
@@ -307,7 +313,7 @@ export function act(s,input,now,rng=Math.random) {
         const rain=weatherAt(now)==='rain'&&!NO_RAIN.includes(mode),jam=!NO_JAM.includes(mode)&&goSlowAt(now);if(rain)ms=Math.round(ms*1.2);if(jam)ms=Math.round(ms*1.4);s.trip={from:s.location,to:input.location,ride:mode==='walk'?null:mode,departs:now,arrives:now+ms,delays:[...(rain?['rain']:[]),...(jam?['go-slow']:[])]};log(s,`${mode==='walk'?'Walking':TRANSIT[mode]?`Taking a ${TRANSIT[mode].name.toLowerCase()}`:mode==='helicopter'?'Flying':mode==='bicycle'?'Cycling':'Driving'} to ${LOCATIONS[input.location].name} · ${Math.ceil(ms/60000)} min.${jam?' Go-slow on the road!':''}${rain?' Flooded streets slow you down.':''}`,now);break;}
       s.location=input.location;s.position3d=arrivalSpot(input.location);break;
     case 'move':
-      requireRule(walkable(s.location,input.x,input.z,s.visiting?[]:s.furniture),'That destination is blocked. Choose open ground.');
+      requireRule(walkable(s.location,input.x,input.z,s.visiting?[]:s.furniture,s.visiting?'mansion':s.home),'That destination is blocked. Choose open ground.');
       s.position3d={x:input.x,z:input.z};break;
     case 'start':start(s,input,now,rng);break;
     case 'decision': {
@@ -374,7 +380,9 @@ export function act(s,input,now,rng=Math.random) {
       else if(food&&s.groceries>0){s.groceries--;bonus=GROCERY.bonus;}
       if(food){s.recovery={id:id(),need:'hunger',label:`Eating ${food.name.toLowerCase()}`,startedAt:now,endsAt:now+Math.round(food.ms*rest),amount:food.hunger+bonus,extra:food.extra||{},food:input.food};break;}
       const ups=upgradesFor(s),sleep=input.need==='energy'?Math.max(.4,1-((perksFor(s).sleep||0)+(s.location==='home'&&!s.visiting?ups.sleep||0:0))/100):1,sofa=input.need==='fun'&&!watching&&s.location==='home'&&!s.visiting?ups.sofa||0:0;
-      s.recovery={id:id(),need:input.need,label:watching?WATCH[family].label:labels[input.need],startedAt:now,endsAt:now+Math.round((watching?WATCH_SESSION:B.recovery[input.need][1])*rest*sleep),watch,...(sofa?{amount:B.recovery.fun[0]+sofa}:{})};break;
+      // Features in a bigger home's extra rooms (guest bed, hot tub, cinema...) use their own label and pose.
+      const room=input.spot&&s.location==='home'&&!s.visiting?homeRooms(s.home).find(r=>r.slot===input.spot&&r.object.need===input.need):null;
+      s.recovery={id:id(),need:input.need,label:room?room.object.verb:watching?WATCH[family].label:labels[input.need],...(room?{spot:room.slot}:{}),startedAt:now,endsAt:now+Math.round((watching?WATCH_SESSION:B.recovery[input.need][1])*rest*sleep),watch,...(sofa?{amount:B.recovery.fun[0]+sofa}:{})};break;
     }
     // Wardrobe: claim clothes free at Palm Boutique (Palm plaza), then wear or take them off anywhere.
     case 'claimWear': {
@@ -490,9 +498,6 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(!s.active&&!s.recovery,'Finish or cancel your activity first.');
       if(def.gadget){requireRule(s.inventory[input.item],'Claim it first.');requireRule(!s.trip,'Wait until you arrive.');}
       else if(def.extension){requireRule(s.inventory[input.item],'Claim it first.');requireRule(s.location==='home'&&!s.visiting,'Your extensions are at home.');}
-      else if(def.extension){requireRule(s.inventory[input.item],'Claim it first.');requireRule(s.location==='home'&&!s.visiting,'Your extensions are at home.');}
-      else if(def.extension){requireRule(s.inventory[input.item],'Claim it first.');requireRule(s.location==='home'&&!s.visiting,'Your extensions are at home.');}
-      else if(def.extension){requireRule(s.inventory[input.item],'Claim it first.');requireRule(s.location==='home'&&!s.visiting,'Your extensions are at home.');}
       else{requireRule(s.location==='home'&&!s.visiting,'Use your items at home.');
       requireRule(s.inventory[input.item]&&s.furniture.some(f=>f.item===input.item),'Place that item at home first.');}
       requireRule(!(POWERED.includes(input.item)&&noPower(s,now)),'NEPA took light. Wait for power, or get a generator.');
@@ -511,7 +516,7 @@ export function act(s,input,now,rng=Math.random) {
     case 'equip':requireRule(s.inventory[input.item]&&ITEMS[input.item]?.slot,'You do not own usable equipment.');s.equipped[ITEMS[input.item].slot]=input.item;break;
     case 'place': {
       requireRule(s.location==='home'&&s.inventory[input.item]&&ITEMS[input.item]?.furniture,'Place your owned furniture at home.');
-      requireRule(canPlace(s.furniture,input.item,input.x,input.z),'That spot overlaps something or blocks a path. Try another (green means it fits).');
+      requireRule(canPlace(s.furniture,input.item,input.x,input.z,s.home),'That spot overlaps something or blocks a path. Try another (green means it fits).');
       requireRule(!s.furniture.some(f=>f.item!==input.item&&f.x===input.x&&f.z===input.z),'That position is occupied.');
       requireRule(s.recovery?.item!==input.item,'Finish using it first.');
       s.furniture=s.furniture.filter(f=>f.item!==input.item);s.furniture.push({item:input.item,x:input.x,z:input.z});break;
@@ -527,7 +532,7 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(s.location==='plaza','Visit Palm Motors at Palm plaza to claim sponsorships.');
       s.vip??={};requireRule(!s.vip[input.item],'You already claimed this sponsorship.');
       requireRule((s.fame||0)>=deal.fame,`${deal.sponsor} sponsors players with ${deal.fame.toLocaleString('en-US')} fame.`);
-      s.vip[input.item]={at:now};if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')s.home=input.item;else if(deal.kind==='style')s.equipped.clothes=input.item;
+      s.vip[input.item]={at:now};if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')moveHome(s,input.item,now);else if(deal.kind==='style')s.equipped.clothes=input.item;
       log(s,`${deal.sponsor} sponsorship claimed: ${deal.name}. Free, and yours to keep.`,now);break;
     }
     case 'talk': {
@@ -542,7 +547,7 @@ export function act(s,input,now,rng=Math.random) {
     }
     case 'useVip': {
       const deal=SPONSORSHIPS[input.item];requireRule(deal&&s.vip?.[input.item],'Claim this sponsorship first.');
-      if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')s.home=input.item;else s.equipped.clothes=input.item;break;
+      if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')moveHome(s,input.item,now);else s.equipped.clothes=input.item;break;
     }
     case 'switch':requireRule(CAREERS[input.career]&&!s.active&&!s.recovery,'Finish your activity and choose a valid career.');requireRule(input.career!=='adult'||input.adult===true,'Confirm an adult character.');if(!s.careers[input.career])s.careers[input.career]=newCareer(input.career,0);s.career=input.career;break;
     case 'acceptOffer': {

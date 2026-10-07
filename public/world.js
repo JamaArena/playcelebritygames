@@ -1,6 +1,6 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, VENUE_ACTS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
+import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, VENUE_ACTS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt, homeRooms, extensionSpot } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 // On the sofa you face the room; watching TV you sit at the end and turn toward the screen.
@@ -69,7 +69,7 @@ const REGULARS={
 };
 // The area kept clear while you train: [minX, maxX, minZ, maxZ].
 const TRAINING_ZONES={stadium:[-3.9,3.9,-4.4,4.4],sports:[-3.3,3.3,-4.3,4.3],studio:[1,4.7,-4.3,-.9],creator:[1,4.7,-4.3,-.9],tech:[1,4.7,-4.3,-.9]};
-export const worldObjects = (location,furniture=[],owned=[]) => ({
+export const worldObjects = (location,furniture=[],owned=[],home) => ({
   home:[
     {name:'Kitchen',icon:'♨',x:-3.6,z:-2.5,vx:-3.2,vz:-4,need:'hunger',verb:'Cook & eat'},
     {name:'Bed',icon:'☾',x:2.6,z:-1.8,vx:2.5,vz:-3.5,need:'energy',verb:'Sleep',pose:'sleep'},
@@ -88,12 +88,13 @@ export const worldObjects = (location,furniture=[],owned=[]) => ({
     {name:'Bedroom plant',icon:'❀',x:3.6,z:-1.2,vx:4.35,vz:-1.2,verb:'Water plant'},
     {name:'Work desk',icon:'⌘',x:.5,z:-3.1,vx:.5,vz:-4.2,action:'practice'},
     {name:'Front door',icon:'🚪',x:-4.6,z:3.6,vx:-5.1,vz:3.6,action:'exit'},
+    ...homeRooms(home).map(({object:o})=>({name:o.name,icon:o.icon,x:o.x,z:o.z,vx:o.vx,vz:o.vz,need:o.need,verb:o.verb,pose:o.pose,face:o.face,action:o.action,spot:o.spot})),
     ...furniture.map((f,i)=>{const def=ITEMS[f.item]||{},use=def.use;
       if(f.item==='chair')return {name:`Chair ${i+1}`,icon:'♙',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Sit',pose:'sit',furniture:f.item};
       if(f.item==='wardrobe')return {name:'Wardrobe',icon:'👗',x:f.x,z:f.z+.75,vx:f.x,vz:f.z,action:'wardrobe',furniture:f.item};
       if(use)return {name:def.name,icon:use.icon,x:f.x,z:f.z+.75,vx:f.x,vz:f.z,verb:use.verb,item:f.item,useItem:true,amount:use.amount,useNeed:use.need,furniture:f.item};
       return {name:f.item==='trophyShelf'?'Display table':def.name||'Display table',icon:'◇',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Admire',pose:null,furniture:f.item};}),
-    ...Object.entries(ITEMS).filter(([key,def])=>def.extension&&owned.includes(key)).map(([key,def])=>({name:def.name,icon:def.use.icon,x:def.extension.x,z:def.extension.z,verb:def.use.verb,item:key,useItem:true,remote:true,amount:def.use.amount,useNeed:def.use.need})),
+    ...Object.entries(ITEMS).filter(([key,def])=>def.extension&&owned.includes(key)).map(([key,def])=>({name:def.name,icon:def.use.icon,...extensionSpot(key,home),face:undefined,verb:def.use.verb,item:key,useItem:true,remote:true,amount:def.use.amount,useNeed:def.use.need})),
   ],
   nightclub:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.tourNightclub.name,icon:VENUE_ACTS.tourNightclub.icon,x:0,z:-3.4,act:'tourNightclub',face:0},{name:VENUE_ACTS.dance.name,icon:VENUE_ACTS.dance.icon,x:0,z:-0.4,act:'dance',face:0},{name:VENUE_ACTS.djSet.name,icon:VENUE_ACTS.djSet.icon,x:0,z:-2.9,act:'djSet',face:0},{name:VENUE_ACTS.bar.name,icon:VENUE_ACTS.bar.icon,x:-3.1,z:0.4,act:'bar',face:-1.5708}],
   lounge:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.fineDining.name,icon:VENUE_ACTS.fineDining.icon,x:2.3,z:1.2,act:'fineDining',face:0},{name:VENUE_ACTS.chill.name,icon:VENUE_ACTS.chill.icon,x:-3,z:2.3,act:'chill',face:3.1416},{name:VENUE_ACTS.karaoke.name,icon:VENUE_ACTS.karaoke.icon,x:0,z:-2.9,act:'karaoke',face:0},{name:VENUE_ACTS.network.name,icon:VENUE_ACTS.network.icon,x:2.4,z:-0.4,act:'network',face:0}],
@@ -139,18 +140,6 @@ const HOME_STYLES={
   duplex:{floor:['#b98b5e','#ad7f53'],walls:['#f2ece0','#ede6d8'],art:['#2a6f8f','#e07a5f'],rug:'#b8604a',trim:'#7a5a43'},
   beachHouse:{floor:['#efe3c4','#e6d8b5'],walls:['#e3f1f5','#dcecf1'],art:['#2bb3c0','#f2c230'],rug:'#7cc4d8'},
   penthouse:{floor:['#2f3237','#3a3d43'],walls:['#e9e9ec','#e2e2e6'],art:['#b23a48','#c9a227'],rug:'#1d1f22',chandelier:'#e8e8f0',trim:'#c9ccc8'},
-  studioFlat:{floor:['#d9d6d0','#cfccc5'],walls:['#e6e3dd','#dfdcd5']},
-  duplex:{floor:['#b98b5e','#ad7f53'],walls:['#f2ece0','#ede6d8'],art:['#2a6f8f','#e07a5f'],rug:'#b8604a',trim:'#7a5a43'},
-  beachHouse:{floor:['#efe3c4','#e6d8b5'],walls:['#e3f1f5','#dcecf1'],art:['#2bb3c0','#f2c230'],rug:'#7cc4d8'},
-  penthouse:{floor:['#2f3237','#3a3d43'],walls:['#e9e9ec','#e2e2e6'],art:['#b23a48','#c9a227'],rug:'#1d1f22',chandelier:'#e8e8f0',trim:'#c9ccc8'},
-  studioFlat:{floor:['#d9d6d0','#cfccc5'],walls:['#e6e3dd','#dfdcd5']},
-  duplex:{floor:['#b98b5e','#ad7f53'],walls:['#f2ece0','#ede6d8'],art:['#2a6f8f','#e07a5f'],rug:'#b8604a',trim:'#7a5a43'},
-  beachHouse:{floor:['#efe3c4','#e6d8b5'],walls:['#e3f1f5','#dcecf1'],art:['#2bb3c0','#f2c230'],rug:'#7cc4d8'},
-  penthouse:{floor:['#2f3237','#3a3d43'],walls:['#e9e9ec','#e2e2e6'],art:['#b23a48','#c9a227'],rug:'#1d1f22',chandelier:'#e8e8f0',trim:'#c9ccc8'},
-  studioFlat:{floor:['#d9d6d0','#cfccc5'],walls:['#e6e3dd','#dfdcd5']},
-  duplex:{floor:['#b98b5e','#ad7f53'],walls:['#f2ece0','#ede6d8'],art:['#2a6f8f','#e07a5f'],rug:'#b8604a',trim:'#7a5a43'},
-  beachHouse:{floor:['#efe3c4','#e6d8b5'],walls:['#e3f1f5','#dcecf1'],art:['#2bb3c0','#f2c230'],rug:'#7cc4d8'},
-  penthouse:{floor:['#2f3237','#3a3d43'],walls:['#e9e9ec','#e2e2e6'],art:['#b23a48','#c9a227'],rug:'#1d1f22',chandelier:'#e8e8f0',trim:'#c9ccc8'},
   mansion:{floor:['#f2ead6','#e3d3a9'],walls:['#f5ecd9','#f1e6cf'],art:['#7a1f2b','#2a4d69'],rug:'#7a1f2b',chandelier:'#d4af37',trim:'#c9a43a'},
 };
 // Background people are reshuffled each visit so the crowd looks different every time.
@@ -171,7 +160,7 @@ export class World {
         else if(!this.gesture.multi){const g=this.gesture;if(Math.hypot(event.clientX-g.startX,event.clientY-g.startY)>6)g.dragged=true;if(g.dragged){this.angleGoal=null;this.angle+=(event.clientX-previous.x)*.009;this.tilt(this.pitch+(event.clientY-previous.y)*.002);}}
         this.canvas.classList.toggle('dragging',this.gesture.dragged);this.draw();return;
       }
-      const r=canvas.getBoundingClientRect();if(this.placement){const point=this.unproject(event.clientX-r.left,event.clientY-r.top),p=this.placement,nx=Math.round(point.x*2)/2,nz=Math.round(point.z*2)/2;if(event.pointerType==='mouse'&&(p.x!==nx||p.z!==nz||!p.shown)){p.x=nx;p.z=nz;p.shown=true;this.onPlacement?.(canPlace(this.state.furniture,p.item,nx,nz));}}const near=list=>list?.find(p=>Math.hypot(p.screen.x-event.clientX+r.left,p.screen.y-event.clientY+r.top)<24);this.hover=event.pointerType==='mouse'?near(this.pins)||near(this.peopleHits)||near(this.houseHits)||this.hits?.find(o=>Math.hypot(o.screen.x-event.clientX+r.left,o.screen.y-event.clientY+r.top)<(this.hitRadius||24)):null;this.draw();
+      const r=canvas.getBoundingClientRect();if(this.placement){const point=this.unproject(event.clientX-r.left,event.clientY-r.top),p=this.placement,nx=Math.round(point.x*2)/2,nz=Math.round(point.z*2)/2;if(event.pointerType==='mouse'&&(p.x!==nx||p.z!==nz||!p.shown)){p.x=nx;p.z=nz;p.shown=true;this.onPlacement?.(canPlace(this.state.furniture,p.item,nx,nz,this.homeKey()));}}const near=list=>list?.find(p=>Math.hypot(p.screen.x-event.clientX+r.left,p.screen.y-event.clientY+r.top)<24);this.hover=event.pointerType==='mouse'?near(this.pins)||near(this.peopleHits)||near(this.houseHits)||this.hits?.find(o=>Math.hypot(o.screen.x-event.clientX+r.left,o.screen.y-event.clientY+r.top)<(this.hitRadius||24)):null;this.draw();
     });
     const endPointer=(event,cancelled=false)=>{if(!this.pointers.has(event.pointerId))return;const tap=this.pointers.size===1&&!this.gesture.dragged&&!this.gesture.multi&&!cancelled;this.pointers.delete(event.pointerId);if(!this.pointers.size){this.canvas.classList.remove('dragging');this.gesture=null;this.pinchDistance=0;}if(tap)this.click(event);};
     canvas.addEventListener('pointerup',event=>endPointer(event));canvas.addEventListener('pointercancel',event=>endPointer(event,true));
@@ -231,9 +220,14 @@ export class World {
   tripWalker(trip,p,serverNow,skin,look){this.human(p.x,p.z,skin,{...look,walk:true,heading:p.heading,gait:(serverNow-trip.departs)/1000*5});}
   tripPosition(trip,serverNow){const points=route(trip.from,trip.to,trip.ride==='helicopter'?'fly':trip.ride?'drive':'walk'),p=along(points,(serverNow-trip.departs)/(trip.arrives-trip.departs)),here=TOWN[this.location]||TOWN.home;return {...p,x:p.x-here.x,z:p.z-here.z};}
   focus(){if(this.state?.trip){const p=this.tripPosition(this.state.trip,Date.now()+(this.serverOffset||0)),f=this.focusBase();return {x:p.x+f.x*.3,z:p.z+f.z*.3};}return this.focusBase();}
-  focusBase(){const here=TOWN[this.location]||TOWN.home,t=this.interior()?0:Math.max(0,Math.min(1,(.9-this.zoom)/.65)),pan=this.pan||{x:0,z:0};return {x:-here.x*t+pan.x,z:(-14-here.z)*t+pan.z};}
+  focusBase(){const here=TOWN[this.location]||TOWN.home,t=this.interior()?0:Math.max(0,Math.min(1,(.9-this.zoom)/.65)),pan=this.pan||{x:0,z:0};
+    // In a bigger home the camera glides east with you into the extra rooms.
+    const rooms=this.location==='home'&&this.interior()&&!this.previewHome?homeRooms(this.homeKey()):[],px=(this.actor||this.player)?.x??0,goal=rooms.length&&px>4.5?Math.min(px,Math.max(...rooms.map(r=>r.x1))-2.5):0;
+    this.followX=(this.followX??goal)+(goal-(this.followX??goal))*.08;return {x:-here.x*t+pan.x+this.followX,z:(-14-here.z)*t+pan.z};}
   // Home is its own screen: an island with the house on it. Trips always show the open city.
   // Every place you enter is its own screen; the open city shows on your street, on trips and on the map.
+  // Whose home layout is showing: a preview, a friend's place you're visiting, or your own.
+  homeKey(){return this.previewHome||(this.visitedHome?this.visitedHome.home:this.state?.home);}
   interior(){return this.location!=='street'&&!this.state?.trip&&!this.overview;}
   project(x,y,z){const f=this.focusPoint||{x:0,z:0};return projectPoint(x-f.x,y,z-f.z,this);}
   unproject(x,y){const f=this.focusPoint||{x:0,z:0},p=groundPoint(x,y,this);return {x:p.x+f.x,z:p.z+f.z};}
@@ -475,12 +469,14 @@ export class World {
     if(l==='road'||l==='street'){}
     else if(l==='home'){
 
-      const style=HOME_STYLES[(this.visitedHome?this.visitedHome.home:this.state.home)||'apartment']||HOME_STYLES.apartment;
+      const homeKey=this.previewHome||(this.visitedHome?this.visitedHome.home:this.state.home)||'apartment',style=HOME_STYLES[homeKey]||HOME_STYLES.apartment;
       for(let x=-5;x<=5;x++)for(let z=-5;z<=5;z++)this.floor(x,z,.99,.99,(x+z)%2?style.floor[1]:style.floor[0]);
-      this.walls(2.4,style.walls[0],style.walls[1],5.35,.18);
+      const rooms=homeRooms(homeKey);if(rooms.length)this.homeWalls(style,rooms);else this.walls(2.4,style.walls[0],style.walls[1],5.35,.18);
+      for(const room of rooms)this.paintRoom(room,style);
       if(style.trim){if(Math.cos(this.angle)>0)this.box(0,-5.26,11,.06,.1,style.trim,2.3);if(Math.sin(this.angle)>0)this.box(-5.26,0,.06,11,.1,style.trim,2.3);}
       if(style.art){if(Math.cos(this.angle)>0){this.box(.5,-5.23,1.3,.04,.85,'#f6f1e6',1.35);this.box(.5,-5.21,1.1,.04,.65,style.art[0],1.45);}if(Math.sin(this.angle)>0){this.box(-5.23,1.5,.04,1.5,.9,'#f6f1e6',1.35);this.box(-5.21,1.5,.04,1.3,.7,style.art[1],1.45);}}
       if(style.rug)this.floor(-2.2,1.5,3,2.4,style.rug,.012);
+      this.homeFeatures(homeKey);
       this.box(-5.2,-2.5,.14,2.5,1.1,this.windowOpen?'#abe3c9':'#bce4fa',.8);this.box(-5.08,-2.5,.12,.06,1.1,'#ffffff',.8);
       const up=this.visitedHome?{}:upgradesFor(this.state),owns=key=>!this.visitedHome&&this.state.inventory?.[key],season=festivalAt(Date.now());
       if(season==='independence'&&Math.cos(this.angle)>0)for(const [i,tone] of ['#008751','#ffffff','#008751'].entries())this.box(-1.4+i*.4,-5.22,.4,.04,.75,tone,1.35);
@@ -505,7 +501,7 @@ export class World {
       this.box(.5,-4.2,1.2,.75,.8,'#c4b08b');this.box(.5,-4.2,1.3,.8,.07,'#f5f0df',.8);this.box(.5,-4.4,.7,.08,.5,'#405c55',.87);this.box(.5,-4.1,.65,.35,.03,'#819087',.88);
       if(Math.sin(this.angle)>0){this.box(-5.25,3.6,.08,1.15,2,'#6b4a35');this.box(-5.2,3.6,.04,.95,1.75,'#7d5841',.08);this.round(-5.17,3.2,.06,.06,.06,'#d4af37',1);}
       if(style.chandelier){this.round(-1.7,1.5,.05,.05,.6,'#8a7a5a',2.05);this.round(-1.7,1.5,.7,.7,.3,style.chandelier,1.85);}
-      for(const f of (this.visitedHome?.furniture||this.state.furniture))if(f.item!==this.placement?.item)this.furnitureModel(f.item,f.x,f.z);this.paintPet();if(!this.visitedHome)for(const [key,def] of Object.entries(ITEMS))if(def.extension&&this.state.inventory?.[key])this.extensionModel(key,def.extension.x,def.extension.z);
+      for(const f of (this.visitedHome?.furniture||this.state.furniture))if(f.item!==this.placement?.item)this.furnitureModel(f.item,f.x,f.z);this.paintPet();if(!this.visitedHome)for(const [key,def] of Object.entries(ITEMS))if(def.extension&&this.state.inventory?.[key])this.extensionModel(key,extensionSpot(key,this.homeKey()).x,extensionSpot(key,this.homeKey()).z);
     }else if(l==='sports'){
       this.floor(0,0,11,11,'#b7c6a0');this.floor(0,0,6.3,8.4,'#7fa788');
       for(let z=-4;z<4;z++)this.floor(0,z+.5,6.2,.96,z%2?'#86ad8d':'#7ca584',.01);
@@ -538,7 +534,7 @@ export class World {
       this.ride(this.showroomRide(),3.3,3.9,'x');
       this.plant(-4.1,4,1.8);this.plant(0,-4.4,1.5);this.plant(-4.8,-.1);
     }
-    if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.item,p.x,p.z);for(const [sx,sz] of p.spots||[])this.round(sx,sz,.16,.16,.02,'#3fbf6f',.02);this.floor(p.x,p.z,1.15,1.15,valid?'#3fbf6f':'#e0533f',.03);this.furnitureModel(p.item,p.x,p.z);}
+    if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.item,p.x,p.z,this.homeKey());for(const [sx,sz] of p.spots||[])this.round(sx,sz,.16,.16,.02,'#3fbf6f',.02);this.floor(p.x,p.z,1.15,1.15,valid?'#3fbf6f':'#e0533f',.03);this.furnitureModel(p.item,p.x,p.z);}
     if(this.interior()&&l!=='home')this.paintCrowd(l);
     const npc=NPCS.find(n=>n.location===l);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone'),nx=obj?.x||2.5,nz=obj?.z||2,talking=this.npcTalkUntil>performance.now();this.human(nx,nz,npc.look.skin,{...this.look(npc.career),...this.body({hair:npc.look.hair,hairColor:npc.look.hairColor,build:npc.look.build,height:npc.look.height}),pose:talking?'gesture':null,heading:talking?Math.atan2(this.player.x-nx,this.player.z-nz):0});}
     this.paintPeople();
@@ -548,11 +544,12 @@ export class World {
     const emote=this.emote&&performance.now()<this.emote.until&&!this.moving&&!this.state.recovery&&!this.state.active?this.emote.kind:null;
     if(emote&&!using)pose=emote;
     const actDef=this.state.recovery?.act&&VENUE_ACTS[this.state.recovery.act],actSpot=actDef&&worldObjects(this.location).find(o=>o.act===this.state.recovery.act);if(actDef)pose=actDef.pose;
+    const roomSpot=this.state.recovery?.spot&&this.location==='home'&&!this.visitedHome?homeRooms(this.state.home).find(r=>r.slot===this.state.recovery.spot)?.object:null;if(roomSpot)pose=roomSpot.pose;
     if(this.state.recovery?.yacht){pose='dance';}
-    const pos=actSpot?{x:actSpot.x,z:actSpot.z}:this.state.recovery?.yacht?{x:4,z:7.1}:usedSpot?.face!=null?{x:usedSpot.x,z:usedSpot.z}:usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
+    const pos=roomSpot?{x:roomSpot.vx,z:roomSpot.vz}:actSpot?{x:actSpot.x,z:actSpot.z}:this.state.recovery?.yacht?{x:4,z:7.1}:usedSpot?.face!=null?{x:usedSpot.x,z:usedSpot.z}:usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
     if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride){this.ride(this.state.trip.ride,p.x,p.z,p.axis,this.state.trip.ride==='helicopter'?6:0);if(OPEN_RIDES.includes(this.state.trip.ride))this.human(p.x,p.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),pose:'sit',seat:.7,heading:p.heading});this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state)});this.actor={x:p.x,z:p.z,pose:null};}return;}
     if(this.state.ride){if(this.interior())this.ride(this.state.ride,-2.5,7.4,'x');else this.ride(this.state.ride,-7.1,2.6,'z');}
-    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),walk:this.moving,pose,seat:usedDef?.seat??actDef?.seat,heading:actSpot?actSpot.face:usedSpot?.face!=null?usedSpot.face:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
+    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),walk:this.moving,pose,seat:usedDef?.seat??actDef?.seat,heading:roomSpot?roomSpot.face:actSpot?actSpot.face:usedSpot?.face!=null?usedSpot.face:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
     this.actor={...pos,pose};
     // Your entourage: a bodyguard at your shoulder in public, paparazzi when they're on you, Mum visiting at home.
     const clock=Date.now()+(this.serverOffset||0),h=this.heading||0,side=(f,sd)=>({x:pos.x+Math.sin(h)*f+Math.cos(h)*sd,z:pos.z+Math.cos(h)*f-Math.sin(h)*sd});
@@ -570,7 +567,7 @@ export class World {
     const ctx=this.ctx;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,r.width,r.height);this.scale=Math.min(r.width/17,r.height/11.8)*this.zoom;
     this.canvas.dataset.zoom=String(Math.round(this.zoom*100));this.canvas.dataset.angle=this.angle.toFixed(3);const zoomLabel=this.canvas.id==='world'&&document.querySelector('#zoomLevel');if(zoomLabel)zoomLabel.textContent=`${Math.round(this.zoom*100)}%`;
     this.focusPoint=this.focus();const light=this.daylight(),gradient=ctx.createLinearGradient(0,0,0,r.height);gradient.addColorStop(0,light.night?'#2d3b57':'#e3ebe4');gradient.addColorStop(1,light.night?'#46536d':'#d3e2d6');ctx.fillStyle=gradient;ctx.fillRect(0,0,r.width,r.height);
-    const t0=performance.now(),key=[this.canvas.width,this.canvas.height,this.zoom.toFixed(4),this.angle.toFixed(4),this.pitch.toFixed(4),this.location,light.night,this.ownersKey,this.state.home,this.lift,!!this.state.trip].join('|'),hasCanvas=typeof document!=='undefined';
+    const t0=performance.now(),key=[this.canvas.width,this.canvas.height,this.zoom.toFixed(4),this.angle.toFixed(4),this.pitch.toFixed(4),this.location,light.night,this.ownersKey,this.state.home,this.previewHome,this.lift,!!this.state.trip].join('|'),hasCanvas=typeof document!=='undefined';
     const shift=this.townPad?this.townShift():{x:0,y:0};
     const island=this.interior();
     if(island)this.paintIsland(light);
@@ -586,7 +583,7 @@ export class World {
     this.paintSpeech();
 
     if(this.moving){const t=this.project(this.target.x,.03,this.target.z);ctx.strokeStyle='#fff8';ctx.lineWidth=1.3;ctx.beginPath();ctx.ellipse(t.x,t.y,7,3.5,0,0,Math.PI*2);ctx.stroke();}
-    this.hits=[...worldObjects(this.location,this.visitedHome?.furniture||this.state.furniture,this.visitedHome?[]:Object.keys(this.state.inventory||{})).map(object=>({...object,screen:this.project(object.vx??object.x,.6,object.vz??object.z)})),...this.petHits()];
+    this.hits=[...worldObjects(this.location,this.visitedHome?.furniture||this.state.furniture,this.visitedHome?[]:Object.keys(this.state.inventory||{}),this.homeKey()).map(object=>({...object,screen:this.project(object.vx??object.x,.6,object.vz??object.z)})),...this.petHits()];
     this.hitRadius=Math.max(14,Math.min(30,this.scale*.42));
     ctx.font='600 10px Segoe UI';for(const o of this.hits.filter(o=>o.name===this.hover?.name)){const p=o.screen;const width=ctx.measureText(o.name).width+14;ctx.fillStyle='#fff9';ctx.beginPath();ctx.roundRect(p.x-width/2,p.y+13,width,17,8);ctx.fill();ctx.fillStyle='#49614f';ctx.fillText(o.name,p.x,p.y+25);}
   }
@@ -654,6 +651,72 @@ export class World {
     if(key==='pool'){this.floor(x,z,3.4,2.4,'#e8e2d4',.02);this.floor(x,z,3,2,night?'#3f6f9a':'#5cc0e0',.04+Math.sin(t*2)*.003);this.round(x+1.9,z-1.4,.08,.08,1.6,'#c9ccc8');this.round(x+1.9,z-1.4,1.4,1.4,.25,'#e05a5a',1.5);return;}
     if(key==='gymRoom'){this.box(x,z,3,2.6,.1,'#2f3237');this.box(x-.7,z-.6,.6,1.2,.16,'#1d1f22',.1);this.box(x-.7,z-1.2,.6,.2,1.1,'#4b5059');this.box(x+.8,z,.4,1.1,.42,'#b23a48',.1);this.box(x+.8,z-.5,1,.04,.04,'#b9bcc2',1.05);return;}
     if(key==='studioRoom'){this.box(x,z,3,2.6,.1,'#3a2f35');this.box(x,z-1.2,2.8,.1,1.6,'#5a4a6b',.1);this.box(x-.5,z-.6,1.2,.6,.75,'#2b2b2b',.1);this.round(x+.6,z-.2,.05,.05,1.4,'#2b2b2b',.1);this.round(x+.6,z-.2,.1,.1,.18,'#666',1.5);return;}
+  }
+  // Bigger homes: the apartment's walls plus each added room's, with doorways; walls between rooms stay low so you can see in.
+  homeWalls(style,rooms){
+    const c=Math.cos(this.angle),s=Math.sin(this.angle),H=2.4,stub=.18,low=.9,t=.18,has=slot=>rooms.some(r=>r.slot===slot);
+    const seg=(along,at,from,to,h,tone,doors=[])=>{const cuts=[from,...doors.flatMap(d=>[d-.5,d+.5]),to];for(let i=0;i<cuts.length;i+=2){const a=cuts[i],b=cuts[i+1];if(b-a<.02)continue;along==='z'?this.box(at,(a+b)/2,t,b-a,h,tone):this.box((a+b)/2,at,b-a,t,h,tone);}};
+    const north=c>0?H:stub,south=c<0?H:stub,west=s>0?H:stub,east=s<0?H:stub,[tz,tx]=style.walls;
+    seg('x',-5.35,-5.5,5.5,north,tz);seg('x',5.35,-5.5,5.5,south,tz);seg('z',-5.35,-5.5,5.5,west,tx);
+    // The bedroom wall: a doorway into room a; the bathroom half stays an outside wall unless room b is there.
+    seg('z',5.35,-5.35,0,Math.min(low,east),tx,[-2.4]);seg('z',5.35,0,5.35,has('b')?Math.min(low,east):east,tx);
+    for(const r of rooms){
+      if(r.north){seg('x',r.z0,r.x0,r.x1,north,tz);if(!has(r.slot==='a'?'b':'d'))seg('x',r.z1,r.x0,r.x1,south,tz);}
+      else{seg('x',r.z0,r.x0,r.x1,low,tz,[r.door.x]);seg('x',r.z1,r.x0,r.x1,south,tz);}
+      const next={a:'c',b:'d'}[r.slot];
+      if(next&&has(next))seg('z',r.x1,r.z0,r.z1,Math.min(low,east),tx,next==='c'?[-2.4]:[]);else seg('z',r.x1,r.z0,r.z1,east,tx);
+    }
+  }
+  paintRoom(r,style){
+    const night=this.daylight().night,o=r.object,f=r.north?-1:1,w=r.x1-r.x0,d=r.z1-r.z0;
+    for(let x=r.x0;x<r.x1-.01;x++)for(let z=r.z0;z<r.z1-.01;z++){const tw=Math.min(1,r.x1-x),td=Math.min(1,r.z1-z);this.floor(x+tw/2,z+td/2,tw-.01,td-.01,(Math.floor(x)+Math.floor(z))%2?style.floor[1]:style.floor[0]);}
+    this.round(r.cx,r.cz,.03,.03,.5,'#55595f',1.9);this.round(r.cx,r.cz,.42,.42,.18,night?'#ffe6a8':'#f4ead2',1.8);
+    switch(r.type){
+      case 'guest':this.floor(o.ox,o.oz-f*.3,2.8,3,style.rug||'#c9b7a0',.012);this.box(o.ox,o.oz,o.w,o.d,.45,'#b7a17d');this.box(o.ox,o.oz,o.w-.06,o.d-.12,.2,'#fff9ee',.45);this.box(o.ox,o.oz-f*.45,o.w-.04,o.d*.55,.08,'#c9a0b4',.65);this.round(o.ox,o.oz+f*(o.d/2-.35),o.w*.7,.4,.22,'#ffffff',.65);this.box(o.ox,o.oz+f*(o.d/2+.06),o.w+.12,.16,1.25,'#c6ae87');
+        for(const sx of [-1,1]){const nx=o.ox+sx*(o.w/2+.4),nz=o.oz+f*(o.d/2-.3);this.box(nx,nz,.55,.5,.55,'#c6ae87');this.round(nx,nz,.07,.07,.3,'#b8916c',.55);this.round(nx,nz,.32,.32,.25,night?'#ffe6a8':'#f2e6c8',.85);}return;
+      case 'office':this.box(o.ox,o.oz,o.w,o.d,.75,'#8b6a4c');this.box(o.ox,o.oz,o.w+.06,o.d+.06,.05,'#a98763',.75);this.box(o.ox,o.oz+f*.2,.8,.06,.5,'#1d1f22',.8);this.box(o.ox,o.oz+f*.16,.72,.02,.42,night?'#5b8fd6':'#7fa6d9',.84);this.chair(o.x,o.z+f*-.1,r.north?Math.PI:0);
+        this.box(r.x1-.35,r.cz,.4,1.6,1.9,'#8b6a4c');for(const y of [.5,1,1.45])for(let i=0;i<5;i++)this.box(r.x1-.35,r.cz-.6+i*.3,.3,.18,.32,['#b23a48','#2f6fb3','#e0b45e','#3d8a6a','#7b4fa3'][i],y);return;
+      case 'cinema':this.box(o.ox,o.oz,o.w,.1,1.7,'#111214',.45);this.box(o.ox,o.oz-f*.06,o.w-.2,.02,1.45,night?'#6f8fd6':'#9db6e0',.57);
+        {const sz=o.z-f*.45;this.box(o.x,sz,2.4,.85,.42,'#7a1f2b');this.box(o.x,sz-f*.38,2.4,.22,.95,'#6a1a25');for(const sx of [-1.15,1.15])this.box(o.x+sx,sz,.2,.85,.65,'#6a1a25');}
+        for(let i=0;i<6;i++)this.round(r.x0+.3+i*(w-.6)/5,o.oz-f*.02,.06,.06,.06,night?'#ffe6a8':'#e8e2d4',2.2);this.floor(r.cx,r.cz,w-1,d-1,'#2a2d33',.011);return;
+      case 'spa':this.round(o.ox,o.oz,o.w,o.d,.6,'#d9d2c3');this.round(o.ox,o.oz,o.w-.3,o.d-.3,.04,'#7cc4d8',.56);for(let i=0;i<5;i++)this.round(o.ox+Math.cos(i*1.3)*.5,o.oz+Math.sin(i*1.3)*.5,.08,.08,.03,'#ffffff',.6);
+        this.plant(r.x0+.5,r.z0+.5,1.1);this.plant(r.x1-.5,r.z0+.5,1.1);for(let i=0;i<3;i++)this.box(r.x1-.3,r.cz+.6+i*.4,.12,.3,.6,['#f7e6d0','#cfe7ee','#ffffff'][i],.9);this.floor(r.cx,r.cz+.6,w-1.2,d-2,'#e8f2f0',.011);return;
+      case 'bar':this.box(o.ox,o.oz,o.w,o.d,1.05,'#3b2f2a');this.box(o.ox,o.oz,o.w+.1,o.d+.1,.06,'#c9a227',1.05);this.box(o.ox,(r.north?r.z0:r.z1)-f*.15,o.w,.22,.05,'#7a5a43',1.5);
+        for(let i=0;i<7;i++)this.round(o.ox-1.1+i*.36,(r.north?r.z0:r.z1)-f*.15,.08,.08,.28,['#2fae6b','#b23a48','#e0b45e','#8fb2c4'][i%4],1.55);
+        for(const sx of [-.8,0,.8]){this.round(o.ox+sx,o.oz-f*.75,.06,.06,.7,'#3b3b3b');this.round(o.ox+sx,o.oz-f*.75,.36,.36,.07,'#c9a227',.7);}return;
+      case 'closet':for(const sx of [-1.05,0,1.05]){this.box(o.ox+sx,o.oz+f*.2,.95,.25,1.95,'#a9825f');this.box(o.ox+sx,o.oz,.9,.04,.04,'#c9ccc8',1.75);for(let i=0;i<5;i++)this.box(o.ox+sx-.36+i*.18,o.oz,.12,.32,.85,['#b23a48','#2d6e9e','#f2b33d','#2f3237','#e8e2d4'][(i+Math.round(sx)+5)%5],.9);}
+        this.box(r.x1-.25,r.cz,.06,.7,1.8,'#d8eaf0',.1);this.box(r.x1-.22,r.cz,.04,.8,1.9,'#c9a46a',.05);this.round(r.cx,r.cz-f*.3,1,1,.02,'#e3c9b8',.011);return;
+      case 'games':this.box(o.ox,o.oz,o.w,o.d,.75,'#5a3a24');this.box(o.ox,o.oz,o.w-.16,o.d-.16,.04,'#1f7a4a',.75);for(let i=0;i<7;i++)this.round(o.ox-.6+(i%4)*.18,o.oz-.3+Math.floor(i/4)*.2,.08,.08,.08,['#f2c230','#2b7fd6','#d23b4b','#7b4fa3','#f39c3d','#2fae6b','#111111'][i],.8);this.round(o.ox+.6,o.oz,.08,.08,.08,'#ffffff',.8);
+        this.box(r.x1-.2,r.cz-1,.1,.8,1.3,'#7a5a43',.4);for(let i=0;i<4;i++)this.box(r.x1-.15,r.cz-1.3+i*.2,.03,.03,1.25,'#d9c7a3',.42);this.floor(o.ox,o.oz,3.2,2.4,'#7a1f2b',.011);return;
+    }
+  }
+  // What makes each home special, kept to the walls, corners and ceiling so no path or object spot is blocked.
+  homeFeatures(key){
+    const back=Math.cos(this.angle)>0,left=Math.sin(this.angle)>0,night=this.daylight().night;
+    const frame=(x,z,w,h,y,tone,side)=>side?(this.box(-5.22,z,.04,w+.12,h+.12,'#f6f1e6',y-.06),this.box(-5.2,z,.04,w,h,tone,y)):(this.box(x,-5.22,w+.12,.04,h+.12,'#f6f1e6',y-.06),this.box(x,-5.2,w,.04,h,tone,y));
+    const pendant=(x,z,tone,y=1.75)=>{this.round(x,z,.03,.03,2.4-y,'#55595f',y);this.round(x,z,.34,.34,.22,night?'#ffe6a8':tone,y-.1);};
+    const column=(x,z,tone,cap)=>{this.round(x,z,.42,.42,2.4,tone);this.box(x,z,.55,.55,.12,cap);this.box(x,z,.55,.55,.12,cap,2.28);};
+    switch(key){
+      case 'studioFlat':if(back){frame(-3,0,.5,.7,1.5,'#e07a5f');}for(let i=0;i<10;i++)this.round(-4.6+i*1,-5.15,.08,.08,.08,night?'#ffe6a8':'#f2e2b8',2.15-Math.sin(i/9*Math.PI)*.2);return;
+      case 'townhouse':if(back){frame(-3.4,0,.45,.6,1.55,'#3a6f8f');frame(-2.6,0,.45,.6,1.55,'#d9a066');frame(-1.9,0,.35,.45,1.62,'#b8604a');}if(left)frame(0,.3,.6,.8,1.4,'#7d5a4f',true);pendant(.1,1.4,'#e8c48a');return;
+      case 'duplex':{// a gallery landing along the back wall: the second storey
+        if(back){this.box(0,-4.95,10.4,.5,.12,'#7a5a43',2.05);for(let x=-4.9;x<=4.9;x+=.45)this.round(x,-4.72,.04,.04,.42,'#3b3b3b',2.17);this.box(0,-4.72,10.4,.05,.05,'#7a5a43',2.58);}
+        for(const x of [-.3,.5])pendant(x,1.4,'#e9c46a');return;}
+      case 'beachHouse':
+        if(left){this.round(-5.08,.9,.12,.5,1.85,'#f2c230',.05);this.box(-5.04,.9,.02,.08,1.7,'#2bb3c0',.12);this.round(-5.1,-.15,.28,.28,.5,'#c9a46a');this.plant(-5.0,-.15,.9);}
+        if(back)for(let i=0;i<7;i++)this.round(1.6+i*.3,-5.15,.1,.06,.12,['#f7e6d0','#f2c6b4','#e3f1f5'][i%3],2.1-Math.sin(i/6*Math.PI)*.15);
+        pendant(-1.7,1.5,'#c9a46a',1.8);this.round(-1.7,1.5,.5,.5,.18,'#d9b98a',1.72);return;
+      case 'villa':column(-4.95,-4.95,'#f7f5ef','#e6e2d8');column(4.95,4.95,'#f7f5ef','#e6e2d8');column(-4.95,4.95,'#f7f5ef','#e6e2d8');
+        if(left){this.box(-5.2,-2.5,.12,2.9,1.7,'#bce4fa',.45);this.round(-5.2,-2.5,.12,2.9,.5,'#bce4fa',2.0);}
+        for(const z of [-4.2,4.2])if(left)this.plant(-5.0,z===4.2?2:z,1);return;
+      case 'penthouse':{// floor-to-ceiling glass with the skyline behind it
+        if(left){this.box(-5.2,-2.5,.1,4.6,2.25,night?'#1d2a44':'#a9cde6',.08);for(let i=0;i<9;i++){const h=.6+((i*37)%7)*.18,z=-4.5+i*.5;this.box(-5.26,z,.04,.38,h,night?'#2a3550':'#7e9bb4',.1);if(night)for(let w=0;w<3;w++)this.box(-5.24,z,.02,.08,.06,'#ffe6a8',.3+w*.3);}for(const z of [-4.8,-2.5,-.2])this.box(-5.15,z,.06,.06,2.25,'#c9ccc8',.08);}
+        if(back){this.box(0,-5.18,10.6,.03,.04,'#c9a227',.05);}column(4.95,-4.95,'#1d1f22','#c9ccc8');return;}
+      case 'mansion':column(-4.95,-4.95,'#f5ecd9','#c9a43a');column(4.95,-4.95,'#f5ecd9','#c9a43a');column(-4.95,4.95,'#f5ecd9','#c9a43a');column(4.95,4.95,'#f5ecd9','#c9a43a');
+        this.floor(-3.4,3.6,1.8,.9,'#7a1f2b',.013);this.floor(-3.4,3.6,1.6,.7,'#9b2a3a',.015);
+        if(back){this.box(2.5,-5.22,1.5,.05,1.05,'#c9a43a',1.45);this.box(2.5,-5.2,1.3,.04,.85,'#2a4d69',1.55);this.round(2.5,-5.17,.35,.02,.45,'#e8c48a',1.75);}
+        for(let i=0;i<6;i++){const a=i/6*Math.PI*2;this.round(-1.7+Math.cos(a)*.42,1.5+Math.sin(a)*.42,.07,.07,.12,night?'#ffe6a8':'#fff3c8',1.74);}return;
+    }
   }
   // Placeable home items, built from simple shapes; each faces +z, where you stand to use it.
   furnitureModel(item,x,z){
@@ -773,7 +836,7 @@ export class World {
   flyTo(zoom){this.zoomGoal=clampZoom(zoom);}
   click(event){if(!this.state)return;const r=this.canvas.getBoundingClientRect(),x=event.clientX-r.left,y=event.clientY-r.top;
     // Arranging: a tap moves the preview there; tapping the same spot again (or a click after hovering it) places it.
-    if(this.placement){const point=this.unproject(x,y),p=this.placement,nx=Math.round(point.x*2)/2,nz=Math.round(point.z*2)/2;if(p.x===nx&&p.z===nz&&p.shown){this.onObject({placement:{item:p.item,x:nx,z:nz}});return;}p.x=nx;p.z=nz;p.shown=true;this.onPlacement?.(canPlace(this.state.furniture,p.item,nx,nz));this.draw();return;}
+    if(this.placement){const point=this.unproject(x,y),p=this.placement,nx=Math.round(point.x*2)/2,nz=Math.round(point.z*2)/2;if(p.x===nx&&p.z===nz&&p.shown){this.onObject({placement:{item:p.item,x:nx,z:nz}});return;}p.x=nx;p.z=nz;p.shown=true;this.onPlacement?.(canPlace(this.state.furniture,p.item,nx,nz,this.homeKey()));this.draw();return;}
     const pin=this.pins?.find(p=>Math.hypot(p.screen.x-x,p.screen.y-y)<24);if(pin){this.onObject({travel:pin.travel});return;}
     const person=this.peopleHits?.find(p=>Math.hypot(p.screen.x-x,p.screen.y-y)<22);if(person){this.onObject({person:person.player,name:person.player.name,screen:person.screen});return;}
     const home=this.houseHits?.find(h=>Math.hypot(h.screen.x-x,h.screen.y-y)<26);if(home){this.onObject({house:home.house,name:`${home.house.name}’s home`,screen:home.screen});return;}
@@ -790,7 +853,7 @@ export class World {
     if(this.state.recovery||this.state.active){this.onObject({blocked:true,message:'Finish or stop your current action before moving.'});return;}
     this.pose=null;
     const furniture=this.visitedHome?.furniture||this.state.furniture;
-    const valid=(px,pz)=>walkable(this.location,px,pz,furniture);
+    const valid=(px,pz)=>walkable(this.location,px,pz,furniture,this.homeKey());
     if(!valid(x,z)){this.onObject({blocked:true});return;}
     // Standing outside the walls (just arrived at the doorstep): walk round to the door and come in through it.
     // Standing on something inside (furniture placed on your spot): step to the nearest open ground.
@@ -814,11 +877,11 @@ export class World {
     this.onMove({x,z}); // others see the walk begin immediately
     if(this.reduced){this.player={x,z};this.waypoints=[];this.arrived();}this.draw();
   }
-  walkToObject(name){const object=worldObjects(this.location,this.visitedHome?.furniture||this.state.furniture,this.visitedHome?[]:Object.keys(this.state.inventory||{})).find(o=>o.name===name);if(object)this.onObject(object);}
+  walkToObject(name){const object=worldObjects(this.location,this.visitedHome?.furniture||this.state.furniture,this.visitedHome?[]:Object.keys(this.state.inventory||{}),this.homeKey()).find(o=>o.name===name);if(object)this.onObject(object);}
   approach(object,callback){
     const furniture=this.visitedHome?.furniture||this.state.furniture;
-    if(walkable(this.location,object.x,object.z,furniture)){this.walk(object.x,object.z,callback);return;}
-    const points=[];for(const radius of [.8,1.1,1.4])for(let i=0;i<16;i++){const x=(object.vx??object.x)+Math.cos(i*Math.PI/8)*radius,z=(object.vz??object.z)+Math.sin(i*Math.PI/8)*radius;if(walkable(this.location,x,z,furniture))points.push({x,z});}
+    if(walkable(this.location,object.x,object.z,furniture,this.homeKey())){this.walk(object.x,object.z,callback);return;}
+    const points=[];for(const radius of [.8,1.1,1.4])for(let i=0;i<16;i++){const x=(object.vx??object.x)+Math.cos(i*Math.PI/8)*radius,z=(object.vz??object.z)+Math.sin(i*Math.PI/8)*radius;if(walkable(this.location,x,z,furniture,this.homeKey()))points.push({x,z});}
     points.sort((a,b)=>Math.hypot(a.x-this.player.x,a.z-this.player.z)-Math.hypot(b.x-this.player.x,b.z-this.player.z));
     if(points.length)this.walk(points[0].x,points[0].z,callback);else this.onObject({blocked:true});
   }
