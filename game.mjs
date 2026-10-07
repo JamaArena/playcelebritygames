@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { WORK_SCENES } from './public/careerText.js';
-import { QUESTS, QUEST_GRADUATION, FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace, homeRooms, npcOpinion, OPINIONS, NPC_NAMES, CLASH_MEDALS, medalTier } from './public/content.js';
+import { bestMode, QUESTS, QUEST_GRADUATION, FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace, homeRooms, npcOpinion, OPINIONS, NPC_NAMES, CLASH_MEDALS, medalTier } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -315,8 +315,8 @@ export function act(s,input,now,rng=Math.random) {
     case 'travel':
       requireRule(LOCATIONS[input.location],'Unknown destination.');requireRule(!s.active&&!s.recovery,'Finish your activity before travelling.');
       if(input.location!==s.location&&!s.visiting&&LOT(input.location)!==LOT(s.location)){
-        // How you travel: your own ride, walking, or public transport (danfo, keke, okada, ride-hailing).
-        const pref=input.mode||s.travelMode||'own',mode=pref==='own'?(s.ride||'walk'):pref;
+        // How you travel: by default the fastest way you have (best), or your own ride, walking, or public transport.
+        const pref=input.mode||s.travelMode||'best',mode=pref==='best'?bestMode(s,now):pref==='own'?(s.ride||'walk'):pref;
         if(TRANSIT[mode])requireRule(mode!=='taxi'||(s.phone&&s.phone!=='basic'),'Ride-hailing needs a smartphone. Upgrade your phone.');
         let ms=Math.round(tripMs(s.location,input.location,mode)*(1-(mode===s.ride?TUNING[(s.tune?.[mode]||0)-1]?.cut||0:0)/100));
         const rain=weatherAt(now)==='rain'&&!NO_RAIN.includes(mode),jam=!NO_JAM.includes(mode)&&goSlowAt(now);if(rain)ms=Math.round(ms*1.2);if(jam)ms=Math.round(ms*1.4);s.trip={from:s.location,to:input.location,ride:mode==='walk'?null:mode,departs:now,arrives:now+ms,delays:[...(rain?['rain']:[]),...(jam?['go-slow']:[])]};log(s,`${mode==='walk'?'Walking':TRANSIT[mode]?`Taking a ${TRANSIT[mode].name.toLowerCase()}`:mode==='helicopter'?'Flying':mode==='bicycle'?'Cycling':'Driving'} to ${LOCATIONS[input.location].name} · ${Math.ceil(ms/60000)} min.${jam?' Go-slow on the road!':''}${rain?' Flooded streets slow you down.':''}`,now);break;}
@@ -420,7 +420,7 @@ export function act(s,input,now,rng=Math.random) {
       else requireRule(false,'Choose feed, play or cuddle.');break;
     }
     case 'rehomePet': {requireRule(s.pet,'You have no pet.');log(s,`${s.pet.name} went to a loving new home.`,now);s.pet=null;break;}
-    case 'travelMode': {requireRule(input.mode==='own'||input.mode==='walk'||TRANSIT[input.mode],'Choose how to travel.');s.travelMode=input.mode;break;}
+    case 'travelMode': {requireRule(input.mode==='best'||input.mode==='own'||input.mode==='walk'||TRANSIT[input.mode],'Choose how to travel.');s.travelMode=input.mode;break;}
     case 'tune': {
       requireRule(s.location==='plaza','Visit Palm Motors at Palm plaza.');requireRule(s.ride&&RIDE_SPEED[s.ride]&&s.ride!=='bicycle','Tune a ride you own.');
       s.tune??={};const level=s.tune[s.ride]||0,next=TUNING[level];requireRule(next,'Your ride is fully tuned.');requireRule((s.fame||0)>=next.fame,`Tuning level ${level+1} needs ${next.fame.toLocaleString('en-US')} fame.`);

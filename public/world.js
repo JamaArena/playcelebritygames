@@ -229,7 +229,7 @@ export class World {
     const onFoot=Boolean(trip.ride)&&trip.ride!=='helicopter'&&[trip.from,trip.to].map(k=>LOT(k)).some(k=>k!=='home'&&TOWN[k]&&Math.abs(p.x-TOWN[k].x)<5.4&&Math.abs(p.z-TOWN[k].z)<5.4);
     return {...p,onFoot,x:p.x-here.x,z:p.z-here.z};}
   focus(){if(this.state?.trip){const p=this.tripPosition(this.state.trip,Date.now()+(this.serverOffset||0)),f=this.focusBase();return {x:p.x+f.x*.3,z:p.z+f.z*.3};}return this.focusBase();}
-  focusBase(){const here=TOWN[this.location]||TOWN.home,t=this.interior()?0:Math.max(0,Math.min(1,(.9-this.zoom)/.65)),pan=this.pan||{x:0,z:0};
+  focusBase(){const here=TOWN[this.location]||TOWN.home,t=this.interior()?0:Math.max(0,Math.min(1,(.9-this.zoom)/.65)),pan=(this.interior()||this.previewHome)&&this.pan||{x:0,z:0};
     // In a bigger home the camera glides east with you into the extra rooms.
     const rooms=this.location==='home'&&this.interior()&&!this.previewHome?homeRooms(this.homeKey()):[],px=(this.actor||this.player)?.x??0,goal=rooms.length&&px>4.5?Math.min(px,Math.max(...rooms.map(r=>r.x1))-2.5):0;
     this.followX=(this.followX??goal)+(goal-(this.followX??goal))*.08;return {x:-here.x*t+pan.x+this.followX,z:(-14-here.z)*t+pan.z};}
@@ -1075,15 +1075,13 @@ export class World {
   stop(){this.stopped=true;this.resize?.disconnect();}
   // Indoors, if you wander near the edge of the screen the camera glides until you are back in the middle.
   keepInView(dt){
-    if(!this.state||!this.interior()||this.overview||this.placement||this.previewHome||this.panHold||!this.width)return;
+    if(!this.state||!this.interior()||this.overview||this.placement||this.previewHome||!this.width)return;
     const a=this.actor||this.player,p=this.project(a.x,1,a.z),w=this.width,h=this.height;
     if(!this.recentering&&(p.x<w*.2||p.x>w*.8||p.y<h*.2||p.y>h*.72))this.recentering=true;
     if(!this.recentering)return;
     this.pan??={x:0,z:0};const tx=a.x-(this.followX||0),tz=a.z,k=Math.min(1,dt*3.2);this.pan.x+=(tx-this.pan.x)*k;this.pan.z+=(tz-this.pan.z)*k;
     if(Math.hypot(tx-this.pan.x,tz-this.pan.z)<.08)this.recentering=false;this.draw();
   }
-  // The arrow pad: slide the view by a number of screen pixels.
-  panBy(dx,dy){if(!this.width)return;const a=this.unproject(this.width/2,this.height/2),b=this.unproject(this.width/2+dx,this.height/2+dy);this.pan??={x:0,z:0};this.pan.x+=b.x-a.x;this.pan.z+=b.z-a.z;this.recentering=false;this.draw();}
   frame(time){if(this.stopped)return;if(this.paused){this.last=time;requestAnimationFrame(t=>this.frame(t));return;}const dt=Math.min((time-this.last)/1000,.05);this.last=time;
     this.keepInView(dt);
     if(this.pose?.expires&&time>this.pose.expires){const kind=this.pose.kind;this.pose=null;if(kind==='water')this.respond('water',true,'❀');}

@@ -196,10 +196,10 @@ test('a sponsored ride drives along the roads for a distance-based time; homes s
   assert.ok(tripMs('home','plaza')<walk,'short walks are shorter');
   assert.throws(()=>act(s,{type:'start',kind:'practice',skill:'passing'},T+1000),/on the road/);
   act(s,{type:'travel',location:'tech'},s.trip.arrives);assert.equal(s.location,'tech');assert.equal(s.trip,null);
-  s.ride='scooter';const back=T+200_000;act(s,{type:'travel',location:'home'},back);let drive=tripMs('tech','home','scooter');if(s.trip.delays.includes('rain'))drive=Math.round(drive*1.2);if(s.trip.delays.includes('go-slow'))drive=Math.round(drive*1.4);assert.equal(s.trip.arrives-back,drive);
+  s.ride='scooter';const back=T+200_000;act(s,{type:'travel',location:'home',mode:'own'},back);let drive=tripMs('tech','home','scooter');if(s.trip.delays.includes('rain'))drive=Math.round(drive*1.2);if(s.trip.delays.includes('go-slow'))drive=Math.round(drive*1.4);assert.equal(s.trip.arrives-back,drive);
   reconcile(s,s.trip.arrives);assert.equal(s.location,'home');
   act(s,{type:'recover',need:'energy'},T+500_000);assert.equal(s.recovery.endsAt-s.recovery.startedAt,Math.round(B.recovery.energy[1]*.8));
-  const walker=make('football');act(walker,{type:'travel',location:'tech'},T);assert.equal(walker.trip.ride,null);assert.equal(walker.trip.arrives-T,walk,'walking is slowest');
+  const walker=make('football');act(walker,{type:'travel',location:'tech',mode:'own'},T);assert.equal(walker.trip.ride,null);assert.equal(walker.trip.arrives-T,walk,'walking is slowest');
   const local=make('football');act(local,{type:'travel',location:'street'},T);assert.equal(local.location,'street','home and its street are next door');assert.deepEqual(local.position3d,{x:0,z:6.2});
   assert.throws(()=>act(local,{type:'move',x:0,z:2},T),/blocked/);act(local,{type:'move',x:3,z:6.5},T);act(local,{type:'travel',location:'home'},T);assert.equal(local.location,'home');
 });
@@ -457,4 +457,15 @@ test('starter quests complete in any order, pay fame once, and graduate with an 
   assert.ok(s.awards.some(a => a.name === QUEST_GRADUATION.name));
   const awards = s.awards.length; questProgress(s, { type: 'move' }, T + 2);
   assert.equal(s.awards.length, awards, 'graduation happens once');
+});
+test('trips default to the fastest way you have', async () => {
+  const { bestMode } = await import('../public/content.js');
+  const calm = 0; // a minute with no go-slow traffic
+  const s = make(); s.ride = null; s.vip = {}; s.phone = 'basic';
+  assert.equal(bestMode(s, calm), 'okada', 'without a ride, the quickest transport (no ride-hailing on a basic phone)');
+  s.vip = { helicopter: { at: 1 } };
+  assert.equal(bestMode(s, calm), 'helicopter', 'a sponsored helicopter beats everything');
+  const t = make(); t.travelMode = undefined; t.ride = null; t.vip = { helicopter: { at: 1 } };
+  act(t, { type: 'travel', location: 'plaza' }, T);
+  assert.equal(t.trip.ride, 'helicopter', 'travel uses the best mode unless you chose another');
 });
