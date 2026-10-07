@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -73,7 +73,7 @@ export function reconcile(s, now) {
   if(s.pet&&dt<=30_000)for(const [k,rate] of Object.entries(PET_CARE.decay))s.pet[k]=clamp(s.pet[k]-rate*dt/3600_000);
   mishaps(s,now);
   if(dt<=30_000)lifeEvents(s,now);
-  if(dt<=30_000&&s.team?.manager&&now>=(s.nextGigAt||0)){const fam=CAREERS[s.career]?.family,acts=Object.entries(VENUE_ACTS).filter(([,a])=>!a.menu&&(!a.family||a.family===fam));const [key]=acts[Math.floor(Math.random()*acts.length)];s.gig={id:id(),act:key,until:now+GIG.windowMs,bonus:Math.max(20,Math.round((s.fame||0)*.005))};s.nextGigAt=now+GIG.everyMs;log(s,`🧑‍💼 Your manager booked you: ${VENUE_ACTS[key].name} at ${LOCATIONS[VENUE_ACTS[key].venue].name} within 10 minutes for +${s.gig.bonus} fame.`,now);}
+  if(dt<=30_000&&s.team?.manager&&now>=(s.nextGigAt||0)){const fam=CAREERS[s.career]?.family,acts=Object.entries(VENUE_ACTS).filter(([,a])=>!a.menu&&!a.moment&&!a.album&&!a.tour&&!a.careers&&!a.minFame&&!a.minOutputs&&(!a.family||a.family===fam));const [key]=acts[Math.floor(Math.random()*acts.length)];s.gig={id:id(),act:key,until:now+GIG.windowMs,bonus:Math.max(20,Math.round((s.fame||0)*.005))};s.nextGigAt=now+GIG.everyMs;log(s,`🧑‍💼 Your manager booked you: ${VENUE_ACTS[key].name} at ${LOCATIONS[VENUE_ACTS[key].venue].name} within 10 minutes for +${s.gig.bonus} fame.`,now);}
   s.lastSeen=now;
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
     item.level=item.upgrade.target; item.upgrade=null; log(s,`${ITEMS[key].name} reached level ${item.level}.`,now);
@@ -116,6 +116,7 @@ export function lifeEvents(s,now,rng=Math.random){
   if(e.fame){const [share,min]=e.fame,raw=share>0?Math.max(min,(s.fame||0)*share):Math.min(min,(s.fame||0)*share);delta=Math.round(raw<0?raw*(1-(perksFor(s).scandal||0)/100):raw);if(delta<0)delta=Math.max(delta,-(s.fame||0));addFame(s,delta,e.title,now);if(key==='luckyBreak'||key==='slip'||key==='sneeze')headline(s,`${s.name}: ${e.title.toLowerCase().replace(/^you /,'')} ${e.icon}`,now);}
   for(const [k,v] of Object.entries(e.needs||{}))s.needs[k]=clamp(s.needs[k]+v);
   if(key==='powerCut'){if(upgradesFor(s).generator)text='Power cut! Your generator kicked in, so nothing stopped.';else s.powerCut={until:now+LIFE_EVENT.powerCutMs};}
+  if(e.transfer){const c=s.careers[s.career];if(!c.offer){const club=['Palm City Club','Harbour Athletic','Emerald United'][Math.floor(rng()*3)];c.offer={id:id(),name:`${club} · transfer`,boost:Math.round(B.contractBoost*1.5*100)/100,expiresAt:now+86400_000,exitAfter:3};}}
   if(e.prompt)s.prompt={id:id(),kind:e.prompt,at:now};if(e.paps)s.papsUntil=now+10*60_000;if(e.visit)s.familyVisit=now+5*60_000;
   s.lifeEvent={id:id(),kind:key,at:now,delta,text};log(s,`${e.icon} ${e.title}. ${text}${delta?` ${delta>0?'+':'−'}${Math.abs(delta).toLocaleString('en-US')} fame.`:''}`,now);
   const [lo,hi]=LIFE_EVENT.gapMs;s.nextEventAt=now+lo+Math.round(rng()*(hi-lo));
@@ -133,6 +134,15 @@ export function finishRecovery(s,now){
     s.actFameAt??={};if(act.fame&&(!act.family||act.family===fam)&&now-(s.actFameAt[r.act]||0)>=10*60_000){s.actFameAt[r.act]=now;addFame(s,act.fame,act.name,now);}
     if(act.fitness)s.fitness=Math.min(FITNESS.max,(s.fitness||0)+FITNESS.perWorkout*act.fitness);
     if(act.groceries)s.groceries=(s.groceries||0)+act.groceries;
+    if(act.moment||act.album){s.momentAt={...(s.momentAt||{}),[r.act]:now};}
+    if(act.moment){const level=s.careers[s.career].skills[CAREERS[s.career].focus].level,win=Math.random()<Math.min(.85,.25+level*.08),[share,min]=win?act.moment.win:act.moment.lose;
+      const delta=Math.round(share>=0?Math.max(min,(s.fame||0)*share):Math.min(min,(s.fame||0)*share));addFame(s,delta,act.name,now);
+      headline(s,`${s.name} ${act.moment.headline[win?0:1]}`.replace(" '","'"),now);log(s,win?`${act.icon} You did it! +${delta} fame.`:`${act.icon} Not this time. ${delta>=0?'+':''}${delta} fame.`,now);
+      if(win&&act.moment.award)s.awards.push({id:id(),name:act.moment.award,career:s.career,at:now});}
+    if(act.album){const recent=s.outputs.filter(o=>o.career===s.career&&o.released).slice(0,3),gain=Math.max(50,Math.round(recent.reduce((n,o)=>n+(o.fame||0),0)*.6));addFame(s,gain,'Album release',now);headline(s,`${s.name}'s new album is out now 💿`,now);log(s,`💿 Your album is out! +${gain} fame.`,now);}
+    if(act.tour){s.tour=s.tour&&now-s.tour.started<=MOMENT.tourMs?s.tour:{started:now,stops:[]};if(!s.tour.stops.includes(r.act))s.tour.stops.push(r.act);
+      if(s.tour.stops.length>=3){const gain=Math.max(200,Math.round((s.fame||0)*.04));addFame(s,gain,'Concert tour',now);headline(s,`${s.name} wrapped a sold-out Palm City tour 🎤`,now);log(s,`🎤 Tour complete! +${gain} fame.`,now);s.awards.push({id:id(),name:'Sold-out tour',career:s.career,at:now});s.tour=null;}
+      else log(s,`🎤 Tour stop ${s.tour.stops.length} of 3 done.`,now);}
     if(s.gig?.act===r.act&&now<=s.gig.until+act.ms){addFame(s,s.gig.bonus,'Manager gig',now);log(s,`🧑‍💼 Gig done! +${s.gig.bonus} fame.`,now);s.gig=null;}
     if(act.charity&&now-(s.charityAt||0)>=30*60_000){s.charityAt=now;headline(s,`${s.name} spent the day volunteering at Palm General 🤲`,now);}
     if(act.interview&&now-(s.interviewAt||0)>=30*60_000){s.interviewAt=now;const good=Math.random()<.65,delta=good?Math.max(20,Math.round((s.fame||0)*.01)):-Math.max(10,Math.round((s.fame||0)*.005));addFame(s,delta,good?'TV interview':'Awkward TV interview',now);headline(s,good?`${s.name} charmed viewers on PCTV 📺`:`${s.name}'s awkward PCTV interview goes viral 😬`,now);log(s,good?`📺 The interview went great! +${delta} fame.`:`📺 That interview did not go well. ${delta} fame.`,now);}
@@ -263,7 +273,7 @@ function settle(s,a,now) {
   const contract=c.affiliation;
   if(qualifies&&contract)gain=Math.floor(gain*(1+(contract.boost??B.contractBoost)));
   gain=Math.floor(gain*a.audienceShare);
-  const fame=Math.round(fameFor(gain)*(1+((perksFor(s).fame||0)+(s.inventory.drone&&CAREERS[s.career].family==='creator'?5:0))/100));c.audience+=gain;addFame(s,fame,`${def.output} released`,now);if(fame>=100)headline(s,`${s.name}'s new ${def.output.toLowerCase()} is a hit: +${fame.toLocaleString('en-US')} fame 🔥`,now);c.completed++;
+  const fame=Math.round(fameFor(gain)*(1+((perksFor(s).fame||0)+(s.inventory.drone&&CAREERS[s.career].family==='creator'?5:0))/100));c.audience+=gain;let viral=def.family==='creator'&&Math.random()<MOMENT.viralChance;addFame(s,fame,`${def.output} released`,now);if(viral){addFame(s,fame*2,'Went viral',now);headline(s,`${s.name}'s ${def.output.toLowerCase()} went viral 🚀`,now);log(s,`🚀 Your ${def.output.toLowerCase()} went viral! +${(fame*2).toLocaleString('en-US')} more fame.`,now);}if(fame>=100)headline(s,`${s.name}'s new ${def.output.toLowerCase()} is a hit: +${fame.toLocaleString('en-US')} fame 🔥`,now);c.completed++;
   if(qualifies)c.engagement=clamp(c.engagement+(quality-50)/10);
   if(contract&&qualifies)c.reputation=clamp(c.reputation+(quality>=60?2:-2));
   if(a.kind==='trial') {
@@ -402,7 +412,10 @@ export function act(s,input,now,rng=Math.random) {
     }
     // Phone apps.
     case 'venueAct': {
-      const a=VENUE_ACTS[input.act];requireRule(a&&!a.menu,'Unknown activity.');requireRule((s.fame||0)>=(a.minFame||0),`${a.name} is for players with ${(a.minFame||0).toLocaleString('en-US')} fame.`);requireRule(s.location===a.venue,`Go to ${LOCATIONS[a.venue].name} for that.`);
+      const a=VENUE_ACTS[input.act];requireRule(a&&!a.menu,'Unknown activity.');requireRule((s.fame||0)>=(a.minFame||0),`${a.name} is for players with ${(a.minFame||0).toLocaleString('en-US')} fame.`);
+      requireRule((!a.careers||a.careers.includes(s.career))&&(!a.family||!(a.moment||a.album||a.tour)||CAREERS[s.career].family===a.family),`${a.name} is for other careers.`);
+      requireRule(!a.minOutputs||s.outputs.filter(o=>o.career===s.career&&o.released).length>=a.minOutputs,`Release ${a.minOutputs} works first.`);
+      requireRule(!(a.moment||a.album)||now-(s.momentAt?.[input.act]??-Infinity)>=MOMENT.cooldownMs,'Once a day for this one. Come back tomorrow.');requireRule(s.location===a.venue,`Go to ${LOCATIONS[a.venue].name} for that.`);
       requireRule(!s.active&&!s.recovery&&!s.trip,'Finish what you are doing first.');
       s.recovery={id:id(),need:a.need,label:a.name,startedAt:now,endsAt:now+a.ms,amount:a.amount,extra:a.extra||{},act:input.act};break;
     }
@@ -429,6 +442,12 @@ export function act(s,input,now,rng=Math.random) {
       log(s,failed?option.riskText:option.text,now);if(p.kind==='journalist')headline(s,failed?`${s.name}'s shade at ${RIVAL.name} backfires 😬`:`${s.name} on ${RIVAL.name}: "${option.fame[0]>.005?'Stay mad.':'We wish him well.'}"`,now);break;
     }
     // Beef with your rival: a diss track that can win or lose fame.
+    case 'retire': {
+      requireRule(CAREERS[input.career]&&input.career!==s.career,'Choose the next career.');requireRule(!s.active&&!s.recovery&&!s.trip,'Finish what you are doing first.');requireRule(input.career!=='adult'||input.adult===true,'Confirm an adult character.');
+      const old=CAREERS[s.career],gain=Math.max(50,Math.round((s.fame||0)*.02));addFame(s,gain,'Farewell event',now);s.awards.push({id:id(),name:`${old.name} legacy`,career:s.career,at:now});
+      headline(s,`${s.name} retires from ${old.name.toLowerCase()} life with a farewell show 👋`,now);log(s,`👋 Farewell event: +${gain} fame. A new chapter begins.`,now);
+      s.careers[s.career].retired=now;if(!s.careers[input.career])s.careers[input.career]=newCareer(input.career,0);s.career=input.career;break;
+    }
     case 'beef': {
       requireRule(s.beefAt==null||now-s.beefAt>=RIVAL.cooldownMs,'Let it cool down before the next diss track.');requireRule(!s.trip,'Wait until you arrive.');s.beefAt=now;
       const level=s.careers[s.career].skills[CAREERS[s.career].focus].level,win=Math.random()<Math.min(.85,.3+level*.07);
