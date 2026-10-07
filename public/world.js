@@ -489,7 +489,7 @@ export class World {
   }
   showroomRide(){const claimed=this.state?.vip||{};return Object.keys(SPONSORSHIPS).find(k=>SPONSORSHIPS[k].kind==='ride'&&!claimed[k])||'hypercar';}
   // Sponsored rides: each model has its own silhouette. along is the axis the car points down.
-  ride(key,x,z,along='x',lift=0){
+  ride(key,x,z,along='x',lift=0,dir=1){
     const deal=RIDES[key]||TRANSIT[key];if(!deal)return;const c=deal.color,X=(l,w)=>along==='x'?[l,w]:[w,l],at=(f,side=0)=>along==='x'?[x+f,z+side]:[x+side,z+f];
     const part=(f,side,l,w,h,y,tone)=>{const [px,pz]=at(f,side),[bw,bd]=X(l,w);this.box(px,pz,bw,bd,h,tone,y+lift);};
     const disc=(f,side,size,thick,y,tone)=>{const [px,pz]=at(f,side),[bw,bd]=X(size,thick);this.round(px,pz,bw,bd,size,tone,y+lift);};
@@ -499,16 +499,26 @@ export class World {
     if(key==='motorbike'||key==='okada'){for(const f of [-.55,.55])disc(f,0,.5,.14,0,'#1d1f22');part(0,0,1.15,.3,.32,.32,c);part(.15,0,.4,.32,.22,.6,shade(c,1.3));part(-.25,0,.5,.3,.08,.66,'#1d1f22');part(.55,0,.08,.55,.06,.85,'#2b2b2b');return;}
     if(key==='keke'){disc(.6,0,.4,.12,0,'#1d1f22');for(const s of [-.4,.4])disc(-.45,s,.4,.12,0,'#1d1f22');part(0,0,1.35,.9,.55,.22,c);part(0,0,1.2,.95,.06,1.25,'#2b2b2b');for(const s of [-.42,.42])part(.45,s,.05,.05,.5,.78,'#2b2b2b');part(0,0,1.36,.92,.06,.5,'#2fae6b');return;}
     if(key==='danfo'){axles(.95,.52);part(0,0,2.7,1.2,1.05,.2,c);part(0,0,2.72,1.22,.07,.55,'#1d1f22');part(0,0,2.72,1.22,.07,.78,'#1d1f22');part(.1,0,2.1,1.22,.32,.86,'#2b3440');part(0,0,2.7,1.2,.08,1.25,shade(c,.85));return;}
-    if(key==='taxi'){axles(.62,.42);part(0,0,1.8,.95,.5,.15,c);part(0,0,1.1,.85,.42,.65,'#2b3440');part(0,0,1.82,.97,.08,.45,'#f2f2f0');part(0,0,.4,.25,.12,1.07,'#f2c230');return;}
-    if(key==='limo'){axles(1.25,.48);part(0,0,3.3,1.08,.48,.12,c);part(-.1,0,2.5,.98,.36,.6,'#14161a');part(0,0,3.32,1.1,.04,.45,'#c9ccc8');return;}
     if(key==='helicopter'){const spin=(performance.now()/90|0)%2;this.round(x,z,1.6,1.1,1.05,c,.3+lift);part(-1.2,0,1.5,.16,.16,.75,c);part(-1.9,0,.12,.1,.5,.7,shade(c,.8));part(.35,0,.6,.9,.5,.55,'#2b3440');for(const s of [-.42,.42])part(0,s,1.6,.07,.06,0,'#2b2b2b');this.box(x,z,spin?3.4:.12,spin?.12:3.4,.04,'#2b2b2b',1.38+lift);this.round(x,z,.12,.12,.12,'#2b2b2b',1.3+lift);return;}
     const body=(l,w,h,y,tone)=>{const [bw,bd]=X(l,w);this.box(x,z,bw,bd,h,tone,y);};
     const wheels=(span,track)=>{for(const a of [-1,1])for(const b of [-1,1]){const [dx,dz]=X(a*span,b*track);this.round(x+dx,z+dz,.3,.3,.3,'#1d1f22',0);}};
     if(key==='scooter'){body(1,.3,.25,.25,c);body(.25,.25,.7,.45,'#2b2f36');wheels(.4,.02);return;}
-    if(key==='suv'){wheels(.7,.45);body(2.1,1.05,.6,.15,c);body(1.5,.95,.5,.75,'#2b3440');body(2.12,1.07,.05,.5,shade(c,1.4));return;}
-    if(key==='hatchback'){wheels(.62,.42);body(1.8,.95,.5,.15,c);body(1.1,.85,.42,.65,'#2b3440');body(1.82,.97,.05,.45,shade(c,1.3));return;}
-    if(key==='coupe'){wheels(.68,.42);body(2,1,.4,.12,c);body(1,.85,.3,.52,'#2b2f36');const [sx,sz]=X(-.95,0);this.box(x+sx,z+sz,...X(.12,.9),.08,'#1d1f22',.6);return;}
-    wheels(.75,.46);body(2.3,1.12,.34,.1,c);body(2.32,.3,.02,.44,shade(c,1.35));body(.95,.86,.24,.44,'#14161a');const [wx,wz]=X(-1.05,0);this.box(x+wx,z+wz,...X(.18,1.05),.06,'#14161a',.66);for(const s of [-1,1]){const [px,pz]=X(-1.05,s*.35);this.box(x+px,z+pz,.08,.08,.22,'#14161a',.44);}
+    // Cars: a darker sill under the paint, a glass cabin with pillars and a roof, tyres with silver hubs,
+    // headlights at the front (dir: which way it drives), red tail lights, a grille and chrome bumpers.
+    const car4=({l,w,h,cab,cabL,cabF=0,span,track,wheel=.34,roof=c,trim=null})=>{const fr=dir,y0=.12;
+      for(const a of [-1,1])for(const b of [-1,1]){const [px,pz]=at(a*span,b*track),[tw,td]=X(wheel,.2);this.round(px,pz,tw,td,wheel,'#17181a',lift);const [hx,hz]=at(a*span,b*(track+.07)),[hw,hd]=X(wheel*.5,.06);this.round(hx,hz,hw,hd,wheel*.5,'#c9ccd2',lift+wheel*.25);}
+      part(0,0,l,w,h*.35,y0,shade(c,.72));part(0,0,l,w,h*.65,y0+h*.35,c);if(trim)part(0,0,l*1.004,w*1.01,.05,y0+h*.55,trim);
+      part(cabF*fr,0,cabL,w*.84,cab*.72,y0+h,'#8fb6c9');part(cabF*fr,0,cabL*.88,w*.8,cab*.28,y0+h+cab*.72,roof);
+      for(const e of [-1,1])part(cabF*fr+e*cabL/2,0,.07,w*.85,cab*.72,y0+h,shade(c,.85));
+      for(const sd of [-1,1]){part(fr*l/2,sd*w*.31,.04,.2,.09,y0+h*.62,'#fff4c4');part(-fr*l/2,sd*w*.33,.04,.18,.08,y0+h*.62,'#d6303a');}
+      part(fr*l/2,0,.04,w*.32,.1,y0+h*.34,'#202326');for(const e of [-1,1])part(e*l/2,0,.07,w*1.02,.07,y0+.02,'#c9ccd2');};
+    if(key==='hatchback'){car4({l:1.8,w:.95,h:.46,cab:.48,cabL:1.05,cabF:-.15,span:.6,track:.42});return;}
+    if(key==='taxi'){car4({l:1.8,w:.95,h:.46,cab:.48,cabL:1.05,cabF:-.1,span:.6,track:.42,trim:'#f2f2f0'});part(-.1*dir,0,.4,.25,.12,1.08,'#f2c230');return;}
+    if(key==='suv'){car4({l:2.1,w:1.05,h:.62,cab:.55,cabL:1.45,cabF:-.12,span:.7,track:.47,wheel:.42});for(const e of [-1,1])part(-.12*dir,e*.38,1.2,.05,.05,1.33,'#2b2d2f');return;}
+    if(key==='coupe'){car4({l:2,w:1,h:.36,cab:.34,cabL:.9,cabF:-.18,span:.68,track:.43,wheel:.32});part(-.95*dir,0,.12,.9,.06,.56,'#1d1f22');return;}
+    if(key==='limo'){car4({l:3.3,w:1.08,h:.42,cab:.38,cabL:2.4,cabF:-.1,span:1.25,track:.48,roof:'#14161a',trim:'#c9ccc8'});return;}
+    // Hypercar: low and wide with a rear wing on struts.
+    car4({l:2.3,w:1.12,h:.3,cab:.26,cabL:.9,cabF:.05,span:.75,track:.47,roof:'#14161a',trim:shade(c,1.35)});part(-1.05*dir,0,.18,1.05,.06,.66,'#14161a');for(const sd of [-1,1])part(-1.05*dir,sd*.35,.08,.08,.22,.44,'#14161a');
   }
   car(x,z,along,color){
     const [w,d]=along==='x'?[1.8,.9]:[.9,1.8];
@@ -580,7 +590,7 @@ export class World {
     const here=TOWN[this.location]||TOWN.home,ox=-here.x,oz=-here.z,{night}=this.daylight(),far=this.zoom<.4,t=this.reduced?0:performance.now()/1000;
     if(!far)for(let i=0;i<6;i++){const wx=ox-60+((t*.6+i*23)%120),wz=oz+12.5+i*1.8;if(this.onScreen(wx,wz,3))this.floor(wx,wz,3.5,.08,night?'#7f9cb9':'#c9e7ee',.01);}
     if(!this.reduced){
-      this.trafficStep();for(const c of this.traffic){const x=c.axis==='x'?c.pos:c.lane,z=c.axis==='x'?c.lane:c.pos;if(this.onScreen(ox+x,oz+z,2.5))this.ride(c.kind,ox+x,oz+z,c.axis);}
+      this.trafficStep();for(const c of this.traffic){const x=c.axis==='x'?c.pos:c.lane,z=c.axis==='x'?c.lane:c.pos;if(this.onScreen(ox+x,oz+z,2.5))this.ride(c.kind,ox+x,oz+z,c.axis,0,c.dir);}
       const walkers=far?0:24;for(let i=0;i<walkers;i++){const dir=i%2?1:-1,along=(t*1.1+i*17.3)%140,u=dir>0?-70+along:70-along,lane=[[6.1,'x'],[-6.1,'x'],[-9.9,'x'],[-22.1,'x'],[-25.9,'x'],[-38.1,'x'],[9.8,'x'],[-6.1,'z'],[6.1,'z'],[-22.1,'z'],[-9.9,'z'],[25.9,'z'],[-41.9,'x'],[-54.1,'x']][i%14];
         const [px,pz]=lane[1]==='x'?[u,lane[0]]:[lane[0],Math.max(-58,Math.min(9,u*.45-24))];if(!this.onScreen(px+ox,pz+oz,2))continue;
         this.human(px+ox,pz+oz,SKIN_TONES[(i+CROWD_SEED)%SKIN_TONES.length],{...this.look(['football','musician','vlogger','actor','developer','tennis'][i%6]),...this.extra(i),walk:true,heading:lane[1]==='x'?dir*Math.PI/2:dir>0?0:Math.PI,gait:t*7+i});}
