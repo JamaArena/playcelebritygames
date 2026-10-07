@@ -791,6 +791,8 @@ export class World {
     const furniture=this.visitedHome?.furniture||this.state.furniture;
     const valid=(px,pz)=>walkable(this.location,px,pz,furniture);
     if(!valid(x,z)){this.onObject({blocked:true});return;}
+    // If you're standing somewhere blocked (furniture placed on you, an old position), step to the nearest open ground first.
+    if(!valid(this.player.x,this.player.z)){let spot=null;for(let r=.3;r<=6&&!spot;r+=.3)for(let i=0;i<24&&!spot;i++){const px=this.player.x+Math.cos(i/24*Math.PI*2)*r,pz=this.player.z+Math.sin(i/24*Math.PI*2)*r;if(valid(px,pz))spot={x:px,z:pz};}if(!spot&&valid(0,1))spot={x:0,z:1};if(spot)this.player=spot;}
     const grid=.3,key=(gx,gz)=>`${gx},${gz}`,start=[Math.round(this.player.x/grid),Math.round(this.player.z/grid)],goal=[Math.round(x/grid),Math.round(z/grid)];
     const frontier=[start],came=new Map([[key(...start),null]]);let found=null;
     for(let cursor=0;cursor<frontier.length&&cursor<1300;cursor++){
