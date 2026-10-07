@@ -32,13 +32,13 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   const first=await a.call({type:'create',name:'River',career:'musician',origin:1});assert.equal(first.status,200);const aId=first.data.playerId;
   const second=await b.call({type:'create',name:'Sky',career:'musician',origin:0});const bId=second.data.playerId;
   assert.equal((await a.call()).data.scenePlayers.length,0,'separate private homes never share occupants');
-  await a.call({type:'chat',body:'Private home message'});
+  assert.equal((await a.call({type:'chat',body:'Public message'})).status,400,'chat is friends-only: no public messages');
   assert.equal((await b.call()).data.messages.length,0,'home chat is private to its occupants');
   await a.call({type:'friend',playerId:bId});await a.call({type:'invite',playerId:bId});
   await b.call({type:'visit',playerId:aId});
   assert.deepEqual((await a.call()).data.scenePlayers.map(p=>p.id),[bId]);
   assert.deepEqual((await b.call()).data.scenePlayers.map(p=>p.id),[aId]);
-  assert.ok((await b.call()).data.messages.some(m=>m.body==='Private home message'));
+  await a.call({type:'chat',body:'Private home message',recipient:bId});assert.ok((await b.call()).data.messages.some(m=>m.body==='Private home message'),'friends can message each other');
   await b.call({type:'leaveVisit'});await goTo(b,bId,'home');
   assert.equal((await a.call()).data.scenePlayers.length,0,'departed guests disappear');
   assert.equal((await a.call()).data.townPlayers.length,0,'players at home are never shown around town');
@@ -58,7 +58,7 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   assert.equal((await b.call({type:'buy',item:'chair'})).status,400);
   assert.equal((await b.call({type:'recover',need:'energy'})).status,400);
   await b.call({type:'leaveVisit'});
-  await a.call({type:'chat',body:'Hello Palm City'});assert.ok((await b.call()).data.messages.some(m=>m.body==='Hello Palm City'));
+  await a.call({type:'chat',body:'Hello Palm City',recipient:bId});assert.ok((await b.call()).data.messages.some(m=>m.body==='Hello Palm City'));
   await b.call({type:'block',playerId:aId});assert.equal((await b.call()).data.messages.length,0);
   assert.equal((await a.call({type:'chat',body:'Blocked message',recipient:bId})).status,400);
   await b.call({type:'unblock',playerId:aId});

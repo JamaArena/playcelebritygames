@@ -303,6 +303,8 @@ export const MOMENT = {cooldownMs: 24 * 3_600_000, tourMs: 24 * 3_600_000, viral
 // Fame milestones: a fan club (defends you: 10% less fame lost in mishaps), the verified tick, billboards and the Hall of Fame.
 export const FAME_MARKS = {fanClub: 10_000, verified: 50_000, billboard: 25_000, hallOfFame: 100_000};
 export const fanClubSize = fame => fame >= FAME_MARKS.fanClub ? Math.round(Math.sqrt(fame) * 12) : 0;
+// Marriage: spouses each earn this share of every fame gain the other makes (not counting what they share back).
+export const SPOUSE_SHARE = .1, SPOUSE_REASON = 'Spouse’s success';
 export const GIG = {everyMs: 15 * 60_000, windowMs: 10 * 60_000};
 // Home items that need electricity during a power cut (unless you own a generator).
 export const POWERED = ['gamingConsole', 'soundSystem', 'coffeeMachine', 'microwave', 'washingMachine', 'ringLight', 'studioMic'];
