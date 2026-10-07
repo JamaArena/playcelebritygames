@@ -1,4 +1,4 @@
-import { TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace } from './content.js';
+import { VENUE_ACTS, TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace } from './content.js';
 import { World, worldObjects } from './world.js';
 import { World3D } from './world3d.js';
 const $=selector=>document.querySelector(selector);
@@ -122,6 +122,9 @@ const onWorldObject=object=>{
   // The kitchen menu: the everyday meal plus every dish, with locked dishes showing the fame they need.
   if(object.name==='Kitchen'&&!state.visiting){const fame=state.fame||0,effects=f=>Object.entries(f.extra||{}).map(([n,v])=>` · ${v>0?'+':''}${v} ${needs[n][0]}`).join('');
     showTray(`♨ Kitchen menu${state.groceries?` · 🥕 ${state.groceries} groceries`:''}`,'<div class="tray-options food-menu">'+button(`♨ Cook & eat <small>+${B.recovery.hunger[0]} Hunger</small>`,'useObject')+Object.entries(FOODS).map(([key,f])=>f.takeaway&&!(state.takeaway?.[key]>0)?button(`${f.icon} ${escape(f.name)} <small>order on Shopping</small>`,'app','data-app="shopping"'):fame>=(f.fame||0)?button(`${f.icon} ${escape(f.name)} <small>+${f.hunger+(!f.takeaway&&state.groceries>0?GROCERY.bonus:0)} Hunger${effects(f)}${f.takeaway?` · you have ${state.takeaway[key]}`:''}</small>`,'cook',`data-food="${key}"`):button(`🔒 ${escape(f.name)} <small>${fmt(f.fame)} fame</small>`,'noop','disabled')).join('')+'</div>');return;}
+  // Things to do at places around the city.
+  if(object.act){const a=VENUE_ACTS[object.act],fam=CAREERS[state.career].family,extra=Object.entries(a.extra||{}).map(([n,v])=>` · ${v>0?'+':''}${v} ${needs[n][0]}`).join(''),bonus=(a.learn&&a.family===fam?' · trains your skill':'')+(a.fame&&(!a.family||a.family===fam)?' · a little fame':'')+(a.interview?' · fame on the line':'')+(a.fitness?' · fitness':'')+(a.groceries?` · +${a.groceries} groceries`:'');
+    pie(object,[[`${a.icon} ${escape(a.name)} <small>+${a.amount} ${needs[a.need][0]}${extra}${bonus}</small>`,'useObject'],...(a.page?[['🛒 Shop now','app',`data-app="${a.page}"`]]:[]),['↗ Go here','goObject']]);return;}
   // Placed home items: use them for their effect.
   if(object.useItem){const def=ITEMS[object.item],effects=Object.entries(def.use.extra||{}).map(([n,v])=>` · ${v>0?'+':''}${v} ${needs[n][0]}`).join('');pie(object,[[`${object.icon} ${escape(object.verb)} <small>+${object.amount} ${escape(needs[object.useNeed][0])}${effects}</small>`,'useObject'],['↗ Go here','goObject']]);return;}
   const watch=object.name==='Television'&&!state.visiting?[[`📺 ${escape(WATCH[def.family].title)} <small>learn a little</small>`,'watchObject']]:[];
@@ -534,6 +537,7 @@ document.addEventListener('click',async event=>{
         if(!use)return;
         const perform=async()=>{
           if(object.useItem){const data=await send({type:'useItem',item:object.item});if(data){world.pose=null;world.draw();}return;}
+          if(object.act){const data=await send({type:'venueAct',act:object.act});if(data){world.pose=null;world.draw();}return;}
           if(object.need){const data=await send({type:'recover',need:object.need,watch,...(object.food?{food:object.food}:{})});if(!data)return;}
           if(object.pose){const x=object.pose==='dine'?.5:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?-3.5:object.vx??object.x;const z=object.pose==='dine'?2.1:object.name==='Television'?2.1:object.name==='Coffee table'||object.name==='Sofa'?1.5:object.vz??object.z;world.pose={kind:object.pose,x,z,face:object.face};}
           if(object.name==='Bedside lamp')world.lampOff=!world.lampOff;

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { lifeEvents, createCharacter, act, reconcile, refill, learn, finishRecovery, shot, shootingProbability, generalProbability, choices, view, tennisPoint, tennisScore, evaluate } from '../game.mjs';
 import { BALANCE as B, CAREERS, effort, tripMs } from '../public/content.js';
 import { worldObjects } from '../public/world.js';
-import { walkable } from '../public/content.js';
+import { walkable, route, TOWN, VENUE_ACTS } from '../public/content.js';
 const T=1_000_000,MISHAP_AT=5;
 const make=(career='football',origin=0)=>createCharacter({name:'River',career,origin,adult:true},T);
 // Trips take real time; tests about other rules arrive immediately.
@@ -301,4 +301,13 @@ test('phone apps: posts, deliveries, takeaway, groceries, dating, music and the 
   act(s,{type:'datingOpen',open:true},T);act(s,{type:'datingLike',playerId:'p2'},T);act(s,{type:'goOnDate',name:'Zee'},T+64_000);assert.match(s.recovery.label,/Zee/);act(s,{type:'cancel'},T+64_000);
   act(s,{type:'listenMusic',song:'Island Boy'},T+65_000);assert.equal(s.recovery.amount,15);
   s.recovery=null;s.nextEventAt=Infinity;s.needs.bladder=1;s.lastSeen=T+300_000;reconcile(s,T+301_000);assert.match(s.headlines[0].text,/River/);assert.ok(s.fameLog[0].delta<0);
+});
+test('new places: activities, fitness, market groceries, and the beach over the bridge',()=>{
+  const s=make();s.location='nightclub';s.needs.fun=40;s.needs.social=40;
+  assert.throws(()=>act(s,{type:'venueAct',act:'workout'},T),/Iron Palm Gym/);
+  act(s,{type:'venueAct',act:'dance'},T);reconcile(s,s.recovery.endsAt+1);assert.equal(Math.round(s.needs.fun),80);assert.equal(Math.round(s.needs.social),60);
+  s.location='gym';for(let i=0;i<8;i++){act(s,{type:'venueAct',act:'workout'},T+i*100_000);s.needs.energy=100;reconcile(s,s.recovery.endsAt+1);}assert.equal(s.fitness,2);
+  s.location='market';act(s,{type:'venueAct',act:'stalls'},T+2_000_000);reconcile(s,s.recovery.endsAt+1);assert.equal(s.groceries,5);
+  const path=route('home','beach');assert.deepEqual(path.at(-1),{x:0,z:27});assert.ok(path.some(p=>p.x===0&&p.z===22),'crosses the bridge');assert.ok(tripMs('plaza','beach')>0);
+  for(const [key,a] of Object.entries(VENUE_ACTS)){assert.ok(TOWN[a.venue],key);const spot=worldObjects(a.venue).find(o=>o.act===key);assert.ok(spot,`${key} has a spot`);}
 });
