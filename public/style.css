@@ -535,3 +535,19 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 #app .need-bar i{width:100%!important;max-width:84px}
 #app .camera-controls{flex-direction:column;bottom:150px;right:10px}
 @media(max-width:700px){#app .camera-controls{bottom:136px}#app .need-bar .need-gem{width:26px;height:26px;font-size:14px}}
+
+/* The phone always fits the screen; only its own screen scrolls. A Close pill sits at the top. */
+#modal.as-phone{overflow:hidden;padding:0}
+#modal.as-phone .modal{width:auto;max-height:none;overflow:visible;padding:0;background:transparent;box-shadow:none;border-radius:0}
+#modal.as-phone .phone-device{--ph:min(calc(100dvh - 76px),860px);height:var(--ph);width:min(calc(100vw - 20px),420px);margin-top:46px;display:flex;flex-direction:column;box-sizing:border-box}
+#modal.as-phone .phone-screen{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+#modal.as-phone .phone-screen:not(.phone-app-screen){overflow-y:auto;scrollbar-width:none}
+#modal.as-phone .phone-screen:not(.phone-app-screen)::-webkit-scrollbar{display:none}
+#modal.as-phone .phone-screen:not(.phone-app-screen) .phone-status{position:sticky;top:0;z-index:3;backdrop-filter:blur(8px)}
+#modal.as-phone .phone-app-screen{height:auto}
+#modal.as-phone .phone-app{scrollbar-width:thin}
+#modal.as-phone .modal-close{position:fixed;top:10px;right:12px;left:auto;width:auto;height:auto;padding:9px 18px;border-radius:999px;background:#fff;color:#1f3a2f;font-family:var(--fun);font-weight:600;font-size:16px;line-height:1;box-shadow:0 6px 18px #0003;border:0;z-index:30}
+#modal.as-phone .modal-close:hover{background:#f1f6f2}
+.phone-app-screen .phone-status{padding-right:16px}
+.phone-app .phone-back{display:flex;align-items:center;gap:6px;font-family:var(--fun);font-weight:600;font-size:15px;color:#2f86f2;padding:10px 14px}
+@media(max-height:560px){#modal.as-phone .phone-device{--ph:calc(100dvh - 56px);margin-top:40px}}
