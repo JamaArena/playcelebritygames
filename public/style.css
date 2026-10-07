@@ -419,3 +419,14 @@ details.v2-more summary{cursor:pointer;font-weight:600;color:#21634e}
 .task-queue{display:flex;align-items:center;gap:6px;margin-top:7px;overflow-x:auto;white-space:nowrap}.task-queue small{font-size:10px;color:#73906a;flex:none}.queue-chip{flex:none;font-size:10px;padding:5px 9px;border-radius:14px;background:#edf3e7;border:1px solid #d5e2cd}.queue-chip b{margin-left:3px;opacity:.6}#app .activity-card:has(.idle-actions) .task-queue{background:#fffef4ed;padding:5px 8px;border-radius:14px}
 /* Arranging the room: a slim bar at the bottom keeps the floor in view. */
 #app .object-tray:has(.placement-hint){top:auto;bottom:150px}.object-tray:has(.placement-hint) .tray-options{margin-top:7px}.object-tray:has(.placement-hint) .tray-options button{padding:7px 10px;font-size:11px}.city-column:has(#objectTray:not([hidden]) .placement-hint) #minimap,.city-column:has(#objectTray:not([hidden]) .placement-hint) .activity-card{display:none}@media(max-width:620px){#app .object-tray:has(.placement-hint){bottom:125px}}
+
+/* Apps open on the phone's screen */
+#modal.phone-app-view .modal{width:min(392px,calc(100vw - 20px));max-height:none;overflow:visible}
+.phone-app-screen{display:flex;flex-direction:column;height:min(740px,calc(100vh - 70px))}
+.phone-app{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;background:#fffdf6;color:#1f3a2f;padding:10px 14px 16px;border-radius:0 0 6px 6px;font-size:13px}
+.phone-app h2{font-size:20px;line-height:1.15}.phone-app .eyebrow{font-size:10px}.phone-app .modal-intro{font-size:12px}
+.phone-app .item-grid{grid-template-columns:1fr 1fr;gap:8px}.phone-app .item-card{padding:10px;min-width:0}.phone-app .item-card h3{font-size:13px}.phone-app .item-card p{font-size:11px}.phone-app .item-card button{font-size:11px;padding:7px 9px}
+.phone-app .phone-back{position:sticky;top:-10px;z-index:2;margin:-10px -14px 8px;padding:8px 14px;width:calc(100% + 28px);text-align:left;background:#fffdf6;border:0;border-bottom:1px solid #e7e2d2;border-radius:0}
+.phone-homebar{flex:none;display:block;width:120px;height:5px;margin:7px auto 6px;padding:0;border:0;border-radius:4px;background:#0005;cursor:pointer}.phone-homebar:hover{background:#0008}
+.piece-count{font-size:11px;color:#5e715a;margin:2px 0 6px}
+.phone-app-screen .phone-status{padding-right:46px}#modal.phone-app-view .modal-close{top:13px;right:16px;width:26px;height:26px;font-size:15px;line-height:1;border-radius:50%;background:#0005;color:#fff}

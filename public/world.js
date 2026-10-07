@@ -90,10 +90,11 @@ export const worldObjects = (location,furniture=[],owned=[],home) => ({
     {name:'Front door',icon:'🚪',x:-4.6,z:3.6,vx:-5.1,vz:3.6,action:'exit'},
     ...homeRooms(home).map(({object:o})=>({name:o.name,icon:o.icon,x:o.x,z:o.z,vx:o.vx,vz:o.vz,need:o.need,verb:o.verb,pose:o.pose,face:o.face,action:o.action,spot:o.spot})),
     ...furniture.map((f,i)=>{const def=ITEMS[f.item]||{},use=def.use;
-      if(f.item==='chair')return {name:`Chair ${i+1}`,icon:'♙',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Sit',pose:'sit',furniture:f.item};
-      if(f.item==='wardrobe')return {name:'Wardrobe',icon:'👗',x:f.x,z:f.z+.75,vx:f.x,vz:f.z,action:'wardrobe',furniture:f.item};
-      if(use)return {name:def.name,icon:use.icon,x:f.x,z:f.z+.75,vx:f.x,vz:f.z,verb:use.verb,item:f.item,useItem:true,amount:use.amount,useNeed:use.need,furniture:f.item};
-      return {name:f.item==='trophyShelf'?'Display table':def.name||'Display table',icon:'◇',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Admire',pose:null,furniture:f.item};}),
+      const piece={key:`f:${f.id??i}`,furniture:f.item,piece:f.id};
+      if(f.item==='chair')return {...piece,name:'Chair',icon:'♙',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Sit',pose:'sit'};
+      if(f.item==='wardrobe')return {...piece,name:'Wardrobe',icon:'👗',x:f.x,z:f.z+.75,vx:f.x,vz:f.z,action:'wardrobe'};
+      if(use)return {...piece,name:def.name,icon:use.icon,x:f.x,z:f.z+.75,vx:f.x,vz:f.z,verb:use.verb,item:f.item,useItem:true,amount:use.amount,useNeed:use.need};
+      return {...piece,name:def.name||'Shelf',icon:'◇',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Admire',pose:null};}),
     ...Object.entries(ITEMS).filter(([key,def])=>def.extension&&owned.includes(key)).map(([key,def])=>({name:def.name,icon:def.use.icon,...extensionSpot(key,home),face:undefined,verb:def.use.verb,item:key,useItem:true,remote:true,amount:def.use.amount,useNeed:def.use.need})),
   ],
   nightclub:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.tourNightclub.name,icon:VENUE_ACTS.tourNightclub.icon,x:0,z:-3.4,act:'tourNightclub',face:0},{name:VENUE_ACTS.dance.name,icon:VENUE_ACTS.dance.icon,x:0,z:-0.4,act:'dance',face:0},{name:VENUE_ACTS.djSet.name,icon:VENUE_ACTS.djSet.icon,x:0,z:-2.9,act:'djSet',face:0},{name:VENUE_ACTS.bar.name,icon:VENUE_ACTS.bar.icon,x:-3.1,z:0.4,act:'bar',face:-1.5708}],
@@ -117,7 +118,9 @@ export const worldObjects = (location,furniture=[],owned=[],home) => ({
   tech:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:VENUE_ACTS.tokenLaunch.name,icon:VENUE_ACTS.tokenLaunch.icon,x:1.6,z:1,act:'tokenLaunch',face:3.1416},{name:VENUE_ACTS.hackathon.name,icon:VENUE_ACTS.hackathon.icon,x:-1.6,z:-1.2,act:'hackathon',face:3.1416},{name:VENUE_ACTS.pitch.name,icon:VENUE_ACTS.pitch.icon,x:0.4,z:-0.6,act:'pitch',face:3.1416},{name:'Project desk',icon:'⌘',x:-3.2,z:-2.3,action:'career'},{name:'Practice lab',icon:'⬡',x:2.5,z:-2,action:'practice'},{name:'Builder Ari',icon:'☺',x:2,z:2,action:'phone'}],
   street:[{name:'Front door',icon:'🚪',x:0,z:5.9,action:'enter'}],
   plaza:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:'Palm Realty estate agent',icon:'🏡',x:-1.2,z:3.8,action:'estate'},{name:'City shop',icon:'◇',x:-3,z:-1.7,action:'shop'},{name:'Palm Motors',icon:'🏁',x:3.3,z:2.75,action:'vip'},{name:'Café',icon:'♨',x:3,z:-1.7,need:'social'},{name:'Park bench',icon:'▱',x:-2.5,z:1.6,need:'fun'},{name:'Creator Mika',icon:'☺',x:2.5,z:2.6,action:'phone'}],
-}[location]||[]);
+}[location]||[]).map(o=>({...o,key:o.key||o.name,label:OBJECT_LABELS[o.name]||o.name}));
+// Things are called what they are: a chair is a chair, wherever it stands.
+const OBJECT_LABELS={'Dining chair':'Chair','Guest chair':'Chair','Dining table':'Table','Coffee table':'Table','Bedside lamp':'Lamp','Living plant':'Plant','Bedroom plant':'Plant','Work desk':'Desk','Front door':'Door','Television':'TV'};
 const shades=new Map(),shade=(hex,factor)=>{const key=hex+factor;let out=shades.get(key);if(!out){const value=parseInt(hex.slice(1),16),c=v=>Math.min(255,Math.round(v*factor));out=`rgb(${c(value>>16)},${c((value>>8)&255)},${c(value&255)})`;shades.set(key,out);}return out;};
 const SKIN_TONES=['#8d5a3f','#c88f69','#6b4532','#b07a58','#e0b08c','#7d5642','#a46a4a'],CAR_TONES=['#d9534f','#f0ad4e','#3d7ea6','#f5f3ee','#3b4a42','#7a5ea8','#2f8f6b'];
 // A seeded layout keeps the city identical for every player. Blocks sit on a 16-unit grid between roads.
@@ -160,7 +163,7 @@ export class World {
         else if(!this.gesture.multi){const g=this.gesture;if(Math.hypot(event.clientX-g.startX,event.clientY-g.startY)>6)g.dragged=true;if(g.dragged){this.angleGoal=null;this.angle+=(event.clientX-previous.x)*.009;this.tilt(this.pitch+(event.clientY-previous.y)*.002);}}
         this.canvas.classList.toggle('dragging',this.gesture.dragged);this.draw();return;
       }
-      const r=canvas.getBoundingClientRect();if(this.placement){const point=this.unproject(event.clientX-r.left,event.clientY-r.top),p=this.placement,nx=Math.round(point.x*2)/2,nz=Math.round(point.z*2)/2;if(event.pointerType==='mouse'&&(p.x!==nx||p.z!==nz||!p.shown)){p.x=nx;p.z=nz;p.shown=true;this.onPlacement?.(canPlace(this.state.furniture,p.item,nx,nz,this.homeKey()));}}const near=list=>list?.find(p=>Math.hypot(p.screen.x-event.clientX+r.left,p.screen.y-event.clientY+r.top)<24);this.hover=event.pointerType==='mouse'?near(this.pins)||near(this.peopleHits)||near(this.houseHits)||this.hits?.find(o=>Math.hypot(o.screen.x-event.clientX+r.left,o.screen.y-event.clientY+r.top)<(this.hitRadius||24)):null;this.draw();
+      const r=canvas.getBoundingClientRect();if(this.placement){const point=this.unproject(event.clientX-r.left,event.clientY-r.top),p=this.placement,nx=Math.round(point.x*2)/2,nz=Math.round(point.z*2)/2;if(event.pointerType==='mouse'&&(p.x!==nx||p.z!==nz||!p.shown)){p.x=nx;p.z=nz;p.shown=true;this.onPlacement?.(canPlace(this.state.furniture,p.id,nx,nz,this.homeKey()));}}const near=list=>list?.find(p=>Math.hypot(p.screen.x-event.clientX+r.left,p.screen.y-event.clientY+r.top)<24);this.hover=event.pointerType==='mouse'?near(this.pins)||near(this.peopleHits)||near(this.houseHits)||this.hits?.find(o=>Math.hypot(o.screen.x-event.clientX+r.left,o.screen.y-event.clientY+r.top)<(this.hitRadius||24)):null;this.draw();
     });
     const endPointer=(event,cancelled=false)=>{if(!this.pointers.has(event.pointerId))return;const tap=this.pointers.size===1&&!this.gesture.dragged&&!this.gesture.multi&&!cancelled;this.pointers.delete(event.pointerId);if(!this.pointers.size){this.canvas.classList.remove('dragging');this.gesture=null;this.pinchDistance=0;}if(tap)this.click(event);};
     canvas.addEventListener('pointerup',event=>endPointer(event));canvas.addEventListener('pointercancel',event=>endPointer(event,true));
@@ -501,7 +504,7 @@ export class World {
       this.box(.5,-4.2,1.2,.75,.8,'#c4b08b');this.box(.5,-4.2,1.3,.8,.07,'#f5f0df',.8);this.box(.5,-4.4,.7,.08,.5,'#405c55',.87);this.box(.5,-4.1,.65,.35,.03,'#819087',.88);
       if(Math.sin(this.angle)>0){this.box(-5.25,3.6,.08,1.15,2,'#6b4a35');this.box(-5.2,3.6,.04,.95,1.75,'#7d5841',.08);this.round(-5.17,3.2,.06,.06,.06,'#d4af37',1);}
       if(style.chandelier){this.round(-1.7,1.5,.05,.05,.6,'#8a7a5a',2.05);this.round(-1.7,1.5,.7,.7,.3,style.chandelier,1.85);}
-      for(const f of (this.visitedHome?.furniture||this.state.furniture))if(f.item!==this.placement?.item)this.furnitureModel(f.item,f.x,f.z);this.paintPet();if(!this.visitedHome)for(const [key,def] of Object.entries(ITEMS))if(def.extension&&this.state.inventory?.[key])this.extensionModel(key,extensionSpot(key,this.homeKey()).x,extensionSpot(key,this.homeKey()).z);
+      for(const f of (this.visitedHome?.furniture||this.state.furniture))if(!this.placement?.id||f.id!==this.placement.id)this.furnitureModel(f.item,f.x,f.z);this.paintPet();if(!this.visitedHome)for(const [key,def] of Object.entries(ITEMS))if(def.extension&&this.state.inventory?.[key])this.extensionModel(key,extensionSpot(key,this.homeKey()).x,extensionSpot(key,this.homeKey()).z);
     }else if(l==='sports'){
       this.floor(0,0,11,11,'#b7c6a0');this.floor(0,0,6.3,8.4,'#7fa788');
       for(let z=-4;z<4;z++)this.floor(0,z+.5,6.2,.96,z%2?'#86ad8d':'#7ca584',.01);
@@ -534,12 +537,12 @@ export class World {
       this.ride(this.showroomRide(),3.3,3.9,'x');
       this.plant(-4.1,4,1.8);this.plant(0,-4.4,1.5);this.plant(-4.8,-.1);
     }
-    if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.item,p.x,p.z,this.homeKey());for(const [sx,sz] of p.spots||[])this.round(sx,sz,.16,.16,.02,'#3fbf6f',.02);this.floor(p.x,p.z,1.15,1.15,valid?'#3fbf6f':'#e0533f',.03);this.furnitureModel(p.item,p.x,p.z);}
+    if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.id,p.x,p.z,this.homeKey());for(const [sx,sz] of p.spots||[])this.round(sx,sz,.16,.16,.02,'#3fbf6f',.02);this.floor(p.x,p.z,1.15,1.15,valid?'#3fbf6f':'#e0533f',.03);this.furnitureModel(p.item,p.x,p.z);}
     if(this.interior()&&l!=='home')this.paintCrowd(l);
     const npc=NPCS.find(n=>n.location===l);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone'),nx=obj?.x||2.5,nz=obj?.z||2,talking=this.npcTalkUntil>performance.now();this.human(nx,nz,npc.look.skin,{...this.look(npc.career),...this.body({hair:npc.look.hair,hairColor:npc.look.hairColor,build:npc.look.build,height:npc.look.height}),pose:talking?'gesture':null,heading:talking?Math.atan2(this.player.x-nx,this.player.z-nz):0});}
     this.paintPeople();
     // Using a placed home item: stand in front of it (or sit on it) in that item's pose.
-    const using=this.state.recovery?.item&&!this.visitedHome,usedDef=using&&ITEMS[this.state.recovery.item]?.use,usedSpot=using&&(ITEMS[this.state.recovery.item]?.extension||this.state.furniture.find(f=>f.item===this.state.recovery.item));
+    const using=this.state.recovery?.item&&!this.visitedHome,usedDef=using&&ITEMS[this.state.recovery.item]?.use,usedSpot=using&&(ITEMS[this.state.recovery.item]?.extension||(this.state.furniture.find(f=>f.id===this.state.recovery.piece)||this.state.furniture.find(f=>f.item===this.state.recovery.item)));
     let mishap=this.freshMishap(),need=using||this.state.recovery?.act?null:this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=(usedDef?usedDef.pose||'watch':null)||(mishap&&!need?MISHAP_POSES[mishap.need]:null)||({energy:'sleep',fun:this.state.recovery?.yacht?'dance':this.pose?.kind==='sit'?'sit':'tv',hygiene:'shower',bladder:'toilet',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
     const emote=this.emote&&performance.now()<this.emote.until&&!this.moving&&!this.state.recovery&&!this.state.active?this.emote.kind:null;
     if(emote&&!using)pose=emote;
@@ -585,7 +588,7 @@ export class World {
     if(this.moving){const t=this.project(this.target.x,.03,this.target.z);ctx.strokeStyle='#fff8';ctx.lineWidth=1.3;ctx.beginPath();ctx.ellipse(t.x,t.y,7,3.5,0,0,Math.PI*2);ctx.stroke();}
     this.hits=[...worldObjects(this.location,this.visitedHome?.furniture||this.state.furniture,this.visitedHome?[]:Object.keys(this.state.inventory||{}),this.homeKey()).map(object=>({...object,screen:this.project(object.vx??object.x,.6,object.vz??object.z)})),...this.petHits()];
     this.hitRadius=Math.max(14,Math.min(30,this.scale*.42));
-    ctx.font='600 10px Segoe UI';for(const o of this.hits.filter(o=>o.name===this.hover?.name)){const p=o.screen;const width=ctx.measureText(o.name).width+14;ctx.fillStyle='#fff9';ctx.beginPath();ctx.roundRect(p.x-width/2,p.y+13,width,17,8);ctx.fill();ctx.fillStyle='#49614f';ctx.fillText(o.name,p.x,p.y+25);}
+    ctx.font='600 10px Segoe UI';for(const o of this.hits.filter(o=>o.key===this.hover?.key)){const p=o.screen;const width=ctx.measureText(o.label).width+14;ctx.fillStyle='#fff9';ctx.beginPath();ctx.roundRect(p.x-width/2,p.y+13,width,17,8);ctx.fill();ctx.fillStyle='#49614f';ctx.fillText(o.label,p.x,p.y+25);}
   }
   // Local chat appears as a speech bubble over the speaker for a few seconds.
   // A short face-to-face chat: both gesture for a couple of seconds and the NPC's line pops up.
@@ -836,7 +839,7 @@ export class World {
   flyTo(zoom){this.zoomGoal=clampZoom(zoom);}
   click(event){if(!this.state)return;const r=this.canvas.getBoundingClientRect(),x=event.clientX-r.left,y=event.clientY-r.top;
     // Arranging: a tap moves the preview there; tapping the same spot again (or a click after hovering it) places it.
-    if(this.placement){const point=this.unproject(x,y),p=this.placement,nx=Math.round(point.x*2)/2,nz=Math.round(point.z*2)/2;if(p.x===nx&&p.z===nz&&p.shown){this.onObject({placement:{item:p.item,x:nx,z:nz}});return;}p.x=nx;p.z=nz;p.shown=true;this.onPlacement?.(canPlace(this.state.furniture,p.item,nx,nz,this.homeKey()));this.draw();return;}
+    if(this.placement){const point=this.unproject(x,y),p=this.placement,nx=Math.round(point.x*2)/2,nz=Math.round(point.z*2)/2;if(p.x===nx&&p.z===nz&&p.shown){this.onObject({placement:{item:p.item,id:p.id,x:nx,z:nz}});return;}p.x=nx;p.z=nz;p.shown=true;this.onPlacement?.(canPlace(this.state.furniture,p.id,nx,nz,this.homeKey()));this.draw();return;}
     const pin=this.pins?.find(p=>Math.hypot(p.screen.x-x,p.screen.y-y)<24);if(pin){this.onObject({travel:pin.travel});return;}
     const person=this.peopleHits?.find(p=>Math.hypot(p.screen.x-x,p.screen.y-y)<22);if(person){this.onObject({person:person.player,name:person.player.name,screen:person.screen});return;}
     const home=this.houseHits?.find(h=>Math.hypot(h.screen.x-x,h.screen.y-y)<26);if(home){this.onObject({house:home.house,name:`${home.house.name}’s home`,screen:home.screen});return;}
@@ -877,7 +880,7 @@ export class World {
     this.onMove({x,z}); // others see the walk begin immediately
     if(this.reduced){this.player={x,z};this.waypoints=[];this.arrived();}this.draw();
   }
-  walkToObject(name){const object=worldObjects(this.location,this.visitedHome?.furniture||this.state.furniture,this.visitedHome?[]:Object.keys(this.state.inventory||{}),this.homeKey()).find(o=>o.name===name);if(object)this.onObject(object);}
+  walkToObject(name){const object=worldObjects(this.location,this.visitedHome?.furniture||this.state.furniture,this.visitedHome?[]:Object.keys(this.state.inventory||{}),this.homeKey()).find(o=>o.key===name);if(object)this.onObject(object);}
   approach(object,callback){
     const furniture=this.visitedHome?.furniture||this.state.furniture;
     if(walkable(this.location,object.x,object.z,furniture,this.homeKey())){this.walk(object.x,object.z,callback);return;}

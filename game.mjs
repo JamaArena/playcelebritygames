@@ -67,6 +67,8 @@ export function reconcile(s, now) {
   if(s.version<3){delete s.money;delete s.inventory.food;for(const c of Object.values(s.careers))for(const deal of [c.affiliation,c.offer])if(deal){deal.boost=B.contractBoost;delete deal.fee;delete deal.share;}s.version=3;}
   // The Fraudster career was retired: those players continue as developers, keeping fame and history.
   if(s.careers?.hacker){delete s.careers.hacker;if(s.career==='hacker'){s.career=Object.keys(s.careers)[0]||'developer';s.careers[s.career]??=newCareer(s.career,0);}if(s.active?.career==='hacker')s.active=null;log(s,'The Fraudster career has been retired. You continue as a '+CAREERS[s.career].name.toLowerCase()+'.',now);}
+  for(const [i,f] of (s.furniture||[]).entries())f.id??=`f${i}${f.item}`;
+  for(const f of s.furniture||[])if(s.inventory[f.item])s.inventory[f.item].count=Math.max(s.inventory[f.item].count||1,s.furniture.filter(g=>g.item===f.item).length);
   refill(s,now);
   // Heartbeats arrive every 20 seconds; gaps up to 30 seconds count as active. Offline needs never decay.
   const dt=Math.max(0,now-s.lastSeen);
@@ -499,14 +501,16 @@ export function act(s,input,now,rng=Math.random) {
       if(def.gadget){requireRule(s.inventory[input.item],'Claim it first.');requireRule(!s.trip,'Wait until you arrive.');}
       else if(def.extension){requireRule(s.inventory[input.item],'Claim it first.');requireRule(s.location==='home'&&!s.visiting,'Your extensions are at home.');}
       else{requireRule(s.location==='home'&&!s.visiting,'Use your items at home.');
-      requireRule(s.inventory[input.item]&&s.furniture.some(f=>f.item===input.item),'Place that item at home first.');}
+      requireRule(s.inventory[input.item]&&s.furniture.some(f=>f.item===input.item&&(!input.id||f.id===input.id)),'Place that item at home first.');}
       requireRule(!(POWERED.includes(input.item)&&noPower(s,now)),'NEPA took light. Wait for power, or get a generator.');
-      s.recovery={id:id(),need:use.need,label:use.verb,startedAt:now,endsAt:now+use.ms,amount:use.amount,extra:use.extra||{},item:input.item};break;
+      s.recovery={id:id(),need:use.need,label:use.verb,startedAt:now,endsAt:now+use.ms,amount:use.amount,extra:use.extra||{},item:input.item,...(input.id&&!def.gadget&&!def.extension?{piece:input.id}:{})};break;
     }
     case 'buy': {
       const item=ITEMS[input.item];requireRule(item,'Unknown item.');requireRule(s.location==='plaza','Visit Palm plaza to shop.');
-      requireRule(!s.inventory[input.item],'You already have this item.');requireRule((s.fame||0)>=item.fame,`${item.name} unlocks at ${item.fame.toLocaleString('en-US')} fame.`);
-      s.inventory[input.item]={level:1};log(s,`Claimed ${item.name}. Free with your fame.`,now);break;
+      requireRule(!s.inventory[input.item]||item.furniture,'You already have this item.');requireRule((s.fame||0)>=item.fame,`${item.name} unlocks at ${item.fame.toLocaleString('en-US')} fame.`);
+      // Furniture: own as many as you like; each new one waits in storage until you place it.
+      if(s.inventory[input.item])s.inventory[input.item].count=(s.inventory[input.item].count||1)+1;else s.inventory[input.item]={level:1,count:1};
+      log(s,`Claimed ${item.name}${item.furniture&&s.inventory[input.item].count>1?` (you have ${s.inventory[input.item].count})`:''}. Free with your fame.`,now);break;
     }
     case 'upgrade': {
       const item=s.inventory[input.item];requireRule(item&&ITEMS[input.item]?.upgradable,'This item cannot be upgraded.');
@@ -516,15 +520,17 @@ export function act(s,input,now,rng=Math.random) {
     case 'equip':requireRule(s.inventory[input.item]&&ITEMS[input.item]?.slot,'You do not own usable equipment.');s.equipped[ITEMS[input.item].slot]=input.item;break;
     case 'place': {
       requireRule(s.location==='home'&&s.inventory[input.item]&&ITEMS[input.item]?.furniture,'Place your owned furniture at home.');
-      requireRule(canPlace(s.furniture,input.item,input.x,input.z,s.home),'That spot overlaps something or blocks a path. Try another (green means it fits).');
-      requireRule(!s.furniture.some(f=>f.item!==input.item&&f.x===input.x&&f.z===input.z),'That position is occupied.');
-      requireRule(s.recovery?.item!==input.item,'Finish using it first.');
-      s.furniture=s.furniture.filter(f=>f.item!==input.item);s.furniture.push({item:input.item,x:input.x,z:input.z});break;
+      const piece=input.id?s.furniture.find(f=>f.id===input.id):null;requireRule(!input.id||piece&&piece.item===input.item,'That piece is not in your home.');
+      requireRule(piece||s.furniture.filter(f=>f.item===input.item).length<(s.inventory[input.item].count||1),`Every ${ITEMS[input.item].name.toLowerCase()} you own is already placed. Claim another at Palm plaza.`);
+      requireRule(canPlace(s.furniture,input.id||null,input.x,input.z,s.home),'That spot overlaps something or blocks a path. Try another (green means it fits).');
+      requireRule(!s.furniture.some(f=>f.id!==input.id&&f.x===input.x&&f.z===input.z),'That position is occupied.');
+      requireRule(!piece||s.recovery?.piece!==piece.id,'Finish using it first.');
+      if(piece)Object.assign(piece,{x:input.x,z:input.z});else s.furniture.push({id:id(),item:input.item,x:input.x,z:input.z});break;
     }
     case 'store': {
-      requireRule(s.location==='home'&&!s.visiting,'Arrange your room at home.');requireRule(s.furniture.some(f=>f.item===input.item),'That item is already in storage.');
-      requireRule(s.recovery?.item!==input.item,'Finish using it first.');
-      s.furniture=s.furniture.filter(f=>f.item!==input.item);log(s,`📦 ${ITEMS[input.item]?.name||'Item'} moved to storage.`,now);break;
+      requireRule(s.location==='home'&&!s.visiting,'Arrange your room at home.');const piece=input.id?s.furniture.find(f=>f.id===input.id):s.furniture.findLast(f=>f.item===input.item);requireRule(piece,'That item is already in storage.');
+      requireRule(s.recovery?.piece!==piece.id&&!(s.recovery?.item===piece.item&&!s.recovery.piece),'Finish using it first.');
+      s.furniture=s.furniture.filter(f=>f!==piece);log(s,`📦 ${ITEMS[piece.item]?.name||'Item'} moved to storage.`,now);break;
     }
     case 'claim': {
       if(SPONSORSHIPS[input.item]?.kind==='brand'){const d=SPONSORSHIPS[input.item];requireRule(!s.vip?.[input.item],'You already signed this deal.');requireRule((s.fame||0)>=d.fame,`${d.sponsor} signs players with ${d.fame.toLocaleString('en-US')} fame.`);s.vip={...(s.vip||{}),[input.item]:{at:now}};if(d.grant.wear){s.closet??={};s.closet[d.grant.wear]=true;}if(d.grant.phone)s.phone=d.grant.phone;headline(s,`${s.name} signs with ${d.sponsor} ${d.icon}`,now);log(s,`${d.icon} Signed with ${d.sponsor}.`,now);break;}
