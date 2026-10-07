@@ -1069,7 +1069,19 @@ export class World {
   }
   arrived(){this.moving=false;const cb=this.pending;this.pending=null;if(cb)cb();}
   stop(){this.stopped=true;this.resize?.disconnect();}
+  // Indoors, if you wander near the edge of the screen the camera glides until you are back in the middle.
+  keepInView(dt){
+    if(!this.state||!this.interior()||this.overview||this.placement||this.previewHome||this.panHold||!this.width)return;
+    const a=this.actor||this.player,p=this.project(a.x,1,a.z),w=this.width,h=this.height;
+    if(!this.recentering&&(p.x<w*.2||p.x>w*.8||p.y<h*.2||p.y>h*.72))this.recentering=true;
+    if(!this.recentering)return;
+    this.pan??={x:0,z:0};const tx=a.x-(this.followX||0),tz=a.z,k=Math.min(1,dt*3.2);this.pan.x+=(tx-this.pan.x)*k;this.pan.z+=(tz-this.pan.z)*k;
+    if(Math.hypot(tx-this.pan.x,tz-this.pan.z)<.08)this.recentering=false;this.draw();
+  }
+  // The arrow pad: slide the view by a number of screen pixels.
+  panBy(dx,dy){if(!this.width)return;const a=this.unproject(this.width/2,this.height/2),b=this.unproject(this.width/2+dx,this.height/2+dy);this.pan??={x:0,z:0};this.pan.x+=b.x-a.x;this.pan.z+=b.z-a.z;this.recentering=false;this.draw();}
   frame(time){if(this.stopped)return;if(this.paused){this.last=time;requestAnimationFrame(t=>this.frame(t));return;}const dt=Math.min((time-this.last)/1000,.05);this.last=time;
+    this.keepInView(dt);
     if(this.pose?.expires&&time>this.pose.expires){const kind=this.pose.kind;this.pose=null;if(kind==='water')this.respond('water',true,'❀');}
     if(this.npcTalkUntil&&time>this.npcTalkUntil)this.npcTalkUntil=null;
     if(this.moving){const dx=this.target.x-this.player.x,dz=this.target.z-this.player.z,d=Math.hypot(dx,dz),desired=this.waypoints.length?2.8:Math.min(2.8,Math.sqrt(14*d));this.speed+=Math.max(-7*dt,Math.min(7*dt,desired-this.speed));const step=Math.min(d,this.speed*dt);this.heading=turnToward(this.heading,Math.atan2(dx,dz),dt);this.gait+=step*8;

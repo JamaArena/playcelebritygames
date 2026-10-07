@@ -699,3 +699,11 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 .notice-overlay{background:radial-gradient(circle at 50% 40%,#0000000d 0,#0000006b 80%)!important;-webkit-backdrop-filter:blur(1.5px);backdrop-filter:blur(1.5px)}
 .notice-card{background:linear-gradient(#fffef8e6,#f4f1e6e0)!important;-webkit-backdrop-filter:blur(14px) saturate(1.3);backdrop-filter:blur(14px) saturate(1.3)}
 .reward-overlay{cursor:pointer}.reward-overlay>*{cursor:auto}
+
+/* Arrow pad for moving the view */
+.pan-pad{position:absolute;z-index:6;left:14px;bottom:150px;display:grid;grid-template-columns:repeat(3,40px);grid-template-rows:repeat(3,40px);gap:4px;padding:6px;border-radius:20px;background:#fffef3b3;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);box-shadow:0 6px 18px #0002;touch-action:none}
+.pan-pad[hidden]{display:none}
+.pan-pad button{width:40px;height:40px;border:0;border-radius:12px;background:linear-gradient(#fff,#e7f3fb);color:#24506b;font-size:16px;box-shadow:inset 0 -3px 0 #c6dcea,0 2px 6px #0002;cursor:pointer}
+.pan-pad button:active{transform:translateY(2px)}
+.pan-pad [data-pan="0,-1"]{grid-column:2;grid-row:1}.pan-pad [data-pan="-1,0"]{grid-column:1;grid-row:2}.pan-pad [data-pan="1,0"]{grid-column:3;grid-row:2}.pan-pad [data-pan="0,1"]{grid-column:2;grid-row:3}
+@media(max-width:700px){.pan-pad{bottom:136px;grid-template-columns:repeat(3,36px);grid-template-rows:repeat(3,36px)}.pan-pad button{width:36px;height:36px}}

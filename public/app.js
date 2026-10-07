@@ -211,6 +211,13 @@ function makeWorld(){
 }
 const world=makeWorld();
 world.onGround=closeTray;
+// Arrow pad (on the map and out in the city): tap to nudge the view, hold to keep sliding.
+let panTimer=null;
+function updatePanPad(){const pad=$('#panPad');if(pad)pad.hidden=!(world.overview||state?.location==='street'||state?.trip);}
+for(const b of document.querySelectorAll('#panPad [data-pan]')){const [dx,dy]=b.dataset.pan.split(',').map(Number),step=()=>world.panBy(dx*70,dy*70);
+  b.addEventListener('pointerdown',e=>{e.preventDefault();world.panHold=true;step();clearInterval(panTimer);panTimer=setInterval(step,90);});
+  for(const ev of ['pointerup','pointerleave','pointercancel'])b.addEventListener(ev,()=>{clearInterval(panTimer);world.panHold=false;});}
+setInterval(updatePanPad,400);
 // Pop-ups get out of the way: a tap anywhere else closes the action menu or tray, and tapping outside a centre pop-up dismisses it.
 document.addEventListener('pointerdown',event=>{const t=event.target;if(!(t instanceof Element))return;
   const menuOpen=!$('#pieMenu').hidden,trayOpen=!$('#objectTray').hidden&&!world.placement;
