@@ -110,8 +110,8 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   // The winner takes about 1% of the loser's fame (at least 1).
   if(battle.winner===0){assert.equal(aEnd.fame,101);assert.equal(bEnd.fame,29);}else if(battle.winner===1){assert.equal(bEnd.fame,31);assert.equal(aEnd.fame,99);}else{assert.equal(aEnd.fame,100);assert.equal(bEnd.fame,30,'a draw changes nothing');}
   assert.ok(!('lucky' in battle),'the lucky shirt day stays a secret');
-  for(const end of [aEnd,bEnd])assert.ok(end.awards.some(w=>w.medal==='clashFighter'&&w.tier===1),'everyone who fought gets Clash fighter ★');
-  if(battle.winner!=null)assert.ok([aEnd,bEnd][battle.winner].awards.some(w=>w.medal==='clashWinner'&&w.name==='Clash winner ★'),'the winner gets Clash winner ★');
+  for(const end of [aEnd,bEnd])assert.deepEqual(end.clashRecord&&{fought:end.clashRecord.fought},{fought:1},'every clash is counted');
+  assert.ok(![aEnd,bEnd].some(e=>e.awards.some(w=>w.medal==='clashWinner'||w.medal==='clashFighter')),'Crowd Conqueror and Never Backs Down start at ten');
   assert.equal(aEnd.battle,null);assert.equal(bEnd.battle,null);
   assert.equal((await a.call({type:'battleMove',battleId,move:'brag',target:bId})).status,400,'finished battles take no more moves');
   assert.equal((await a.call({type:'battleCreate',mode:3})).status,400,'only 1v1 Fame Clashes');

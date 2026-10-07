@@ -689,8 +689,8 @@ export function npcOpinion(npcId, fame = 0, day = 0) {
 
 // Fame Clash medals, each with five star tiers.
 export const CLASH_MEDALS = {
-  clashWinner: {name: 'Clash winner', icon: '🏆', stat: 'won', tiers: [1, 2, 3, 5, 10]},
-  clashFighter: {name: 'Clash fighter', icon: '🥊', stat: 'fought', tiers: [1, 5, 12, 25, 50]},
+  clashWinner: {name: 'Crowd Conqueror', icon: '👑', stat: 'won', tiers: [10, 20, 30, 50, 100]},
+  clashFighter: {name: 'Never Backs Down', icon: '🥊', stat: 'fought', tiers: [10, 50, 120, 250, 500]},
   weightClass: {name: 'Punched outta your weight class', icon: '🥋', stat: 'bigFought', tiers: [1, 5, 12, 25, 50]},
   giantSlayer: {name: 'Giant slayer', icon: '🗡️', stat: 'giantWins', tiers: [1, 2, 3, 5, 10]},
 };

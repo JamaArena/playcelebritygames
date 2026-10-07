@@ -434,6 +434,7 @@ test('fame clash maths: stakes are 1% of the loser, bigger means double and 100 
   const {clashStake,isBigger,medalTier}=await import('../public/content.js');
   assert.equal(clashStake(1_000_000),10_000);assert.equal(clashStake(1_000),10);assert.equal(clashStake(30),1);assert.equal(clashStake(0),0);
   assert.ok(isBigger(1_000_000,1_000));assert.ok(!isBigger(150,100));assert.ok(!isBigger(80,30),'twice as much but not 100 more');
-  assert.equal(medalTier('clashWinner',{won:0}),0);assert.equal(medalTier('clashWinner',{won:1}),1);assert.equal(medalTier('clashWinner',{won:4}),3);assert.equal(medalTier('clashWinner',{won:10}),5);
-  assert.equal(medalTier('clashFighter',{fought:12}),3);assert.equal(medalTier('clashFighter',{fought:50}),5);assert.equal(medalTier('giantSlayer',{giantWins:5}),4);assert.equal(medalTier('weightClass',{bigFought:25}),4);
+  assert.equal(medalTier('clashWinner',{won:9}),0);assert.equal(medalTier('clashWinner',{won:10}),1);assert.equal(medalTier('clashWinner',{won:40}),3);assert.equal(medalTier('clashWinner',{won:100}),5);
+  assert.equal(medalTier('clashFighter',{fought:120}),3);assert.equal(medalTier('clashFighter',{fought:500}),5);assert.equal(medalTier('clashFighter',{fought:49}),1);
+  const old=make();old.clashRecord={fought:3,won:1};old.awards.push({id:'x',name:'Clash winner ★',medal:'clashWinner',tier:1,career:old.career,at:T});reconcile(old,T+1);assert.ok(!old.awards.some(w=>w.medal==='clashWinner'),'old medals are re-graded');assert.equal(medalTier('giantSlayer',{giantWins:5}),4);assert.equal(medalTier('weightClass',{bigFought:25}),4);
 });
