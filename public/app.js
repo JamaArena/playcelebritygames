@@ -19,7 +19,7 @@ function phoneFrame(body){const model=phoneModel();return `<div class="phone-dev
 function showModal(page,html,closable=true){
   if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;
   const inPhone=closable&&Boolean(state)&&!NOT_PHONE.includes(page),body=(closable&&!NOT_PHONE.includes(page)?button('‹ Phone','backToPhone','','phone-back'):'')+html;
-  $('#modalContent').innerHTML=inPhone?phoneFrame(body):body;$('#modal').classList.toggle('as-phone',page==='phoneHome'||inPhone);$('#modal').classList.toggle('phone-app-view',inPhone);
+  $('#modalContent').innerHTML=inPhone?phoneFrame(body):body;$('#modal').classList.toggle('as-phone',page==='phoneHome'||inPhone);const onPhone=page==='phoneHome'||inPhone;$('#closeModal').textContent=onPhone?'✕ Close':'×';$('#closeModal').setAttribute('aria-label',onPhone?'Close phone':'Close dialog');$('#modal').classList.toggle('phone-app-view',inPhone);
   const title=$('#modalContent h2');if(title)title.id='modalTitle';
   setTimeout(()=>$('#modalContent input, #modalContent button, #closeModal')?.focus(),0);
 }
