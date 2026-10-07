@@ -22,7 +22,7 @@ function phoneStatus(model){const time=new Date();if(model.key!=='basic')return 
 function phoneFrame(body){const model=phoneModel();return `<div class="phone-device skin-${model.key}${model.key==='basic'?'':' ios'}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen phone-app-screen">${phoneStatus(model)}<div class="phone-app">${body}</div><button class="phone-homebar" data-action="backToPhone" aria-label="Back to the home screen"></button></div></div>`;}
 // Phone app kit: a sticky header (round back chevron + app name), avatars, list rows, segmented tabs.
 const CHEVRON='<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 4.5 7.5 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const PAGE_TITLES={prepare:'Career',wallet:'Fame wallet',phone:'Social',thread:'Messages',chat:'Messages',shop:'Market',inventory:'My stuff',vip:'Palm Motors',phones:'Upgrade',tips:'Tips',life:'My life',estate:'Palm Realty',barber:'Barber & Salon',tattoo:'Tattoos',tailor:'Tailor',gift:'Send a gift',upgrade:'Upgrade',retire:'Retirement',battle:'Fame Clash',battles:'Battles',graphicsOffer:'Graphics'};
+const PAGE_TITLES={prepare:'Career',wallet:'Fame wallet',phone:'Social',thread:'Messages',chat:'Messages',shop:'Market',inventory:'My stuff',vip:'Naija Motors',phones:'Upgrade',tips:'Tips',life:'My life',estate:'Lekki Realty',barber:'Barber & Salon',tattoo:'Tattoos',tailor:'Tailor',gift:'Send a gift',upgrade:'Upgrade',retire:'Retirement',battle:'Fame Clash',battles:'Battles',graphicsOffer:'Graphics'};
 const appHead=(title,slot='',back='data-action="backToPhone" aria-label="Back to the home screen"')=>`<header class="app-head"><button class="app-back" ${back}>${CHEVRON}</button><h2>${title}</h2><span class="app-head-slot">${slot}</span></header>`;
 // Hair for a head centred at (x,y) with radius r: [behind the head, over the head].
 function hairSvg(style,x,y,r,c){
@@ -212,7 +212,7 @@ const onWorldObject=object=>{
     pie(object,def.skills.map(skill=>[`🎯 ${escape(skillName(state.career,skill))} <small>Lv ${c.skills[skill].level}</small>`,'startPractice',`data-skill="${escape(skill)}"`]));return;
   }
   if(object.action==='career'){const kind=['founder','web3'].includes(state.career)?'build':'produce';pie(object,[[`${def.icon} ${escape(def.output)} <small>⚡ 1</small>`,'quickStart',`data-kind="${kind}"`],['📝 Plan it first','prepareDetails',`data-kind="${kind}"`],['🚶 Go here','goObject']]);return;}
-  if(object.action==='shop'){pie(object,[['🛍️ Browse shop','page','data-page="shop"'],['👗 Palm Boutique','page','data-page="wardrobe"'],['🚶 Go here','goObject']]);return;}
+  if(object.action==='shop'){pie(object,[['🛍️ Browse shop','page','data-page="shop"'],['👗 Ankara Boutique','page','data-page="wardrobe"'],['🚶 Go here','goObject']]);return;}
   if(object.pet){const p=state.pet;toast(`${PETS[p.kind].icon} ${p.name} · food ${Math.round(p.food)}% · happiness ${Math.round(p.joy)}%`);pie(object,[[`🍖 Feed <small>+${PET_CARE.feed} food</small>`,'petCare','data-act="feed"'],[`🎾 Play <small>+${PET_CARE.play} happiness · +5 Fun</small>`,'petCare','data-act="play"'],[`🤗 Cuddle <small>+${PET_CARE.cuddle} happiness</small>`,'petCare','data-act="cuddle"']]);return;}
   if(object.action==='wardrobe'){pie(object,[['👗 Change outfit','page','data-page="wardrobe"'],['🚶 Go here','goObject']]);return;}
   if(object.action==='exit'){pie(object,[['🚪 Go outside','travel','data-location="street"']]);return;}
@@ -373,7 +373,7 @@ function authScreen(tab=authStep.tab,error=''){
   showModal('auth',`<div class="auth"><div class="auth-brand"><span>✦</span><strong>Celebrity Games</strong><i>18+</i></div><p class="auth-lede">Live your celebrity story with real people.</p>
   ${codeStep?`<form id="codeForm" class="auth-form">${authStep.fallback?`<p class="auth-note">Email codes aren’t switched on yet, so use <strong>123456</strong>.</p>`:`<p>We sent a 6-digit code to <strong>${escape(authStep.email)}</strong>.</p>`}<div class="field"><label for="code">Code</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="\\d{6}" maxlength="6" required placeholder="123456"></div>${error?`<p class="auth-error">${escape(error)}</p>`:''}<button class="primary wide" type="submit">Verify &amp; continue</button><div class="auth-links">${button('Resend code','authResend','','text-button')}${button('Use a different email','authTab',`data-tab="${authStep.from||'signup'}"`,'text-button')}</div></form>`
   :`<div class="auth-tabs">${button('Create account','authTab','data-tab="signup"',signup?'on':'')}${button('Log in','authTab','data-tab="login"',signup?'':'on')}</div><form id="authForm" class="auth-form"><input type="hidden" name="purpose" value="${tab}">
-  ${signup?`<div class="field"><label for="authName">Your name</label><input id="authName" name="name" placeholder="e.g. Tolu Adebayo" minlength="2" maxlength="40" required autocomplete="name"></div><div class="field"><label for="authUser">Username</label><div class="at-input"><span>@</span><input id="authUser" name="username" placeholder="tolu_eko" pattern="[A-Za-z0-9_]{3,20}" maxlength="20" required autocomplete="username"></div><small>Your celebrity name in Palm City. 3–20 letters, numbers or underscores.</small></div>`:''}
+  ${signup?`<div class="field"><label for="authName">Your name</label><input id="authName" name="name" placeholder="e.g. Tolu Adebayo" minlength="2" maxlength="40" required autocomplete="name"></div><div class="field"><label for="authUser">Username</label><div class="at-input"><span>@</span><input id="authUser" name="username" placeholder="tolu_eko" pattern="[A-Za-z0-9_]{3,20}" maxlength="20" required autocomplete="username"></div><small>Your celebrity name in Naija City. 3–20 letters, numbers or underscores.</small></div>`:''}
   <div class="field"><label for="authEmail">Email</label><input id="authEmail" name="email" type="email" required autocomplete="email" placeholder="you@example.com" value="${escape(authStep.email)}"></div>
   ${signup?'<label class="check"><input type="checkbox" name="adult" required> I’m 18 or older.</label>':''}${error?`<p class="auth-error">${escape(error)}</p>`:''}<button class="primary wide" type="submit">Send code</button><p class="empty">${signup?'We’ll email you a code. No password needed.':'We’ll email a code to the address on your account.'}</p></form>`}</div>`,false);
 }
@@ -424,7 +424,7 @@ function updateCreationCareer(key){
   document.querySelectorAll('.career-option').forEach(b=>b.classList.toggle('selected',b.dataset.career===key));
   $('#careerExtras').innerHTML=`<div class="career-pick"><strong>${def.icon} ${escape(def.name)}</strong><small>${escape(def.umbrella)} · stories: ${def.origins.map(escape).join(' or ')}</small></div>`+(key==='musician'?'<div class="field"><label for="technique">Primary technique</label><select id="technique" name="technique"><option value="vocals">Vocals</option><option value="instrument">Instrument</option></select></div>':key==='adult'?'<label class="check"><input type="checkbox" name="adult" required> 18+ career. My character and everyone in their projects are adults. Expect flirty, suggestive themes; nothing explicit is shown.</label>':'');
 }
-function map(){world.overview=true;world.flyTo(.22);showTray('📍 Palm City','<div class="map-sheet"><div class="city-tiles">'+Object.entries(LOCATIONS).sort(([a],[b])=>(b===state.location)-(a===state.location)).map(([key,l])=>button('<span>'+(TOWN[key]?.pin||'🚪')+'</span><b>'+escape(l.name)+'</b>'+(key===state.location?'<small>You’re here</small>':key!=='street'?'<small>'+eta(key)+'</small>':''),'travel','data-location="'+key+'"'+(key===state.location?' disabled':''),'city-tile'+(key===state.location?' here':''))).join('')+'</div>'+travelModes()+'<small class="map-hint">Swipe the places, or tap a pin on the map.</small></div>');}
+function map(){world.overview=true;world.flyTo(.22);showTray('📍 Naija City','<div class="map-sheet"><div class="city-tiles">'+Object.entries(LOCATIONS).sort(([a],[b])=>(b===state.location)-(a===state.location)).map(([key,l])=>button('<span>'+(TOWN[key]?.pin||'🚪')+'</span><b>'+escape(l.name)+'</b>'+(key===state.location?'<small>You’re here</small>':key!=='street'?'<small>'+eta(key)+'</small>':''),'travel','data-location="'+key+'"'+(key===state.location?' disabled':''),'city-tile'+(key===state.location?' here':''))).join('')+'</div>'+travelModes()+'<small class="map-hint">Swipe the places, or tap a pin on the map.</small></div>');}
 // About how long a trip takes with your chosen way of travelling.
 function eta(key){const pref=state.travelMode||'best',mode=pref==='best'?bestMode(state,now()):pref==='own'?(state.ride||'walk'):pref;if(!RIDE_SPEED[mode])return '';const ms=tripMs(state.location==='street'?'home':state.location,key,mode);return ms<60_000?`~${Math.round(ms/1000)}s`:`~${Math.round(ms/60000)} min`;}
 // How a trip reads: walking, cycling, flying, taking public transport, or driving.
@@ -473,7 +473,7 @@ const WEAR_ICONS={top:'👕',bottom:'👖',shoes:'👟',head:'🧢',face:'🕶�
 const wearIcon=w=>FIT_ICONS[w.fit]||WEAR_ICONS[w.slot]||'👕';
 function shop(){const fame=state.fame||0;markSeen('shop',marketUnlocked());
   const card=([key,item])=>{const owned=state.inventory[key],ready=fame>=item.fame;return product({emoji:itemIcon(key),name:escape(item.name),note:escape(item.description),price:`✦ ${fmt(item.fame)}`,locked:!ready,action:owned&&!item.furniture?button('Owned ✓','noop','disabled','secondary small'):ready?owned?button(`Claim another · ${owned.count||1}`,'buy',`data-item="${key}"`,'secondary small'):button('Claim free','buy',`data-item="${key}"`,'primary small'):button(`🔒 ${fmt(item.fame-fame)} to go`,'noop','disabled','secondary small')});};
-  showModal('shop',`<div class="kit-hero hero-shop banner"><span class="banner-emoji">🛍️</span><div><strong>Free with fame</strong><small>No coins here: items unlock with fame and you claim them at Palm plaza. You have ✦ ${fmt(fame)}.</small></div></div>
+  showModal('shop',`<div class="kit-hero hero-shop banner"><span class="banner-emoji">🛍️</span><div><strong>Free with fame</strong><small>No coins here: items unlock with fame and you claim them at Eko plaza. You have ✦ ${fmt(fame)}.</small></div></div>
   <div class="product-grid">${Object.entries(ITEMS).map(card).join('')}</div>
   <p class="app-label">🐾 Pet stall</p>${state.pet?`<p class="app-sub">You have ${escape(state.pet.name)} the ${escape(PETS[state.pet.kind].name.toLowerCase())}. One pet at a time.</p>`:`<div class="product-grid">${Object.entries(PETS).map(([key,p])=>product({emoji:p.icon,name:escape(p.name),note:escape(p.note),tone:'pet',price:`✦ ${fmt(p.fame)}`,locked:fame<p.fame,action:fame>=p.fame?`<input id="petName-${key}" class="pet-name" maxlength="20" placeholder="Name your ${p.name.toLowerCase()}" aria-label="Pet name">${state.location==='plaza'?button('Adopt','adoptPet',`data-kind="${key}"`,'primary small'):button('Adopt at plaza','travel','data-location="plaza"','secondary small')}`:button(`🔒 ${fmt(p.fame-fame)} to go`,'noop','disabled','secondary small')})).join('')}</div>`}`);}
 // The wardrobe: a dressing-room stage with your character, slot tabs, and item cards you can tap to preview.
@@ -495,7 +495,7 @@ function wardrobe(){
     return product({emoji:wearIcon(w),name:escape(w.name),tone:'wear',tag:w.perk?escape(PERKS[w.perk[0]].label(w.perk[1])):'',price:w.fame?`✦ ${fmt(w.fame)}${owned?' · Owned':''}`:'Free basic',locked:!owned&&fame<w.fame,action,extra:`<b class="swatch-dot" style="--c:${escape(wear.tint?.[key]||w.color)}"></b>`,attrs:`data-action="wardrobePreview" data-item="${key}"`}).replace('class="product ',`class="product ${worn?'worn ':''}${preview===key?'previewing ':''}`);}).join('');
   showModal('wardrobe',`<div class="dress-stage">${preview?lookSvg(wear,preview).replace('class="look"','class="look pop"'):lookSvg(wear,preview)}<span class="stage-pill">${preview?`Previewing: ${escape(WEAR[preview].name)}`:'Today’s look'}</span>${preview?button('Reset','wardrobePreview','data-item=""','stage-reset'):''}</div>
   <div class="slot-tabs">${tabs}</div>
-  <details class="perk-chips"><summary>✦ Active perks (${perks.length})</summary><div class="chip-scroll">${perks.map(([key,v])=>`<span class="perk-chip">${escape(PERKS[key].label(v))}</span>`).join('')||'<span class="perk-chip none">No perks yet. Claim clothes at Palm Boutique and wear them.</span>'}</div></details>
+  <details class="perk-chips"><summary>✦ Active perks (${perks.length})</summary><div class="chip-scroll">${perks.map(([key,v])=>`<span class="perk-chip">${escape(PERKS[key].label(v))}</span>`).join('')||'<span class="perk-chip none">No perks yet. Claim clothes at Ankara Boutique and wear them.</span>'}</div></details>
   <div class="product-grid">${cards}</div>`);
 }
 // Phone apps: chat inbox, friends, feed, music, fame wallet, news, dating, calendar, camera, shopping.
@@ -531,7 +531,7 @@ function friendMenu(id){
 }
 // Feed: a composer card with ideas and a counter, filter chips, and posts as cards.
 let feedFilter='latest';
-const FEED_IDEAS=['Studio day 🎧','Out in Palm City 🌴','Big news soon 👀','Thank you fans ❤️'];
+const FEED_IDEAS=['Studio day 🎧','Out in Naija City 🌴','Big news soon 👀','Thank you fans ❤️'];
 function feedApp(){
   const friends=new Set(state.friends);let posts=[...(state.posts||[]).map(p=>({...p,...myLook(),online:false,mine:true,verified:(state.fame||0)>=50_000})),...snapshot.players.filter(p=>p.id!==me()&&(feedFilter!=='friends'||friends.has(p.id))).flatMap(p=>(p.posts||[]).map(x=>({...x,name:p.name,color:p.color,hair:p.hair,hairColor:p.hairColor,wear:p.wear,online:p.online,verified:p.verified})))];
   posts=posts.sort(feedFilter==='trending'?(a,b)=>(b.likes||0)-(a.likes||0)||b.at-a.at:(a,b)=>b.at-a.at).slice(0,40);
@@ -540,7 +540,7 @@ function feedApp(){
   ${posts.map(p=>`<article class="post-card"><header>${avatar(p,'md')}<div><strong>${escape(p.name)}</strong> <small>· ${ago(p.at)}</small>${p.verified?'<span class="role-chip">✔ Verified star</span>':''}</div></header><p>${escape(p.body)}</p><footer><span>❤️ ${fmt(p.likes||0)} fan likes</span>${p.mine?'<span>✍️ You</span>':''}</footer></article>`).join('')||'<p class="empty">No posts yet. Be the first.</p>'}`);
 }
 // A built-in playlist of fictional tracks, played with a tiny synth in the browser.
-const PLAYLIST=[['Lagos Night Drive','Kemi Vibes',96],['Island Boy','DJ Palm',104],['Jollof Summer','Tobi Ray',112],['Owambe Saturday','The Palm Band',120],['Third Mainland','Ayo Keys',100],['Danfo Dance','Shoki Kids',108],['Detty December','Amaka',116],['Harmattan Love','Femi Sol',92]];
+const PLAYLIST=[['Lagos Night Drive','Kemi Vibes',96],['Island Boy','DJ Jollof',104],['Jollof Summer','Tobi Ray',112],['Owambe Saturday','The Highlife Band',120],['Third Mainland','Ayo Keys',100],['Danfo Dance','Shoki Kids',108],['Detty December','Amaka',116],['Harmattan Love','Femi Sol',92]];
 let music=null;
 function playSong(index){
   stopSong();const [, , bpm]=PLAYLIST[index]||PLAYLIST[0];let audio;try{audio=new AudioContext();}catch{return;}
@@ -556,7 +556,7 @@ const album=i=>{const [a,b]=ALBUM_TONES[((i%6)+6)%6];return `<span class="album"
 function musicApp(){
   const mine=(state.outputs||[]).filter(o=>CAREERS[o.career]?.family==='music').slice(0,5).map((o,i)=>[o.title,state.name,100+i*4]);
   const songs=[...mine,...PLAYLIST],playing=music?songs[music.index+mine.length]:null;
-  showModal('music',`<div class="kit-hero hero-music"><div class="np">${album(music?music.index:0).replace('album','album big')}<div><small>${playing?'Now playing':'Palm City radio'}</small><strong>${escape(playing?.[0]||'Pick a track')}</strong><span>${escape(playing?.[1]||'Listening for 30 seconds lifts your fun (+15)')}</span></div>${playing?'<i class="eq" aria-hidden="true"><b></b><b></b><b></b></i>':''}</div><div class="np-bar"><i class="${playing?'run':''}"></i></div>${playing?button('⏹ Stop','stopSong','','glass small'):''}</div>
+  showModal('music',`<div class="kit-hero hero-music"><div class="np">${album(music?music.index:0).replace('album','album big')}<div><small>${playing?'Now playing':'Naija City radio'}</small><strong>${escape(playing?.[0]||'Pick a track')}</strong><span>${escape(playing?.[1]||'Listening for 30 seconds lifts your fun (+15)')}</span></div>${playing?'<i class="eq" aria-hidden="true"><b></b><b></b><b></b></i>':''}</div><div class="np-bar"><i class="${playing?'run':''}"></i></div>${playing?button('⏹ Stop','stopSong','','glass small'):''}</div>
   <div class="pcard">${songs.map(([title,artist],i)=>{const idx=i-mine.length,on=music?.index===idx;return prow(album(idx),escape(title),escape(artist),button(on?'❚❚':'▶','playSong',`data-index="${idx}" data-title="${escape(title)}" aria-label="Play ${escape(title)}"`,on?'primary round':tint('#2fa84f','round')),on?'data-on':'');}).join('')}</div>`);
 }
 // Fame wallet: a balance card, gained and lost tiles, and the ledger grouped by day with an icon per kind of entry.
@@ -567,7 +567,7 @@ function walletApp(){
   const rank=snapshot.players.filter(p=>p.id!==me()&&(p.fame||0)>(state.fame||0)).length+1,today=new Date().toDateString();
   const entry=e=>{const [,icon,c]=LEDGER_KINDS.find(([re])=>re.test(e.reason))||[0,e.delta>0?'✦':'↘',e.delta>0?'#2fa84f':'#e5484d'];return prow(ico(icon,c).replace('prow-ico','prow-ico round'),escape(e.reason),ago(e.at),`<b class="amount ${e.delta>0?'up':'down'}">${e.delta>0?'+':'−'}${fmt(Math.abs(e.delta))}</b>`);};
   const shown=walletAll?log:log.slice(0,8),groups=[['Today',shown.filter(e=>new Date(e.at).toDateString()===today)],['Earlier',shown.filter(e=>new Date(e.at).toDateString()!==today)]].filter(([,l])=>l.length);
-  showModal('wallet',`<div class="kit-hero hero-wallet"><small>Fame balance</small><strong class="big-number">✦ ${fmt(state.fame||0)}</strong><span>${rank?`Rank #${rank} in Palm City`:'Palm City'} · ${B.tiers[state.careers[state.career].tier][0]}</span></div>
+  showModal('wallet',`<div class="kit-hero hero-wallet"><small>Fame balance</small><strong class="big-number">✦ ${fmt(state.fame||0)}</strong><span>${rank?`Rank #${rank} in Naija City`:'Naija City'} · ${B.tiers[state.careers[state.career].tier][0]}</span></div>
   <div class="stat-pair"><div class="stat-tile"><span class="disc" style="--c:#2fa84f">↗</span><strong>+${fmt(gained)}</strong><small>Gained recently</small></div><div class="stat-tile"><span class="disc" style="--c:#e5484d">↘</span><strong>−${fmt(lost)}</strong><small>Lost recently</small></div></div>
   ${groups.map(([label,list])=>`<p class="app-label">${label}</p><div class="pcard">${list.map(entry).join('')}</div>`).join('')||'<p class="empty">Your fame history starts with your next win (or mishap).</p>'}${log.length>8?button(walletAll?'Show less':`Show all ${log.length}`,'walletAll','','secondary wide'):''}`);
 }
@@ -575,7 +575,7 @@ function newsApp(){
   const top=[...snapshot.players].sort((a,b)=>(b.fame||0)-(a.fame||0))[0],items=[...(state.headlines||[]),...snapshot.players.filter(p=>p.id!==me()).flatMap(p=>p.headlines||[])].sort((a,b)=>b.at-a.at).slice(0,25);
   const weather=weatherAt(now()),season=festivalAt(now());
   const trending=[...snapshot.players].filter(p=>p.trend>0).sort((a,b)=>b.trend-a.trend).slice(0,5),legends=snapshot.players.filter(p=>p.hallOfFame);
-  showModal('news',`${trending.length?`<h3>🔥 Trending today</h3>${trending.map((p,i)=>`<div class="ledger"><span>${i+1}. ${escape(p.name)}${p.verified?' ✔':''}</span><strong class="up">+${fmt(p.trend)}</strong></div>`).join('')}`:''}${legends.length?`<h3>🌟 Hall of Fame</h3>${legends.map(p=>`<div class="ledger"><span>${escape(p.name)} ✔</span><small>since ${new Date(p.hallOfFame).toLocaleDateString()}</small></div>`).join('')}`:''}<h3>Headlines</h3>${top?`<div class="headline lead">👑 ${escape(top.name)} leads Palm City with ✦ ${fmt(top.fame||0)} fame</div>`:''}${season==='independence'?'<div class="headline">🇳🇬 Green and white everywhere as Palm City celebrates Independence week</div>':''}${weather==='rain'?'<div class="headline">🌧 Heavy rain floods streets; trips running slow</div>':weather==='harmattan'?'<div class="headline">🌫 Harmattan haze settles over the lagoon</div>':''}${items.map(h=>`<div class="headline">${escape(h.text)} <small>${ago(h.at)}</small></div>`).join('')||'<p class="empty">A quiet news day. Make some headlines.</p>'}`);
+  showModal('news',`${trending.length?`<h3>🔥 Trending today</h3>${trending.map((p,i)=>`<div class="ledger"><span>${i+1}. ${escape(p.name)}${p.verified?' ✔':''}</span><strong class="up">+${fmt(p.trend)}</strong></div>`).join('')}`:''}${legends.length?`<h3>🌟 Hall of Fame</h3>${legends.map(p=>`<div class="ledger"><span>${escape(p.name)} ✔</span><small>since ${new Date(p.hallOfFame).toLocaleDateString()}</small></div>`).join('')}`:''}<h3>Headlines</h3>${top?`<div class="headline lead">👑 ${escape(top.name)} leads Naija City with ✦ ${fmt(top.fame||0)} fame</div>`:''}${season==='independence'?'<div class="headline">🇳🇬 Green and white everywhere as Naija City celebrates Independence week</div>':''}${weather==='rain'?'<div class="headline">🌧 Heavy rain floods streets; trips running slow</div>':weather==='harmattan'?'<div class="headline">🌫 Harmattan haze settles over the lagoon</div>':''}${items.map(h=>`<div class="headline">${escape(h.text)} <small>${ago(h.at)}</small></div>`).join('')||'<p class="empty">A quiet news day. Make some headlines.</p>'}`);
 }
 function datingApp(){
   const open=!!state.dating?.open,likes=state.dating?.likes||[],people=snapshot.players.filter(p=>p.id!==me()&&p.dating);
@@ -594,7 +594,7 @@ const loadPhotos=()=>{try{return JSON.parse(localStorage.getItem('cg.photos')||'
 function cameraApp(){const photos=loadPhotos();showModal('camera',`<p class="modal-intro">Photos stay on this device. Your character strikes a selfie pose.</p>${button('📸 Take a photo','takePhoto','','primary wide')}<div class="gallery">${photos.map((p,i)=>`<figure><img src="${p.src}" alt="Photo at ${escape(p.place)}"><figcaption>${escape(p.place)} · ${ago(p.at)} <button class="text-button" data-action="deletePhoto" data-index="${i}">Delete</button></figcaption></figure>`).join('')||'<p class="empty">No photos yet.</p>'}</div>`);}
 function takePhoto(){
   closeModal();world.emote={kind:'selfie',until:performance.now()+3000};send({type:'emote',emote:'selfie'},{keepModal:true,quiet:true});
-  setTimeout(()=>{const src=world.snapshotImage?.();if(!src){toast('The camera needs the 3D view.');return;}const photos=[{src,at:now(),place:LOCATIONS[state.location]?.name||'Palm City'},...loadPhotos()].slice(0,12);try{localStorage.setItem('cg.photos',JSON.stringify(photos));toast('📸 Saved to your gallery.');}catch{toast('Your gallery is full. Delete a photo first.');}},700);
+  setTimeout(()=>{const src=world.snapshotImage?.();if(!src){toast('The camera needs the 3D view.');return;}const photos=[{src,at:now(),place:LOCATIONS[state.location]?.name||'Naija City'},...loadPhotos()].slice(0,12);try{localStorage.setItem('cg.photos',JSON.stringify(photos));toast('📸 Saved to your gallery.');}catch{toast('Your gallery is full. Delete a photo first.');}},700);
 }
 let shopCat='food';
 function shoppingApp(){
@@ -606,7 +606,7 @@ function shoppingApp(){
     item:Object.entries(ITEMS).filter(([k,i])=>!state.inventory[k]&&!i.slot).slice(0,30).map(([k,i])=>card('item',k,itemIcon(k),i.name,i.description,i.fame)).join(''),
     wear:Object.entries(WEAR).filter(([k,w])=>w.fame>0&&!state.closet?.[k]).map(([k,w])=>card('wear',k,wearIcon(w),w.name,w.note,w.fame,w.perk?escape(PERKS[w.perk[0]].label(w.perk[1])):'')).join('')};
   const empty={item:'You own everything here.',wear:'Your wardrobe is complete.'};
-  showModal('shopping',`<div class="kit-hero hero-shopping banner"><span class="banner-emoji">🛵</span><div><strong>Delivered in 1 min</strong><small>Order from anywhere in Palm City.</small></div></div>
+  showModal('shopping',`<div class="kit-hero hero-shopping banner"><span class="banner-emoji">🛵</span><div><strong>Delivered in 1 min</strong><small>Order from anywhere in Naija City.</small></div></div>
   ${smart?'':'<p class="notice">Shopping needs a smartphone. Upgrade your phone in Profile → Phone upgrades.</p>'}${state.deliveries?.length?`<div class="notice">📦 On the way: ${state.deliveries.map(d=>escape(d.name)).join(', ')}</div>`:''}
   <div class="chip-scroll filters">${[['food','🍲 Takeaway'],['groceries','🥕 Groceries'],['item','🏠 Home'],['wear','👕 Clothes']].map(([k,l])=>`<button class="chip ${k===shopCat?'on':''}" data-action="shopCat" data-cat="${k}" aria-pressed="${k===shopCat}">${l}</button>`).join('')}</div>
   ${lists[shopCat]?`<div class="product-grid">${lists[shopCat]}</div>`:`<p class="empty">${empty[shopCat]||'Nothing here right now.'}</p>`}`);
@@ -615,31 +615,31 @@ function shoppingApp(){
 let barberPick=null;
 function barberShop(){
   barberPick??={hair:state.hair||'curls',hairColor:state.hairColor||'black'};const here=state.location==='mall';
-  showModal('barber',`<div class="field"><label>Hairstyle</label><div class="choice-grid">${Object.entries(HAIRSTYLES).map(([k,n])=>`<button class="choice ${k===barberPick.hair?'on':''}" data-action="barberPick" data-hair="${k}">${escape(n)}</button>`).join('')}</div></div><div class="field"><label>Colour</label><div class="swatches">${Object.entries(HAIR_COLORS).map(([k,c])=>`<button class="swatch ${k===barberPick.hairColor?'on':''}" style="--c:${c}" data-action="barberPick" data-color="${k}" aria-label="${k}"></button>`).join('')}</div></div>${here?button('💈 Get this look','restyle','','primary wide'):button('Go to Palm Mall','travel','data-location="mall"','primary wide')}`);
+  showModal('barber',`<div class="field"><label>Hairstyle</label><div class="choice-grid">${Object.entries(HAIRSTYLES).map(([k,n])=>`<button class="choice ${k===barberPick.hair?'on':''}" data-action="barberPick" data-hair="${k}">${escape(n)}</button>`).join('')}</div></div><div class="field"><label>Colour</label><div class="swatches">${Object.entries(HAIR_COLORS).map(([k,c])=>`<button class="swatch ${k===barberPick.hairColor?'on':''}" style="--c:${c}" data-action="barberPick" data-color="${k}" aria-label="${k}"></button>`).join('')}</div></div>${here?button('💈 Get this look','restyle','','primary wide'):button('Go to Ikeja Mega Mall','travel','data-location="mall"','primary wide')}`);
 }
 function tattooShop(){
   const mine=state.tattoos||[],here=state.location==='mall';
-  showModal('tattoo',`<p class="modal-intro">Add ink, or have it lasered off any time.</p>${Object.entries(TATTOOS).map(([k,n])=>`<div class="ledger"><span>${escape(n)}</span>${here?button(mine.includes(k)?'Laser it off':'Get it','tattoo',`data-spot="${k}"`,mine.includes(k)?'':'primary'):'<small>Visit Palm Mall</small>'}</div>`).join('')}`);
+  showModal('tattoo',`<p class="modal-intro">Add ink, or have it lasered off any time.</p>${Object.entries(TATTOOS).map(([k,n])=>`<div class="ledger"><span>${escape(n)}</span>${here?button(mine.includes(k)?'Laser it off':'Get it','tattoo',`data-spot="${k}"`,mine.includes(k)?'':'primary'):'<small>Visit Ikeja Mega Mall</small>'}</div>`).join('')}`);
 }
 function tailorShop(){
   const wear=state.wear||{},tops=Object.entries(WEAR).filter(([k,w])=>w.slot==='top'&&(w.fame===0||state.closet?.[k])),here=state.location==='market';
   showModal('tailor',`<p class="modal-intro">Re-dye any top you own. ${here?'':'Visit the market tailor to change colours.'}</p>${tops.map(([k,w])=>`<div class="tailor-row"><strong>${escape(w.name)}</strong><div class="swatches">${TAILOR_COLORS.map(c=>`<button class="swatch ${(wear.tint?.[k]||w.color)===c?'on':''}" style="--c:${c}" ${here?`data-action="tailor" data-item="${k}" data-color="${c}"`:'disabled'} aria-label="Dye ${escape(w.name)} ${c}"></button>`).join('')}</div></div>`).join('')}`);
 }
-// Palm Realty: homes to move into (free with fame) and extensions to build around your house.
+// Lekki Realty: homes to move into (free with fame) and extensions to build around your house.
 function estateAgent(){
   const fame=state.fame||0,here=state.location==='plaza',claimed=state.vip||{};
   const homes=Object.entries(SPONSORSHIPS).filter(([,d])=>d.kind==='home').sort((a,b)=>a[1].fame-b[1].fame).map(([key,d])=>{const owned=claimed[key]||d.fame===0,living=state.home===key||(!state.home&&key==='studioFlat'&&false);
-    const action=state.home===key?button('Living here ✓','noop','disabled'):owned&&claimed[key]?button('Move in','useVip',`data-item="${key}"`):fame>=d.fame?(here?button('Claim free','claim',`data-item="${key}"`,'primary'):button('Claim at Palm plaza','travel','data-location="plaza"')):button(`🔒 ${fmt(d.fame)} fame`,'noop','disabled');
+    const action=state.home===key?button('Living here ✓','noop','disabled'):owned&&claimed[key]?button('Move in','useVip',`data-item="${key}"`):fame>=d.fame?(here?button('Claim free','claim',`data-item="${key}"`,'primary'):button('Claim at Eko plaza','travel','data-location="plaza"')):button(`🔒 ${fmt(d.fame)} fame`,'noop','disabled');
     const rooms=homeRooms(key);
     return `<div class="item-card"><h3>${d.icon} ${escape(d.name)}</h3><p>${escape(d.description)}</p><p class="home-rooms">${rooms.length?`🚪 +${rooms.length} room${rooms.length>1?'s':''}: ${rooms.map(r=>escape(r.name)).join(', ')}`:'🚪 One open-plan room'}</p>${action}${state.home===key?'':button('👀 Look inside','previewHome',`data-item="${key}"`)}</div>`;}).join('');
-  const ext=Object.entries(ITEMS).filter(([,i])=>i.extension).map(([key,i])=>`<div class="item-card"><h3>${i.use.icon} ${escape(i.name)}</h3><p>${escape(i.description)}</p>${state.inventory[key]?button('Built ✓','noop','disabled'):fame>=i.fame?(here?button('Build free','buy',`data-item="${key}"`,'primary'):button('Build at Palm plaza','travel','data-location="plaza"')):button(`🔒 ${fmt(i.fame)} fame`,'noop','disabled')}</div>`).join('');
+  const ext=Object.entries(ITEMS).filter(([,i])=>i.extension).map(([key,i])=>`<div class="item-card"><h3>${i.use.icon} ${escape(i.name)}</h3><p>${escape(i.description)}</p>${state.inventory[key]?button('Built ✓','noop','disabled'):fame>=i.fame?(here?button('Build free','buy',`data-item="${key}"`,'primary'):button('Build at Eko plaza','travel','data-location="plaza"')):button(`🔒 ${fmt(i.fame)} fame`,'noop','disabled')}</div>`).join('');
   showModal('estate',`<p class="modal-intro">Homes and extensions are free with fame. Extensions appear around your house; tap them at home.</p><h3>Homes</h3><div class="item-grid">${homes}</div><h3>Extensions</h3><div class="item-grid">${ext}</div>`);
 }
 // Walk round any home before moving in: your place is shown restyled until you leave the preview.
 async function previewHome(key){
   closeModal();if(state.location!=='home'||state.visiting){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast(`${tripVerb(data.state.trip.ride)} home. Look inside when you arrive.`);return;}}
   const d=SPONSORSHIPS[key],fame=state.fame||0,claimed=Boolean(state.vip?.[key]);world.previewHome=key;world.resetCamera();const east=Math.max(5.35,...homeRooms(key).map(r=>r.x1));world.pan={x:(east-5.35)/2,z:0};world.setZoom(10.7/(east+5.35)*(innerWidth<620?.7:1));world.draw();
-  const action=claimed?button('Move in','previewMoveIn',`data-item="${key}"`,'primary'):fame>=d.fame?button('Claim at Palm plaza','travel','data-location="plaza"','primary'):button(`🔒 ${fmt(d.fame)} fame`,'noop','disabled');
+  const action=claimed?button('Move in','previewMoveIn',`data-item="${key}"`,'primary'):fame>=d.fame?button('Claim at Eko plaza','travel','data-location="plaza"','primary'):button(`🔒 ${fmt(d.fame)} fame`,'noop','disabled');
   showTray(`${d.icon} ${d.name}`,`<small class="placement-hint">A preview: your furniture, their style.</small><div class="tray-options">${action}${button('Back to my home','closeTray')}</div>`);
 }
 // My team: hire a mentor, a manager and a bodyguard; see your booked gig; start beef with your rival.
@@ -652,7 +652,7 @@ const BADGES=['⭐','🔥','👑','💎','🦁','🌴','⚡','🎵'];let crewBad
 function crewsApp(){
   const crews=new Map();for(const p of snapshot.players)if(p.crew?.name){const c=crews.get(p.crew.name)||{badge:p.crew.badge,members:[]};c.members.push(p);crews.set(p.crew.name,c);}
   const mine=state.crew;
-  showModal('crews',`<p class="app-lead">${mine?`${escape(mine.badge)} ${escape(mine.name)}`:'Find your squad'}</p>${mine?button('Leave crew','crewLeave'):`<form id="crewForm" class="chat-form"><input class="chat-input" name="name" maxlength="24" required placeholder="Crew name" aria-label="Crew name"><button class="primary" type="submit">Start crew</button></form><div class="swatches">${BADGES.map(b=>`<button type="button" class="chip ${b===crewBadge?'on':''}" data-action="crewBadge" data-badge="${b}">${b}</button>`).join('')}</div>`}<h3>Crews in Palm City</h3>${[...crews.entries()].map(([name,c])=>`<div class="person"><div class="avatar">${escape(c.badge)}</div><div class="person-info"><strong>${escape(name)}</strong><br><small>${c.members.map(m=>escape(m.name)).join(', ')}</small></div>${mine?.name===name?'':button('Join','crewJoin',`data-name="${escape(name)}" data-badge="${escape(c.badge)}"`)}</div>`).join('')||'<p class="empty">No crews yet. Start the first one.</p>'}`);
+  showModal('crews',`<p class="app-lead">${mine?`${escape(mine.badge)} ${escape(mine.name)}`:'Find your squad'}</p>${mine?button('Leave crew','crewLeave'):`<form id="crewForm" class="chat-form"><input class="chat-input" name="name" maxlength="24" required placeholder="Crew name" aria-label="Crew name"><button class="primary" type="submit">Start crew</button></form><div class="swatches">${BADGES.map(b=>`<button type="button" class="chip ${b===crewBadge?'on':''}" data-action="crewBadge" data-badge="${b}">${b}</button>`).join('')}</div>`}<h3>Crews in Naija City</h3>${[...crews.entries()].map(([name,c])=>`<div class="person"><div class="avatar">${escape(c.badge)}</div><div class="person-info"><strong>${escape(name)}</strong><br><small>${c.members.map(m=>escape(m.name)).join(', ')}</small></div>${mine?.name===name?'':button('Join','crewJoin',`data-name="${escape(name)}" data-badge="${escape(c.badge)}"`)}</div>`).join('')||'<p class="empty">No crews yet. Start the first one.</p>'}`);
 }
 function giftPicker(playerId){
   const p=playerById(playerId),owned=Object.entries(WEAR).filter(([k,w])=>w.fame>0&&state.closet?.[k]);
@@ -675,7 +675,7 @@ function toggleAmbience(){
     ambience.timer=setTimeout(chirp,party?2000:600+Math.random()*1600);};
   ambience={ctx};chirp();$('[data-action=ambience]')?.classList.add('on');
 }
-// Mini map: a small overview of Palm City with you and your friends.
+// Mini map: a small overview of Naija City with you and your friends.
 let minimapOn=(()=>{try{return localStorage.getItem('cg.minimap')!=='0';}catch{return true;}})();
 function drawMinimap(){
   const c=$('#minimap');if(!c)return;c.hidden=!minimapOn||!state;if(c.hidden)return;const g=c.getContext('2d'),w=c.width,h=c.height,sx=x=>(x+76)/152*w,sz=z=>(z+60)/100*h;
@@ -746,12 +746,12 @@ function battlesApp(){
   ${button('⚔️ Start a Fame Clash','battleCreate','data-mode="1"','battle-cta')}
   <details class="arena-rules"><summary>How a Fame Clash works</summary><p>1v1, three turns each. Brag, shade, get physical or turn on the charm; your rival claps back and the crowd picks a side. Your career skills help, tiredness hurts. Each player spends 1 career charge; the winner takes about 1% of the loser’s fame, and the crowd tends to back the more famous player.</p></details>
   <p class="app-label">Clashes at ${escape(LOCATIONS[state.location].name)}</p>${lobby.length?`<div class="arena-list">${lobby.map(b=>prow(ico('⚔️','#f97316'),`${b.mode}v${b.mode} · ${b.status==='open'?'Open lobby':escape(b.status)}`,b.teamNames.map(t=>t.map(p=>escape(p.name)).join(', ')||'—').join(' vs '),button('View','openBattle',`data-battle="${b.id}"`,tint('#f5b942')))).join('')}</div>`:'<p class="empty">No clashes here yet. Start one, or tap a player and challenge them.</p>'}
-  <p class="app-label">Palm City leaderboard</p><div class="podium">${[1,0,2].map(spot).join('')}</div>
+  <p class="app-label">Naija City leaderboard</p><div class="podium">${[1,0,2].map(spot).join('')}</div>
   <div class="ranks">${ranked.slice(3,10).map((p,i)=>prow(`<b class="rank-no">${i+4}</b>${avatar(p)}`,escape(p.name)+(p.id===me()?' (you)':''),`✦ ${fmt(p.fame||0)}`)).join('')||'<p class="empty">More stars will join the board soon.</p>'}</div>
   <div class="my-rank"><b class="rank-no">${rank||'–'}</b>${avatar(you)}<strong>Your rank</strong><span>✦ ${fmt(state.fame||0)}</span></div></div>`);
 }
 function directMessage(playerId){chatThread(playerId);}
-// Palm Motors: fame unlocks free sponsored rides and looks. Fame is never spent.
+// Naija Motors: fame unlocks free sponsored rides and looks. Fame is never spent.
 function vip(){tip('vip');
   const fame=state.fame||0,claimed=state.vip||{};
   showModal('vip',`<p class="modal-intro">You have <strong>✦ ${fmt(fame)} fame</strong>. Sponsors give these to famous players for free. Fame isn't spent, and what you claim stays yours.</p><div class="item-grid">${Object.entries(SPONSORSHIPS).map(([key,d])=>{
@@ -760,10 +760,10 @@ function vip(){tip('vip');
     return `<div class="item-card vip-card ${owned?'owned':''}"><div class="vip-icon" style="--tone:${d.color}">${d.icon}</div><h3>${escape(d.name)}</h3><small class="vip-sponsor">by ${escape(d.sponsor)}</small><p>${escape(d.description)}</p><div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,fame/d.fame*100)}%"></div></div><small>${owned?'Claimed':ready?'Ready to claim':`${fmt(d.fame-fame)} fame to go`}</small>${action}</div>`;
   }).join('')}</div>${garage()}`);
 }
-// Palm Motors garage: wash and tune your current ride; throw a party if you own the yacht.
+// Naija Motors garage: wash and tune your current ride; throw a party if you own the yacht.
 function garage(){
   const fame=state.fame||0,ride=state.ride&&state.ride!=='bicycle'?state.ride:null,level=ride?state.tune?.[ride]||0:0,next=TUNING[level],here=state.location==='plaza';
-  const tune=!ride?'<p>Claim or drive a ride to tune it.</p>':next?(fame>=next.fame?(here?button(`🔧 Tune to level ${level+1} · trips ${next.cut}% faster`,'tune','','primary'):button('Tune at Palm Motors ➜','travel','data-location="plaza"')):button(`🔒 Tuning level ${level+1} at ${fmt(next.fame)} fame`,'noop','disabled')):'<p>Your ride is fully tuned.</p>';
+  const tune=!ride?'<p>Claim or drive a ride to tune it.</p>':next?(fame>=next.fame?(here?button(`🔧 Tune to level ${level+1} · trips ${next.cut}% faster`,'tune','','primary'):button('Tune at Naija Motors ➜','travel','data-location="plaza"')):button(`🔒 Tuning level ${level+1} at ${fmt(next.fame)} fame`,'noop','disabled')):'<p>Your ride is fully tuned.</p>';
   const wash=state.ride?(here?button('🧽 Wash your ride','wash'):''):'';
   const yacht=state.vip?.yacht?(state.location==='street'?button('🛥️ Throw a yacht party · +50 Fun, +30 Social','yachtParty','','primary'):button('🛥️ Yacht party (go to your street)','travel','data-location="street"')):'';
   return `<div class="garage"><strong>🔧 Garage${ride?` · ${escape(RIDES[ride]?.name||'')}${level?` · tuned level ${level}`:''}`:''}</strong><div class="actions">${tune}${wash}${yacht}</div></div>`;
@@ -796,13 +796,13 @@ function openBattle(id){battleId=id;battleView();}
 const TIPS={
   home:['🏠 Your home','Tap furniture to use it: the bed restores energy, the fridge hunger, the shower hygiene, the sofa fun. Need bars sit on the left. The front door takes you out to your street.'],
   venue:['📍 Inside a place','Each place you enter stands on its own. Drag to look around, tap things to use them, and tap people to say hi or challenge them. To go somewhere else, use the Exit or the Map app on your phone.'],
-  city:['🏙️ Out in Palm City','Tap the ground to walk. Tap a pin to head somewhere (walking takes up to 1:30, a car is faster). Tap people to say hi, add friends or challenge them to a battle.'],
+  city:['🏙️ Out in Naija City','Tap the ground to walk. Tap a pin to head somewhere (walking takes up to 1:30, a car is faster). Tap people to say hi, add friends or challenge them to a battle.'],
   career:['✦ Your career','Practise to level skills, then play activities: every choice you make shapes the quality. Good work earns reach (views, streams, fans) and fame. Each major activity uses 1 of your 10 charges.'],
   phone:['💬 Social','Chat with people nearby, add friends, message them, open 1v1, 3v3 or 5v5 battles, and collaborate.'],
   inventory:['◇ My home','Everything you own. Place furniture, change your look, and upgrade gear as your fame grows.'],
   profile:['♙ Profile','Your fame, awards, season results and career history.'],
   shop:['🛍️ Market','No coins here: items unlock with fame and are free to claim.'],
-  vip:['🏁 Palm Motors','Fame unlocks free sponsored cars, looks and homes. Fame is never spent, and what you claim stays yours.'],
+  vip:['🏁 Naija Motors','Fame unlocks free sponsored cars, looks and homes. Fame is never spent, and what you claim stays yours.'],
   battle:['⚔ Battles','Turn-based. On your turn: strike, use your signature move, guard or hype your team. Winners take fame from the losers.'],
 };
 let tipQueue=[],tipsSeen={};try{tipsSeen=JSON.parse(localStorage.getItem('celebritygames-tips')||'{}');}catch{}
@@ -814,7 +814,7 @@ function closeTip(){tipQueue.shift();showTip();}
 function alerts(){const me=snapshot.playerId;return state.invitations.filter(i=>i.expiresAt>now()).length+(snapshot.battles||[]).filter(b=>b.invited===me&&b.status==='open').length;}
 function phoneWidget(){const model=PHONES[state.phone]||PHONES.basic,count=alerts();
   return `<button class="phone-widget skin-${PHONES[state.phone]?state.phone:'basic'}" data-action="openPhone" style="--phone:${model.color}" aria-label="Open your phone${count?`, ${count} alerts`:''}"><span class="phone-mini">📱${count?`<i>${count}</i>`:''}</span><span class="phone-line"><strong>✦ ${fmt(state.fame||0)}</strong><small>fame · ${B.tiers[state.careers[state.career].tier][0]}</small></span><span class="phone-line"><strong>⚡ ${state.charges}/10</strong><small id="chargeRefill">${state.refillAnchor===null?'charged':`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></span></button>`;}
-const APPS=[['map','🗺️','Map'],['career','⭐','Career'],['phone','💬','Social'],['battles','⚔️','Battles'],['inventory','🏠','My stuff'],['wardrobe','👗','Wardrobe'],['chat','✉️','Chat'],['friends','👥','Friends'],['feed','📰','Feed'],['music','🎵','Music'],['wallet','💰','Fame wallet'],['team','🧑‍💼','My team'],['crews','🛡️','Crews'],['news','🗞️','News'],['dating','💘','Dating'],['calendar','📅','Calendar'],['camera','📷','Camera'],['shopping','🛒','Shopping'],['shop','🛍️','Market'],['vip','🏁','Palm Motors'],['quests','🎯','Quests'],['profile','🪪','Profile'],['life','❤️','My life'],['nearby','📍','Nearby'],['tips','💡','Tips']];
+const APPS=[['map','🗺️','Map'],['career','⭐','Career'],['phone','💬','Social'],['battles','⚔️','Battles'],['inventory','🏠','My stuff'],['wardrobe','👗','Wardrobe'],['chat','✉️','Chat'],['friends','👥','Friends'],['feed','📰','Feed'],['music','🎵','Music'],['wallet','💰','Fame wallet'],['team','🧑‍💼','My team'],['crews','🛡️','Crews'],['news','🗞️','News'],['dating','💘','Dating'],['calendar','📅','Calendar'],['camera','📷','Camera'],['shopping','🛒','Shopping'],['shop','🛍️','Market'],['vip','🏁','Naija Motors'],['quests','🎯','Quests'],['profile','🪪','Profile'],['life','❤️','My life'],['nearby','📍','Nearby'],['tips','💡','Tips']];
 // Upgrade and Log out live in Profile's settings, not on the home grid.
 const HIDDEN_APPS=[['upgrade','📲','Upgrade'],['logout','🚪','Log out']];
 // Red badges on tiles: unread chats, quests finished since you last looked, and new Market unlocks.
@@ -823,7 +823,7 @@ const unreadChats=()=>state.friends.filter(id=>{const last=between(id).at(-1);re
 const marketUnlocked=()=>Object.entries(ITEMS).filter(([k,i])=>(state.fame||0)>=i.fame&&!state.inventory[k]).length;
 const questsDone=()=>(state.quests?.done||[]).length;
 function badge(key){const n=key==='phone'?alerts():key==='chat'?unreadChats():key==='quests'?(questsDone()>seenCount('quests')?'NEW':0):key==='shop'?(marketUnlocked()>seenCount('shop')?'NEW':0):0;return n?`<i class="tile-badge">${n}</i>`:'';}
-// Palm City on the wallpaper: palms, towers and the stadium along the bottom of the home screen.
+// Naija City on the wallpaper: palms, towers and the stadium along the bottom of the home screen.
 const SKYLINE='<svg class="home-skyline" viewBox="0 0 400 120" preserveAspectRatio="xMidYMax slice" aria-hidden="true"><path fill="currentColor" d="M0 120V96h18V78h14v18h10V60h22v36h8V84h16v12h12V50l14-8 14 8v46h10V70h20v26h8V88q34-30 68 0v8h10V64h16v32h8V40h24v56h10V74h14v22h12V58h18v38h10V82h16v14h14v24Z"/><g fill="currentColor"><path d="M44 120c2-22 4-38 2-52h3c3 14 2 30-1 52Z"/><path d="M47 68c-10-8-22-6-30 2 10-2 20-2 30 0-6-6-6-14-2-20 4 6 4 12 4 18 4-6 12-10 22-8-8 0-14 4-18 10 8-2 18 2 22 10-8-6-18-8-28-12Z"/><path d="M352 120c2-26 6-44 2-60h3c4 16 1 34-1 60Z"/><path d="M355 60c-10-8-22-6-30 2 10-2 20-2 30 0-6-6-6-14-2-20 4 6 4 12 4 18 4-6 12-10 22-8-8 0-14 4-18 10 8-2 18 2 22 10-8-6-18-8-28-12Z"/></g></svg>';
 
 // Each phone tier has its own look and feel; cheaper phones lag and sometimes hang (only ever a delay).
@@ -943,7 +943,7 @@ document.addEventListener('click',async event=>{
     case 'claimWear':case 'wear':await send({type:d.action,item:d.item},{keepModal:true});break;
     case 'takeOff':await send({type:'takeOff',slot:d.slot},{keepModal:true});break;
     case 'closeMishap':modalPage=null;$('#modal').hidden=true;if(state?.mishap)world.playMishap(state.mishap);break;
-    case 'closeReel':lookWorld?.stop();lookWorld=null;modalPage=null;$('#modal').hidden=true;toast('Welcome to Palm City. Your next chapter starts at home.');break;
+    case 'closeReel':lookWorld?.stop();lookWorld=null;modalPage=null;$('#modal').hidden=true;toast('Welcome to Naija City. Your next chapter starts at home.');break;
     case 'playHere':elsewhere=false;modalPage=null;$('#modal').hidden=true;await refresh(true);scheduleHeartbeat();break;
     case 'authTab':authStep.from=d.tab;authScreen(d.tab);break;
     case 'authResend':try{await auth({type:'sendCode',purpose:authStep.purpose,email:authStep.email,...authStep.extra});authScreen('code','A new code is on its way.');}catch(e){authScreen('code',e.message);}break;
@@ -1080,7 +1080,7 @@ function questHud(){
   if(seenQuest===null)seenQuest=q.last?q.last.key+q.last.at:'';
   if(q.last&&seenQuest!==q.last.key+q.last.at){const first=false;seenQuest=q.last.key+q.last.at;const quest=QUESTS.find(x=>x.key===q.last.key);
     if(!first&&quest)showNotice('✅','Quest complete!',`${quest.icon} ${quest.title}${next?` · Next: ${next.title}`:''}`,quest.reward);
-    if(!first&&q.graduated===q.last.at)showNotice('🎓',QUEST_GRADUATION.name,'You finished every starter quest. Palm City is yours.',QUEST_GRADUATION.fame);}
+    if(!first&&q.graduated===q.last.at)showNotice('🎓',QUEST_GRADUATION.name,'You finished every starter quest. Naija City is yours.',QUEST_GRADUATION.fame);}
   let chip=$('#questChip');
   if(!next||questsHidden()){chip?.remove();return;}
   if(!chip){chip=document.createElement('button');chip.id='questChip';chip.className='quest-chip';chip.dataset.action='app';chip.dataset.app='quests';$('.world-card').append(chip);}

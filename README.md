@@ -1,6 +1,6 @@
 # Celebrity Games
 
-A playable browser life simulation set in Palm City, implemented from the supplied **Celebrity Life Game Mechanics Specification**, dated 6 October 2026.
+A playable browser life simulation set in Naija City, implemented from the supplied **Celebrity Life Game Mechanics Specification**, dated 6 October 2026.
 
 Create a character, explore six locations, recover daily needs, train skills, play career decisions, publish credited outputs, grow an audience, join affiliations, and improve your home. The city uses a small, dependency-free orthographic 3D renderer with an open neighbourhood of six lots, cutaway interiors, a local day/night sky, camera rotation, click-to-walk movement and obstacle routing.
 
@@ -31,7 +31,7 @@ Tests cover core mechanics and a real HTTP server with an isolated temporary SQL
 ## Playing
 
 - Choose one of 15 careers and two starting origins. Football offers outfield positions; music offers vocals or instrument technique. Adult entertainment contains only abstract project decisions and requires an adult character.
-- **City** is one open neighbourhood: your apartment, sports arena, studio, creator quarter, technology workspace and Palm plaza sit on lots around the lagoon. Tap a pin or a neighbouring lot to head there; **Explore city** zooms out to the whole map. Select an object to open its pie menu, then choose an interaction to walk over and start it. Arrow keys and WASD also move the character. The bottom-left panel shows your mood plumbob and labelled needs; tap a need to recover it.
+- **City** is one open neighbourhood: your apartment, sports arena, studio, creator quarter, technology workspace and Eko plaza sit on lots around the lagoon. Tap a pin or a neighbouring lot to head there; **Explore city** zooms out to the whole map. Select an object to open its pie menu, then choose an interaction to walk over and start it. Arrow keys and WASD also move the character. The bottom-left panel shows your mood plumbob and labelled needs; tap a need to recover it.
 - **Career** starts practice, fixtures, productions, live music performances, trials, NPC collaborations, and product builds or launches. Every start previews requirements and rewards. Activities pause at decisions without a response deadline.
 - **My home** shows your inventory, equipment, upgrade previews and furniture placement. Buy groceries, gear, clothing and furniture at the plaza shop.
 - **Social** contains local chat, player contacts, direct messages, blocks, reports, home invitations and accepted collaboration agreements. A second browser profile creates a second player on the same running server.

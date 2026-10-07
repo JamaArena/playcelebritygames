@@ -29,34 +29,34 @@ export const CAREERS = {
   web3: career('Web3 builder', '🪙', 'tech', ['product', 'community', 'research', 'technical skill'], ['Independent newcomer', 'Community-connected talent'], 'tech', 'Product', ['Pick a useful fictional product direction.', 'Respond to community concerns.', 'Handle a launch-readiness decision.']),
 };
 export const LOCATIONS = {
-  home: {name: 'Your apartment', subtitle: 'A little room for big dreams', icon: '🏠', color: '#edc594'},
-  sports: {name: 'Arena district', subtitle: 'Leave it all on the pitch', icon: '⚽', color: '#88bda5'},
-  studio: {name: 'Sound & screen', subtitle: 'Where your next chapter gets made', icon: '🎙️', color: '#b4a7d9'},
-  creator: {name: 'Creator quarter', subtitle: 'Make something worth sharing', icon: '🎬', color: '#e0a28f'},
-  tech: {name: 'Innovation hub', subtitle: 'Start small. Build something lasting.', icon: '💻', color: '#85b9ca'},
-  nightclub: {name: 'Club Neon', subtitle: 'Dance till the lights come on', icon: '🪩', color: '#7b4fa3'},
-  lounge: {name: 'Velvet Lounge', subtitle: 'Chill, chat and karaoke', icon: '🍸', color: '#b23a48'},
-  cinema: {name: 'Palm Cinema', subtitle: 'Popcorn and premieres', icon: '🍿', color: '#d23b4b'},
-  mall: {name: 'Palm Mall', subtitle: 'Shops, food court and fashion', icon: '🛒', color: '#2f6fb3'},
-  tvStation: {name: 'PCTV Studios', subtitle: 'Interviews and talk shows', icon: '📺', color: '#3d6a8a'},
-  radio: {name: 'Palm FM', subtitle: 'Airplay and call-ins', icon: '📻', color: '#e08a3d'},
-  market: {name: 'Balogun-style market', subtitle: 'Busy stalls, fabrics and snacks', icon: '🧺', color: '#d9573f'},
-  gym: {name: 'Iron Palm Gym', subtitle: 'Get fit with the city', icon: '🏋️', color: '#2f3237'},
-  hospital: {name: 'Palm General Hospital', subtitle: 'Check-ups and recovery', icon: '🏥', color: '#3d9a7a'},
-  worship: {name: 'Palm Chapel & Mosque', subtitle: 'Quiet, calm and community', icon: '🕊️', color: '#c9a46a'},
-  eventHall: {name: 'Grand Event Hall', subtitle: 'Owambe parties and launches', icon: '🎉', color: '#c9a227'},
-  stadium: {name: 'Palm National Stadium', subtitle: 'Big matches and concerts', icon: '🏟', color: '#2f7a55'},
-  park: {name: 'Central Park', subtitle: 'Walk, jog, picnic and breathe', icon: '🌳', color: '#5aa36b'},
-  airport: {name: 'Palm International Airport', subtitle: 'Fly out for shows', icon: '✈️', color: '#5b6fa8'},
-  beach: {name: 'Island beach', subtitle: 'Sun, sand and the lagoon', icon: '🏖️', color: '#e8c97a'},
-  plaza: {name: 'Palm plaza', subtitle: 'Meet the city. Find your people.', icon: '🛍️', color: '#c3c48c'},
-  street: {name: 'Your street', subtitle: 'Step out into Palm City', icon: '🚪', color: '#c9d6bf'},
+  home: {name: 'Your flat', subtitle: 'A little room for big dreams', icon: '🏠', color: '#edc594'},
+  sports: {name: 'Surulere Sports Arena', subtitle: 'Leave it all on the pitch', icon: '⚽', color: '#88bda5'},
+  studio: {name: 'Nollywood Studios', subtitle: 'Where your next chapter gets made', icon: '🎙️', color: '#b4a7d9'},
+  creator: {name: 'Lekki Creators Quarter', subtitle: 'Make something worth sharing', icon: '🎬', color: '#e0a28f'},
+  tech: {name: 'Yabacon Valley Hub', subtitle: 'Start small. Build something lasting.', icon: '💻', color: '#85b9ca'},
+  nightclub: {name: 'Club Shayo', subtitle: 'Dance till the lights come on', icon: '🪩', color: '#7b4fa3'},
+  lounge: {name: 'Suya & Chill Lounge', subtitle: 'Chill, chat and karaoke', icon: '🍸', color: '#b23a48'},
+  cinema: {name: 'Eko Cinema', subtitle: 'Popcorn and premieres', icon: '🍿', color: '#d23b4b'},
+  mall: {name: 'Ikeja Mega Mall', subtitle: 'Shops, food court and fashion', icon: '🛒', color: '#2f6fb3'},
+  tvStation: {name: 'NCTV Studios', subtitle: 'Interviews and talk shows', icon: '📺', color: '#3d6a8a'},
+  radio: {name: 'Naija FM 98.9', subtitle: 'Airplay and call-ins', icon: '📻', color: '#e08a3d'},
+  market: {name: 'Balogun Market', subtitle: 'Busy stalls, fabrics and snacks', icon: '🧺', color: '#d9573f'},
+  gym: {name: 'Eko Iron Gym', subtitle: 'Get fit with the city', icon: '🏋️', color: '#2f3237'},
+  hospital: {name: 'Naija General Hospital', subtitle: 'Check-ups and recovery', icon: '🏥', color: '#3d9a7a'},
+  worship: {name: 'Unity Chapel & Mosque', subtitle: 'Quiet, calm and community', icon: '🕊️', color: '#c9a46a'},
+  eventHall: {name: 'Owambe Event Centre', subtitle: 'Owambe parties and launches', icon: '🎉', color: '#c9a227'},
+  stadium: {name: 'Naija National Stadium', subtitle: 'Big matches and concerts', icon: '🏟', color: '#2f7a55'},
+  park: {name: 'Freedom Park', subtitle: 'Walk, jog, picnic and breathe', icon: '🌳', color: '#5aa36b'},
+  airport: {name: 'Naija International Airport', subtitle: 'Fly out for shows', icon: '✈️', color: '#5b6fa8'},
+  beach: {name: 'Lekki Beach', subtitle: 'Sun, sand and the lagoon', icon: '🏖️', color: '#e8c97a'},
+  plaza: {name: 'Eko plaza', subtitle: 'Meet the city. Find your people.', icon: '🛍️', color: '#c3c48c'},
+  street: {name: 'Your street', subtitle: 'Step out into Naija City', icon: '🚪', color: '#c9d6bf'},
 };
 // Every location is an 11×11 lot in one open neighbourhood; x/z are lot centres in world units.
 export const TOWN = {
   home: {x: -16, z: 0, pin: '🏠', height: 4.5}, plaza: {x: 0, z: 0, pin: '🛍️', height: 2.6}, studio: {x: 16, z: 0, pin: '🎙️', height: 3.9},
   sports: {x: -16, z: -16, pin: '🏟️', height: 2.4}, creator: {x: 0, z: -16, pin: '🎬', height: 3.3}, tech: {x: 16, z: -16, pin: '💡', height: 7.6},
-  // Places around the city: downtown nightlife and media, Palm Heights services, and the island beach.
+  // Places around the city: downtown nightlife and media, Lekki Heights services, and the island beach.
   nightclub: {x: 32, z: 0, pin: '🪩', height: 3.4}, lounge: {x: 48, z: 0, pin: '🍸', height: 3}, cinema: {x: 64, z: 0, pin: '🍿', height: 4},
   mall: {x: 32, z: -16, pin: '🛒', height: 4.4}, tvStation: {x: 48, z: -16, pin: '📺', height: 6.5}, radio: {x: 64, z: -16, pin: '📻', height: 5.5},
   market: {x: -32, z: 0, pin: '🧺', height: 2.2}, gym: {x: -32, z: -16, pin: '🏋️', height: 3.2}, hospital: {x: -48, z: -16, pin: '🏥', height: 4.6},
@@ -117,8 +117,8 @@ export const ITEMS = {
   trophyCabinet: {name: 'Trophy cabinet', fame: 1500, description: 'Shows off the awards you have won.', furniture: true, use: {verb: 'Admire your trophies', icon: '🏆', need: 'fun', amount: 10, ms: 10_000, pose: null}},
   weights: {name: 'Weight bench', fame: 1000, description: 'Lift weights: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Lift weights', icon: '🏋️', need: 'fun', amount: 20, ms: 40_000, pose: 'press', extra: {energy: -10, hygiene: -15}}},
 };
-// The wardrobe: clothes and accessories by slot. Each unlocks with fame (claimed free at Palm Boutique,
-// Palm plaza) and most carry one perk. Wearing changes how you look; perks change the rules a little.
+// The wardrobe: clothes and accessories by slot. Each unlocks with fame (claimed free at Ankara Boutique,
+// Eko plaza) and most carry one perk. Wearing changes how you look; perks change the rules a little.
 export const WEAR_SLOTS = {top: 'Tops', bottom: 'Bottoms', shoes: 'Shoes', head: 'Headwear', face: 'Eyewear', neck: 'Necklaces', ears: 'Earrings', wrist: 'Wrist', bag: 'Bags'};
 // Perks add up across everything you wear, up to the cap.
 export const PERKS = {
@@ -149,7 +149,7 @@ export const WEAR = {
   agbada: {name: 'Agbada', slot: 'top', fame: 1500, fit: 'robe', color: '#f0e6d2', accent: '#c9a227', perk: ['fame', 5], note: 'Flowing robes for big occasions.'},
   stageOutfit: {name: 'Sparkly stage outfit', slot: 'top', fame: 2500, fit: 'jacket', color: '#7b4fa3', perk: ['success', 8], note: 'Made to catch the spotlight.'},
   eveningGown: {name: 'Evening gown', slot: 'top', fame: 3000, fit: 'gown', color: '#9b1b30', perk: ['scandal', 25], note: 'So elegant, the blogs forgive you.'},
-  palmColaTee: {name: 'Palm Cola tee', slot: 'top', fame: 0, exclusive: 'palmCola', fit: 'tee', color: '#d23b4b', perk: ['fame', 4], note: 'Brand-deal exclusive.'},
+  palmColaTee: {name: 'Zobo Cola tee', slot: 'top', fame: 0, exclusive: 'palmCola', fit: 'tee', color: '#d23b4b', perk: ['fame', 4], note: 'Brand-deal exclusive.'},
   maisonGown: {name: 'Maison runway look', slot: 'top', fame: 0, exclusive: 'maisonDeal', fit: 'gown', color: '#1f1f24', perk: ['fame', 8], note: 'Brand-deal exclusive.'},
   redCarpetTux: {name: 'Red-carpet tux', slot: 'top', fame: 5000, fit: 'suit', color: '#111111', accent: '#d4af37', perk: ['fame', 10], note: 'Every camera finds you.'},
   // Bottoms: trousers, shorts or a skirt.
@@ -204,7 +204,7 @@ export const EMOTES = {
 };
 // Quick reactions in local chat.
 export const REACTIONS = ['👍', '😂', '🔥', '❤️', '👏', '😮'];
-// Pets: adopt one at Palm plaza. Keep them fed and happy and they give you a perk.
+// Pets: adopt one at Eko plaza. Keep them fed and happy and they give you a perk.
 export const PETS = {
   cat: {name: 'Cat', fame: 200, icon: '🐈', perk: ['social', 10], note: 'Naps with you. Social drains slower.'},
   dog: {name: 'Dog', fame: 300, icon: '🐕', perk: ['fun', 15], note: 'Follows you everywhere. Fun drains slower.'},
@@ -258,7 +258,7 @@ export const LIFE_EVENTS = {
   journalist: {icon: '📰', title: 'A journalist wants a quote', text: 'About your rival, of course.', weight: 2, minFame: 1000, prompt: 'journalist'},
   paparazzi: {icon: '📸', title: 'Paparazzi spotted you', text: 'Flashes everywhere. Careful: the next ten minutes are on camera.', weight: 2, where: 'out', minFame: 5000, fame: [.003, 10], guarded: true, paps: true},
   transferWindow: {icon: '📝', title: 'The transfer window is open', text: 'A bigger club wants you. Check your career offers.', weight: 2, family: 'sport', transfer: true},
-  magazineCover: {icon: '📰', title: 'You made a magazine cover', text: 'Palm Style put you on the cover. Fans are buying every copy.', fame: [.01, 100], weight: 1, minFame: 20_000, award: 'Cover star'},
+  magazineCover: {icon: '📰', title: 'You made a magazine cover', text: 'Naija Style put you on the cover. Fans are buying every copy.', fame: [.01, 100], weight: 1, minFame: 20_000, award: 'Cover star'},
   scandal: {icon: '🫢', title: 'A scandal hit the blogs', text: 'An old post resurfaced. The comments are not kind.', fame: [-.015, -40], weight: 1, minFame: 10_000},
   rivalHit: {icon: '🥊', title: 'Your rival dropped a hit', text: 'Duke Adeyemi is all over the radio. Time to answer?', weight: 1, minFame: 2000},
   mumCalls: {icon: '📞', title: 'Mum called', text: '"Have you eaten?" You feel loved.', needs: {social: 15}, weight: 2},
@@ -303,7 +303,7 @@ export const VENUE_ACTS = {
   network: {venue: 'lounge', name: 'Network with VIPs', icon: '🤝', need: 'social', amount: 25, ms: 40_000, pose: 'gesture', fame: 5},
   film: {venue: 'cinema', name: 'Watch a film', icon: '🎬', need: 'fun', amount: 45, ms: 90_000, extra: {hunger: -5}, pose: 'sit', seat: .5, family: 'acting', learn: 3},
   barber: {venue: 'mall', name: 'Barber & salon', icon: '💈', menu: 'barber'},
-  tattoo: {venue: 'mall', name: 'Ink Palm tattoos', icon: '🖋️', menu: 'tattoo'},
+  tattoo: {venue: 'mall', name: 'Eko Ink tattoos', icon: '🖋️', menu: 'tattoo'},
   phoneShop: {venue: 'mall', name: 'Phone shop', icon: '📱', menu: 'phones'},
   tailor: {venue: 'market', name: 'Tailor', icon: '🧵', menu: 'tailor'},
   bukka: {venue: 'market', name: 'Eat at the bukka', icon: '🍲', need: 'hunger', amount: 60, ms: 30_000, extra: {social: 5}, pose: 'sit', seat: .45},
@@ -317,13 +317,13 @@ export const VENUE_ACTS = {
   ludo: {venue: 'park', name: 'Play Ludo & Ayo', icon: '🎲', need: 'fun', amount: 25, ms: 40_000, extra: {social: 15}, pose: 'sitFloor'},
   volunteer: {venue: 'hospital', name: 'Volunteer', icon: '🤲', need: 'social', amount: 20, ms: 60_000, extra: {fun: 10, energy: -5}, pose: 'chat', fame: 10, charity: true},
   // Career moments: big, risky beats for particular careers. Your focus skill sets the odds; wins can bring awards.
-  awardShow: {venue: 'eventHall', name: 'Attend the Palm Awards', icon: '🏅', need: 'social', amount: 30, ms: 75_000, extra: {fun: 20}, pose: 'sit', seat: .5, minFame: 1000, moment: {win: [.02, 120], lose: [.002, 10], award: 'Palm Award', headline: ['won at the Palm Awards 🏅', 'was nominated at the Palm Awards']}},
+  awardShow: {venue: 'eventHall', name: 'Attend the Naija Star Awards', icon: '🏅', need: 'social', amount: 30, ms: 75_000, extra: {fun: 20}, pose: 'sit', seat: .5, minFame: 1000, moment: {win: [.02, 120], lose: [.002, 10], award: 'Naija Star Award', headline: ['won at the Naija Star Awards 🏅', 'was nominated at the Naija Star Awards']}},
   final: {venue: 'stadium', name: 'Play the championship final', icon: '🏆', need: 'fun', amount: 30, ms: 75_000, extra: {energy: -20}, pose: 'sport', careers: ['football', 'basketball'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Champions', headline: ['lifted the championship trophy 🏆', 'fell short in the final']}},
   grandSlam: {venue: 'stadium', name: 'Play a grand slam final', icon: '🎾', need: 'fun', amount: 30, ms: 75_000, extra: {energy: -20}, pose: 'sport', careers: ['tennis'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Grand slam champion', headline: ['won the grand slam 🎾', 'lost a five-set epic']}},
   titleBelt: {venue: 'eventHall', name: 'Fight for the title belt', icon: '🥇', need: 'fun', amount: 30, ms: 60_000, extra: {energy: -25}, pose: 'sport', careers: ['wrestling'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Title belt', headline: ['is the new champion 🥇', 'lost the title fight']}},
   premiere: {venue: 'cinema', name: 'Walk your movie premiere', icon: '🎬', need: 'social', amount: 30, ms: 60_000, pose: 'gesture', careers: ['actor', 'adult'], minOutputs: 2, moment: {win: [.02, 100], lose: [.005, 20], headline: ['dazzled at a premiere 🎬', "'s premiere got mixed reviews"]}},
   pitch: {venue: 'tech', name: 'Pitch for a funding round', icon: '💼', need: 'social', amount: 15, ms: 60_000, pose: 'gesture', careers: ['founder'], moment: {win: [.025, 120], lose: [.005, 15], award: 'Funded founder', headline: ['closed a funding round 💼', "'s pitch didn't land"]}},
-  hackathon: {venue: 'tech', name: 'Enter the hackathon', icon: '⌨️', need: 'fun', amount: 25, ms: 75_000, extra: {energy: -15}, pose: 'work', careers: ['developer'], learn: 8, moment: {win: [.02, 100], lose: [.004, 10], award: 'Hackathon winner', headline: ['won the Palm hackathon ⌨️', 'shipped a bug at the hackathon']}},
+  hackathon: {venue: 'tech', name: 'Enter the hackathon', icon: '⌨️', need: 'fun', amount: 25, ms: 75_000, extra: {energy: -15}, pose: 'work', careers: ['developer'], learn: 8, moment: {win: [.02, 100], lose: [.004, 10], award: 'Hackathon winner', headline: ['won the Yabacon hackathon ⌨️', 'shipped a bug at the hackathon']}},
   tokenLaunch: {venue: 'tech', name: 'Launch a token project', icon: '🪙', need: 'fun', amount: 20, ms: 60_000, pose: 'gesture', careers: ['web3'], moment: {win: [.04, 150], lose: [-.01, -30], headline: ["'s launch sold out in minutes 🪙", "'s launch flopped. Ouch."]}},
   albumRelease: {venue: 'radio', name: 'Release an album', icon: '💿', need: 'social', amount: 20, ms: 60_000, pose: 'perform', family: 'music', minOutputs: 3, album: true},
   tourNightclub: {venue: 'nightclub', name: 'Tour stop: Club Neon show', icon: '🎤', need: 'fun', amount: 20, ms: 60_000, extra: {energy: -10}, pose: 'perform', family: 'music', tour: true},
@@ -383,27 +383,27 @@ export const FOODS = {
   suya: {name: 'Suya', icon: '🍢', hunger: 35, ms: 25_000, extra: {fun: 8}, takeaway: true},
   shawarma: {name: 'Shawarma', icon: '🌯', hunger: 45, ms: 30_000, extra: {fun: 5}, takeaway: true},
 };
-// VIP sponsorship deals: free items unlocked by fame, claimed at Palm Motors in Palm plaza.
+// VIP sponsorship deals: free items unlocked by fame, claimed at Naija Motors in Eko plaza.
 // Fame is not spent and claimed items stay yours. Brand names are fictional.
 export const SPONSORSHIPS = {
-  scooter: {name: 'City e-scooter', sponsor: 'Volt Mobility', fame: 100, kind: 'ride', icon: '🛵', color: '#3d9a7a', description: 'Zip between lots in style. Your first sponsor believes in you.'},
-  designer: {name: 'Designer look', sponsor: 'Maison Palme', fame: 500, kind: 'style', icon: '🕶️', color: '#1f1f24', description: 'A tailored black-and-gold outfit for red carpets.'},
-  coupe: {name: 'Rossa sports coupé', sponsor: 'Rossa Motori', fame: 5_000, kind: 'ride', icon: '🏎️', color: '#c9302c', description: 'Low, loud and very red.'},
-  suv: {name: 'Atlas luxury SUV', sponsor: 'Atlas Autos', fame: 20_000, kind: 'ride', icon: '🚙', color: '#23262f', description: 'Tinted windows for when the paparazzi find you.'},
-  bicycle: {name: 'City bicycle', sponsor: 'Palm Cycles', fame: 20, kind: 'ride', icon: '🚲', color: '#e05a47', description: 'Free, healthy and never stuck in traffic.'},
-  motorbike: {name: 'Kinetic sports motorbike', sponsor: 'Kinetic Moto', fame: 1_500, kind: 'ride', icon: '🏍️', color: '#2b2d42', description: 'Fast, nimble, and it slips through go-slow.'},
-  limo: {name: 'Royal limousine', sponsor: 'Royal Limousines', fame: 50_000, kind: 'ride', icon: '🚘', color: '#111111', description: 'Arrive in style: fans notice, and you earn a little fame when you pull up.'},
-  yacht: {name: 'Lagoon yacht', sponsor: 'Lagoon Marine', fame: 75_000, kind: 'yacht', icon: '🛥️', color: '#f2f2f0', description: 'Moored by your street. Throw yacht parties on the lagoon.'},
-  helicopter: {name: 'SkyPalm helicopter', sponsor: 'SkyPalm Aviation', fame: 250_000, kind: 'ride', icon: '🚁', color: '#d4af37', description: 'Fly straight over the city. No roads, no traffic, no rain delays.'},
-  palmCola: {name: 'Palm Cola ambassador', sponsor: 'Palm Cola', fame: 3_000, kind: 'brand', icon: '🥤', color: '#d23b4b', grant: {wear: 'palmColaTee'}, description: 'A fizzy deal: an exclusive Palm Cola tee (+4% fame from your work).'},
+  scooter: {name: 'Eko e-scooter', sponsor: 'Gidi Mobility', fame: 100, kind: 'ride', icon: '🛵', color: '#3d9a7a', description: 'Zip between lots in style. Your first sponsor believes in you.'},
+  designer: {name: 'Designer look', sponsor: 'Maison Ankara', fame: 500, kind: 'style', icon: '🕶️', color: '#1f1f24', description: 'A tailored black-and-gold outfit for red carpets.'},
+  coupe: {name: 'Tear-rubber coupé', sponsor: 'Omo Motors', fame: 5_000, kind: 'ride', icon: '🏎️', color: '#c9302c', description: 'Low, loud and very red.'},
+  suv: {name: 'Big Boy SUV', sponsor: 'Odogwu Autos', fame: 20_000, kind: 'ride', icon: '🚙', color: '#23262f', description: 'Tinted windows for when the paparazzi find you.'},
+  bicycle: {name: 'Eko bicycle', sponsor: 'Eko Cycles', fame: 20, kind: 'ride', icon: '🚲', color: '#e05a47', description: 'Free, healthy and never stuck in traffic.'},
+  motorbike: {name: 'Gidi power bike', sponsor: 'Okada Kings Moto', fame: 1_500, kind: 'ride', icon: '🏍️', color: '#2b2d42', description: 'Fast, nimble, and it slips through go-slow.'},
+  limo: {name: 'Kabiyesi limousine', sponsor: 'Kabiyesi Limousines', fame: 50_000, kind: 'ride', icon: '🚘', color: '#111111', description: 'Arrive in style: fans notice, and you earn a little fame when you pull up.'},
+  yacht: {name: 'Eko lagoon yacht', sponsor: 'Eko Marine', fame: 75_000, kind: 'yacht', icon: '🛥️', color: '#f2f2f0', description: 'Moored by your street. Throw yacht parties on the lagoon.'},
+  helicopter: {name: 'Big Man helicopter', sponsor: 'Naija Sky Aviation', fame: 250_000, kind: 'ride', icon: '🚁', color: '#d4af37', description: 'Fly straight over the city. No roads, no traffic, no rain delays.'},
+  palmCola: {name: 'Zobo Cola ambassador', sponsor: 'Zobo Cola', fame: 3_000, kind: 'brand', icon: '🥤', color: '#d23b4b', grant: {wear: 'palmColaTee'}, description: 'A fizzy deal: an exclusive Zobo Cola tee (+4% fame from your work).'},
   zoomPhones: {name: 'Zoom Mobile face', sponsor: 'Zoom Mobile', fame: 8_000, kind: 'brand', icon: '📱', color: '#7b4fa3', grant: {phone: 'pro'}, description: 'They hand you a Pro edition phone, free.'},
-  maisonDeal: {name: 'Maison Palme muse', sponsor: 'Maison Palme', fame: 30_000, kind: 'brand', icon: '👗', color: '#1f1f24', grant: {wear: 'maisonGown'}, description: 'An exclusive runway look (+8% fame from your work).'},
-  hypercar: {name: 'Vitesse hypercar', sponsor: 'Vitesse', fame: 100_000, kind: 'ride', icon: '🏁', color: '#1d4fa8', description: 'A hand-built hypercar for Icons only. A sponsorship deal, free to claim.'},
-  studioFlat: {name: 'Cosy studio flat', sponsor: 'Palm Realty', fame: 0, kind: 'home', icon: '🛏️', color: '#9aa7b3', rest: 1, description: 'A cheap and cheerful starter home with a fresh coat of paint.'},
-  duplex: {name: 'Lekki-style duplex', sponsor: 'Palm Realty', fame: 8_000, kind: 'home', icon: '🏘️', color: '#7a5a43', rest: .85, description: 'Two storeys, wood floors and room to grow. Home recovery is 15% faster.'},
+  maisonDeal: {name: 'Maison Ankara muse', sponsor: 'Maison Ankara', fame: 30_000, kind: 'brand', icon: '👗', color: '#1f1f24', grant: {wear: 'maisonGown'}, description: 'An exclusive runway look (+8% fame from your work).'},
+  hypercar: {name: 'Odogwu hypercar', sponsor: 'Jaiye Motors', fame: 100_000, kind: 'ride', icon: '🏁', color: '#1d4fa8', description: 'A hand-built hypercar for Icons only. A sponsorship deal, free to claim.'},
+  studioFlat: {name: 'Cosy studio flat', sponsor: 'Lekki Realty', fame: 0, kind: 'home', icon: '🛏️', color: '#9aa7b3', rest: 1, description: 'A cheap and cheerful starter home with a fresh coat of paint.'},
+  duplex: {name: 'Lekki-style duplex', sponsor: 'Lekki Realty', fame: 8_000, kind: 'home', icon: '🏘️', color: '#7a5a43', rest: .85, description: 'Two storeys, wood floors and room to grow. Home recovery is 15% faster.'},
   beachHouse: {name: 'Lagoon beach house', sponsor: 'Coastline Estates', fame: 40_000, kind: 'home', icon: '🏖️', color: '#2bb3c0', rest: .75, description: 'Sandy floors and sea breeze. Home recovery is 25% faster.'},
-  penthouse: {name: 'Skyline penthouse', sponsor: 'Palm Realty', fame: 60_000, kind: 'home', icon: '🌆', color: '#2f3237', rest: .75, description: 'Dark marble and city views. Home recovery is 25% faster.'},
-  townhouse: {name: 'Palm Heights townhouse', sponsor: 'Palm Realty', fame: 2_000, kind: 'home', icon: '🏡', color: '#b86b52', rest: .9, description: 'Warm wood floors and art on the walls. Home recovery 10% faster.'},
+  penthouse: {name: 'Skyline penthouse', sponsor: 'Lekki Realty', fame: 60_000, kind: 'home', icon: '🌆', color: '#2f3237', rest: .75, description: 'Dark marble and city views. Home recovery is 25% faster.'},
+  townhouse: {name: 'Lekki Heights townhouse', sponsor: 'Lekki Realty', fame: 2_000, kind: 'home', icon: '🏡', color: '#b86b52', rest: .9, description: 'Warm wood floors and art on the walls. Home recovery 10% faster.'},
   villa: {name: 'Lagoon villa', sponsor: 'Coastline Estates', fame: 25_000, kind: 'home', icon: '🏝️', color: '#3a8fa8', rest: .8, description: 'Marble, sea light and a statement chandelier. Home recovery 20% faster.'},
   mansion: {name: 'Island mansion', sponsor: 'Isle Royale', fame: 150_000, kind: 'home', icon: '🏰', color: '#b8932f', rest: .7, description: 'Gold trim, a grand piano and room for the whole entourage. Home recovery 30% faster.'},
 };
@@ -415,13 +415,13 @@ export const RIDE_SPEED = {walk: 1, bicycle: .85, scooter: .75, keke: .75, danfo
 // Public transport anyone can take. Ride-hailing is booked with a smartphone.
 export const TRANSIT = {
   danfo: {name: 'Danfo bus', icon: '🚌', color: '#f2c230', note: 'Cheap and cheerful, a bit slower.'},
-  keke: {name: 'Keke', icon: '🛺', color: '#f2c230', note: 'Handy for short hops.'},
+  keke: {name: 'Keke Napep', icon: '🛺', color: '#f2c230', note: 'Handy for short hops.'},
   okada: {name: 'Okada', icon: '🏍️', color: '#b23a48', note: 'Fastest through go-slow traffic.'},
-  taxi: {name: 'Ride-hailing', icon: '🚕', color: '#2fae6b', note: 'Booked on your smartphone.'},
+  taxi: {name: 'Kabu-kabu ride-hail', icon: '🚕', color: '#2fae6b', note: 'Booked on your smartphone.'},
 };
 // Rides that dodge go-slow traffic, or rain delays.
 export const NO_JAM = ['walk', 'bicycle', 'okada', 'motorbike', 'helicopter'], NO_RAIN = ['helicopter'];
-// Tuning at Palm Motors: each level makes trips in your own ride a little shorter.
+// Tuning at Naija Motors: each level makes trips in your own ride a little shorter.
 export const TUNING = [{fame: 1_000, cut: 5}, {fame: 5_000, cut: 10}, {fame: 20_000, cut: 15}];
 // Best-start characters begin with a family car; sponsored rides come from fame.
 export const STARTER_RIDE = 'hatchback';
@@ -505,7 +505,7 @@ const INSIGHTS = {
   planning: 'Every step of the plan clicked into place. Your planning improved.',
 };
 export const insightFor = (family, skill) => INSIGHTS[skill] || `${WATCH[family]?.hero || 'Someone on screen'} was brilliant. You learnt a little more about ${skill}.`;
-export const RIDES = {hatchback: {name: 'Family hatchback', icon: '🚗', color: '#5f8f8a'}, ...Object.fromEntries(Object.entries(SPONSORSHIPS).filter(([, d]) => d.kind === 'ride'))};
+export const RIDES = {hatchback: {name: 'Tokunbo hatchback', icon: '🚗', color: '#5f8f8a'}, ...Object.fromEntries(Object.entries(SPONSORSHIPS).filter(([, d]) => d.kind === 'ride'))};
 // Talking to an NPC is instant: a short chat, a line of dialogue and a little social boost per cool-off.
 // Character looks: a fixed set of skin tones, hairstyles, hair colours and body shapes.
 export const SKIN_TONES = ['#f6d9c5', '#ecc3a2', '#dba67f', '#c98d64', '#ad7350', '#8d5b3d', '#6e442e', '#4b2e20'];
@@ -525,7 +525,7 @@ export const MISHAPS = {
   fun: {icon: '📱', title: 'You posted a cringe 3am rant', text: 'Bored out of your mind, you went live. Fans unfollowed in droves.', fame: .015, set: {fun: 20}},
   social: {icon: '🪴', title: 'You livestreamed a chat with your houseplant', text: 'Lonely and talking to a fern. Fans are worried about you.', fame: .015, set: {social: 15}},
 };
-export const NPC_TALK = {social: 10, cooldownMs: 45_000, lines: ['Big things are coming for you, I can feel it.', 'Saw your last post. You’re getting better!', 'This city never sleeps, eh?', 'Keep practising. People are starting to notice.', 'Have you been to Palm Motors? Those cars, ehn!', 'Don’t forget to rest. Burnout is real.', 'You know who you should meet? Everybody!', 'Fame is a marathon, not a sprint.']};
+export const NPC_TALK = {social: 10, cooldownMs: 45_000, lines: ['Big things are coming for you, I can feel it.', 'Saw your last post. You’re getting better!', 'This city never sleeps, eh?', 'Keep practising. People are starting to notice.', 'Have you been to Naija Motors? Those cars, ehn!', 'Don’t forget to rest. Burnout is real.', 'You know who you should meet? Everybody!', 'Fame is a marathon, not a sprint.']};
 // Key NPCs always look the same so players recognise them; background people get random looks.
 export const NPCS = [
   {id:'nova', name:'Nova', career:'musician', location:'studio', role:'Producer', color:'#b4a7d9', look:{skin:'#8d5b3d', hair:'locs', hairColor:'black', build:'average', height:'tall'}},
@@ -633,7 +633,7 @@ export const OPINIONS = {
   unknown: {icon: '🤷', title: name => `${name} doesn't know you`, social: 6, fun: 0, sound: 'huh', lines: [
     "Sorry, have we met? I'm terrible with faces.",
     "Who? You'll have to remind me what you do.",
-    "Nice to meet you! Are you new around Palm City?",
+    "Nice to meet you! Are you new around Naija City?",
     "Hmm, you look like someone's cousin. Are you?",
     "I don't really follow celebrities, so… hi?",
     "Wait, should I know you? My bad if I should.",
@@ -700,7 +700,7 @@ export const isBigger = (theirs = 0, yours = 0) => theirs >= yours * 2 && theirs
 // What a Fame Clash is worth: about 1% of the loser's fame (at least 1, if they have any).
 export const clashStake = loserFame => loserFame > 0 ? Math.max(1, Math.round(loserFame * .01)) : 0;
 
-// Starter quests: fifteen first steps that teach how Palm City works. Any order counts;
+// Starter quests: fifteen first steps that teach how Naija City works. Any order counts;
 // the HUD shows the next one. Each pays a little fame, and finishing them all earns an award.
 export const QUESTS = [
   {key: 'walk', icon: '👣', title: 'Take a stroll', how: 'Tap the floor anywhere to walk there.', reward: 10},
@@ -711,7 +711,7 @@ export const QUESTS = [
   {key: 'travel', icon: '🗺️', title: 'Head into the city', how: 'Open the phone and the Map app, then pick a place to go.', reward: 20},
   {key: 'talk', icon: '🗣️', title: 'Meet a local', how: 'Tap a character in town and choose to talk to them.', reward: 20},
   {key: 'work', icon: '⭐', title: 'Do your first job', how: 'Tap Go to work, then Start work, and make your choices.', reward: 30},
-  {key: 'gym', icon: '🏋️', title: 'Hit the gym', how: 'Travel to Iron Palm Gym and use any machine.', reward: 25},
+  {key: 'gym', icon: '🏋️', title: 'Hit the gym', how: 'Travel to Eko Iron Gym and use any machine.', reward: 25},
   {key: 'shop', icon: '🛍️', title: 'Treat yourself', how: 'Buy something from the Market or Shopping app.', reward: 25},
   {key: 'dress', icon: '👗', title: 'Change your look', how: 'Open Wardrobe and wear something new.', reward: 20},
   {key: 'home', icon: '🛋️', title: 'Make it home', how: 'Open My stuff and place an item in your home.', reward: 25},
@@ -719,9 +719,9 @@ export const QUESTS = [
   {key: 'chat', icon: '💬', title: 'Start a conversation', how: 'Send a chat message where you are, or message a friend.', reward: 25},
   {key: 'clash', icon: '⚔️', title: 'Step into a Fame Clash', how: 'Open Battles and start or join a Fame Clash.', reward: 40},
 ];
-export const QUEST_GRADUATION = {name: 'Palm City Starter', fame: 250};
+export const QUEST_GRADUATION = {name: 'Naija City Starter', fame: 250};
 
-// The fastest way you can travel right now: any ride you own (Palm Motors tuning counts on your main
+// The fastest way you can travel right now: any ride you own (Naija Motors tuning counts on your main
 // ride) or public transport, allowing for go-slow traffic. This is how trips go unless you pick otherwise.
 export const ownedRides = s => [...new Set([s.ride, ...Object.keys(s.vip || {}).filter(k => SPONSORSHIPS[k]?.kind === 'ride')].filter(Boolean))];
 export function bestMode(s, now = Date.now()) {
