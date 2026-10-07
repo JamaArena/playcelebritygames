@@ -221,7 +221,10 @@ export class World {
   }
   // Zooming out drifts the camera from the current lot toward the town centre (0,-8).
   tripWalker(trip,p,serverNow,skin,look){this.human(p.x,p.z,skin,{...look,walk:true,heading:p.heading,gait:(serverNow-trip.departs)/1000*5});}
-  tripPosition(trip,serverNow){const points=route(trip.from,trip.to,trip.ride==='helicopter'?'fly':trip.ride?'drive':'walk'),p=along(points,(serverNow-trip.departs)/(trip.arrives-trip.departs)),here=TOWN[this.location]||TOWN.home;return {...p,x:p.x-here.x,z:p.z-here.z};}
+  tripPosition(trip,serverNow){const points=route(trip.from,trip.to,trip.ride==='helicopter'?'fly':trip.ride?'drive':'walk'),p=along(points,(serverNow-trip.departs)/(trip.arrives-trip.departs)),here=TOWN[this.location]||TOWN.home;
+    // Cars don't drive into buildings: inside a venue's lot you are on foot, walking to or from the kerb.
+    const onFoot=Boolean(trip.ride)&&trip.ride!=='helicopter'&&[trip.from,trip.to].map(k=>LOT(k)).some(k=>k!=='home'&&TOWN[k]&&Math.abs(p.x-TOWN[k].x)<5.4&&Math.abs(p.z-TOWN[k].z)<5.4);
+    return {...p,onFoot,x:p.x-here.x,z:p.z-here.z};}
   focus(){if(this.state?.trip){const p=this.tripPosition(this.state.trip,Date.now()+(this.serverOffset||0)),f=this.focusBase();return {x:p.x+f.x*.3,z:p.z+f.z*.3};}return this.focusBase();}
   focusBase(){const here=TOWN[this.location]||TOWN.home,t=this.interior()?0:Math.max(0,Math.min(1,(.9-this.zoom)/.65)),pan=this.pan||{x:0,z:0};
     // In a bigger home the camera glides east with you into the extra rooms.
@@ -407,8 +410,19 @@ export class World {
   careerLook(career,clothes=null){const family=CAREERS[career]?.family;if(clothes==='designer')return {outfit:'#1f1f24',pants:'#2a2a30',shoes:'#d4af37',fit:'suit',accent:'#d4af37'};const fit=clothes==='jacket'||family==='acting'||family==='tech'?'suit':family==='sport'?'kit':'tee';return {outfit:clothes==='jacket'?'#24634e':({sport:'#2f6fb3',music:'#7b4fa3',creator:'#e07a5f',acting:'#b23a48',tech:'#3d6a8a',risk:'#2b2d42'})[family]||'#8ea9a4',pants:family==='sport'?'#f2f2ee':family==='tech'||family==='acting'?'#23262e':'#34435e',shoes:family==='sport'?'#2b2d42':fit==='suit'?'#1d1b1a':'#f4f1ea',fit,accent:family==='acting'?'#1d1b1a':'#7a2433'};}
   // Local time drives the sky, building lights and the HUD clock; it never affects game rules.
   daylight(){const d=new Date(),h=this.forceHour??d.getHours()+d.getMinutes()/60,dark=h<5||h>=21?1:h<7?(7-h)/2:h>=19?(h-19)/2:0;return {hour:h,dark,night:dark>.5};}
-  palm(x,z,size=1){this.round(x,z,.2*size,.2*size,2*size,'#a98b67');this.round(x,z,1.5*size,1.5*size,.45*size,'#6aa679',1.9*size);this.round(x+.25*size,z-.1,.9*size,.9*size,.35*size,'#86c493',2.15*size);}
-  tree(x,z,size=1){this.round(x,z,.22*size,.22*size,1.1*size,'#8b6d50');this.round(x,z,1.6*size,1.6*size,1.5*size,'#77ad7c',.9*size);this.round(x-.2*size,z+.1,1.1*size,1.1*size,1*size,'#8fc493',1.6*size);}
+  // A palm: a gently curving, ringed trunk, drooping fronds and a few coconuts.
+  palm(x,z,size=1){const s=size,lean=(Math.abs(Math.sin(x*3.1+z*1.7))>.5?1:-1)*.06*s;
+    for(let k=0;k<5;k++){this.rod(x+lean*k,z,(.2-k*.012)*s,(.2-k*.012)*s,.44*s,k%2?'#9c7e5c':'#a98b67',k*.42*s);this.round(x+lean*k,z,(.22-k*.012)*s,(.22-k*.012)*s,.05*s,'#8b6d50',(k+1)*.42*s-.03*s);}
+    const tx=x+lean*5,ty=2.1*s,fr=['#4f8f5a','#5fa064','#6aad6f'];
+    for(const [dx,dz,l] of [[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[.7,.7,.75],[-.7,.7,.75],[.7,-.7,.75],[-.7,-.7,.75]]){const w=Math.abs(dx)>.9||Math.abs(dz)>.9;
+      this.round(tx+dx*.45*s*l,z+dz*.45*s*l,(w?(Math.abs(dx)>.5?.95:.26):.55)*s*l,(w?(Math.abs(dz)>.5?.95:.26):.55)*s*l,.12*s,fr[(Math.abs(dx*3+dz*5)|0)%3],ty);
+      this.round(tx+dx*1.05*s*l,z+dz*1.05*s*l,(w?(Math.abs(dx)>.5?.7:.2):.4)*s*l,(w?(Math.abs(dz)>.5?.7:.2):.4)*s*l,.1*s,fr[(Math.abs(dx*5+dz*3)|0)%3],ty-.28*s);}
+    for(const [dx,dz] of [[.12,.08],[-.1,.1],[0,-.13]])this.round(tx+dx*s,z+dz*s,.16*s,.16*s,.16*s,'#6b4a2e',ty-.16*s);}
+  // A broadleaf tree: a trunk with branches and a lumpy canopy of overlapping leaf clusters, varied per tree.
+  tree(x,z,size=1){const s=size,h=Math.floor(Math.abs(Math.sin(x*12.9898+z*78.233))*1000),greens=['#4f8a52','#5f9a5c','#6faa68','#7fb874','#5a9460'],trunk='#7a5a3c';
+    this.rod(x,z,.24*s,.24*s,1.25*s,trunk);this.rod(x,z,.32*s,.32*s,.18*s,'#6b4d32');this.rod(x+.18*s,z+.05*s,.09*s,.09*s,.45*s,trunk,1*s);this.rod(x-.16*s,z-.08*s,.08*s,.08*s,.4*s,trunk,1.05*s);
+    const cl=[[0,0,1.35,1.75],[.48,.18,.95,1.95],[-.45,.22,1,1.85],[.1,-.48,.95,1.9],[-.2,-.25,.85,2.25],[.25,.2,.8,2.4],[0,.05,.7,2.65]];
+    cl.forEach(([dx,dz,r,y],k)=>{const j=1+((h>>k)%5-2)*.05;this.round(x+dx*s*j,z+dz*s*j,r*s*j,r*s*j,r*.82*s*j,greens[(h+k)%greens.length],(y-r*.4)*s);});}
   // Soft ground shadow cast toward the lower right; drawn flat before the meshes.
   shadowRect(x,z,w,d,h){const o=Math.min(h*.35,3);this.polygon([[x-w/2,0,z-d/2],[x+w/2,0,z-d/2],[x+w/2+o,0,z-d/2+o],[x+w/2+o,0,z+d/2+o],[x-w/2+o,0,z+d/2+o],[x-w/2,0,z+d/2]],'rgba(30,52,38,.14)');}
   onScreen(x,z,radius=6){const p=this.project(x,0,z),m=radius*this.scale+60+(this.cullPad||0);return p.x>-m&&p.x<this.width+m&&p.y>-m&&p.y<this.height+m+16*this.scale;}
@@ -513,14 +527,38 @@ export class World {
     const tones=season==='independence'?['#008751','#ffffff']:['#d23b4b','#f2c230','#2fae6b','#2b7fd6'];
     for(let i=0;i<8;i++){const f=i/7,tone=tones[i%tones.length];this.box(x-w/2+f*w,z+d/2+.05,.22,.04,.28,tone,h+.12);this.box(x-w/2+f*w,z-d/2-.05,.22,.04,.28,tone,h+.12);}
   }
+  // City traffic: a small simulation. Cars keep a gap to the one ahead in their lane, ease to a stop,
+  // and wait at a junction while a crossing car is in it (the main east-west roads have right of way).
+  trafficStep(){
+    const now=performance.now()/1000,dt=Math.min(.1,Math.max(0,now-(this.trafficAt??now)));this.trafficAt=now;
+    if(!this.traffic){const kinds=['hatchback','danfo','taxi','suv','keke','coupe','danfo','limo'].filter(k=>RIDES[k]||TRANSIT[k]);this.traffic=[];let n=0;
+      for(const road of [8,-8,-24,-40,-56])for(const dir of [1,-1])for(let k=0;k<2;k++,n++)this.traffic.push({axis:'x',lane:road+dir*.75,dir,pos:-74+((n*37+k*71)%148),speed:3+(n%3)*.6,kind:kinds[n%kinds.length]});
+      for(const road of [-40,-8,24])for(const dir of [1,-1])for(let k=0;k<2;k++,n++)this.traffic.push({axis:'z',lane:road+dir*.75,dir,pos:-56+((n*23+k*31)%64),speed:2.6+(n%3)*.5,kind:kinds[n%kinds.length]});
+      // Start everyone clear of junctions and of each other.
+      const XR=[8,-8,-24,-40,-56],ZR=[-72,-56,-40,-24,-8,8,24,40,56,72];
+      for(const c of this.traffic){const [lo,hi]=c.axis==='x'?[-74,74]:[-52,4.5];for(let k=0;k<40;k++){const clear=(c.axis==='x'?ZR:XR).every(j=>Math.abs(c.pos-j)>(c.axis==='x'?2.5:4.2))&&this.traffic.every(o=>o===c||o.axis!==c.axis||o.lane!==c.lane||Math.abs(o.pos-c.pos)>4);if(clear)break;c.pos+=1.3;if(c.pos>hi)c.pos=lo+(c.pos-hi);}}}
+    const X_ROADS=[8,-8,-24,-40,-56],Z_ROADS=[-72,-56,-40,-24,-8,8,24,40,56,72];
+    for(const c of this.traffic){
+      const [lo,hi]=c.axis==='x'?[-74,74]:[-56,8],len=hi-lo;let go=true;
+      for(const o of this.traffic)if(o!==c&&o.axis===c.axis&&o.lane===c.lane){let ahead=(o.pos-c.pos)*c.dir;if(ahead<0)ahead+=len;if(ahead<3.6){go=false;break;}}
+      // Junctions: north-south cars stop at a stop line well clear of the crossing and only go when it is clear;
+      // east-west cars only yield to a car that is actually in the junction box, so the two can never wait on each other.
+      const road=c.lane-c.dir*.75;
+      if(go)for(const j of c.axis==='x'?Z_ROADS:X_ROADS){const ahead=(j-c.pos)*c.dir;
+        if(c.axis==='z'?ahead<=2.3||ahead>=4.3:ahead<=.3||ahead>=2.9)continue;
+        for(const o of this.traffic)if(o.axis!==c.axis&&Math.abs(o.lane-j)<1.2&&Math.abs(o.pos-road)<(c.axis==='z'?4.2:2.15)){go=false;break;}if(!go)break;}
+      c.v=(c.v??c.speed)+((go?c.speed:0)-(c.v??c.speed))*Math.min(1,dt*(go?3:14));c.pos+=c.v*c.dir*dt;
+      // East-west cars drive off one edge of the map and come back at the other; north-south cars U-turn before the junctions at their ends.
+      if(c.axis==='x'){if(c.pos>hi)c.pos=lo;if(c.pos<lo)c.pos=hi;}else if(c.pos>hi-3.4||c.pos<lo+3.4){const road=c.lane-c.dir*.75,other=road-c.dir*.75;c.pos=Math.max(lo+3.4,Math.min(hi-3.4,c.pos));
+        if(this.traffic.some(o=>o!==c&&o.axis==='z'&&o.lane===other&&Math.abs(o.pos-c.pos)<4))c.v=0;else{c.dir=-c.dir;c.lane=other;c.pos=Math.max(lo+3.45,Math.min(hi-3.45,c.pos));}}
+    }
+  }
   // Moving parts of the city (waves, cars, pedestrians) are redrawn every frame on top of the cached town.
   townLife(){
     const here=TOWN[this.location]||TOWN.home,ox=-here.x,oz=-here.z,{night}=this.daylight(),far=this.zoom<.4,t=this.reduced?0:performance.now()/1000;
     if(!far)for(let i=0;i<6;i++){const wx=ox-60+((t*.6+i*23)%120),wz=oz+12.5+i*1.8;if(this.onScreen(wx,wz,3))this.floor(wx,wz,3.5,.08,night?'#7f9cb9':'#c9e7ee',.01);}
     if(!this.reduced){
-      for(let i=0;i<10;i++){const road=[8,-8,-24,-40,-56,8,-8,-24][i%8],dir=i%2?1:-1,along=(t*(3.2+i%3)+i*31)%150,u=dir>0?-75+along:75-along;
-        if(i<8){const cz=road+dir*.75;if(this.onScreen(ox+u,oz+cz,2))this.car(ox+u,oz+cz,'x',CAR_TONES[i%CAR_TONES.length]);}
-        else{const cx=[-8,24][i-8]+dir*.75,v=Math.max(-58,Math.min(9,u*.45-24));if(this.onScreen(ox+cx,oz+v,2))this.car(ox+cx,oz+v,'z',CAR_TONES[i%CAR_TONES.length]);}}
+      this.trafficStep();for(const c of this.traffic){const x=c.axis==='x'?c.pos:c.lane,z=c.axis==='x'?c.lane:c.pos;if(this.onScreen(ox+x,oz+z,2.5))this.ride(c.kind,ox+x,oz+z,c.axis);}
       const walkers=far?0:24;for(let i=0;i<walkers;i++){const dir=i%2?1:-1,along=(t*1.1+i*17.3)%140,u=dir>0?-70+along:70-along,lane=[[6.1,'x'],[-6.1,'x'],[-9.9,'x'],[-22.1,'x'],[-25.9,'x'],[-38.1,'x'],[9.8,'x'],[-6.1,'z'],[6.1,'z'],[-22.1,'z'],[-9.9,'z'],[25.9,'z'],[-41.9,'x'],[-54.1,'x']][i%14];
         const [px,pz]=lane[1]==='x'?[u,lane[0]]:[lane[0],Math.max(-58,Math.min(9,u*.45-24))];if(!this.onScreen(px+ox,pz+oz,2))continue;
         this.human(px+ox,pz+oz,SKIN_TONES[(i+CROWD_SEED)%SKIN_TONES.length],{...this.look(['football','musician','vlogger','actor','developer','tennis'][i%6]),...this.extra(i),walk:true,heading:lane[1]==='x'?dir*Math.PI/2:dir>0?0:Math.PI,gait:t*7+i});}
@@ -630,7 +668,7 @@ export class World {
     const roomSpot=this.state.recovery?.spot&&this.location==='home'&&!this.visitedHome?homeRooms(this.state.home).find(r=>r.slot===this.state.recovery.spot)?.object:null;if(roomSpot)pose=roomSpot.pose;
     if(this.state.recovery?.yacht){pose='dance';}
     const pos=roomSpot?{x:roomSpot.vx,z:roomSpot.vz}:actSpot?{x:actSpot.x,z:actSpot.z}:this.state.recovery?.yacht?{x:4,z:7.1}:usedSpot?.face!=null?{x:usedSpot.x,z:usedSpot.z}:usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
-    if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride){this.ride(this.state.trip.ride,p.x,p.z,p.axis,this.state.trip.ride==='helicopter'?6:0);if(OPEN_RIDES.includes(this.state.trip.ride))this.human(p.x,p.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),pose:'sit',seat:.7,heading:p.heading});this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state)});this.actor={x:p.x,z:p.z,pose:null};}return;}
+    if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride&&!p.onFoot){this.ride(this.state.trip.ride,p.x,p.z,p.axis,this.state.trip.ride==='helicopter'?6:0);if(OPEN_RIDES.includes(this.state.trip.ride))this.human(p.x,p.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),pose:'sit',seat:.7,heading:p.heading});this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state)});this.actor={x:p.x,z:p.z,pose:null};}return;}
     if(this.state.ride){if(this.interior())this.ride(this.state.ride,-2.5,7.4,'x');else this.ride(this.state.ride,-7.1,2.6,'z');}
     const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),walk:this.moving,pose,seat:usedDef?.seat??actDef?.seat,heading:roomSpot?roomSpot.face:actSpot?actSpot.face:usedSpot?.face!=null?usedSpot.face:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
     this.actor={...pos,pose};
@@ -890,7 +928,7 @@ export class World {
   inTrainingZone(x,z){const zone=TRAINING_ZONES[this.location];return !!zone&&x>zone[0]&&x<zone[1]&&z>zone[2]&&z<zone[3];}
   paintPeople(){
     const here=TOWN[this.location]||TOWN.home;
-    const clear=this.training();for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride){this.ride(p.trip.ride,t.x,t.z,t.axis,p.trip.ride==='helicopter'?6:0);if(OPEN_RIDES.includes(p.trip.ride))this.human(t.x,t.z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),pose:'sit',seat:.7,heading:t.heading});}else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1)||(clear&&this.inTrainingZone(x,z)))continue;const emoting=p.emote&&!p.moving&&Date.now()+this.serverOffset-p.emote.at<(EMOTES[p.emote.kind]?.ms||0)?(EMOTES[p.emote.kind]?.pose||p.emote.kind):null;this.human(x,z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait,pose:emoting});}
+    const clear=this.training();for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride&&!t.onFoot){this.ride(p.trip.ride,t.x,t.z,t.axis,p.trip.ride==='helicopter'?6:0);if(OPEN_RIDES.includes(p.trip.ride))this.human(t.x,t.z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),pose:'sit',seat:.7,heading:t.heading});}else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1)||(clear&&this.inTrainingZone(x,z)))continue;const emoting=p.emote&&!p.moving&&Date.now()+this.serverOffset-p.emote.at<(EMOTES[p.emote.kind]?.ms||0)?(EMOTES[p.emote.kind]?.pose||p.emote.kind):null;this.human(x,z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait,pose:emoting});}
   }
   // The home screen: a soft sky and a round lawn under the house, like a dollhouse on a table.
   paintIsland(light){const ctx=this.ctx,g=ctx.createLinearGradient(0,0,0,this.height);g.addColorStop(0,light.night?'#24324d':'#cfe3f4');g.addColorStop(1,light.night?'#3b4a66':'#eef5f9');ctx.fillStyle=g;ctx.fillRect(0,0,this.width,this.height);

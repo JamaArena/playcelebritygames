@@ -192,7 +192,7 @@ test('fame unlocks free sponsorships at Palm Motors, once, without spending fame
 test('a sponsored ride drives along the roads for a distance-based time; homes speed up recovery',()=>{
   const s=make('football');s.vip={hypercar:{at:T},villa:{at:T}};s.ride='hypercar';s.home='villa';
   act(s,{type:'travel',location:'tech'},T);
-  assert.equal(s.location,'home');assert.equal(s.trip.to,'tech');const walk=tripMs('home','tech');assert.ok(walk>60_000&&walk<=90_000,'walking across town takes at most 1:30');for(const a of ['home','street','plaza','studio','sports','creator','tech'])for(const b of ['plaza','studio','sports','creator','tech'])assert.ok(tripMs(a,b)<=90_000);assert.equal(s.trip.arrives-T,tripMs('home','tech','hypercar'));assert.ok(tripMs('home','tech','hypercar')<walk*.4,'cars are much faster');
+  assert.equal(s.location,'home');assert.equal(s.trip.to,'tech');const walk=tripMs('home','tech');assert.ok(walk>20_000&&walk<=30_000,'walking across town takes at most 30 seconds');for(const a of ['home','street','plaza','studio','sports','creator','tech'])for(const b of ['plaza','studio','sports','creator','tech'])assert.ok(tripMs(a,b)<=30_000);assert.equal(s.trip.arrives-T,tripMs('home','tech','hypercar'));assert.ok(tripMs('home','tech','hypercar')<walk*.4,'cars are much faster');
   assert.ok(tripMs('home','plaza')<walk,'short walks are shorter');
   assert.throws(()=>act(s,{type:'start',kind:'practice',skill:'passing'},T+1000),/on the road/);
   act(s,{type:'travel',location:'tech'},s.trip.arrives);assert.equal(s.location,'tech');assert.equal(s.trip,null);

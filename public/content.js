@@ -424,7 +424,9 @@ export function route(from, to, mode = 'walk') {
   return points;
 }
 export const routeLength = points => points.slice(1).reduce((n, p, i) => n + Math.abs(p.x - points[i].x) + Math.abs(p.z - points[i].z), 0);
-export const tripMs = (from, to, ride = 'walk') => Math.round(Math.min(BALANCE.walkCapMs, routeLength(route(from, to)) / 16 * BALANCE.walkMsPerBlock) * (RIDE_SPEED[ride] ?? 1));
+// Trips take a third of the original time (everything moves about 3.3x faster).
+export const TRIP_PACE = 1 / 3;
+export const tripMs = (from, to, ride = 'walk') => Math.round(Math.min(BALANCE.walkCapMs, routeLength(route(from, to)) / 16 * BALANCE.walkMsPerBlock) * (RIDE_SPEED[ride] ?? 1) * TRIP_PACE);
 export function along(points, f) {
   const total = routeLength(points); let left = Math.max(0, Math.min(1, f)) * total;
   for (let i = 1; i < points.length; i++) { const a = points[i - 1], b = points[i], d = Math.abs(b.x - a.x) + Math.abs(b.z - a.z);
