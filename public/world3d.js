@@ -339,6 +339,11 @@ export class World3D extends World {
     for (let i = 0; i < 320; i++) { const a = Math.sin(i * 12.9898) * 43758.5453, b = Math.sin(i * 78.233) * 12543.11, x = f.x + ((a - Math.floor(a)) - .5) * span, z = f.z + ((b - Math.floor(b)) - .5) * span, y = 14 - ((t * 14 + i * 1.7) % 14); this.rain.setMatrixAt(i, m.compose(v.set(x, y, z), q, sc)); }
     this.rain.instanceMatrix.needsUpdate = true;
   }
+  // A small JPEG of the current view, for the Camera app.
+  snapshotImage() {
+    this.draw(); const src = this.glCanvas, w = 360, h = Math.round(w * src.height / src.width), c = document.createElement('canvas'); c.width = w; c.height = h;
+    const g = c.getContext('2d'); g.drawImage(src, 0, 0, w, h); g.drawImage(this.canvas, 0, 0, w, h); return c.toDataURL('image/jpeg', .7);
+  }
   // On your street the camera follows you; zooming out eases it over to the city overview.
   focus() {
     const base = super.focus(); if (this.location !== 'street' || this.state?.trip || !this.player) return base;

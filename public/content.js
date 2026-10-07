@@ -224,6 +224,10 @@ export const LIFE_EVENTS = {
 };
 // Home items that need electricity during a power cut (unless you own a generator).
 export const POWERED = ['gamingConsole', 'soundSystem', 'coffeeMachine', 'microwave', 'washingMachine', 'ringLight', 'studioMic'];
+// Phone apps: deliveries take a minute; groceries make home cooking more filling.
+export const DELIVERY_MS = 60_000, GROCERY = {pack: 10, bonus: 15};
+// Social feed posts: a little social, and a little fame at most every 10 minutes.
+export const POSTS = {cooldownMs: 10 * 60_000, max: 280};
 // The kitchen menu. Each dish fills hunger over `ms` and may lift other needs; some unlock with fame.
 export const FOODS = {
   jollof: {name: 'Jollof rice', icon: '🍛', hunger: 60, ms: 90_000, extra: {fun: 5}},
@@ -234,6 +238,9 @@ export const FOODS = {
   smoothie: {name: 'Fruit smoothie', icon: '🥤', hunger: 10, ms: 15_000, extra: {energy: 10}},
   zobo: {name: 'Zobo drink', icon: '🍷', hunger: 5, ms: 10_000, extra: {fun: 8}},
   chapman: {name: 'Chapman', icon: '🍹', hunger: 5, ms: 10_000, extra: {fun: 10, social: 5}, fame: 500},
+  // Takeaway: order on the Shopping app and eat it when it arrives.
+  suya: {name: 'Suya', icon: '🍢', hunger: 35, ms: 25_000, extra: {fun: 8}, takeaway: true},
+  shawarma: {name: 'Shawarma', icon: '🌯', hunger: 45, ms: 30_000, extra: {fun: 5}, takeaway: true},
 };
 // VIP sponsorship deals: free items unlocked by fame, claimed at Palm Motors in Palm plaza.
 // Fame is not spent and claimed items stay yours. Brand names are fictional.

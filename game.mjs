@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -17,7 +17,13 @@ export function createCharacter(input, now) {
 }
 // Fame is one character-wide total earned from reach in any career. Battles can also move it.
 export const fameFor = reach => Math.floor(reach * B.famePerReach);
-export function addFame(s, amount) { s.fame = Math.max(0, (s.fame || 0) + amount); }
+export function addFame(s, amount, reason = 'Other', at = Date.now()) {
+  const before = s.fame || 0; s.fame = Math.max(0, before + amount); const delta = s.fame - before;
+  // The Fame wallet app shows where fame came from and went.
+  if (delta) s.fameLog = [{at, delta, reason}, ...(s.fameLog || [])].slice(0, 60);
+}
+// Palm City News: notable moments become headlines other players can read.
+export function headline(s, text, at) { s.headlines = [{at, text}, ...(s.headlines || [])].slice(0, 5); }
 export function log(s, message, now) { s.events.unshift({id:id(),message,at:now}); s.events = s.events.slice(0,100); }
 export function refill(s, now) {
   if (s.charges >= B.capacity) { s.charges=B.capacity; s.refillAnchor=null; return; }
@@ -70,7 +76,11 @@ export function reconcile(s, now) {
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
     item.level=item.upgrade.target; item.upgrade=null; log(s,`${ITEMS[key].name} reached level ${item.level}.`,now);
   }
-  if(s.trip && now>=s.trip.arrives){if(s.trip.ride==='limo'&&LOT(s.trip.to)!=='home'&&now-(s.limoAt||0)>=10*60_000){s.limoAt=now;addFame(s,10);log(s,'🚘 Fans spotted your limousine pulling up. +10 fame.',now);}s.location=s.trip.to;s.position3d=arrivalSpot(s.trip.to);s.visiting=null;log(s,`Arrived at ${LOCATIONS[s.trip.to].name}.`,now);s.trip=null;}
+  // Phone orders arrive at your door.
+  if(s.deliveries?.length){const due=s.deliveries.filter(d=>now>=d.at);s.deliveries=s.deliveries.filter(d=>now<d.at);for(const d of due){
+    if(d.kind==='item')s.inventory[d.item]??={level:1};else if(d.kind==='wear'){s.closet??={};s.closet[d.item]=true;}else if(d.kind==='groceries')s.groceries=(s.groceries||0)+GROCERY.pack;else if(d.kind==='food'){s.takeaway??={};s.takeaway[d.item]=(s.takeaway[d.item]||0)+1;}
+    log(s,`📦 Your delivery arrived: ${d.name}.`,d.at);}}
+  if(s.trip && now>=s.trip.arrives){if(s.trip.ride==='limo'&&LOT(s.trip.to)!=='home'&&now-(s.limoAt||0)>=10*60_000){s.limoAt=now;addFame(s,10,'Limousine arrival',now);log(s,'🚘 Fans spotted your limousine pulling up. +10 fame.',now);}s.location=s.trip.to;s.position3d=arrivalSpot(s.trip.to);s.visiting=null;log(s,`Arrived at ${LOCATIONS[s.trip.to].name}.`,now);s.trip=null;}
   if(s.recovery?.watch)watchInsights(s,s.recovery,Math.min(now,s.recovery.endsAt));
   if(s.recovery && now>=s.recovery.endsAt)finishRecovery(s,s.recovery.endsAt);
   if(s.active?.kind==='practice' && now>=s.active.readyAt) {
@@ -88,7 +98,7 @@ export function mishaps(s,now){
   for(const [need,m] of Object.entries(MISHAPS)){
     if(s.needs[need]>MISHAP.at||s.recovery?.need===need||now-(s.mishapAt[need]||0)<MISHAP.cooldownMs)continue;
     const lost=Math.min(s.fame||0,Math.round(Math.max(MISHAP.minFame,(s.fame||0)*m.fame)*(1-(perksFor(s).scandal||0)/100)));
-    addFame(s,-lost);s.mishapAt[need]=now;for(const [k,v] of Object.entries(m.set))s.needs[k]=v;
+    addFame(s,-lost,m.title,now);s.mishapAt[need]=now;headline(s,`${s.name}: ${m.title.toLowerCase().replace(/^you /,'')}! ${m.icon}`,now);for(const [k,v] of Object.entries(m.set))s.needs[k]=v;
     s.mishap={id:id(),need,at:now,lost};log(s,`${m.icon} ${m.title}. ${m.text} −${lost.toLocaleString('en-US')} fame.`,now);return;
   }
 }
@@ -101,7 +111,7 @@ export function lifeEvents(s,now,rng=Math.random){
   const total=options.reduce((n,[,e])=>n+e.weight,0);let pick=rng()*total,key=options[0][0];
   for(const [k,e] of options){pick-=e.weight;if(pick<=0){key=k;break;}}
   const e=LIFE_EVENTS[key];let delta=0,text=e.text;
-  if(e.fame){const [share,min]=e.fame,raw=share>0?Math.max(min,(s.fame||0)*share):Math.min(min,(s.fame||0)*share);delta=Math.round(raw<0?raw*(1-(perksFor(s).scandal||0)/100):raw);if(delta<0)delta=Math.max(delta,-(s.fame||0));addFame(s,delta);}
+  if(e.fame){const [share,min]=e.fame,raw=share>0?Math.max(min,(s.fame||0)*share):Math.min(min,(s.fame||0)*share);delta=Math.round(raw<0?raw*(1-(perksFor(s).scandal||0)/100):raw);if(delta<0)delta=Math.max(delta,-(s.fame||0));addFame(s,delta,e.title,now);if(key==='luckyBreak'||key==='slip'||key==='sneeze')headline(s,`${s.name}: ${e.title.toLowerCase().replace(/^you /,'')} ${e.icon}`,now);}
   for(const [k,v] of Object.entries(e.needs||{}))s.needs[k]=clamp(s.needs[k]+v);
   if(key==='powerCut'){if(upgradesFor(s).generator)text='Power cut! Your generator kicked in, so nothing stopped.';else s.powerCut={until:now+LIFE_EVENT.powerCutMs};}
   s.lifeEvent={id:id(),kind:key,at:now,delta,text};log(s,`${e.icon} ${e.title}. ${text}${delta?` ${delta>0?'+':'−'}${Math.abs(delta).toLocaleString('en-US')} fame.`:''}`,now);
@@ -112,7 +122,7 @@ export function finishRecovery(s,now){
   const r=s.recovery,start=r.startedAt??r.endsAt-B.recovery[r.need][1],share=Math.max(0,Math.min(1,(now-start)/(r.endsAt-start))),amount=r.amount??B.recovery[r.need][0];
   s.needs[r.need]=clamp(s.needs[r.need]+amount*share);for(const [k,v] of Object.entries(r.extra||{}))s.needs[k]=clamp(s.needs[k]+v*share);s.recovery=null;
   if(r.watch){watchInsights(s,r,now);if(r.watch.given)s.watchLearnAt=now;}
-  if(r.item&&ITEMS[r.item]?.use?.post&&share>=.5&&now-(s.postedAt||0)>=10*60_000){s.postedAt=now;const gain=Math.max(5,Math.round((s.fame||0)*.002));addFame(s,gain);log(s,`📷 Your photos got likes. +${gain} fame.`,now);}
+  if(r.item&&ITEMS[r.item]?.use?.post&&share>=.5&&now-(s.postedAt||0)>=10*60_000){s.postedAt=now;const gain=Math.max(5,Math.round((s.fame||0)*.002));addFame(s,gain,'Photo post',now);log(s,`📷 Your photos got likes. +${gain} fame.`,now);}
   const train=r.item&&ITEMS[r.item]?.use?.learn;if(train&&CAREERS[s.career].family===train.family&&share>=.5)learn(s,s.career,CAREERS[s.career].focus,Math.round(train.points*share),`item:${r.id}`);
   log(s,share>=1?`${r.label} completed.`:`${r.label}: stopped early, +${Math.round(amount*share)} ${r.need}.`,now);
 }
@@ -238,7 +248,7 @@ function settle(s,a,now) {
   const contract=c.affiliation;
   if(qualifies&&contract)gain=Math.floor(gain*(1+(contract.boost??B.contractBoost)));
   gain=Math.floor(gain*a.audienceShare);
-  const fame=Math.round(fameFor(gain)*(1+((perksFor(s).fame||0)+(s.inventory.drone&&CAREERS[s.career].family==='creator'?5:0))/100));c.audience+=gain;addFame(s,fame);c.completed++;
+  const fame=Math.round(fameFor(gain)*(1+((perksFor(s).fame||0)+(s.inventory.drone&&CAREERS[s.career].family==='creator'?5:0))/100));c.audience+=gain;addFame(s,fame,`${def.output} released`,now);if(fame>=100)headline(s,`${s.name}'s new ${def.output.toLowerCase()} is a hit: +${fame.toLocaleString('en-US')} fame 🔥`,now);c.completed++;
   if(qualifies)c.engagement=clamp(c.engagement+(quality-50)/10);
   if(contract&&qualifies)c.reputation=clamp(c.reputation+(quality>=60?2:-2));
   if(a.kind==='trial') {
@@ -320,7 +330,7 @@ export function act(s,input,now,rng=Math.random) {
     case 'recover': {
       requireRule(!s.active&&!s.recovery,'Finish or cancel your activity first.');
       requireRule(B.recovery[input.need],'Unknown need.');
-      const where=s.location==='home'||(input.need==='social'&&s.location!=='home')||(input.need==='fun'&&s.location==='plaza');
+      const where=s.location==='home'||(input.need==='hunger'&&FOODS[input.food]?.takeaway&&!s.trip)||(input.need==='social'&&s.location!=='home')||(input.need==='fun'&&s.location==='plaza');
       requireRule(where,'Go home to use this recovery object.');
       const labels={hunger:'Eating',energy:'Sleeping',fun:'Relaxing',social:'Socialising',hygiene:'Washing',bladder:'Using the toilet'};
       const rest=s.location==='home'&&!s.visiting?SPONSORSHIPS[s.home]?.rest??1:1;
@@ -329,8 +339,11 @@ export function act(s,input,now,rng=Math.random) {
       // A dish from the kitchen menu: its own amount, time and side effects.
       requireRule(!(watching&&noPower(s,now)),'NEPA took light. The TV is off until power comes back.');
       const food=input.need==='hunger'&&input.food!=null?FOODS[input.food]:null;
-      if(input.food!=null){requireRule(food,'That dish is not on the menu.');requireRule(s.location==='home','Cook at home.');requireRule((s.fame||0)>=(food.fame||0),`${food.name} unlocks at ${(food.fame||0).toLocaleString('en-US')} fame.`);}
-      if(food){s.recovery={id:id(),need:'hunger',label:`Eating ${food.name.toLowerCase()}`,startedAt:now,endsAt:now+Math.round(food.ms*rest),amount:food.hunger,extra:food.extra||{},food:input.food};break;}
+      if(input.food!=null){requireRule(food,'That dish is not on the menu.');requireRule(s.location==='home'||food.takeaway,'Cook at home.');requireRule((s.fame||0)>=(food.fame||0),`${food.name} unlocks at ${(food.fame||0).toLocaleString('en-US')} fame.`);}
+      let bonus=0;
+      if(food?.takeaway){requireRule(s.takeaway?.[input.food]>0,`Order ${food.name.toLowerCase()} on the Shopping app first.`);s.takeaway[input.food]--;}
+      else if(food&&s.groceries>0){s.groceries--;bonus=GROCERY.bonus;}
+      if(food){s.recovery={id:id(),need:'hunger',label:`Eating ${food.name.toLowerCase()}`,startedAt:now,endsAt:now+Math.round(food.ms*rest),amount:food.hunger+bonus,extra:food.extra||{},food:input.food};break;}
       const ups=upgradesFor(s),sleep=input.need==='energy'?Math.max(.4,1-((perksFor(s).sleep||0)+(s.location==='home'&&!s.visiting?ups.sleep||0:0))/100):1,sofa=input.need==='fun'&&!watching&&s.location==='home'&&!s.visiting?ups.sofa||0:0;
       s.recovery={id:id(),need:input.need,label:watching?WATCH[family].label:labels[input.need],startedAt:now,endsAt:now+Math.round((watching?WATCH_SESSION:B.recovery[input.need][1])*rest*sleep),watch,...(sofa?{amount:B.recovery.fun[0]+sofa}:{})};break;
     }
@@ -372,6 +385,27 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(s.vip?.yacht,'Claim the yacht sponsorship first.');requireRule(s.location==='street'&&!s.trip,'Your yacht is moored by your street.');requireRule(!s.active&&!s.recovery,'Finish your activity first.');
       s.recovery={id:id(),need:'fun',label:'Yacht party on the lagoon',startedAt:now,endsAt:now+90_000,amount:50,extra:{social:30},yacht:true};break;
     }
+    // Phone apps.
+    case 'post': {
+      const body=text(input.body,POSTS.max);requireRule(body,'Write something to post.');
+      const fans=Math.round(Math.sqrt(s.fame||0)*(2+Math.random()*3));s.posts=[{id:id(),at:now,body,likes:fans},...(s.posts||[])].slice(0,20);s.needs.social=clamp(s.needs.social+3);
+      if(now-(s.lastPostFame||0)>=POSTS.cooldownMs){s.lastPostFame=now;addFame(s,Math.max(1,Math.round((s.fame||0)*.0005)),'Social post',now);}break;
+    }
+    case 'order': {
+      requireRule(s.phone&&s.phone!=='basic','Shopping needs a smartphone. Upgrade your phone.');requireRule((s.deliveries||[]).length<5,'Wait for your deliveries to arrive.');
+      let entry;
+      if(input.kind==='item'){const item=ITEMS[input.item];requireRule(item&&!s.inventory[input.item],'You already have that, or it does not exist.');requireRule((s.fame||0)>=item.fame,`${item.name} unlocks at ${item.fame.toLocaleString('en-US')} fame.`);entry={name:item.name};}
+      else if(input.kind==='wear'){const item=WEAR[input.item];requireRule(item&&item.fame>0&&!s.closet?.[input.item],'You already have that, or it does not exist.');requireRule((s.fame||0)>=item.fame,`${item.name} unlocks at ${item.fame.toLocaleString('en-US')} fame.`);entry={name:item.name};}
+      else if(input.kind==='groceries')entry={name:'Groceries (10 meals)'};
+      else if(input.kind==='food'){const f=FOODS[input.item];requireRule(f?.takeaway,'Choose suya or shawarma.');entry={name:f.name};}
+      else requireRule(false,'Choose something to order.');
+      s.deliveries=[...(s.deliveries||[]),{kind:input.kind,item:input.item||null,name:entry.name,at:now+DELIVERY_MS}];log(s,`🛒 Ordered ${entry.name}. Arriving in a minute.`,now);break;
+    }
+    case 'unfriend': {s.friends=s.friends.filter(p=>p!==input.playerId);break;}
+    case 'listenMusic': {requireRule(!s.active&&!s.recovery,'Finish your activity first.');requireRule(!s.trip,'Listen when you arrive.');s.recovery={id:id(),need:'fun',label:`Listening to ${text(input.song,40)||'music'}`,startedAt:now,endsAt:now+30_000,amount:15,music:true};break;}
+    case 'goOnDate': {requireRule(s.dating?.open,'Turn on dating first.');requireRule(!s.active&&!s.recovery&&!s.trip,'Finish what you are doing first.');const who=text(input.name,30)||'your match';s.recovery={id:id(),need:'social',label:`On a date with ${who}`,startedAt:now,endsAt:now+90_000,amount:40,extra:{fun:15},date:who};log(s,`💘 Went on a date with ${who}.`,now);break;}
+    case 'datingOpen': {s.dating??={likes:[]};s.dating.open=!!input.open;break;}
+    case 'datingLike': {requireRule(s.dating?.open,'Turn on dating first.');requireRule(input.playerId,'Choose someone.');if(!s.dating.likes.includes(input.playerId))s.dating.likes.push(input.playerId);break;}
     case 'takeOff': {requireRule(s.wear?.[input.slot],'Nothing to take off there.');delete s.wear[input.slot];break;}
     case 'useItem': {
       // Use a placed home item: it fills a need over time like the built-in objects.
