@@ -335,6 +335,7 @@ export class World3D extends World {
   }
   toilet(x, z) { this.toilets.next().position.set(x, 0, z); }
   human(x, z, skin, o = {}) {
+    if (o.pose === 'sit' || o.pose === 'work') { const f = this.seatAt(x, z); if (f != null) o = { ...o, heading: f }; }
     const f = this.figures.next(); o = { hair: '#2b211c', style: 'curls', outfit: '#8ea9a4', pants: '#34435e', shoes: '#f4f1ea', gait: this.gait, ...o };
     f.apply(x, z, skin, o, performance.now() / 1000, this.reduced);
   }
@@ -401,7 +402,7 @@ export class World3D extends World {
     this.island.visible = inside; this.city.visible = !inside; this.scene3.fog = inside ? null : this.fog;
     if (!inside) { const key = [this.location, day.night, this.ownersKey, this.state.home, !!this.state.trip, festivalAt(Date.now()), !!this.state.vip?.yacht, this.starsKey].join('|'); if (key !== this.cityKey) { this.cityKey = key; this.buildCity(day.night); } }
     for (const p of [this.boxes, this.balls, this.rods, this.figures, this.toilets]) p.begin();
-    this.meshes = []; if (!inside) this.townLife(); this.scene();
+    this.meshes = []; this.seats = []; if (!inside) this.townLife(); this.scene();
     for (const p of [this.boxes, this.balls, this.rods, this.figures, this.toilets]) p.end();
     this.paintRain();
     this.renderer.render(this.scene3, this.camera);
