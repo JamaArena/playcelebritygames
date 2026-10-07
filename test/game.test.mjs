@@ -142,7 +142,7 @@ test('kitchen dishes and placed home items fill needs with their own effects',()
   reconcile(s,s.recovery.endsAt+1);assert.equal(Math.round(s.needs.hunger),70);assert.ok(s.needs.fun>=54,'jollof lifts fun a little');
   assert.throws(()=>act(s,{type:'useItem',item:'treadmill'},T+200_000),/Place that item/);
   s.location='plaza';act(s,{type:'buy',item:'treadmill'},T+200_000);s.location='home';act(s,{type:'place',item:'treadmill',x:0,z:-1},T+200_000);
-  s.needs.fun=40;s.needs.energy=80;act(s,{type:'useItem',item:'treadmill'},T+200_000);assert.equal(s.recovery.item,'treadmill');
+  s.needs.fun=40;s.needs.energy=80;s.nextEventAt=Infinity;act(s,{type:'useItem',item:'treadmill'},T+200_000);assert.equal(s.recovery.item,'treadmill');
   reconcile(s,s.recovery.endsAt+1);assert.equal(Math.round(s.needs.fun),60);assert.ok(s.needs.energy<=71,'running is tiring');
 });
 test('interaction points are walkable and blocked moves or placements spend nothing',()=>{
