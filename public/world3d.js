@@ -298,11 +298,13 @@ export class World3D extends World {
     this.rain = new T.InstancedMesh(UNIT_BOX, new T.MeshBasicMaterial({ color: '#d5e3f0', transparent: true, opacity: .55 }), 320); this.rain.frustumCulled = false; this.scene3.add(this.rain);
     this.boxes = new Pool(this.world3, () => { const m = new T.Mesh(UNIT_BOX, mat('#fff')); m.castShadow = true; m.receiveShadow = true; return m; });
     this.balls = new Pool(this.world3, () => { const m = new T.Mesh(UNIT_BALL, mat('#fff')); m.castShadow = true; m.receiveShadow = true; return m; });
+    this.rods = new Pool(this.world3, () => { const m = new T.Mesh(UNIT_ROD, mat('#fff')); m.castShadow = true; m.receiveShadow = true; return m; });
     this.figures = new Pool(this.world3, () => new Figure()); this.toilets = new Pool(this.world3, makeToilet);
     this.raycaster = new T.Raycaster(); this.ground = new T.Vector3();
   }
   // Drawing primitives used by the shared scene descriptions, now as 3D meshes.
   box(x, z, w, d, h, color, y = 0) { if (this.capture) { this.capture.push(['box', color, x, y + h / 2, z, w, h, d]); return; } const m = this.boxes.next(); m.material = mat(color, GLASS.has(color) ? 'glass' : 'matte'); m.scale.set(Math.max(w, .001), Math.max(h, .001), Math.max(d, .001)); m.position.set(x, y + h / 2, z); }
+  rod(x, z, w, d, h, color, y = 0) { if (this.capture) { this.capture.push(['rod', color, x, y + h / 2, z, w, h, d]); return; } const m = this.rods.next(); m.material = mat(color, 'gloss'); m.scale.set(Math.max(w, .001), Math.max(h, .001), Math.max(d, .001)); m.position.set(x, y + h / 2, z); }
   round(x, z, w, d, h, color, y = 0) { if (this.capture) { this.capture.push(['ball', color, x, y + h / 2, z, w, h, d]); return; } const m = this.balls.next(); m.material = mat(color, 'gloss'); m.scale.set(Math.max(w, .001), Math.max(h, .001), Math.max(d, .001)); m.position.set(x, y + h / 2, z); }
   // Room-sized floors indoors are tiled; paths, lawns and streets stay plain.
   floor(x, z, w, d, color, y = 0) { if (this.capture) { this.capture.push(['box', color, x, y - .01, z, w, .03, d]); return; } const m = this.boxes.next(); m.material = this.interior() && w >= 8 && d >= 8 && w <= 12 && d <= 12 ? tileMat(color, w, d) : mat(color); m.scale.set(w, .03, d); m.position.set(x, y - .01, z); }
@@ -323,8 +325,8 @@ export class World3D extends World {
     const groups = new Map(), m4 = new T.Matrix4(), q = new T.Quaternion(), v = new T.Vector3(), sc = new T.Vector3();
     for (const e of this.capture) { if (e[0] === 'mesh') { this.city.add(e[1]); continue; } const key = e[0] + e[1]; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(e); }
     for (const list of groups.values()) {
-      const [kind, color] = list[0], geo = kind === 'box' ? UNIT_BOX : UNIT_BALL;
-      const im = new T.InstancedMesh(geo, mat(color, GLASS.has(color) || (night && color === '#ffd98a') ? 'glass' : kind === 'ball' ? 'gloss' : 'matte'), list.length);
+      const [kind, color] = list[0], geo = kind === 'box' ? UNIT_BOX : kind === 'rod' ? UNIT_ROD : UNIT_BALL;
+      const im = new T.InstancedMesh(geo, mat(color, GLASS.has(color) || (night && color === '#ffd98a') ? 'glass' : kind !== 'box' ? 'gloss' : 'matte'), list.length);
       list.forEach(([, , x, y, z, w, h, d], i) => im.setMatrixAt(i, m4.compose(v.set(x, y, z), q, sc.set(Math.max(w, .001), Math.max(h, .001), Math.max(d, .001)))));
       // Flat ground (roads, lawns, water) only receives shadows; casting onto itself causes striping.
       im.receiveShadow = true; im.castShadow = list.some(e => e[6] > .05); im.computeBoundingSphere(); this.city.add(im);
@@ -398,9 +400,9 @@ export class World3D extends World {
     const inside = this.interior();
     this.island.visible = inside; this.city.visible = !inside; this.scene3.fog = inside ? null : this.fog;
     if (!inside) { const key = [this.location, day.night, this.ownersKey, this.state.home, !!this.state.trip, festivalAt(Date.now()), !!this.state.vip?.yacht, this.starsKey].join('|'); if (key !== this.cityKey) { this.cityKey = key; this.buildCity(day.night); } }
-    for (const p of [this.boxes, this.balls, this.figures, this.toilets]) p.begin();
+    for (const p of [this.boxes, this.balls, this.rods, this.figures, this.toilets]) p.begin();
     this.meshes = []; if (!inside) this.townLife(); this.scene();
-    for (const p of [this.boxes, this.balls, this.figures, this.toilets]) p.end();
+    for (const p of [this.boxes, this.balls, this.rods, this.figures, this.toilets]) p.end();
     this.paintRain();
     this.renderer.render(this.scene3, this.camera);
     // Labels, bubbles and rings stay crisp on the 2D layer above the 3D view.
