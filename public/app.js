@@ -1,4 +1,4 @@
-import { fanClubSize, PROMPTS, RIVAL, TEAM, TAILOR_COLORS, TATTOOS, VENUE_ACTS, TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace, homeRooms } from './content.js';
+import { bestMode, fanClubSize, PROMPTS, RIVAL, TEAM, TAILOR_COLORS, TATTOOS, VENUE_ACTS, TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace, homeRooms } from './content.js';
 import { World, worldObjects } from './world.js';
 import { World3D } from './world3d.js';
 import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS } from './sound.js';
@@ -255,13 +255,6 @@ function makeWorld(){
 }
 const world=makeWorld();
 world.onGround=closeTray;
-// Arrow pad (on the map and out in the city): tap to nudge the view, hold to keep sliding.
-let panTimer=null;
-function updatePanPad(){const pad=$('#panPad');if(pad)pad.hidden=!(world.overview||state?.location==='street'||state?.trip);}
-for(const b of document.querySelectorAll('#panPad [data-pan]')){const [dx,dy]=b.dataset.pan.split(',').map(Number),step=()=>world.panBy(dx*70,dy*70);
-  b.addEventListener('pointerdown',e=>{e.preventDefault();world.panHold=true;step();clearInterval(panTimer);panTimer=setInterval(step,90);});
-  for(const ev of ['pointerup','pointerleave','pointercancel'])b.addEventListener(ev,()=>{clearInterval(panTimer);world.panHold=false;});}
-setInterval(updatePanPad,400);
 // Pop-ups get out of the way: a tap anywhere else closes the action menu or tray, and tapping outside a centre pop-up dismisses it.
 document.addEventListener('pointerdown',event=>{const t=event.target;if(!(t instanceof Element))return;
   const menuOpen=!$('#pieMenu').hidden,trayOpen=!$('#objectTray').hidden&&!world.placement;
@@ -433,11 +426,11 @@ function updateCreationCareer(key){
 }
 function map(){world.overview=true;world.flyTo(.22);showTray('📍 Palm City','<div class="map-sheet"><div class="city-tiles">'+Object.entries(LOCATIONS).sort(([a],[b])=>(b===state.location)-(a===state.location)).map(([key,l])=>button('<span>'+(TOWN[key]?.pin||'🚪')+'</span><b>'+escape(l.name)+'</b>'+(key===state.location?'<small>You’re here</small>':key!=='street'?'<small>'+eta(key)+'</small>':''),'travel','data-location="'+key+'"'+(key===state.location?' disabled':''),'city-tile'+(key===state.location?' here':''))).join('')+'</div>'+travelModes()+'<small class="map-hint">Swipe the places, or tap a pin on the map.</small></div>');}
 // About how long a trip takes with your chosen way of travelling.
-function eta(key){const pref=state.travelMode||'own',mode=pref==='own'?(state.ride||'walk'):pref;if(!RIDE_SPEED[mode])return '';const ms=tripMs(state.location==='street'?'home':state.location,key,mode);return ms<60_000?`~${Math.round(ms/1000)}s`:`~${Math.round(ms/60000)} min`;}
+function eta(key){const pref=state.travelMode||'best',mode=pref==='best'?bestMode(state,now()):pref==='own'?(state.ride||'walk'):pref;if(!RIDE_SPEED[mode])return '';const ms=tripMs(state.location==='street'?'home':state.location,key,mode);return ms<60_000?`~${Math.round(ms/1000)}s`:`~${Math.round(ms/60000)} min`;}
 // How a trip reads: walking, cycling, flying, taking public transport, or driving.
 const tripVerb=ride=>!ride?'Walking':TRANSIT[ride]?`Taking a ${TRANSIT[ride].name.toLowerCase()}`:ride==='helicopter'?'Flying':ride==='bicycle'?'Cycling':'Driving';
 // How you travel: your own ride, walking, or public transport.
-function travelModes(){const mode=state.travelMode||'own',own=state.ride?`${RIDES[state.ride]?.icon||'🚗'} ${RIDES[state.ride]?.name||'Your ride'}`:'🚶 Walk';return '<div class="travel-modes"><strong>How you travel</strong><div>'+[['own',own],...(state.ride?[['walk','🚶 Walk']]:[]),...Object.entries(TRANSIT).map(([k,t])=>[k,`${t.icon} ${t.name}`])].map(([k,label])=>`<button class="chip ${k===mode?'on':''}" data-action="travelMode" data-mode="${k}">${escape(label)}</button>`).join('')+'</div></div>';}
+function travelModes(){const mode=state.travelMode||'best',own=state.ride?`${RIDES[state.ride]?.icon||'🚗'} ${RIDES[state.ride]?.name||'Your ride'}`:'🚶 Walk',best=bestMode(state,now()),bestLabel=best==='walk'?'🚶 Walk':RIDES[best]?`${RIDES[best].icon||'🚗'} ${RIDES[best].name}`:TRANSIT[best]?`${TRANSIT[best].icon} ${TRANSIT[best].name}`:best;return '<div class="travel-modes"><strong>How you travel</strong><div>'+[['best',`⭐ Fastest: ${bestLabel}`],['own',own],...(state.ride?[['walk','🚶 Walk']]:[]),...Object.entries(TRANSIT).map(([k,t])=>[k,`${t.icon} ${t.name}`])].map(([k,label])=>`<button class="chip ${k===mode?'on':''}" data-action="travelMode" data-mode="${k}">${escape(label)}</button>`).join('')+'</div></div>';}
 function practice(){const def=CAREERS[state.career];if(state.location==='home'&&!state.inventory.gear){showTray('🎯 Practise','<div class="tray-options">'+button('📍 Go to venue','travel','data-location="'+def.location+'"','primary')+button('🛒 Buy home equipment','travel','data-location="plaza"')+'</div>');return;}showTray('🎯 Practise','<div class="tray-options skills-options">'+def.skills.map(skill=>button(escape(skillName(state.career,skill))+' <small>Lv '+state.careers[state.career].skills[skill].level+'</small>','startPractice','data-skill="'+escape(skill)+'"')).join('')+'</div><small>⚡ 1 · '+duration(B.practiceMs)+' · +7 XP</small>');}
 function prepare(kind){const def=CAREERS[state.career];kind??=['founder','web3'].includes(state.career)?'build':'produce';if(kind==='launch'||kind==='collab'){prepareDetails(kind);return;}showTray(def.icon+' '+def.output,'<div class="tray-options">'+button('▶ Start · ⚡ 1','quickStart','data-kind="'+kind+'"','primary')+button('Options','prepareDetails','data-kind="'+kind+'"')+'</div><small>'+duration(def.family==='sport'?B.sportMs:B.activityMs)+' · '+(def.family==='sport'?6:3)+' choices</small>');}
 function prepareDetails(kind){

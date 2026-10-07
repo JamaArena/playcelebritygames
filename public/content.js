@@ -720,3 +720,12 @@ export const QUESTS = [
   {key: 'clash', icon: '⚔️', title: 'Step into a Fame Clash', how: 'Open Battles and start or join a Fame Clash.', reward: 40},
 ];
 export const QUEST_GRADUATION = {name: 'Palm City Starter', fame: 250};
+
+// The fastest way you can travel right now: any ride you own (Palm Motors tuning counts on your main
+// ride) or public transport, allowing for go-slow traffic. This is how trips go unless you pick otherwise.
+export const ownedRides = s => [...new Set([s.ride, ...Object.keys(s.vip || {}).filter(k => SPONSORSHIPS[k]?.kind === 'ride')].filter(Boolean))];
+export function bestMode(s, now = Date.now()) {
+  const jam = goSlowAt(now), options = [...ownedRides(s), ...Object.keys(TRANSIT).filter(k => k !== 'taxi' || (s.phone && s.phone !== 'basic'))];
+  const cost = m => (RIDE_SPEED[m] ?? 1) * (1 - (m === s.ride ? TUNING[(s.tune?.[m] || 0) - 1]?.cut || 0 : 0) / 100) * (jam && !NO_JAM.includes(m) ? 1.4 : 1);
+  return options.reduce((best, m) => cost(m) < cost(best) ? m : best, 'walk');
+}
