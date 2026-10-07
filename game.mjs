@@ -21,6 +21,8 @@ export function addFame(s, amount, reason = 'Other', at = Date.now()) {
   const before = s.fame || 0; s.fame = Math.max(0, before + amount); const delta = s.fame - before;
   // The Fame wallet app shows where fame came from and went.
   if (delta) s.fameLog = [{at, delta, reason}, ...(s.fameLog || [])].slice(0, 60);
+  // What a spouse shares in: fame you earned yourself (shared fame is not shared back).
+  if (delta > 0 && reason !== 'Spouse’s success') s.fameEarned = (s.fameEarned || 0) + delta;
 }
 // Palm City News: notable moments become headlines other players can read.
 export function headline(s, text, at) { s.headlines = [{at, text}, ...(s.headlines || [])].slice(0, 5); }
