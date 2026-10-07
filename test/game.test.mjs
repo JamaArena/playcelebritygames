@@ -420,3 +420,12 @@ test('strangers: the more famous you are, the more people know you and love or h
   const after=s.needs.social;act(s,{type:'chatRegular',npc:'plaza:2'},T+1000);assert.ok(s.needs.social<=after,'one social boost per person per 10 minutes');
   assert.throws(()=>act(s,{type:'chatRegular',npc:'gym:1'},T),/Walk over/);
 });
+
+test('careers: every skill has its own name and ten things to learn; work scenes vary; gym equipment is usable',async()=>{
+  const {SKILL_NAMES,LEARN_LINES,WORK_SCENES}=await import('../public/careerText.js');
+  for(const [key,def] of Object.entries(CAREERS))for(const skill of def.skills){assert.ok(SKILL_NAMES[key]?.[skill],`${key}.${skill} has a name`);assert.equal(new Set(LEARN_LINES[key]?.[skill]).size,10,`${key}.${skill} has ten lines`);}
+  for(const [key,list] of Object.entries(WORK_SCENES)){assert.equal(list.length,10,key);for(const [text,options] of list){assert.ok(text);assert.equal(options.length,3);}}
+  const s=make('developer');go(s);act(s,{type:'start',kind:'produce'},T+1);const v=view(s,T+1);assert.ok(WORK_SCENES.developer.some(([text])=>v.active.scene.text.endsWith(text)),'a developer scene');
+  assert.ok(WORK_SCENES.developer.some(([,opts])=>opts.includes(v.active.choices[0].label)),'with developer choices');
+  const g=make();g.location='gym';for(const act_ of ['treadmillRun','benchPress','squats','spinBike','punchBag','rower']){act(g,{type:'venueAct',act:act_},T);assert.equal(g.recovery.act,act_);g.recovery=null;}
+});
