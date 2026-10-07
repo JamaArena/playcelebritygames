@@ -94,27 +94,6 @@ export const ITEMS = {
   pool: {name: 'Swimming pool', fame: 3000, description: 'Swim laps at home.', extension: {x: 6.6, z: 6.4, face: 3.1416}, use: {verb: 'Swim laps', icon: '🏊', need: 'hygiene', amount: 25, ms: 40_000, pose: 'sport', extra: {fun: 20, energy: -5}}},
   gymRoom: {name: 'Home gym room', fame: 5000, description: 'A full training room: workouts build fitness.', extension: {x: 3.2, z: -7.6, face: 0}, use: {verb: 'Train in your gym', icon: '🏋️', need: 'fun', amount: 15, ms: 45_000, pose: 'sport', extra: {energy: -10, hygiene: -15}, fitness: 1}},
   studioRoom: {name: 'Home recording studio', fame: 8000, description: 'Record without travelling. Musicians and creators train here.', extension: {x: -3.2, z: -7.6, face: 0}, use: {verb: 'Record in your studio', icon: '🎙️', need: 'fun', amount: 15, ms: 45_000, pose: 'perform', learn: {family: 'music', points: 8}, learnAlso: 'creator'}},
-  // Home extensions, built on the lawn around your house. Tap them at home to use them.
-  garden: {name: 'Garden', fame: 300, description: 'Vegetable beds and flowers to tend.', extension: {x: -6.6, z: 6.4, face: 3.1416}, use: {verb: 'Tend the garden', icon: '🌱', need: 'fun', amount: 20, ms: 30_000, pose: 'water', extra: {hunger: 10}}},
-  terrace: {name: 'Rooftop terrace', fame: 800, description: 'A deck with lights for hangouts.', extension: {x: -7.6, z: -1.6, face: 1.5708}, use: {verb: 'Hang out on the terrace', icon: '🌇', need: 'fun', amount: 25, ms: 40_000, pose: 'sit', seat: .45, extra: {social: 10}}},
-  garage: {name: 'Garage', fame: 1500, description: 'Show off your rides.', extension: {x: 7.6, z: -1.6, face: -1.5708}, use: {verb: 'Tinker with your ride', icon: '🔧', need: 'fun', amount: 15, ms: 30_000, pose: 'chat'}},
-  pool: {name: 'Swimming pool', fame: 3000, description: 'Swim laps at home.', extension: {x: 6.6, z: 6.4, face: 3.1416}, use: {verb: 'Swim laps', icon: '🏊', need: 'hygiene', amount: 25, ms: 40_000, pose: 'sport', extra: {fun: 20, energy: -5}}},
-  gymRoom: {name: 'Home gym room', fame: 5000, description: 'A full training room: workouts build fitness.', extension: {x: 3.2, z: -7.6, face: 0}, use: {verb: 'Train in your gym', icon: '🏋️', need: 'fun', amount: 15, ms: 45_000, pose: 'sport', extra: {energy: -10, hygiene: -15}, fitness: 1}},
-  studioRoom: {name: 'Home recording studio', fame: 8000, description: 'Record without travelling. Musicians and creators train here.', extension: {x: -3.2, z: -7.6, face: 0}, use: {verb: 'Record in your studio', icon: '🎙️', need: 'fun', amount: 15, ms: 45_000, pose: 'perform', learn: {family: 'music', points: 8}, learnAlso: 'creator'}},
-  // Home extensions, built on the lawn around your house. Tap them at home to use them.
-  garden: {name: 'Garden', fame: 300, description: 'Vegetable beds and flowers to tend.', extension: {x: -6.6, z: 6.4, face: 3.1416}, use: {verb: 'Tend the garden', icon: '🌱', need: 'fun', amount: 20, ms: 30_000, pose: 'water', extra: {hunger: 10}}},
-  terrace: {name: 'Rooftop terrace', fame: 800, description: 'A deck with lights for hangouts.', extension: {x: -7.6, z: -1.6, face: 1.5708}, use: {verb: 'Hang out on the terrace', icon: '🌇', need: 'fun', amount: 25, ms: 40_000, pose: 'sit', seat: .45, extra: {social: 10}}},
-  garage: {name: 'Garage', fame: 1500, description: 'Show off your rides.', extension: {x: 7.6, z: -1.6, face: -1.5708}, use: {verb: 'Tinker with your ride', icon: '🔧', need: 'fun', amount: 15, ms: 30_000, pose: 'chat'}},
-  pool: {name: 'Swimming pool', fame: 3000, description: 'Swim laps at home.', extension: {x: 6.6, z: 6.4, face: 3.1416}, use: {verb: 'Swim laps', icon: '🏊', need: 'hygiene', amount: 25, ms: 40_000, pose: 'sport', extra: {fun: 20, energy: -5}}},
-  gymRoom: {name: 'Home gym room', fame: 5000, description: 'A full training room: workouts build fitness.', extension: {x: 3.2, z: -7.6, face: 0}, use: {verb: 'Train in your gym', icon: '🏋️', need: 'fun', amount: 15, ms: 45_000, pose: 'sport', extra: {energy: -10, hygiene: -15}, fitness: 1}},
-  studioRoom: {name: 'Home recording studio', fame: 8000, description: 'Record without travelling. Musicians and creators train here.', extension: {x: -3.2, z: -7.6, face: 0}, use: {verb: 'Record in your studio', icon: '🎙️', need: 'fun', amount: 15, ms: 45_000, pose: 'perform', learn: {family: 'music', points: 8}, learnAlso: 'creator'}},
-  // Home extensions, built on the lawn around your house. Tap them at home to use them.
-  garden: {name: 'Garden', fame: 300, description: 'Vegetable beds and flowers to tend.', extension: {x: -6.6, z: 6.4, face: 3.1416}, use: {verb: 'Tend the garden', icon: '🌱', need: 'fun', amount: 20, ms: 30_000, pose: 'water', extra: {hunger: 10}}},
-  terrace: {name: 'Rooftop terrace', fame: 800, description: 'A deck with lights for hangouts.', extension: {x: -7.6, z: -1.6, face: 1.5708}, use: {verb: 'Hang out on the terrace', icon: '🌇', need: 'fun', amount: 25, ms: 40_000, pose: 'sit', seat: .45, extra: {social: 10}}},
-  garage: {name: 'Garage', fame: 1500, description: 'Show off your rides.', extension: {x: 7.6, z: -1.6, face: -1.5708}, use: {verb: 'Tinker with your ride', icon: '🔧', need: 'fun', amount: 15, ms: 30_000, pose: 'chat'}},
-  pool: {name: 'Swimming pool', fame: 3000, description: 'Swim laps at home.', extension: {x: 6.6, z: 6.4, face: 3.1416}, use: {verb: 'Swim laps', icon: '🏊', need: 'hygiene', amount: 25, ms: 40_000, pose: 'sport', extra: {fun: 20, energy: -5}}},
-  gymRoom: {name: 'Home gym room', fame: 5000, description: 'A full training room: workouts build fitness.', extension: {x: 3.2, z: -7.6, face: 0}, use: {verb: 'Train in your gym', icon: '🏋️', need: 'fun', amount: 15, ms: 45_000, pose: 'sport', extra: {energy: -10, hygiene: -15}, fitness: 1}},
-  studioRoom: {name: 'Home recording studio', fame: 8000, description: 'Record without travelling. Musicians and creators train here.', extension: {x: -3.2, z: -7.6, face: 0}, use: {verb: 'Record in your studio', icon: '🎙️', need: 'fun', amount: 15, ms: 45_000, pose: 'perform', learn: {family: 'music', points: 8}, learnAlso: 'creator'}},
   // Upgrades: claim them once and they work in the background (no placing needed).
   // Gadgets you carry: they work anywhere (not on a trip).
   laptop: {name: 'Laptop', fame: 300, description: 'Tech careers can practise anywhere.', gadget: true},
@@ -402,18 +381,6 @@ export const SPONSORSHIPS = {
   duplex: {name: 'Lekki-style duplex', sponsor: 'Palm Realty', fame: 8_000, kind: 'home', icon: '🏘️', color: '#7a5a43', rest: .85, description: 'Two storeys, wood floors and room to grow. Home recovery is 15% faster.'},
   beachHouse: {name: 'Lagoon beach house', sponsor: 'Coastline Estates', fame: 40_000, kind: 'home', icon: '🏖️', color: '#2bb3c0', rest: .75, description: 'Sandy floors and sea breeze. Home recovery is 25% faster.'},
   penthouse: {name: 'Skyline penthouse', sponsor: 'Palm Realty', fame: 60_000, kind: 'home', icon: '🌆', color: '#2f3237', rest: .75, description: 'Dark marble and city views. Home recovery is 25% faster.'},
-  studioFlat: {name: 'Cosy studio flat', sponsor: 'Palm Realty', fame: 0, kind: 'home', icon: '🛏️', color: '#9aa7b3', rest: 1, description: 'A cheap and cheerful starter home with a fresh coat of paint.'},
-  duplex: {name: 'Lekki-style duplex', sponsor: 'Palm Realty', fame: 8_000, kind: 'home', icon: '🏘️', color: '#7a5a43', rest: .85, description: 'Two storeys, wood floors and room to grow. Home recovery is 15% faster.'},
-  beachHouse: {name: 'Lagoon beach house', sponsor: 'Coastline Estates', fame: 40_000, kind: 'home', icon: '🏖️', color: '#2bb3c0', rest: .75, description: 'Sandy floors and sea breeze. Home recovery is 25% faster.'},
-  penthouse: {name: 'Skyline penthouse', sponsor: 'Palm Realty', fame: 60_000, kind: 'home', icon: '🌆', color: '#2f3237', rest: .75, description: 'Dark marble and city views. Home recovery is 25% faster.'},
-  studioFlat: {name: 'Cosy studio flat', sponsor: 'Palm Realty', fame: 0, kind: 'home', icon: '🛏️', color: '#9aa7b3', rest: 1, description: 'A cheap and cheerful starter home with a fresh coat of paint.'},
-  duplex: {name: 'Lekki-style duplex', sponsor: 'Palm Realty', fame: 8_000, kind: 'home', icon: '🏘️', color: '#7a5a43', rest: .85, description: 'Two storeys, wood floors and room to grow. Home recovery is 15% faster.'},
-  beachHouse: {name: 'Lagoon beach house', sponsor: 'Coastline Estates', fame: 40_000, kind: 'home', icon: '🏖️', color: '#2bb3c0', rest: .75, description: 'Sandy floors and sea breeze. Home recovery is 25% faster.'},
-  penthouse: {name: 'Skyline penthouse', sponsor: 'Palm Realty', fame: 60_000, kind: 'home', icon: '🌆', color: '#2f3237', rest: .75, description: 'Dark marble and city views. Home recovery is 25% faster.'},
-  studioFlat: {name: 'Cosy studio flat', sponsor: 'Palm Realty', fame: 0, kind: 'home', icon: '🛏️', color: '#9aa7b3', rest: 1, description: 'A cheap and cheerful starter home with a fresh coat of paint.'},
-  duplex: {name: 'Lekki-style duplex', sponsor: 'Palm Realty', fame: 8_000, kind: 'home', icon: '🏘️', color: '#7a5a43', rest: .85, description: 'Two storeys, wood floors and room to grow. Home recovery is 15% faster.'},
-  beachHouse: {name: 'Lagoon beach house', sponsor: 'Coastline Estates', fame: 40_000, kind: 'home', icon: '🏖️', color: '#2bb3c0', rest: .75, description: 'Sandy floors and sea breeze. Home recovery is 25% faster.'},
-  penthouse: {name: 'Skyline penthouse', sponsor: 'Palm Realty', fame: 60_000, kind: 'home', icon: '🌆', color: '#2f3237', rest: .75, description: 'Dark marble and city views. Home recovery is 25% faster.'},
   townhouse: {name: 'Palm Heights townhouse', sponsor: 'Palm Realty', fame: 2_000, kind: 'home', icon: '🏡', color: '#b86b52', rest: .9, description: 'Warm wood floors and art on the walls. Home recovery 10% faster.'},
   villa: {name: 'Lagoon villa', sponsor: 'Coastline Estates', fame: 25_000, kind: 'home', icon: '🏝️', color: '#3a8fa8', rest: .8, description: 'Marble, sea light and a statement chandelier. Home recovery 20% faster.'},
   mansion: {name: 'Island mansion', sponsor: 'Isle Royale', fame: 150_000, kind: 'home', icon: '🏰', color: '#b8932f', rest: .7, description: 'Gold trim, a grand piano and room for the whole entourage. Home recovery 30% faster.'},
@@ -545,7 +512,41 @@ export const NPCS = [
 ];
 export const clamp = (value, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, value));
 export const effort = (level, base = 35) => level <= 4 ? base * level : 4 * base * 2 ** (level - 4);
-export function obstacles(location, furniture=[]) {
+// Bigger homes add rooms east of the apartment, reached through a door in the bedroom wall.
+// Slots a and c are on the north side (their feature against the back wall); b and d on the south side.
+export const ROOM_SLOTS={
+  a:{x0:5.35,x1:10.35,z0:-5.35,z1:0,north:true,door:{x:5.35,z:-2.4,wall:'x'}},
+  b:{x0:5.35,x1:10.35,z0:0,z1:5.35,north:false,door:{x:7.85,z:0,wall:'z'}},
+  c:{x0:10.35,x1:15.35,z0:-5.35,z1:0,north:true,door:{x:10.35,z:-2.4,wall:'x'}},
+  d:{x0:10.35,x1:15.35,z0:0,z1:5.35,north:false,door:{x:12.85,z:0,wall:'z'}},
+};
+export const ROOM_TYPES={
+  guest:{name:'Guest bedroom',object:{name:'Guest bed',icon:'☾',need:'energy',verb:'Sleep in the guest room',pose:'sleep',size:[1.9,2.4],onIt:true}},
+  office:{name:'Home office',object:{name:'Office desk',icon:'⌘',action:'practice',size:[1.8,.8]}},
+  cinema:{name:'Home cinema',object:{name:'Cinema screen',icon:'🎬',need:'fun',verb:'Watch a film',pose:'sit',size:[3,.3],gap:2}},
+  spa:{name:'Spa room',object:{name:'Hot tub',icon:'♨',need:'hygiene',verb:'Soak in the hot tub',pose:'sit',size:[1.8,1.8],onIt:true}},
+  bar:{name:'Bar lounge',object:{name:'Home bar',icon:'🍹',need:'fun',verb:'Mix a mocktail',pose:'chat',size:[2.6,.7]}},
+  closet:{name:'Walk-in closet',object:{name:'Walk-in closet',icon:'👗',action:'wardrobe',size:[3.2,.7]}},
+  games:{name:'Games room',object:{name:'Pool table',icon:'🎱',need:'fun',verb:'Shoot pool',pose:'gesture',size:[2.2,1.3],centre:true}},
+};
+export const HOME_ROOMS={townhouse:{a:'guest'},duplex:{a:'guest',b:'office'},villa:{a:'guest',b:'cinema',c:'spa'},beachHouse:{a:'guest',b:'bar',c:'spa'},penthouse:{a:'guest',b:'cinema',c:'bar',d:'closet'},mansion:{a:'guest',b:'cinema',c:'spa',d:'games'}};
+// Each added room and its feature: where it stands (ox, oz), where you stand to use it (x, z) and where you pose (vx, vz).
+export function homeRooms(home){
+  return Object.entries(HOME_ROOMS[home]||{}).map(([slot,type])=>{
+    const r=ROOM_SLOTS[slot],o=ROOM_TYPES[type].object,[w,d]=o.size,cx=(r.x0+r.x1)/2,gap=o.gap||.6,south=o.centre||r.north;
+    const oz=o.centre?(r.z0+r.z1)/2:r.north?r.z0+.25+d/2:r.z1-.25-d/2,z=south?oz+d/2+gap:oz-d/2-gap;
+    return {...r,slot,type,name:ROOM_TYPES[type].name,cx,cz:(r.z0+r.z1)/2,object:{...o,spot:slot,ox:cx,oz,w,d,x:cx,z,vx:cx,vz:o.onIt?oz:z,face:south?Math.PI:0}};
+  });
+}
+function inRooms(home,x,z){
+  return homeRooms(home).some(r=>x>r.x0+.55&&x<r.x1-.55&&z>r.z0+.55&&z<r.z1-.55||(r.door.wall==='x'?Math.abs(x-r.door.x)<.75&&Math.abs(z-r.door.z)<.45:Math.abs(z-r.door.z)<.75&&Math.abs(x-r.door.x)<.45));
+}
+// Lawn extensions east of the house move further out when the house grows that way.
+export function extensionSpot(key,home){
+  const e=ITEMS[key].extension,east=Math.max(5.35,...homeRooms(home).map(r=>r.x1));
+  return {x:e.x>5&&east>5.35?e.x+east-5.35+.5:e.x,z:e.z,face:e.face};
+}
+export function obstacles(location, furniture=[], home) {
   const rects={
     home:[[-2.8,-4,4.2,1],[-.7,-4.25,.8,.9],[.5,-4.2,1.3,.8],[2.5,-3.5,1.95,2.5],[4.1,-4,.7,.65],[-3.6,1.5,1.2,3.2],[-1.7,1.5,1.2,1.5],[-2.8,4.4,2.9,.65],[4.1,3.2,.6,1.1],[2.55,2.7,.13,3.7],[.5,3,1.5,1.5],[.5,2.1,.7,.7],[.5,3.9,.7,.7]],
     sports:[[-4.1,-3.6,1.9,2.2],[4.3,0,.9,5]],
@@ -569,11 +570,11 @@ export function obstacles(location, furniture=[]) {
     beach:[[0,4.4,11,2.4]],
     plaza:[[-3.1,-3.3,3.2,2.35],[3.1,-3.3,3.2,2.35],[-3,2.4,2,.75],[2.7,1.8,1.1,1.1],[3.3,3.9,2.4,1.3]],
   }[location]||[];
-  return [...rects,...(location==='home'?furniture.map(f=>[f.x,f.z,.85,.85]):[])];
+  return [...rects,...(location==='home'?[...furniture.map(f=>[f.x,f.z,.85,.85]),...homeRooms(home).map(r=>[r.object.ox,r.object.oz,r.object.w,r.object.d])]:[])];
 }
-export function walkable(location,x,z,furniture=[]){
+export function walkable(location,x,z,furniture=[],home){
   if(location==='street')return Number.isFinite(x)&&Number.isFinite(z)&&Math.abs(x)<=7&&z>=5.7&&z<=7.3;
-  return Number.isFinite(x)&&Number.isFinite(z)&&Math.abs(x)<=4.8&&Math.abs(z)<=4.8&&!obstacles(location,furniture).some(([cx,cz,w,d])=>Math.abs(x-cx)<w/2+.16&&Math.abs(z-cz)<d/2+.16);
+  return Number.isFinite(x)&&Number.isFinite(z)&&(Math.abs(x)<=4.8&&Math.abs(z)<=4.8||location==='home'&&inRooms(home,x,z))&&!obstacles(location,furniture,home).some(([cx,cz,w,d])=>Math.abs(x-cx)<w/2+.16&&Math.abs(z-cz)<d/2+.16);
 }
 // Where you stand to use the built-in home objects (kitchen, bed, sofa, shower, toilet, chairs, table, TV, fridge, lamp, window, plants, desk).
 export const HOME_SPOTS = [[-3.6,-2.5],[2.6,-1.8],[-2.8,.3],[4,1.5],[4,2.35],[.1,1.4],[1.6,3.9],[-2.8,3.7],[-.7,-3],[4.1,-3.2],[-4.5,-1.8],[-3.8,-.8],[3.6,-1.2],[.5,-3.1]];
@@ -581,17 +582,19 @@ const HOME_DOOR = [-4.3,3.6];
 // Furniture goes on half-tile spots anywhere in the apartment, as long as nothing overlaps and you can still
 // walk from the front door to every built-in object and to the front of every piece of furniture.
 const placeCache=new Map();
-export function canPlace(furniture,item,x,z){
-  const memo=JSON.stringify([furniture,item,x,z]);if(placeCache.has(memo))return placeCache.get(memo);
-  const fits=placeCheck(furniture,item,x,z);if(placeCache.size>500)placeCache.clear();placeCache.set(memo,fits);return fits;
+export function canPlace(furniture,item,x,z,home){
+  const memo=JSON.stringify([furniture,item,x,z,home]);if(placeCache.has(memo))return placeCache.get(memo);
+  const fits=placeCheck(furniture,item,x,z,home);if(placeCache.size>500)placeCache.clear();placeCache.set(memo,fits);return fits;
 }
-function placeCheck(furniture,item,x,z){
-  if(!Number.isInteger(x*2)||!Number.isInteger(z*2)||Math.abs(x)>4||z<-4||z>3.5)return false;
+function placeCheck(furniture,item,x,z,home){
+  const rooms=homeRooms(home);
+  if(!Number.isInteger(x*2)||!Number.isInteger(z*2)||!(Math.abs(x)<=4&&z>=-4&&z<=3.5||rooms.some(r=>x>=r.x0+.9&&x<=r.x1-.9&&z>=r.z0+.9&&z<=r.z1-.9)))return false;
   const others=furniture.filter(f=>f.item!==item),next=[...others,{item,x,z}];
   // The whole footprint must be clear (not just its centre), and you need room to stand in front of it.
-  if(![[0,0],[-.4,-.4],[.4,-.4],[-.4,.4],[.4,.4]].every(([dx,dz])=>walkable('home',x+dx,z+dz,others))||!walkable('home',x,z+.75,next))return false;
+  if(![[0,0],[-.4,-.4],[.4,-.4],[-.4,.4],[.4,.4]].every(([dx,dz])=>walkable('home',x+dx,z+dz,others,home))||!walkable('home',x,z+.75,next,home))return false;
   const grid=.3,key=(a,b)=>a+','+b,start=[Math.round(HOME_DOOR[0]/grid),Math.round(HOME_DOOR[1]/grid)],seen=new Set([key(...start)]),open=[start],reached=[];
-  for(let i=0;i<open.length;i++){const [a,b]=open[i];reached.push([a*grid,b*grid]);for(const [da,db] of [[1,0],[-1,0],[0,1],[0,-1]]){const c=[a+da,b+db],k=key(...c);if(!seen.has(k)&&walkable('home',c[0]*grid,c[1]*grid,next)){seen.add(k);open.push(c);}}}
+  for(let i=0;i<open.length;i++){const [a,b]=open[i];reached.push([a*grid,b*grid]);for(const [da,db] of [[1,0],[-1,0],[0,1],[0,-1]]){const c=[a+da,b+db],k=key(...c);if(!seen.has(k)&&walkable('home',c[0]*grid,c[1]*grid,next,home)){seen.add(k);open.push(c);}}}
   const near=([px,pz])=>reached.some(([rx,rz])=>Math.hypot(rx-px,rz-pz)<=.6);
-  return HOME_SPOTS.every(p=>walkable('home',p[0],p[1],[{item,x,z}])&&near(p))&&next.every(f=>near([f.x,f.z+.75]));
+  const spots=[...HOME_SPOTS,...rooms.map(r=>[r.object.x,r.object.z])];
+  return spots.every(p=>walkable('home',p[0],p[1],[{item,x,z}],home)&&near(p))&&next.every(f=>near([f.x,f.z+.75]));
 }

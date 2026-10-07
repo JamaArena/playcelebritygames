@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { lifeEvents, createCharacter, act, reconcile, refill, learn, finishRecovery, shot, shootingProbability, generalProbability, choices, view, tennisPoint, tennisScore, evaluate } from '../game.mjs';
 import { BALANCE as B, CAREERS, effort, tripMs } from '../public/content.js';
 import { worldObjects } from '../public/world.js';
-import { walkable, route, TOWN, VENUE_ACTS } from '../public/content.js';
+import { walkable, route, TOWN, VENUE_ACTS, HOME_ROOMS, homeRooms, extensionSpot, SPONSORSHIPS } from '../public/content.js';
 const T=1_000_000,MISHAP_AT=5;
 const make=(career='football',origin=0)=>createCharacter({name:'River',career,origin,adult:true},T);
 // Trips take real time; tests about other rules arrive immediately.
@@ -373,4 +373,23 @@ test('fame: brand deals, exclusives, magazine covers, scandals, the fan club and
   s.wear={};s.needs.bladder=1;s.nextEventAt=Infinity;s.lastSeen=T;reconcile(s,T+1000);assert.equal(s.mishap.lost,Math.round(Math.max(10,s.fame*0+40_000*.03)*.9));
   s.mishap=null;s.prompt=null;s.location='home';s.nextEventAt=0;const kinds=new Set();for(let i=0;i<40;i++){s.nextEventAt=0;s.prompt=null;lifeEvents(s,T+i,()=>i/40);kinds.add(s.lifeEvent.kind);}assert.ok(kinds.has('magazineCover')&&kinds.has('scandal'));
   s.fame=150_000;s.lastSeen=T+10_000;reconcile(s,T+11_000);assert.ok(s.hallOfFame);assert.match(s.headlines.find(h=>/Hall of Fame/.test(h.text)).text,/River/);
+});
+
+test('bigger homes add rooms you can walk into, use and furnish',()=>{
+  const reach=home=>{const g=.3,k=(a,b)=>a+','+b,start=[Math.round(-4.3/g),Math.round(3.6/g)],seen=new Set([k(...start)]),open=[start],out=[];
+    for(let i=0;i<open.length;i++){const [a,b]=open[i];out.push([a*g,b*g]);for(const [da,db] of [[1,0],[-1,0],[0,1],[0,-1]]){const c=[a+da,b+db];if(!seen.has(k(...c))&&walkable('home',c[0]*g,c[1]*g,[],home)){seen.add(k(...c));open.push(c);}}}return out;};
+  let previous=0;
+  for(const [key,d] of Object.entries(SPONSORSHIPS).filter(([,d])=>d.kind==='home').sort((a,b)=>a[1].fame-b[1].fame)){
+    const rooms=homeRooms(key),cells=reach(key);assert.ok(rooms.length>=previous,`${key} is at least as roomy as cheaper homes`);previous=rooms.length;
+    for(const o of worldObjects('home',[],[],key))assert.ok(cells.some(([x,z])=>Math.hypot(x-o.x,z-o.z)<.6),`${key}: ${o.name} reachable`);
+    for(const ext of ['garage','pool']){const e=extensionSpot(ext,key);assert.ok(!rooms.some(r=>e.x>r.x0-1&&e.x<r.x1+1&&e.z>r.z0-1&&e.z<r.z1+1),`${key}: ${ext} clear of the rooms`);}
+  }
+  assert.equal(homeRooms('studioFlat').length,0);assert.equal(homeRooms('mansion').length,4);
+  const s=make();s.home='villa';s.location='home';
+  act(s,{type:'move',x:7.85,z:-1},T);assert.deepEqual(s.position3d,{x:7.85,z:-1},'walk into the guest room');
+  const flat=make();flat.location='home';assert.throws(()=>act(flat,{type:'move',x:7.85,z:-1},T),/blocked/,'a studio flat has no guest room');
+  act(s,{type:'recover',need:'hygiene',spot:'c'},T);assert.equal(s.recovery.spot,'c');assert.equal(s.recovery.label,'Soak in the hot tub');s.recovery=null;
+  act(s,{type:'recover',need:'fun',spot:'c'},T);assert.equal(s.recovery.spot,undefined,'a spot only counts for its own need');s.recovery=null;
+  s.inventory.chair={level:1};assert.throws(()=>act(s,{type:'place',item:'chair',x:8,z:3},T),/blocks a path/,'not on the cinema seat');act(s,{type:'place',item:'chair',x:6.5,z:1.5},T);assert.deepEqual(s.furniture,[{item:'chair',x:6.5,z:1.5}],'furnish the new rooms');
+  s.vip={townhouse:{at:T}};act(s,{type:'useVip',item:'townhouse'},T);assert.equal(s.home,'townhouse');assert.deepEqual(s.furniture,[],'furniture from a room you no longer have goes into storage');assert.ok(s.inventory.chair);
 });

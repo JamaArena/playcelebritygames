@@ -1,4 +1,4 @@
-import { fanClubSize, PROMPTS, RIVAL, TEAM, TAILOR_COLORS, TATTOOS, VENUE_ACTS, TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace } from './content.js';
+import { fanClubSize, PROMPTS, RIVAL, TEAM, TAILOR_COLORS, TATTOOS, VENUE_ACTS, TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace, homeRooms } from './content.js';
 import { World, worldObjects } from './world.js';
 import { World3D } from './world3d.js';
 const $=selector=>document.querySelector(selector);
@@ -89,7 +89,7 @@ async function send(input,{keepModal=false,quiet=false}={}){
   finally{busy=false;}
 }
 
-function closeTray(){ if(world.overview){world.overview=false;world.flyTo(1);}$('#objectTray').hidden=true;$('#pieMenu').hidden=true;world.placement=null; }
+function closeTray(){ if(world.previewHome){world.previewHome=null;world.draw();}if(world.overview){world.overview=false;world.flyTo(1);}$('#objectTray').hidden=true;$('#pieMenu').hidden=true;world.placement=null; }
 // Sims-style pie menu: the object's name in the centre, its interactions fanned around it.
 function pie(object,options){
   // Your own furniture can be moved or put away from its menu.
@@ -149,7 +149,7 @@ function makeWorld(){
   if(!deep)return flat;
   const views=[flat,deep];let active=flat;deep.paused=true;
   const swap=()=>{const next=deep;if(next===active)return;
-    for(const key of ['player','target','heading','pose','moving','waypoints','pending','speed','people','speech','zoom','angle','pitch','lift','pan','npcTalkUntil','lampOff','fridgeOpen','windowOpen','placement'])next[key]=active[key];
+    for(const key of ['player','target','heading','pose','moving','waypoints','pending','speed','people','speech','zoom','angle','pitch','lift','pan','npcTalkUntil','lampOff','fridgeOpen','windowOpen','placement','previewHome'])next[key]=active[key];
     active.paused=true;next.paused=false;active=next;$('#world').style.display=active===flat?'':'none';$('#world3dWrap').style.display=active===deep?'':'none';active.draw();};
   return new Proxy({},{
     get(_,key){if(key==='update')return (...args)=>{for(const view of views)view.update(...args);swap();};const value=active[key];return typeof value==='function'?value.bind(active):value;},
@@ -177,7 +177,7 @@ function useObject(object,use,watch){
         const perform=async()=>{
           if(object.useItem){const data=await send({type:'useItem',item:object.item});if(data){world.pose=null;world.draw();}return;}
           if(object.act){const data=await send({type:'venueAct',act:object.act});if(data){world.pose=null;world.draw();}return;}
-          if(object.need){const data=await send({type:'recover',need:object.need,watch,...(object.food?{food:object.food}:{})});if(!data)return;}
+          if(object.need){const data=await send({type:'recover',need:object.need,watch,...(object.food?{food:object.food}:{}),...(object.spot?{spot:object.spot}:{})});if(!data)return;}
           if(object.pose){const x=object.pose==='dine'?.5:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?-3.5:object.vx??object.x;const z=object.pose==='dine'?2.1:object.name==='Television'?2.1:object.name==='Coffee table'||object.name==='Sofa'?1.5:object.vz??object.z;world.pose={kind:object.pose,x,z,face:object.face};}
           if(object.name==='Bedside lamp')world.lampOff=!world.lampOff;
           if(object.name==='Fridge')world.fridgeOpen=!world.fridgeOpen;
@@ -197,7 +197,7 @@ async function startAtObject(input){
   if(isBusyWithTimer()){closeTray();closeModal();queueTask({icon:CAREERS[state.career].icon,label:input.kind==='practice'?`Practise ${input.skill}`:'Work',run:()=>startAtObject(input)});return;}
   closeTray();closeModal();const def=CAREERS[state.career];lastTaskAt=Date.now();
   if(state.location!==def.location&&!(input.kind==='practice'&&state.location==='home'&&state.inventory.gear)){const data=await send({type:'travel',location:def.location});if(!data)return;if(data.state.trip){toast(`${tripVerb(data.state.trip.ride)} to ${LOCATIONS[def.location].name}. Start work when you arrive.`);return;}}
-  const object=worldObjects(state.location,state.furniture).find(o=>o.action===(input.kind==='practice'?'practice':'career'));
+  const object=worldObjects(state.location,state.furniture,[],state.home).find(o=>o.action===(input.kind==='practice'?'practice':'career'));
   if(object)world.approach(object,()=>whenIdle(()=>send({type:'start',...input})));else await send({type:'start',...input});
 }
 let tripTimer;
@@ -211,7 +211,7 @@ function render(){
   $('#locationTitle').textContent=state.visiting?`${snapshot.players.find(p=>p.id===state.visiting)?.name||'Friend'}’s home`:state.location==='home'&&SPONSORSHIPS[state.home]?`Your ${SPONSORSHIPS[state.home].name.toLowerCase()}`:location.name;
   $('#locationSubtitle').textContent=location.subtitle;
   $('#locationEyebrow').textContent=state.location==='home'?'YOUR NEIGHBOURHOOD':'OUT IN PALM CITY';
-  $('#objects').innerHTML=worldObjects(state.location,snapshot.visitedHome?.furniture||state.furniture).map(o=>button(`${o.icon} ${escape(o.name)}`,'object',`data-name="${escape(o.name)}"`,'object-button')).join('')+(state.location==='home'?button('♧ Socialise','recover','data-need="social"','object-button')+(snapshot.visitedHome?'':button('🛋 Arrange room','arrangeRoom','','object-button')):'');
+  $('#objects').innerHTML=worldObjects(state.location,snapshot.visitedHome?.furniture||state.furniture,[],snapshot.visitedHome?snapshot.visitedHome.home:state.home).map(o=>button(`${o.icon} ${escape(o.name)}`,'object',`data-name="${escape(o.name)}"`,'object-button')).join('')+(state.location==='home'?button('♧ Socialise','recover','data-need="social"','object-button')+(snapshot.visitedHome?'':button('🛋 Arrange room','arrangeRoom','','object-button')):'');
   if(state.visiting)$('#objects').innerHTML=button('♡ Socialise','recover','data-need="social"','object-button')+button('↗ Leave visit','leaveVisit','','object-button');
   const moodValue=Object.values(state.needs).reduce((a,b)=>a+b,0)/6,moodLabel=moodValue>=75?'Very happy':moodValue>=55?'Content':moodValue>=30?'Uncomfortable':'Miserable';
   $('#needsHud').innerHTML=`<div class="sim-portrait" style="--skin:${escape(state.color)};--mood:${Math.round(moodValue*1.2)}" title="Mood ${Math.round(moodValue)}%"><span>${escape(state.name.slice(0,1).toUpperCase())}</span></div><div class="sim-meta"><strong>${escape(state.name)}</strong><small style="--mood:${Math.round(moodValue*1.2)}">${moodLabel}</small></div><div class="sim-needs">${Object.entries(needs).map(([key,[label]])=>button(`<label>${label}</label><i style="--need:${state.needs[key]}%;--hue:${Math.round(state.needs[key]*1.2)}"></i>`,'recover',`data-need="${key}" aria-label="${label} ${Math.round(state.needs[key])} percent. Recover ${label}." title="${label} · ${Math.round(state.needs[key])}%"`,'need-bar')).join('')}</div>`;
@@ -338,7 +338,7 @@ function ring(value,center,label,attrs=''){const v=Math.max(0,Math.min(100,Math.
 function skillRings(c){return `<div class="v2-rings">${Object.entries(c.skills).map(([key,sk])=>ring(sk.level===10?100:sk.level*10+sk.points/effort(sk.level)*10,`Lv ${sk.level}`,key)).join('')}</div>`;}
 const awardIcon=name=>/champ|trophy|slam|belt|winner/i.test(name)?'🏆':/married/i.test(name)?'💍':/tour/i.test(name)?'🎤':/cover/i.test(name)?'📰':/fund/i.test(name)?'💼':/legacy/i.test(name)?'👋':/palm award/i.test(name)?'🏅':'⭐';
 
-async function recover(need){if(need==='social'){showTray('♡ Socialise','<div class="tray-options">'+button('♡ Chat','quickSocial')+button('♧ Contacts','page','data-page="phone"')+'</div>');return;}if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast(`${tripVerb(data.state.trip.ride)} home. Recover when you arrive.`);return;}}const object=worldObjects('home',state.furniture,Object.keys(state.inventory||{})).find(o=>o.need===need);if(object)world.onObject(object);}
+async function recover(need){if(need==='social'){showTray('♡ Socialise','<div class="tray-options">'+button('♡ Chat','quickSocial')+button('♧ Contacts','page','data-page="phone"')+'</div>');return;}if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast(`${tripVerb(data.state.trip.ride)} home. Recover when you arrive.`);return;}}const object=worldObjects('home',state.furniture,Object.keys(state.inventory||{}),state.home).find(o=>o.need===need);if(object)world.onObject(object);}
 function shop(){const fame=state.fame||0;showModal('shop',`<span class="eyebrow">PALM CITY MARKET</span><h2>Make yourself at home.</h2><p class="modal-intro">No coins in Palm City: items unlock with fame and are free to claim. You have ✦ ${fmt(fame)} fame. Claim them at Palm plaza.</p><div class="item-grid">${Object.entries(ITEMS).map(([key,item])=>`<div class="item-card"><h3>${item.name}</h3><p>${item.description}</p><div class="shop-price">✦ ${fmt(item.fame)} fame</div>${state.inventory[key]?button('Owned ✓','noop','disabled'):fame>=item.fame?button('Claim free','buy',`data-item="${key}"`,'primary'):button(`🔒 ${fmt(item.fame-fame)} fame to go`,'noop','disabled')}</div>`).join('')}</div><h3 class="pet-heading">🐾 Pet stall</h3>${state.pet?`<p class="modal-intro">You have ${escape(state.pet.name)} the ${escape(PETS[state.pet.kind].name.toLowerCase())}. One pet at a time.</p>`:`<div class="item-grid">${Object.entries(PETS).map(([key,p])=>`<div class="item-card"><h3>${p.icon} ${p.name}</h3><p>${escape(p.note)}</p><div class="shop-price">✦ ${fmt(p.fame)} fame</div>${fame>=p.fame?`<input id="petName-${key}" class="pet-name" maxlength="20" placeholder="Name your ${p.name.toLowerCase()}" aria-label="Pet name">${state.location==='plaza'?button('Adopt','adoptPet',`data-kind="${key}"`,'primary'):button('Adopt at Palm plaza','travel','data-location="plaza"')}`:button(`🔒 ${fmt(p.fame-fame)} fame to go`,'noop','disabled')}</div>`).join('')}</div>`}`);}
 // The wardrobe: tabs per slot, every piece with its perk; wear what you own, claim new pieces at Palm plaza.
 let wardrobeSlot='top';
@@ -452,9 +452,17 @@ function estateAgent(){
   const fame=state.fame||0,here=state.location==='plaza',claimed=state.vip||{};
   const homes=Object.entries(SPONSORSHIPS).filter(([,d])=>d.kind==='home').sort((a,b)=>a[1].fame-b[1].fame).map(([key,d])=>{const owned=claimed[key]||d.fame===0,living=state.home===key||(!state.home&&key==='studioFlat'&&false);
     const action=state.home===key?button('Living here ✓','noop','disabled'):owned&&claimed[key]?button('Move in','useVip',`data-item="${key}"`):fame>=d.fame?(here?button('Claim free','claim',`data-item="${key}"`,'primary'):button('Claim at Palm plaza','travel','data-location="plaza"')):button(`🔒 ${fmt(d.fame)} fame`,'noop','disabled');
-    return `<div class="item-card"><h3>${d.icon} ${escape(d.name)}</h3><p>${escape(d.description)}</p>${action}</div>`;}).join('');
+    const rooms=homeRooms(key);
+    return `<div class="item-card"><h3>${d.icon} ${escape(d.name)}</h3><p>${escape(d.description)}</p><p class="home-rooms">${rooms.length?`🚪 +${rooms.length} room${rooms.length>1?'s':''}: ${rooms.map(r=>escape(r.name)).join(', ')}`:'🚪 One open-plan room'}</p>${action}${state.home===key?'':button('👀 Look inside','previewHome',`data-item="${key}"`)}</div>`;}).join('');
   const ext=Object.entries(ITEMS).filter(([,i])=>i.extension).map(([key,i])=>`<div class="item-card"><h3>${i.use.icon} ${escape(i.name)}</h3><p>${escape(i.description)}</p>${state.inventory[key]?button('Built ✓','noop','disabled'):fame>=i.fame?(here?button('Build free','buy',`data-item="${key}"`,'primary'):button('Build at Palm plaza','travel','data-location="plaza"')):button(`🔒 ${fmt(i.fame)} fame`,'noop','disabled')}</div>`).join('');
   showModal('estate',`<span class="eyebrow">PALM REALTY · ESTATE AGENT</span><h2>Find your place</h2><p class="modal-intro">Homes and extensions are free with fame. Extensions appear around your house; tap them at home.</p><h3>Homes</h3><div class="item-grid">${homes}</div><h3>Extensions</h3><div class="item-grid">${ext}</div>`);
+}
+// Walk round any home before moving in: your place is shown restyled until you leave the preview.
+async function previewHome(key){
+  closeModal();if(state.location!=='home'||state.visiting){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast(`${tripVerb(data.state.trip.ride)} home. Look inside when you arrive.`);return;}}
+  const d=SPONSORSHIPS[key],fame=state.fame||0,claimed=Boolean(state.vip?.[key]);world.previewHome=key;world.resetCamera();const east=Math.max(5.35,...homeRooms(key).map(r=>r.x1));world.pan={x:(east-5.35)/2,z:0};world.setZoom(10.7/(east+5.35)*(innerWidth<620?.7:1));world.draw();
+  const action=claimed?button('Move in','previewMoveIn',`data-item="${key}"`,'primary'):fame>=d.fame?button('Claim at Palm plaza','travel','data-location="plaza"','primary'):button(`🔒 ${fmt(d.fame)} fame`,'noop','disabled');
+  showTray(`${d.icon} ${d.name}`,`<small class="placement-hint">A preview: your furniture, their style.</small><div class="tray-options">${action}${button('Back to my home','closeTray')}</div>`);
 }
 // My team: hire a mentor, a manager and a bodyguard; see your booked gig; start beef with your rival.
 function teamApp(){
@@ -505,9 +513,9 @@ function upgrade(item){const owned=state.inventory[item],cost=effort(owned.level
 async function placement(item){closeModal();if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast('Heading home. Arrange your room when you arrive.');return;}}
   const placed=state.furniture.find(f=>f.item===item);showTray((placed?'Move ':'Place ')+ITEMS[item].name,'<small class="placement-hint">Tap the floor to try a spot · green fits, red overlaps or blocks a path.</small><div class="tray-options">'+button('✓ Place here','placeHere','id="placeHere" disabled','primary')+(placed?button('📦 Store instead','storeItem',`data-item="${item}"`):'')+button('Done','closeTray')+'</div>');
   world.resetCamera();if(innerWidth<620)world.setZoom(.7); // see the whole room while arranging
-  world.placement={item,x:placed?.x??0,z:placed?.z??-1,spots:[],shown:Boolean(placed)};world.onPlacement(Boolean(placed)&&canPlace(state.furniture,item,placed.x,placed.z));world.draw();
+  world.placement={item,x:placed?.x??0,z:placed?.z??-1,spots:[],shown:Boolean(placed)};world.onPlacement(Boolean(placed)&&canPlace(state.furniture,item,placed.x,placed.z,state.home));world.draw();
   // Light up every spot that fits, a few rows at a time so the game stays responsive.
-  const p=world.placement;for(let x=-4;x<=4;x+=.5){await new Promise(r=>setTimeout(r));if(world.placement!==p)return;for(let z=-4;z<=3.5;z+=.5)if(canPlace(state.furniture,item,x,z))p.spots.push([x,z]);world.draw();}
+  const p=world.placement;const east=Math.max(4,...homeRooms(state.home).map(r=>r.x1-.9));for(let x=-4;x<=east;x+=.5){await new Promise(r=>setTimeout(r));if(world.placement!==p)return;for(let z=-4;z<=4.5;z+=.5)if(canPlace(state.furniture,item,x,z,state.home))p.spots.push([x,z]);world.draw();}
   if(!p.spots.length)toast('No free spot fits this right now. Store something to make room.');}
 // Arrange your room: every piece of furniture you own, placed or in storage.
 function arrangeRoom(){
@@ -740,6 +748,8 @@ document.addEventListener('click',async event=>{
     case 'upgrade':await send({type:'upgrade',item:d.item});break;
     case 'placePreview':case 'moveItem':closeTray();placement(d.item);break;
     case 'arrangeRoom':arrangeRoom();break;
+    case 'previewHome':previewHome(d.item);break;
+    case 'previewMoveIn':await send({type:'useVip',item:d.item});break;
     case 'placeHere':{const p=world.placement;if(p)onWorldObject({placement:{item:p.item,x:p.x,z:p.z}});break;}
     case 'storeItem':{const data=await send({type:'store',item:d.item},{keepModal:true});if(data){closeTray();world.placement=null;world.draw();toast(`${ITEMS[d.item].name} stored. Place it again any time from Arrange room.`);if(modalPage==='arrange')arrangeRoom();else if(modalPage==='inventory')inventory();}break;}
     case 'place':await send({type:'place',item:d.item,x:Number(d.x),z:Number(d.z)});break;
