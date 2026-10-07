@@ -231,7 +231,7 @@ function useObject(object,use,watch){
         if(!use)return;
         const perform=async()=>{
           if(object.useItem){const data=await send({type:'useItem',item:object.item,...(object.piece?{id:object.piece}:{})});if(data){world.pose=null;world.draw();}return;}
-          if(object.act){const data=await send({type:'venueAct',act:object.act});if(data){world.pose=null;world.draw();}return;}
+          if(object.act){world.actAt={act:object.act,x:object.x,z:object.z,vx:object.vx??object.x,vz:object.vz??object.z,face:object.face};const data=await send({type:'venueAct',act:object.act});if(data){world.pose=null;world.draw();}return;}
           if(object.need){const data=await send({type:'recover',need:object.need,watch,...(object.food?{food:object.food}:{}),...(object.spot?{spot:object.spot}:{})});if(!data)return;}
           if(object.pose){const x=object.pose==='dine'?.5:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?-3.5:object.vx??object.x;const z=object.pose==='dine'?2.1:object.name==='Television'?2.1:object.name==='Coffee table'||object.name==='Sofa'?1.5:object.vz??object.z;world.pose={kind:object.pose,x,z,face:object.face};}
           if(object.name==='Bedside lamp')world.lampOff=!world.lampOff;
