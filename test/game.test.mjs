@@ -405,3 +405,18 @@ test('own as many pieces of furniture as you like, each placed or stored on its 
   act(s,{type:'place',item:'chair',x:1,z:0},T);assert.equal(s.furniture.length,3,'stored chairs come back out');
   const legacy=make();legacy.furniture=[{item:'chair',x:1,z:0}];legacy.inventory.chair={level:1};reconcile(legacy,T+1);assert.ok(legacy.furniture[0].id,'old saves get ids');assert.equal(legacy.inventory.chair.count,1);
 });
+
+test('strangers: the more famous you are, the more people know you and love or hate you',async()=>{
+  const {npcOpinion,OPINIONS}=await import('../public/content.js');
+  for(const o of Object.values(OPINIONS))assert.equal(new Set(o.lines).size,10,'ten different lines each');
+  const share=fame=>{const c={unknown:0,neutral:0,love:0,hate:0};for(let i=0;i<2000;i++)c[npcOpinion(`plaza:${i}`,fame,3).kind]++;return c;};
+  const nobody=share(0),local=share(2_000),star=share(500_000);
+  assert.ok(nobody.unknown>1700,'almost nobody knows a newcomer');
+  assert.ok(star.unknown<local.unknown&&local.unknown<nobody.unknown,'fame makes you known');
+  assert.ok(star.love+star.hate>local.love+local.hate,'and more of them have strong feelings');
+  assert.ok(star.love>200&&star.hate>200,'some love you, some hate you');
+  assert.deepEqual(npcOpinion('plaza:4',5000,9),npcOpinion('plaza:4',5000,9),'same person, same day, same opinion');
+  const s=make();s.location='plaza';s.needs.social=40;act(s,{type:'chatRegular',npc:'plaza:2'},T);assert.ok(s.lastChat&&s.needs.social>40);
+  const after=s.needs.social;act(s,{type:'chatRegular',npc:'plaza:2'},T+1000);assert.ok(s.needs.social<=after,'one social boost per person per 10 minutes');
+  assert.throws(()=>act(s,{type:'chatRegular',npc:'gym:1'},T),/Walk over/);
+});

@@ -12,7 +12,7 @@ function audio() {
   try { ctx = new AudioContext(); } catch { return null; }
   master = ctx.createGain(); master.gain.value = .9; master.connect(ctx.destination);
   musicBus = ctx.createGain(); musicBus.gain.value = prefs.music ? .055 : 0; musicBus.connect(master);
-  sfxBus = ctx.createGain(); sfxBus.gain.value = prefs.voices ? .5 : 0; sfxBus.connect(master);
+  sfxBus = ctx.createGain(); sfxBus.gain.value = prefs.voices ? .45 : 0; sfxBus.connect(master);
   noise = ctx.createBuffer(1, ctx.sampleRate, ctx.sampleRate); const d = noise.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
   return ctx;
 }
@@ -55,51 +55,55 @@ function startMusic() { if (!audio() || timer) return; nextAt = ctx.currentTime 
 function stopMusic() { clearInterval(timer); timer = null; }
 export function setMood(place) { mood = ['nightclub', 'eventHall', 'lounge', 'stadium'].includes(place) ? 'party' : 'day'; }
 
-// ---------- Voices: vowel-shaped gibberish, pitched per character ----------
-// Formant pairs for a, e, i, o, u: a buzzing tone through two band-pass filters sounds like a vowel.
-const VOWELS = { a: [800, 1200], e: [500, 1900], i: [320, 2300], o: [520, 900], u: [330, 800] };
+// ---------- Voices: soft, cute "blip" speech (think Animal Crossing), pitched per character ----------
+const PENTA = [0, 2, 4, 7, 9, 12];
 const hash = s => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
-export function voiceFor(id, hint) { const h = hash(id || 'me'); const high = hint === 'high' || (hint !== 'low' && h % 2); return { pitch: (high ? 205 : 118) * (1 + (h % 7 - 3) * .035), wobble: .9 + (h % 5) * .05 }; }
-function syllable(t, vowel, pitch, len, { glide = 0, gain = .5, breath = .12 } = {}) {
-  const o = ctx.createOscillator(), g = ctx.createGain(), [f1, f2] = VOWELS[vowel] || VOWELS.a;
-  o.type = 'sawtooth'; o.frequency.setValueAtTime(pitch, t); if (glide) o.frequency.exponentialRampToValueAtTime(Math.max(60, pitch * glide), t + len);
-  const vib = ctx.createOscillator(), vg = ctx.createGain(); vib.frequency.value = 6; vg.gain.value = pitch * .02; vib.connect(vg).connect(o.frequency);
-  const mixOut = ctx.createGain(); mixOut.gain.value = 1;
-  for (const [f, q, lvl] of [[f1, 7, 1], [f2, 9, .55]]) { const bp = ctx.createBiquadFilter(), lg = ctx.createGain(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q; lg.gain.value = lvl; o.connect(bp).connect(lg).connect(mixOut); }
-  if (breath) { const n = ctx.createBufferSource(), nf = ctx.createBiquadFilter(), ng = ctx.createGain(); n.buffer = noise; nf.type = 'bandpass'; nf.frequency.value = f2; ng.gain.value = breath; n.connect(nf).connect(ng).connect(mixOut); n.start(t); n.stop(t + len + .05); }
-  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + .025); g.gain.setValueAtTime(gain, t + len * .6); g.gain.exponentialRampToValueAtTime(.001, t + len);
-  mixOut.connect(g).connect(sfxBus); o.start(t); o.stop(t + len + .05); vib.start(t); vib.stop(t + len + .05);
+export function voiceFor(id, hint) { const h = hash(id || 'me'); const high = hint === 'high' || (hint !== 'low' && h % 2); return { pitch: (high ? 330 : 210) * (1 + (h % 7 - 3) * .03), wobble: 1 }; }
+// One rounded note: a triangle wave through a gentle low-pass, quick fade in and out.
+function tone(t, freq, len, { glide = 1, gain = .18, vibrato = 0, type = 'triangle' } = {}) {
+  const o = ctx.createOscillator(), lp = ctx.createBiquadFilter(), g = ctx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t); if (glide !== 1) o.frequency.exponentialRampToValueAtTime(freq * glide, t + len);
+  if (vibrato) { const v = ctx.createOscillator(), vg = ctx.createGain(); v.frequency.value = vibrato; vg.gain.value = freq * .025; v.connect(vg).connect(o.frequency); v.start(t); v.stop(t + len + .05); }
+  lp.type = 'lowpass'; lp.frequency.value = Math.min(4000, freq * 3.2); lp.Q.value = .6;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + .012); g.gain.setValueAtTime(gain, t + len * .55); g.gain.exponentialRampToValueAtTime(.001, t + len);
+  o.connect(lp).connect(g).connect(sfxBus); o.start(t); o.stop(t + len + .05);
 }
-// "Bla bla": one babble syllable per couple of letters, with a question lilting up and an exclamation punching.
+const semis = (base, n) => base * Math.pow(2, n / 12);
+// "Bla bla": a short blip per syllable, its note picked from the letters, so the same words always sound the same.
 export function babble(text, voice = voiceFor('me')) {
   if (!prefs.voices || !audio()) return;
   const clean = String(text).replace(/[^\p{L}\p{N}?!.\s]/gu, '').trim(); if (!clean) return;
-  const n = Math.max(2, Math.min(9, Math.round(clean.length / 5))), ask = /\?\s*$/.test(clean), shout = /!\s*$/.test(clean), keys = Object.keys(VOWELS);
-  let t = ctx.currentTime + .02;
-  for (let i = 0; i < n; i++) {
-    const last = i === n - 1, len = .085 + ((hash(clean) >> i) % 4) * .02, p = voice.pitch * voice.wobble * (1 + (((hash(clean + i) % 9) - 4) * .04)) * (last && ask ? 1.25 : 1) * (shout ? 1.12 : 1);
-    syllable(t, keys[hash(clean.slice(i * 2) + i) % keys.length], p, last ? len * 1.5 : len, { glide: last ? (ask ? 1.35 : shout ? .9 : .85) : 1, gain: shout ? .62 : .5 });
-    t += len + .03 + (i % 3 === 2 ? .05 : 0);
+  const words = clean.split(/\s+/).slice(0, 10), ask = /\?\s*$/.test(clean), shout = /!\s*$/.test(clean);
+  let t = ctx.currentTime + .02, k = 0;
+  for (const word of words) {
+    const syl = Math.max(1, Math.min(3, Math.round(word.length / 3)));
+    for (let i = 0; i < syl; i++, k++) {
+      const last = k === words.length * 2, step = PENTA[hash(word + i) % PENTA.length];
+      tone(t, semis(voice.pitch, step), .065, { gain: shout ? .2 : .16 }); t += .085;
+    }
+    t += .04;
   }
+  if (ask) tone(t, semis(voice.pitch, 7), .16, { glide: 1.25, gain: .15 });
+  else if (shout) tone(t, semis(voice.pitch, 12), .12, { gain: .17 });
 }
-// Expressions, by emote or reaction.
+// Expressions for emotes and reactions.
 export function express(kind, voice = voiceFor('me')) {
   if (!prefs.voices || !audio()) return;
-  const t = ctx.currentTime + .02, p = voice.pitch;
-  const run = (list) => { let at = t; for (const [v, mul, len, opts, gap = .02] of list) { syllable(at, v, p * mul, len, opts); at += len + gap; } };
+  const t0 = ctx.currentTime + .02, p = voice.pitch, seq = (list) => { let t = t0; for (const [st, len, opts = {}, gap = .03] of list) { tone(t, semis(p, st), len, opts); t += len + gap; } };
   switch (kind) {
-    case 'laugh': run([[ 'a', 1.3, .1, { breath: .35 }, .05], ['a', 1.22, .1, { breath: .35 }, .05], ['a', 1.15, .1, { breath: .35 }, .05], ['a', 1.08, .1, { breath: .35 }, .05], ['a', 1, .16, { breath: .4, glide: .85 }]]); break;
-    case 'huh': run([['u', .95, .28, { glide: 1.5 }]]); break;
-    case 'wow': run([['u', .9, .1, {}, 0], ['o', 1.15, .32, { glide: .82 }]]); break;
-    case 'yay': run([['e', 1.25, .12, {}, .03], ['a', 1.5, .3, { glide: 1.12 }]]); break;
-    case 'cry': run([['u', 1.1, .3, { glide: .8, breath: .3 }, .08], ['u', 1.05, .3, { glide: .78, breath: .3 }, .08], ['u', 1, .4, { glide: .7, breath: .35 }]]); break;
-    case 'ugh': run([['u', .8, .3, { glide: .75, breath: .25 }]]); break;
-    case 'hey': run([['e', 1.2, .14, {}, .02], ['i', 1.35, .2, { glide: 1.08 }]]); break;
-    case 'cheese': run([['i', 1.3, .35, { glide: 1.02 }]]); click(t + .45); break;
-    case 'woo': run([['u', 1.3, .35, { glide: 1.4 }]]); break;
+    case 'laugh': seq([[12, .07, {}, .04], [9, .07, {}, .04], [12, .07, {}, .04], [9, .07, {}, .04], [7, .12, { vibrato: 9 }]]); break;
+    case 'huh': seq([[0, .22, { glide: 1.4 }]]); break;
+    case 'hmm': seq([[2, .26, { glide: .94, gain: .13, vibrato: 5 }]]); break;
+    case 'wow': seq([[0, .12, { glide: 1.35 }, 0], [5, .26, { glide: .8 }]]); break;
+    case 'yay': seq([[0, .07, {}, .02], [4, .07, {}, .02], [7, .07, {}, .02], [12, .24, { vibrato: 7 }]]); break;
+    case 'cry': seq([[7, .26, { glide: .88, vibrato: 7, gain: .14 }, .06], [5, .26, { glide: .86, vibrato: 7, gain: .14 }, .06], [2, .34, { glide: .8, vibrato: 7, gain: .13 }]]); break;
+    case 'ugh': seq([[-5, .24, { glide: .82, gain: .15 }]]); break;
+    case 'hey': seq([[4, .08, {}, .03], [9, .16, { glide: 1.08 }]]); break;
+    case 'cheese': seq([[12, .26, { vibrato: 6 }]]); click(t0 + .32); break;
+    case 'woo': seq([[0, .3, { glide: 1.6 }]]); break;
   }
 }
-function click(t) { const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = noise; g.gain.setValueAtTime(.6, t); g.gain.exponentialRampToValueAtTime(.001, t + .04); s.connect(g).connect(sfxBus); s.start(t); s.stop(t + .05); }
+function click(t) { const s = ctx.createBufferSource(), lp = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = noise; lp.type = 'lowpass'; lp.frequency.value = 2500; g.gain.setValueAtTime(.25, t); g.gain.exponentialRampToValueAtTime(.001, t + .04); s.connect(lp).connect(g).connect(sfxBus); s.start(t); s.stop(t + .05); }
 export const EMOTE_SOUNDS = { laugh: 'laugh', cry: 'cry', facepalm: 'ugh', victory: 'yay', wave: 'hey', selfie: 'cheese', dance: 'woo', shoki: 'woo', huh: 'huh', wow: 'wow' };
 
 // ---------- UI chimes ----------
@@ -117,7 +121,7 @@ export function soundPrefs() { return { ...prefs }; }
 export function setSound(key, on) {
   prefs[key] = on; save(); if (!audio()) return;
   if (key === 'music') { musicBus.gain.setTargetAtTime(on ? .055 : 0, ctx.currentTime, .2); on ? startMusic() : stopMusic(); }
-  if (key === 'voices') sfxBus.gain.setTargetAtTime(on ? .5 : 0, ctx.currentTime, .05);
+  if (key === 'voices') sfxBus.gain.setTargetAtTime(on ? .45 : 0, ctx.currentTime, .05);
 }
 // Start on the first tap or key press (browsers block sound before that).
 const wake = () => { if (!audio()) return; if (prefs.music) startMusic(); removeEventListener('pointerdown', wake); removeEventListener('keydown', wake); };
