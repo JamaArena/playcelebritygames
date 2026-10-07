@@ -1,4 +1,4 @@
-// Sound for Palm City, all synthesised in the browser (no audio files, nothing to license):
+// Sound for Naija City, all synthesised in the browser (no audio files, nothing to license):
 // a looping background tune, Sims-style gibberish voices for speech bubbles, expression sounds and little UI chimes.
 // Browsers only allow audio after a tap or key press, so everything starts on the first interaction.
 

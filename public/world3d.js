@@ -1,4 +1,4 @@
-// WebGL view of Palm City built on three.js. It reuses the 2D World for game logic (walking, poses,
+// WebGL view of Naija City built on three.js. It reuses the 2D World for game logic (walking, poses,
 // people, labels, taps) and its scene descriptions (box/round/floor calls), but draws them as lit,
 // shadowed 3D meshes with physically based materials, image-based lighting and filmic tone mapping.
 // Meshes are pooled and re-placed each frame, so nothing is rebuilt while playing.
