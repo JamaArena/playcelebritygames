@@ -640,3 +640,6 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 #modal .phone-device.ios .phone-clock strong{font-size:clamp(52px,19vw,76px)}
 #modal .phone-device.ios .app-grid{padding-bottom:128px}
 #modal .phone-device.ios .ios-status{padding:14px 26px 0 30px}
+/* Action menus and the bottom buttons stay on one line, sized to their text (the menu box itself has no width) */
+.pie-option,.pie-center,#app .idle-actions button,.object-button{white-space:nowrap!important;overflow-wrap:normal!important;width:max-content;max-width:calc(100vw - 24px)}
+.pie-option{text-overflow:ellipsis;overflow:hidden}
