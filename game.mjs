@@ -511,9 +511,15 @@ export function act(s,input,now,rng=Math.random) {
     case 'equip':requireRule(s.inventory[input.item]&&ITEMS[input.item]?.slot,'You do not own usable equipment.');s.equipped[ITEMS[input.item].slot]=input.item;break;
     case 'place': {
       requireRule(s.location==='home'&&s.inventory[input.item]&&ITEMS[input.item]?.furniture,'Place your owned furniture at home.');
-      requireRule(canPlace(s.furniture,input.item,input.x,input.z),'Choose a free position away from furniture and interaction points.');
+      requireRule(canPlace(s.furniture,input.item,input.x,input.z),'That spot overlaps something or blocks a path. Try another (green means it fits).');
       requireRule(!s.furniture.some(f=>f.item!==input.item&&f.x===input.x&&f.z===input.z),'That position is occupied.');
+      requireRule(s.recovery?.item!==input.item,'Finish using it first.');
       s.furniture=s.furniture.filter(f=>f.item!==input.item);s.furniture.push({item:input.item,x:input.x,z:input.z});break;
+    }
+    case 'store': {
+      requireRule(s.location==='home'&&!s.visiting,'Arrange your room at home.');requireRule(s.furniture.some(f=>f.item===input.item),'That item is already in storage.');
+      requireRule(s.recovery?.item!==input.item,'Finish using it first.');
+      s.furniture=s.furniture.filter(f=>f.item!==input.item);log(s,`📦 ${ITEMS[input.item]?.name||'Item'} moved to storage.`,now);break;
     }
     case 'claim': {
       if(SPONSORSHIPS[input.item]?.kind==='brand'){const d=SPONSORSHIPS[input.item];requireRule(!s.vip?.[input.item],'You already signed this deal.');requireRule((s.fame||0)>=d.fame,`${d.sponsor} signs players with ${d.fame.toLocaleString('en-US')} fame.`);s.vip={...(s.vip||{}),[input.item]:{at:now}};if(d.grant.wear){s.closet??={};s.closet[d.grant.wear]=true;}if(d.grant.phone)s.phone=d.grant.phone;headline(s,`${s.name} signs with ${d.sponsor} ${d.icon}`,now);log(s,`${d.icon} Signed with ${d.sponsor}.`,now);break;}

@@ -89,10 +89,10 @@ export const worldObjects = (location,furniture=[],owned=[]) => ({
     {name:'Work desk',icon:'⌘',x:.5,z:-3.1,vx:.5,vz:-4.2,action:'practice'},
     {name:'Front door',icon:'🚪',x:-4.6,z:3.6,vx:-5.1,vz:3.6,action:'exit'},
     ...furniture.map((f,i)=>{const def=ITEMS[f.item]||{},use=def.use;
-      if(f.item==='chair')return {name:`Chair ${i+1}`,icon:'♙',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Sit',pose:'sit'};
-      if(f.item==='wardrobe')return {name:'Wardrobe',icon:'👗',x:f.x,z:f.z+.75,vx:f.x,vz:f.z,action:'wardrobe'};
-      if(use)return {name:def.name,icon:use.icon,x:f.x,z:f.z+.75,vx:f.x,vz:f.z,verb:use.verb,item:f.item,useItem:true,amount:use.amount,useNeed:use.need};
-      return {name:f.item==='trophyShelf'?'Display table':def.name||'Display table',icon:'◇',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Admire',pose:null};}),
+      if(f.item==='chair')return {name:`Chair ${i+1}`,icon:'♙',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Sit',pose:'sit',furniture:f.item};
+      if(f.item==='wardrobe')return {name:'Wardrobe',icon:'👗',x:f.x,z:f.z+.75,vx:f.x,vz:f.z,action:'wardrobe',furniture:f.item};
+      if(use)return {name:def.name,icon:use.icon,x:f.x,z:f.z+.75,vx:f.x,vz:f.z,verb:use.verb,item:f.item,useItem:true,amount:use.amount,useNeed:use.need,furniture:f.item};
+      return {name:f.item==='trophyShelf'?'Display table':def.name||'Display table',icon:'◇',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Admire',pose:null,furniture:f.item};}),
     ...Object.entries(ITEMS).filter(([key,def])=>def.extension&&owned.includes(key)).map(([key,def])=>({name:def.name,icon:def.use.icon,x:def.extension.x,z:def.extension.z,verb:def.use.verb,item:key,useItem:true,remote:true,amount:def.use.amount,useNeed:def.use.need})),
   ],
   nightclub:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.tourNightclub.name,icon:VENUE_ACTS.tourNightclub.icon,x:0,z:-3.4,act:'tourNightclub',face:0},{name:VENUE_ACTS.dance.name,icon:VENUE_ACTS.dance.icon,x:0,z:-0.4,act:'dance',face:0},{name:VENUE_ACTS.djSet.name,icon:VENUE_ACTS.djSet.icon,x:0,z:-2.9,act:'djSet',face:0},{name:VENUE_ACTS.bar.name,icon:VENUE_ACTS.bar.icon,x:-3.1,z:0.4,act:'bar',face:-1.5708}],
@@ -171,7 +171,7 @@ export class World {
         else if(!this.gesture.multi){const g=this.gesture;if(Math.hypot(event.clientX-g.startX,event.clientY-g.startY)>6)g.dragged=true;if(g.dragged){this.angleGoal=null;this.angle+=(event.clientX-previous.x)*.009;this.tilt(this.pitch+(event.clientY-previous.y)*.002);}}
         this.canvas.classList.toggle('dragging',this.gesture.dragged);this.draw();return;
       }
-      const r=canvas.getBoundingClientRect();if(this.placement){const point=this.unproject(event.clientX-r.left,event.clientY-r.top);this.placement.x=Math.round(point.x);this.placement.z=Math.round(point.z);}const near=list=>list?.find(p=>Math.hypot(p.screen.x-event.clientX+r.left,p.screen.y-event.clientY+r.top)<24);this.hover=event.pointerType==='mouse'?near(this.pins)||near(this.peopleHits)||near(this.houseHits)||this.hits?.find(o=>Math.hypot(o.screen.x-event.clientX+r.left,o.screen.y-event.clientY+r.top)<(this.hitRadius||24)):null;this.draw();
+      const r=canvas.getBoundingClientRect();if(this.placement){const point=this.unproject(event.clientX-r.left,event.clientY-r.top),p=this.placement,nx=Math.round(point.x*2)/2,nz=Math.round(point.z*2)/2;if(event.pointerType==='mouse'&&(p.x!==nx||p.z!==nz||!p.shown)){p.x=nx;p.z=nz;p.shown=true;this.onPlacement?.(canPlace(this.state.furniture,p.item,nx,nz));}}const near=list=>list?.find(p=>Math.hypot(p.screen.x-event.clientX+r.left,p.screen.y-event.clientY+r.top)<24);this.hover=event.pointerType==='mouse'?near(this.pins)||near(this.peopleHits)||near(this.houseHits)||this.hits?.find(o=>Math.hypot(o.screen.x-event.clientX+r.left,o.screen.y-event.clientY+r.top)<(this.hitRadius||24)):null;this.draw();
     });
     const endPointer=(event,cancelled=false)=>{if(!this.pointers.has(event.pointerId))return;const tap=this.pointers.size===1&&!this.gesture.dragged&&!this.gesture.multi&&!cancelled;this.pointers.delete(event.pointerId);if(!this.pointers.size){this.canvas.classList.remove('dragging');this.gesture=null;this.pinchDistance=0;}if(tap)this.click(event);};
     canvas.addEventListener('pointerup',event=>endPointer(event));canvas.addEventListener('pointercancel',event=>endPointer(event,true));
@@ -180,7 +180,7 @@ export class World {
     canvas.addEventListener('keydown',event=>{
       if(['+','=','-','_','0'].includes(event.key)){event.preventDefault();event.key==='0'?this.resetCamera():this.setZoom(this.zoom*(event.key==='-'||event.key==='_'?1/1.2:1.2));return;}
       const directions={ArrowUp:[0,-.7],w:[0,-.7],ArrowDown:[0,.7],s:[0,.7],ArrowLeft:[-.7,0],a:[-.7,0],ArrowRight:[.7,0],d:[.7,0]};
-      if(this.placement){if(event.key==='Enter'){event.preventDefault();this.onObject({placement:{...this.placement}});}else if(directions[event.key]){event.preventDefault();const [dx,dz]=directions[event.key];this.placement.x+=Math.sign(dx);this.placement.z+=Math.sign(dz);this.draw();}return;}
+      if(this.placement){if(event.key==='Enter'){event.preventDefault();this.onObject({placement:{...this.placement}});}else if(directions[event.key]){event.preventDefault();const [dx,dz]=directions[event.key];this.placement.x+=Math.sign(dx)/2;this.placement.z+=Math.sign(dz)/2;this.draw();}return;}
       if(directions[event.key]){event.preventDefault();const [dx,dy]=directions[event.key],c=Math.cos(this.angle),s=Math.sin(this.angle);this.walk(this.player.x+dx*c+dy*s,this.player.z-dx*s+dy*c);}
     });
     this.last=performance.now();requestAnimationFrame(t=>this.frame(t));
@@ -505,7 +505,7 @@ export class World {
       this.box(.5,-4.2,1.2,.75,.8,'#c4b08b');this.box(.5,-4.2,1.3,.8,.07,'#f5f0df',.8);this.box(.5,-4.4,.7,.08,.5,'#405c55',.87);this.box(.5,-4.1,.65,.35,.03,'#819087',.88);
       if(Math.sin(this.angle)>0){this.box(-5.25,3.6,.08,1.15,2,'#6b4a35');this.box(-5.2,3.6,.04,.95,1.75,'#7d5841',.08);this.round(-5.17,3.2,.06,.06,.06,'#d4af37',1);}
       if(style.chandelier){this.round(-1.7,1.5,.05,.05,.6,'#8a7a5a',2.05);this.round(-1.7,1.5,.7,.7,.3,style.chandelier,1.85);}
-      for(const f of (this.visitedHome?.furniture||this.state.furniture))this.furnitureModel(f.item,f.x,f.z);this.paintPet();if(!this.visitedHome)for(const [key,def] of Object.entries(ITEMS))if(def.extension&&this.state.inventory?.[key])this.extensionModel(key,def.extension.x,def.extension.z);
+      for(const f of (this.visitedHome?.furniture||this.state.furniture))if(f.item!==this.placement?.item)this.furnitureModel(f.item,f.x,f.z);this.paintPet();if(!this.visitedHome)for(const [key,def] of Object.entries(ITEMS))if(def.extension&&this.state.inventory?.[key])this.extensionModel(key,def.extension.x,def.extension.z);
     }else if(l==='sports'){
       this.floor(0,0,11,11,'#b7c6a0');this.floor(0,0,6.3,8.4,'#7fa788');
       for(let z=-4;z<4;z++)this.floor(0,z+.5,6.2,.96,z%2?'#86ad8d':'#7ca584',.01);
@@ -538,7 +538,7 @@ export class World {
       this.ride(this.showroomRide(),3.3,3.9,'x');
       this.plant(-4.1,4,1.8);this.plant(0,-4.4,1.5);this.plant(-4.8,-.1);
     }
-    if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.item,p.x,p.z);this.floor(p.x,p.z,.9,.9,valid?'#87bc9c':'#d79c8c',.025);this.furnitureModel(p.item,p.x,p.z);}
+    if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.item,p.x,p.z);for(const [sx,sz] of p.spots||[])this.round(sx,sz,.16,.16,.02,'#3fbf6f',.02);this.floor(p.x,p.z,1.15,1.15,valid?'#3fbf6f':'#e0533f',.03);this.furnitureModel(p.item,p.x,p.z);}
     if(this.interior()&&l!=='home')this.paintCrowd(l);
     const npc=NPCS.find(n=>n.location===l);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone'),nx=obj?.x||2.5,nz=obj?.z||2,talking=this.npcTalkUntil>performance.now();this.human(nx,nz,npc.look.skin,{...this.look(npc.career),...this.body({hair:npc.look.hair,hairColor:npc.look.hairColor,build:npc.look.build,height:npc.look.height}),pose:talking?'gesture':null,heading:talking?Math.atan2(this.player.x-nx,this.player.z-nz):0});}
     this.paintPeople();
@@ -772,7 +772,8 @@ export class World {
   screenOf(object){if(object.screen&&!('x' in object))return object.screen;return this.project(object.vx??object.x,.8,object.vz??object.z);}
   flyTo(zoom){this.zoomGoal=clampZoom(zoom);}
   click(event){if(!this.state)return;const r=this.canvas.getBoundingClientRect(),x=event.clientX-r.left,y=event.clientY-r.top;
-    if(this.placement){const point=this.unproject(x,y);this.onObject({placement:{item:this.placement.item,x:Math.round(point.x),z:Math.round(point.z)}});return;}
+    // Arranging: a tap moves the preview there; tapping the same spot again (or a click after hovering it) places it.
+    if(this.placement){const point=this.unproject(x,y),p=this.placement,nx=Math.round(point.x*2)/2,nz=Math.round(point.z*2)/2;if(p.x===nx&&p.z===nz&&p.shown){this.onObject({placement:{item:p.item,x:nx,z:nz}});return;}p.x=nx;p.z=nz;p.shown=true;this.onPlacement?.(canPlace(this.state.furniture,p.item,nx,nz));this.draw();return;}
     const pin=this.pins?.find(p=>Math.hypot(p.screen.x-x,p.screen.y-y)<24);if(pin){this.onObject({travel:pin.travel});return;}
     const person=this.peopleHits?.find(p=>Math.hypot(p.screen.x-x,p.screen.y-y)<22);if(person){this.onObject({person:person.player,name:person.player.name,screen:person.screen});return;}
     const home=this.houseHits?.find(h=>Math.hypot(h.screen.x-x,h.screen.y-y)<26);if(home){this.onObject({house:home.house,name:`${home.house.name}’s home`,screen:home.screen});return;}

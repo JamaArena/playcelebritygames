@@ -92,6 +92,8 @@ async function send(input,{keepModal=false,quiet=false}={}){
 function closeTray(){ if(world.overview){world.overview=false;world.flyTo(1);}$('#objectTray').hidden=true;$('#pieMenu').hidden=true;world.placement=null; }
 // Sims-style pie menu: the object's name in the centre, its interactions fanned around it.
 function pie(object,options){
+  // Your own furniture can be moved or put away from its menu.
+  if(object.furniture&&state.location==='home'&&!snapshot.visitedHome&&!state.visiting)options=[...options,['✥ Move','moveItem',`data-item="${object.furniture}"`],['📦 Store','storeItem',`data-item="${object.furniture}"`]];
   $('#objectTray').hidden=true;
   const card=$('.world-card'),canvas=$('#world'),p=world.screenOf(object),n=options.length;
   const half=Math.min(170,card.clientWidth/2),x=Math.min(card.clientWidth-half,Math.max(half,canvas.offsetLeft+p.x)),y=Math.min(card.clientHeight-40,Math.max(80+n*44,canvas.offsetTop+p.y));
@@ -104,7 +106,7 @@ function showTray(title,html){$('#pieMenu').hidden=true;$('#objectTray').innerHT
 const onWorldMove=position=>{closeTray();send({type:'move',...position},{keepModal:true,quiet:true});};
 const onWorldObject=object=>{
   if(object.blocked){toast(object.message||'Choose open ground.');return;}
-  if(object.placement){send({type:'place',...object.placement}).then(data=>{if(data){world.placement=null;world.draw();}});return;}
+  if(object.placement){send({type:'place',...object.placement}).then(data=>{if(data){world.placement=null;closeTray();world.draw();toast(`${ITEMS[object.placement.item].name} placed.`);}});return;}
   if(object.decision!==undefined){chooseDecision(object.decision);return;}
   if(object.travel){closeTray();send({type:'travel',location:object.travel});return;}
   if(object.person){const p=object.person,friend=state.friends.includes(p.id);selectedObject=null;if(p.ride&&RIDES[p.ride])toast(`${RIDES[p.ride].icon} ${p.name} drives a ${RIDES[p.ride].name}.`);pie(object,[[`${CAREERS[p.career]?.icon||'☺'} ${escape(CAREERS[p.career]?.name||'Player')} <small>${escape(B.tiers[p.tier||0][0])}</small>`,'page','data-page="phone"'],friend?['✉ Message','directMessage',`data-player="${p.id}"`]:['♡ Add friend','friend',`data-player="${p.id}"`],['💬 Local chat','page','data-page="phone"'],['⚔ Challenge 1v1','battleCreate',`data-mode="1" data-opponent="${p.id}"`]]);return;}
@@ -156,6 +158,7 @@ function makeWorld(){
 }
 const world=makeWorld();
 world.onGround=closeTray;
+world.onPlacement=fits=>{const b=$('#placeHere');if(b){b.disabled=!fits;b.innerHTML=fits?'✓ Place here':'✕ Doesn’t fit here';}};
 // Task queue: tap more things while you're busy and they run one after another.
 // Timed tasks (eating, sleeping, work) finish first; untimed ones (sitting, posing) give way after a few seconds.
 const taskQueue=[],QUEUE_MAX=5,UNTIMED_LINGER=3000;let lastTaskAt=0;
@@ -208,7 +211,7 @@ function render(){
   $('#locationTitle').textContent=state.visiting?`${snapshot.players.find(p=>p.id===state.visiting)?.name||'Friend'}’s home`:state.location==='home'&&SPONSORSHIPS[state.home]?`Your ${SPONSORSHIPS[state.home].name.toLowerCase()}`:location.name;
   $('#locationSubtitle').textContent=location.subtitle;
   $('#locationEyebrow').textContent=state.location==='home'?'YOUR NEIGHBOURHOOD':'OUT IN PALM CITY';
-  $('#objects').innerHTML=worldObjects(state.location,snapshot.visitedHome?.furniture||state.furniture).map(o=>button(`${o.icon} ${escape(o.name)}`,'object',`data-name="${escape(o.name)}"`,'object-button')).join('')+(state.location==='home'?button('♧ Socialise','recover','data-need="social"','object-button'):'');
+  $('#objects').innerHTML=worldObjects(state.location,snapshot.visitedHome?.furniture||state.furniture).map(o=>button(`${o.icon} ${escape(o.name)}`,'object',`data-name="${escape(o.name)}"`,'object-button')).join('')+(state.location==='home'?button('♧ Socialise','recover','data-need="social"','object-button')+(snapshot.visitedHome?'':button('🛋 Arrange room','arrangeRoom','','object-button')):'');
   if(state.visiting)$('#objects').innerHTML=button('♡ Socialise','recover','data-need="social"','object-button')+button('↗ Leave visit','leaveVisit','','object-button');
   const moodValue=Object.values(state.needs).reduce((a,b)=>a+b,0)/6,moodLabel=moodValue>=75?'Very happy':moodValue>=55?'Content':moodValue>=30?'Uncomfortable':'Miserable';
   $('#needsHud').innerHTML=`<div class="sim-portrait" style="--skin:${escape(state.color)};--mood:${Math.round(moodValue*1.2)}" title="Mood ${Math.round(moodValue)}%"><span>${escape(state.name.slice(0,1).toUpperCase())}</span></div><div class="sim-meta"><strong>${escape(state.name)}</strong><small style="--mood:${Math.round(moodValue*1.2)}">${moodLabel}</small></div><div class="sim-needs">${Object.entries(needs).map(([key,[label]])=>button(`<label>${label}</label><i style="--need:${state.needs[key]}%;--hue:${Math.round(state.needs[key]*1.2)}"></i>`,'recover',`data-need="${key}" aria-label="${label} ${Math.round(state.needs[key])} percent. Recover ${label}." title="${label} · ${Math.round(state.needs[key])}%"`,'need-bar')).join('')}</div>`;
@@ -495,11 +498,23 @@ function drawMinimap(){
 const APP_PAGES={thread:()=>chatThread(threadWith),team:teamApp,crews:crewsApp,estate:estateAgent,barber:barberShop,tattoo:tattooShop,tailor:tailorShop,chat:chatApp,friends:friendsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp};
 function inventory(){
   showModal('inventory',`<span class="eyebrow">YOUR POSSESSIONS</span><h2>A place to call yours.</h2><p class="modal-intro">Furnish your apartment, equip a new look, and improve your tools.</p><div class="actions">${button('👗 Wardrobe','page','data-page="wardrobe"','primary')}${button('Visit market','travel','data-location="plaza"')}${button('Go home','travel','data-location="home"')}</div><div class="item-grid">${Object.entries(state.inventory).map(([key,item])=>{
-    const def=ITEMS[key];return `<div class="item-card"><h3>${def?.name||key[0].toUpperCase()+key.slice(1)}</h3><p>${def?.gadget?'Gadget · '+escape(def.description):def?.upgrade?'Home upgrade · always on':`Level ${item.level}${item.upgrade?` · upgrading to ${item.upgrade.target} in ${duration(item.upgrade.endsAt-now())}`:''}`}</p>${def?.slot?button(state.equipped[def.slot]===key?'Equipped':'Equip','equip',`data-item="${key}"`):''}${def?.gadget&&def.use?button(`${def.use.icon} ${escape(def.use.verb)}`,'useGadget',`data-item="${key}"`,'primary'):''}${def?.upgradable&&!item.upgrade&&item.level<10?button('Preview upgrade','previewUpgrade',`data-item="${key}"`):''}${def?.furniture?button('Place in home','placePreview',`data-item="${key}"`):''}</div>`;
+    const def=ITEMS[key];return `<div class="item-card"><h3>${def?.name||key[0].toUpperCase()+key.slice(1)}</h3><p>${def?.gadget?'Gadget · '+escape(def.description):def?.upgrade?'Home upgrade · always on':`Level ${item.level}${item.upgrade?` · upgrading to ${item.upgrade.target} in ${duration(item.upgrade.endsAt-now())}`:''}`}</p>${def?.slot?button(state.equipped[def.slot]===key?'Equipped':'Equip','equip',`data-item="${key}"`):''}${def?.gadget&&def.use?button(`${def.use.icon} ${escape(def.use.verb)}`,'useGadget',`data-item="${key}"`,'primary'):''}${def?.upgradable&&!item.upgrade&&item.level<10?button('Preview upgrade','previewUpgrade',`data-item="${key}"`):''}${def?.furniture?(state.furniture.some(f=>f.item===key)?button('✥ Move','placePreview',`data-item="${key}"`)+button('📦 Store','storeItem',`data-item="${key}"`):button('Place in home','placePreview',`data-item="${key}"`)):''}</div>`;
   }).join('')}</div>${state.pet?`<h3 class="pet-heading">${PETS[state.pet.kind].icon} ${escape(state.pet.name)}</h3><div class="pet-bars"><label>Food <i style="--v:${Math.round(state.pet.food)}%"></i></label><label>Happiness <i style="--v:${Math.round(state.pet.joy)}%"></i></label></div><p class="modal-intro">${state.pet.food>PET_CARE.happy&&state.pet.joy>PET_CARE.happy?'Happy pet: '+escape(PERKS[PETS[state.pet.kind].perk[0]].label(PETS[state.pet.kind].perk[1])):'Feed and play with your pet at home to get its perk back.'}</p>${button('Find a new home','rehomePet')}`:''}`);
 }
 function upgrade(item){const owned=state.inventory[item],cost=effort(owned.level,100),ready=(state.fame||0)>=cost,time=effort(owned.level,B.upgradeMs);showModal('upgrade',`<span class="eyebrow">A BETTER TOOL</span><h2>${ITEMS[item].name}</h2><p class="modal-intro">Level ${owned.level} → ${owned.level+1}</p><div class="notice">Needs ✦ ${fmt(cost)} fame (not spent) · ${duration(time)} minutes · no materials needed · no career charge.<br>Production quality bonus rises to +${owned.level*5}. Your current tool remains usable. This upgrade completes offline, applies once, and cannot be cancelled after starting. Maximum level 10.</div>${(ready?button('Start timed upgrade','upgrade',`data-item="${item}"`,'primary'):button(`🔒 ${fmt(cost-(state.fame||0))} fame to go`,'noop','disabled'))}`);}
-async function placement(item){closeModal();if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;}showTray('Place '+ITEMS[item].name,'<small class="placement-hint">Tap a floor tile · green fits, red is blocked.</small>');world.placement={item,x:0,z:0};world.draw();}
+async function placement(item){closeModal();if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast('Heading home. Arrange your room when you arrive.');return;}}
+  const placed=state.furniture.find(f=>f.item===item);showTray((placed?'Move ':'Place ')+ITEMS[item].name,'<small class="placement-hint">Tap the floor to try a spot · green fits, red overlaps or blocks a path.</small><div class="tray-options">'+button('✓ Place here','placeHere','id="placeHere" disabled','primary')+(placed?button('📦 Store instead','storeItem',`data-item="${item}"`):'')+button('Done','closeTray')+'</div>');
+  world.resetCamera();if(innerWidth<620)world.setZoom(.7); // see the whole room while arranging
+  world.placement={item,x:placed?.x??0,z:placed?.z??-1,spots:[],shown:Boolean(placed)};world.onPlacement(Boolean(placed)&&canPlace(state.furniture,item,placed.x,placed.z));world.draw();
+  // Light up every spot that fits, a few rows at a time so the game stays responsive.
+  const p=world.placement;for(let x=-4;x<=4;x+=.5){await new Promise(r=>setTimeout(r));if(world.placement!==p)return;for(let z=-4;z<=3.5;z+=.5)if(canPlace(state.furniture,item,x,z))p.spots.push([x,z]);world.draw();}
+  if(!p.spots.length)toast('No free spot fits this right now. Store something to make room.');}
+// Arrange your room: every piece of furniture you own, placed or in storage.
+function arrangeRoom(){
+  const owned=Object.keys(state.inventory).filter(k=>ITEMS[k]?.furniture),placed=new Set(state.furniture.map(f=>f.item));
+  const card=k=>`<div class="item-card"><h3>${escape(ITEMS[k].use?.icon||{wardrobe:'👗',chair:'♙',ankaraRug:'🟥',floorLamp:'💡',wallArt:'🖼️',trophyShelf:'🏆'}[k]||'◇')} ${escape(ITEMS[k].name)}</h3><p>${placed.has(k)?'In your room':'In storage'}</p>${placed.has(k)?button('✥ Move','moveItem',`data-item="${k}"`,'primary')+button('📦 Store','storeItem',`data-item="${k}"`):button('Place','moveItem',`data-item="${k}"`,'primary')}</div>`;
+  showModal('arrange',`<span class="eyebrow">ARRANGE YOUR ROOM</span><h2>Make it yours</h2><p class="modal-intro">Move furniture anywhere there's space, or put it in storage and bring it back later. Paths to your bed, kitchen and door always stay clear.</p>${owned.length?`<h3>In your room</h3><div class="item-grid">${owned.filter(k=>placed.has(k)).map(card).join('')||'<p class="empty">Nothing placed yet.</p>'}</div><h3>Storage</h3><div class="item-grid">${owned.filter(k=>!placed.has(k)).map(card).join('')||'<p class="empty">Storage is empty.</p>'}</div>`:`<p class="empty">You don't own any furniture yet. ${button('Visit the market','travel','data-location="plaza"')}</p>`}`);
+}
 function profile(){const season=snapshot.season,c=state.careers[state.career],def=CAREERS[state.career];showModal('profile',`${hero(escape(state.name.slice(0,1).toUpperCase()),escape(state.name),[`${def.icon} ${def.name}`,B.tiers[c.tier][0],...((state.fame||0)>=50_000?['✔ Verified']:[]),...(state.spouse?[`💍 ${escape(state.spouse.name)}`]:[]),...(state.crew?[`${escape(state.crew.badge)} ${escape(state.crew.name)}`]:[])],state.color)}
   ${tiles([['✦',fmt(state.fame||0),'Fame'],['🏆',state.awards.length,'Awards'],['🎬',state.outputs.length,'Works'],['💪',Math.floor(state.fitness||0),'Fitness'],['👥',fmt(fanClubSize(state.fame||0)),'Fan club']])}
   ${state.spouse?`<div class="v2-offer"><div><strong>💍 Married to ${escape(state.spouse.name)}</strong><small>You each earn 10% of the fame the other makes.</small></div></div>`:''}
@@ -723,7 +738,10 @@ document.addEventListener('click',async event=>{
     case 'buy':case 'equip':case 'claim':case 'useVip':await send({type:d.action,item:d.item},{keepModal:true});break;
     case 'previewUpgrade':upgrade(d.item);break;
     case 'upgrade':await send({type:'upgrade',item:d.item});break;
-    case 'placePreview':placement(d.item);break;
+    case 'placePreview':case 'moveItem':closeTray();placement(d.item);break;
+    case 'arrangeRoom':arrangeRoom();break;
+    case 'placeHere':{const p=world.placement;if(p)onWorldObject({placement:{item:p.item,x:p.x,z:p.z}});break;}
+    case 'storeItem':{const data=await send({type:'store',item:d.item},{keepModal:true});if(data){closeTray();world.placement=null;world.draw();toast(`${ITEMS[d.item].name} stored. Place it again any time from Arrange room.`);if(modalPage==='arrange')arrangeRoom();else if(modalPage==='inventory')inventory();}break;}
     case 'place':await send({type:'place',item:d.item,x:Number(d.x),z:Number(d.z)});break;
     case 'acceptOffer':await send({type:'acceptOffer'},{keepModal:true});break;
     case 'phoneTab':phone(d.tab);break;

@@ -148,8 +148,19 @@ test('kitchen dishes and placed home items fill needs with their own effects',()
 test('interaction points are walkable and blocked moves or placements spend nothing',()=>{
   for(const location of ['home','sports','studio','creator','tech','plaza'])for(const o of worldObjects(location))assert.ok(walkable(location,o.x,o.z),`${location}: ${o.name}`);
   const s=make();assert.throws(()=>act(s,{type:'move',x:2.5,z:-3.5},T),/blocked/);assert.equal(s.charges,10);
-  s.inventory.chair={level:1};assert.throws(()=>act(s,{type:'place',item:'chair',x:2,z:-3},T),/free position/);assert.equal(s.furniture.length,0);
+  s.inventory.chair={level:1};assert.throws(()=>act(s,{type:'place',item:'chair',x:2,z:-3},T),/overlaps something/);assert.equal(s.furniture.length,0);
   act(s,{type:'place',item:'chair',x:1,z:0},T);assert.equal(s.furniture.length,1);
+});
+test('arranging the room: move furniture on half tiles, keep paths clear, store it and place it again',()=>{
+  const s=make();s.inventory.chair={level:1};s.inventory.aquarium={level:1};
+  act(s,{type:'place',item:'chair',x:1,z:0},T);act(s,{type:'place',item:'chair',x:1.5,z:.5},T);assert.deepEqual(s.furniture,[{item:'chair',x:1.5,z:.5}]);
+  assert.throws(()=>act(s,{type:'place',item:'aquarium',x:1.5,z:.5},T),/overlaps something/,'no stacking');
+  assert.throws(()=>act(s,{type:'place',item:'aquarium',x:-4,z:-2.5},T),/blocks a path/,'cannot cover the kitchen spot');
+  assert.throws(()=>act(s,{type:'place',item:'aquarium',x:1.2,z:-1},T),/blocks a path/,'half tiles only');
+  act(s,{type:'store',item:'chair'},T);assert.deepEqual(s.furniture,[]);assert.ok(s.inventory.chair,'stored items are kept');
+  assert.throws(()=>act(s,{type:'store',item:'chair'},T),/already in storage/);
+  act(s,{type:'place',item:'chair',x:-.5,z:-1},T);assert.equal(s.furniture.length,1);
+  s.location='plaza';assert.throws(()=>act(s,{type:'store',item:'chair'},T),/at home/);
 });
 test('every career completes its own sequence and saves its credited output',()=>{
   for(const key of Object.keys(CAREERS)){
