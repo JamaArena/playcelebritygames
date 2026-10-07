@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -123,6 +123,15 @@ export function finishRecovery(s,now){
   s.needs[r.need]=clamp(s.needs[r.need]+amount*share);for(const [k,v] of Object.entries(r.extra||{}))s.needs[k]=clamp(s.needs[k]+v*share);s.recovery=null;
   if(r.watch){watchInsights(s,r,now);if(r.watch.given)s.watchLearnAt=now;}
   if(r.item&&ITEMS[r.item]?.use?.post&&share>=.5&&now-(s.postedAt||0)>=10*60_000){s.postedAt=now;const gain=Math.max(5,Math.round((s.fame||0)*.002));addFame(s,gain,'Photo post',now);log(s,`📷 Your photos got likes. +${gain} fame.`,now);}
+  // Things done at places: train, earn a little fame, get fitter, pick up groceries, or face the TV cameras.
+  const act=r.act&&VENUE_ACTS[r.act],fam=CAREERS[s.career]?.family;
+  if(act&&share>=.5){
+    if(act.learn&&act.family===fam)learn(s,s.career,CAREERS[s.career].focus,act.learn,`act:${r.id}`);
+    s.actFameAt??={};if(act.fame&&(!act.family||act.family===fam)&&now-(s.actFameAt[r.act]||0)>=10*60_000){s.actFameAt[r.act]=now;addFame(s,act.fame,act.name,now);}
+    if(act.fitness)s.fitness=Math.min(FITNESS.max,(s.fitness||0)+FITNESS.perWorkout*act.fitness);
+    if(act.groceries)s.groceries=(s.groceries||0)+act.groceries;
+    if(act.interview&&now-(s.interviewAt||0)>=30*60_000){s.interviewAt=now;const good=Math.random()<.65,delta=good?Math.max(20,Math.round((s.fame||0)*.01)):-Math.max(10,Math.round((s.fame||0)*.005));addFame(s,delta,good?'TV interview':'Awkward TV interview',now);headline(s,good?`${s.name} charmed viewers on PCTV 📺`:`${s.name}'s awkward PCTV interview goes viral 😬`,now);log(s,good?`📺 The interview went great! +${delta} fame.`:`📺 That interview did not go well. ${delta} fame.`,now);}
+  }
   const train=r.item&&ITEMS[r.item]?.use?.learn;if(train&&CAREERS[s.career].family===train.family&&share>=.5)learn(s,s.career,CAREERS[s.career].focus,Math.round(train.points*share),`item:${r.id}`);
   log(s,share>=1?`${r.label} completed.`:`${r.label}: stopped early, +${Math.round(amount*share)} ${r.need}.`,now);
 }
@@ -386,13 +395,18 @@ export function act(s,input,now,rng=Math.random) {
       s.recovery={id:id(),need:'fun',label:'Yacht party on the lagoon',startedAt:now,endsAt:now+90_000,amount:50,extra:{social:30},yacht:true};break;
     }
     // Phone apps.
+    case 'venueAct': {
+      const a=VENUE_ACTS[input.act];requireRule(a,'Unknown activity.');requireRule(s.location===a.venue,`Go to ${LOCATIONS[a.venue].name} for that.`);
+      requireRule(!s.active&&!s.recovery&&!s.trip,'Finish what you are doing first.');
+      s.recovery={id:id(),need:a.need,label:a.name,startedAt:now,endsAt:now+a.ms,amount:a.amount,extra:a.extra||{},act:input.act};break;
+    }
     case 'post': {
       const body=text(input.body,POSTS.max);requireRule(body,'Write something to post.');
       const fans=Math.round(Math.sqrt(s.fame||0)*(2+Math.random()*3));s.posts=[{id:id(),at:now,body,likes:fans},...(s.posts||[])].slice(0,20);s.needs.social=clamp(s.needs.social+3);
       if(now-(s.lastPostFame||0)>=POSTS.cooldownMs){s.lastPostFame=now;addFame(s,Math.max(1,Math.round((s.fame||0)*.0005)),'Social post',now);}break;
     }
     case 'order': {
-      requireRule(s.phone&&s.phone!=='basic','Shopping needs a smartphone. Upgrade your phone.');requireRule((s.deliveries||[]).length<5,'Wait for your deliveries to arrive.');
+      requireRule((s.phone&&s.phone!=='basic')||s.location==='mall','Shopping needs a smartphone, or a visit to Palm Mall.');requireRule((s.deliveries||[]).length<5,'Wait for your deliveries to arrive.');
       let entry;
       if(input.kind==='item'){const item=ITEMS[input.item];requireRule(item&&!s.inventory[input.item],'You already have that, or it does not exist.');requireRule((s.fame||0)>=item.fame,`${item.name} unlocks at ${item.fame.toLocaleString('en-US')} fame.`);entry={name:item.name};}
       else if(input.kind==='wear'){const item=WEAR[input.item];requireRule(item&&item.fame>0&&!s.closet?.[input.item],'You already have that, or it does not exist.');requireRule((s.fame||0)>=item.fame,`${item.name} unlocks at ${item.fame.toLocaleString('en-US')} fame.`);entry={name:item.name};}

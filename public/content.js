@@ -34,6 +34,21 @@ export const LOCATIONS = {
   studio: {name: 'Sound & screen', subtitle: 'Where your next chapter gets made', icon: '♫', color: '#b4a7d9'},
   creator: {name: 'Creator quarter', subtitle: 'Make something worth sharing', icon: '▷', color: '#e0a28f'},
   tech: {name: 'Innovation hub', subtitle: 'Start small. Build something lasting.', icon: '⌘', color: '#85b9ca'},
+  nightclub: {name: 'Club Neon', subtitle: 'Dance till the lights come on', icon: '🪩', color: '#7b4fa3'},
+  lounge: {name: 'Velvet Lounge', subtitle: 'Chill, chat and karaoke', icon: '🍸', color: '#b23a48'},
+  cinema: {name: 'Palm Cinema', subtitle: 'Popcorn and premieres', icon: '🍿', color: '#d23b4b'},
+  mall: {name: 'Palm Mall', subtitle: 'Shops, food court and fashion', icon: '🛒', color: '#2f6fb3'},
+  tvStation: {name: 'PCTV Studios', subtitle: 'Interviews and talk shows', icon: '📺', color: '#3d6a8a'},
+  radio: {name: 'Palm FM', subtitle: 'Airplay and call-ins', icon: '📻', color: '#e08a3d'},
+  market: {name: 'Balogun-style market', subtitle: 'Busy stalls, fabrics and snacks', icon: '🧺', color: '#d9573f'},
+  gym: {name: 'Iron Palm Gym', subtitle: 'Get fit with the city', icon: '🏋️', color: '#2f3237'},
+  hospital: {name: 'Palm General Hospital', subtitle: 'Check-ups and recovery', icon: '🏥', color: '#3d9a7a'},
+  worship: {name: 'Palm Chapel & Mosque', subtitle: 'Quiet, calm and community', icon: '🕊️', color: '#c9a46a'},
+  eventHall: {name: 'Grand Event Hall', subtitle: 'Owambe parties and launches', icon: '🎉', color: '#c9a227'},
+  stadium: {name: 'Palm National Stadium', subtitle: 'Big matches and concerts', icon: '🏟', color: '#2f7a55'},
+  park: {name: 'Central Park', subtitle: 'Walk, jog, picnic and breathe', icon: '🌳', color: '#5aa36b'},
+  airport: {name: 'Palm International Airport', subtitle: 'Fly out for shows', icon: '✈️', color: '#5b6fa8'},
+  beach: {name: 'Island beach', subtitle: 'Sun, sand and the lagoon', icon: '🏖️', color: '#e8c97a'},
   plaza: {name: 'Palm plaza', subtitle: 'Meet the city. Find your people.', icon: '◈', color: '#c3c48c'},
   street: {name: 'Your street', subtitle: 'Step out into Palm City', icon: '🚪', color: '#c9d6bf'},
 };
@@ -41,6 +56,12 @@ export const LOCATIONS = {
 export const TOWN = {
   home: {x: -16, z: 0, pin: '🏠', height: 4.5}, plaza: {x: 0, z: 0, pin: '🛍️', height: 2.6}, studio: {x: 16, z: 0, pin: '🎙️', height: 3.9},
   sports: {x: -16, z: -16, pin: '🏟️', height: 2.4}, creator: {x: 0, z: -16, pin: '🎬', height: 3.3}, tech: {x: 16, z: -16, pin: '💡', height: 7.6},
+  // Places around the city: downtown nightlife and media, Palm Heights services, and the island beach.
+  nightclub: {x: 32, z: 0, pin: '🪩', height: 3.4}, lounge: {x: 48, z: 0, pin: '🍸', height: 3}, cinema: {x: 64, z: 0, pin: '🍿', height: 4},
+  mall: {x: 32, z: -16, pin: '🛒', height: 4.4}, tvStation: {x: 48, z: -16, pin: '📺', height: 6.5}, radio: {x: 64, z: -16, pin: '📻', height: 5.5},
+  market: {x: -32, z: 0, pin: '🧺', height: 2.2}, gym: {x: -32, z: -16, pin: '🏋️', height: 3.2}, hospital: {x: -48, z: -16, pin: '🏥', height: 4.6},
+  worship: {x: -64, z: -16, pin: '🕊️', height: 4.8}, eventHall: {x: 16, z: -32, pin: '🎉', height: 3.6}, stadium: {x: -16, z: -32, pin: '🏟', height: 4.2},
+  park: {x: 0, z: -32, pin: '🌳', height: 1.5}, airport: {x: 64, z: -48, pin: '✈️', height: 3.8}, beach: {x: 0, z: 28, pin: '🏖️', height: 2},
 };
 export const lotAt = (x, z) => Object.keys(TOWN).find(key => Math.abs(x - TOWN[key].x) <= 5.5 && Math.abs(z - TOWN[key].z) <= 5.5);
 export const ITEMS = {
@@ -182,6 +203,7 @@ export const PET_CARE = {decay: {food: 10, joy: 8}, feed: 40, play: 30, cuddle: 
 // Everything that adjusts the rules for a character: worn perks, a happy pet and home upgrades.
 export function perksFor(s) {
   const totals = wearPerks(s?.wear), pet = s?.pet && PETS[s.pet.kind];
+  if (s?.fitness >= 1) totals.energy = Math.min((totals.energy || 0) + Math.floor(s.fitness), PERKS.energy.cap);
   if (pet && s.pet.food > PET_CARE.happy && s.pet.joy > PET_CARE.happy) totals[pet.perk[0]] = Math.min((totals[pet.perk[0]] || 0) + pet.perk[1], PERKS[pet.perk[0]].cap);
   return totals;
 }
@@ -228,6 +250,38 @@ export const POWERED = ['gamingConsole', 'soundSystem', 'coffeeMachine', 'microw
 export const DELIVERY_MS = 60_000, GROCERY = {pack: 10, bonus: 15};
 // Social feed posts: a little social, and a little fame at most every 10 minutes.
 export const POSTS = {cooldownMs: 10 * 60_000, max: 280};
+// Things to do at each place. Each fills needs over time; some train a career family or earn a little fame.
+export const VENUE_ACTS = {
+  dance: {venue: 'nightclub', name: 'Hit the dance floor', icon: '💃', need: 'fun', amount: 40, ms: 60_000, extra: {social: 20, energy: -10}, pose: 'dance'},
+  djSet: {venue: 'nightclub', name: 'Play a DJ set', icon: '🎧', need: 'fun', amount: 25, ms: 60_000, extra: {social: 10}, pose: 'perform', family: 'music', learn: 6, fame: 15},
+  bar: {venue: 'nightclub', name: 'Chapman at the bar', icon: '🍹', need: 'fun', amount: 12, ms: 20_000, extra: {hunger: 5, social: 5}, pose: 'chat'},
+  chill: {venue: 'lounge', name: 'Chill in a booth', icon: '🛋️', need: 'fun', amount: 25, ms: 45_000, extra: {social: 15}, pose: 'sit', seat: .5},
+  karaoke: {venue: 'lounge', name: 'Sing karaoke', icon: '🎤', need: 'fun', amount: 30, ms: 45_000, extra: {social: 10}, pose: 'perform', family: 'music', learn: 3},
+  network: {venue: 'lounge', name: 'Network with VIPs', icon: '🤝', need: 'social', amount: 25, ms: 40_000, pose: 'gesture', fame: 5},
+  film: {venue: 'cinema', name: 'Watch a film', icon: '🎬', need: 'fun', amount: 45, ms: 90_000, extra: {hunger: -5}, pose: 'sit', seat: .5, family: 'acting', learn: 3},
+  shop: {venue: 'mall', name: 'Window-shop', icon: '🛍️', need: 'fun', amount: 20, ms: 30_000, pose: 'chat', page: 'shopping'},
+  foodCourt: {venue: 'mall', name: 'Food court meal', icon: '🍔', need: 'hunger', amount: 45, ms: 30_000, extra: {fun: 5}, pose: 'sit', seat: .5},
+  interview: {venue: 'tvStation', name: 'TV interview', icon: '🎙️', need: 'social', amount: 15, ms: 45_000, pose: 'gesture', interview: true},
+  talkShow: {venue: 'tvStation', name: 'Sit in a talk-show audience', icon: '📺', need: 'fun', amount: 25, ms: 45_000, pose: 'sit', seat: .5},
+  airplay: {venue: 'radio', name: 'Get radio airplay', icon: '📻', need: 'social', amount: 10, ms: 40_000, pose: 'perform', family: 'music', fame: 25},
+  callIn: {venue: 'radio', name: 'Call-in show', icon: '☎️', need: 'social', amount: 20, ms: 30_000, pose: 'chat'},
+  stalls: {venue: 'market', name: 'Browse the stalls', icon: '🧺', need: 'fun', amount: 15, ms: 30_000, extra: {social: 10}, pose: 'chat', groceries: 5},
+  snack: {venue: 'market', name: 'Buy puff-puff', icon: '🍩', need: 'hunger', amount: 20, ms: 15_000, extra: {fun: 5}, pose: 'chat'},
+  workout: {venue: 'gym', name: 'Work out', icon: '🏋️', need: 'fun', amount: 15, ms: 45_000, extra: {energy: -12, hygiene: -15}, pose: 'sport', fitness: 1},
+  checkup: {venue: 'hospital', name: 'Get a check-up', icon: '🩺', need: 'energy', amount: 50, ms: 60_000, extra: {hunger: 25, hygiene: 20}, pose: 'sit', seat: .55},
+  reflect: {venue: 'worship', name: 'Pray and reflect', icon: '🕊️', need: 'fun', amount: 15, ms: 45_000, extra: {social: 20}, pose: 'sit', seat: .48},
+  owambe: {venue: 'eventHall', name: 'Party at an owambe', icon: '🎉', need: 'social', amount: 40, ms: 90_000, extra: {fun: 30, hunger: 15}, pose: 'shoki'},
+  match: {venue: 'stadium', name: 'Watch a big match', icon: '⚽', need: 'fun', amount: 40, ms: 75_000, extra: {social: 15}, pose: 'victory', family: 'sport', learn: 3},
+  jog: {venue: 'park', name: 'Jog round the park', icon: '🏃', need: 'fun', amount: 15, ms: 40_000, extra: {energy: -8}, pose: 'sport', fitness: 1},
+  picnic: {venue: 'park', name: 'Picnic on the grass', icon: '🧺', need: 'fun', amount: 20, ms: 40_000, extra: {hunger: 15}, pose: 'sitFloor'},
+  yoga: {venue: 'park', name: 'Meditation & yoga', icon: '🧘', need: 'fun', amount: 15, ms: 40_000, extra: {energy: 10}, pose: 'sitFloor'},
+  flight: {venue: 'airport', name: 'Fly out for a weekend show', icon: '✈️', need: 'fun', amount: 50, ms: 120_000, extra: {energy: -10}, pose: 'sit', seat: .5, fame: 30},
+  swim: {venue: 'beach', name: 'Swim in the lagoon', icon: '🏊', need: 'hygiene', amount: 20, ms: 40_000, extra: {fun: 25, energy: -5}, pose: 'sport'},
+  sunbathe: {venue: 'beach', name: 'Relax on the sand', icon: '🏖️', need: 'fun', amount: 30, ms: 45_000, extra: {energy: 5}, pose: 'sitFloor'},
+  beachBall: {venue: 'beach', name: 'Beach football', icon: '⚽', need: 'fun', amount: 25, ms: 40_000, extra: {energy: -10, social: 10}, pose: 'sport', family: 'sport', learn: 3},
+};
+// Fitness: workouts raise your fitness level, and each level means 1% less energy used (up to 10%).
+export const FITNESS = {max: 10, perWorkout: .25};
 // The kitchen menu. Each dish fills hunger over `ms` and may lift other needs; some unlock with fame.
 export const FOODS = {
   jollof: {name: 'Jollof rice', icon: '🍛', hunger: 60, ms: 90_000, extra: {fun: 5}},
@@ -281,6 +335,12 @@ export const LOT = location => location === 'street' ? 'home' : location;
 export const arrivalSpot = location => location === 'street' ? {x: 0, z: 6.2} : {x: 0, z: 1};
 export function route(from, to, mode = 'walk') {
   // Helicopters fly straight from door to door.
+  if (LOT(from) === 'beach' || LOT(to) === 'beach') {
+    if (LOT(from) === LOT(to)) return [{x: 0, z: 27}, {x: 0, z: 27}];
+    const other = LOT(from) === 'beach' ? to : from, o = TOWN[LOT(other)], door = LOT(other) === 'home' ? {x: o.x, z: o.z + 6.2} : {x: o.x, z: o.z}, edge = mode === 'walk' ? 1.9 : .75, road = o.z + 8 - edge;
+    const points = [door, {x: o.x, z: road}, ...(o.z < 0 ? [{x: 8 - edge, z: road}, {x: 8 - edge, z: 8 - edge}] : []), {x: 0, z: 8 - edge}, {x: 0, z: 22}, {x: 0, z: 27}];
+    return LOT(from) === 'beach' ? points.reverse() : points;
+  }
   if (mode === 'fly') { const door = (key, lot) => LOT(key) === 'home' ? {x: lot.x, z: lot.z + 6.2} : {x: lot.x, z: lot.z}; return [door(from, TOWN[LOT(from)]), door(to, TOWN[LOT(to)])]; }
   // Homes are entered and left by the front door on the street; venues are walked into.
   const edge = mode === 'walk' ? 1.9 : .75, a = TOWN[LOT(from)], b = TOWN[LOT(to)], road = lot => lot.z + 8 - edge, door = (key, lot) => LOT(key) === 'home' ? {x: lot.x, z: lot.z + 6.2} : {x: lot.x, z: lot.z};
@@ -387,6 +447,21 @@ export function obstacles(location, furniture=[]) {
     studio:[[-2.2,-3.3,3.6,1.35],[-2.2,-1.9,.6,.6],[-.7,3.5,2.2,1],[0,2.2,1.3,.9]],
     creator:[[-2.2,-3.3,3.6,1.35],[-2.2,-1.9,.6,.6],[-.7,3.5,2.2,1],[0,2.2,1.3,.9]],
     tech:[[-2.2,-3.3,3.6,1.35],[-2.2,-1.9,.6,.6],[-.7,3.5,2.2,1],[0,2.2,1.3,.9]],
+    nightclub:[[0,-3.9,2.7,1.1],[-4.3,0,1.2,3.6],[-2,-4.2,.7,.7],[2,-4.2,.7,.7]],
+    lounge:[[-3,2.85,2.2,1.2],[3,2.85,2.2,1.2],[0,-3.8,3,1.4],[3.9,-2,1.2,3.2]],
+    cinema:[[0,.4,6.7,.7],[0,2.8,6.7,.7],[0,4,6.7,.7],[-4.6,3,.6,1]],
+    mall:[[-3.4,-4.6,2.8,.6],[0,-4.6,2.8,.6],[3.4,-4.6,2.8,.6],[-3.6,2.8,2.4,1.2],[1.6,2,.9,.9],[3.2,2,.9,.9],[1.6,3.5,.9,.9],[3.2,3.5,.9,.9]],
+    tvStation:[[-1,-3.4,1.4,.6],[0,2.6,7,.7],[0,3.4,7,.7],[0,4.2,7,.7]],
+    radio:[[0,-4.2,4,1],[3.6,2.6,1.6,.8]],
+    market:[[-3.4,-3,2.2,1.2],[0,-3,2.2,1.2],[3.4,-3,2.2,1.2],[-3.4,1,2.2,1.2],[0,1.2,2.2,1.2],[3.4,1,2.2,1.2],[3,3,1.2,.8]],
+    gym:[[-3.6,-3.6,.7,1.4],[-1.8,-3.6,.7,1.4],[0,-3.6,.7,1.4],[1.8,-3.6,.7,1.4],[3.6,-3.6,.7,1.4]],
+    hospital:[[-2.6,-3.6,1,1.9],[0,-3.6,1,1.9],[-3,2.5,2.8,1]],
+    worship:[[-2.4,-1.4,3,.6],[2.4,-1.4,3,.6],[-2.4,0,3,.6],[2.4,0,3,.6],[-2.4,1.4,3,.6],[2.4,2.8,3,.6],[-2.4,2.8,3,.6],[0,-4.4,2.5,1.1]],
+    eventHall:[[-3.5,-2,1.3,1.3],[3.5,-2,1.3,1.3],[-3.5,2,1.3,1.3],[3.5,2,1.3,1.3],[0,3.6,1.3,1.3],[0,-4.4,5,1.2]],
+    stadium:[[-4.95,0,1.4,9.5],[4.95,0,1.4,9.5]],
+    park:[[-2.4,1.2,3.6,1.8],[0,3.5,1.6,.5]],
+    airport:[[-3.6,-3,1.8,.7],[-1.4,-3,1.8,.7],[0,.8,5.7,.6],[0,2,5.7,.6]],
+    beach:[[0,4.4,11,2.4]],
     plaza:[[-3.1,-3.3,3.2,2.35],[3.1,-3.3,3.2,2.35],[-3,2.4,2,.75],[2.7,1.8,1.1,1.1],[3.3,3.9,2.4,1.3]],
   }[location]||[];
   return [...rects,...(location==='home'?furniture.map(f=>[f.x,f.z,.85,.85]):[])];

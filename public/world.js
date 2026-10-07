@@ -1,10 +1,18 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
+import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, VENUE_ACTS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 // On the sofa you face the room; watching TV you sit at the end and turn toward the screen.
 const SOFA_TV_FACE=.55;
+// How each new place looks from the street: footprint, height, wall, roof and night sign colour.
+const VENUE_LOOKS={nightclub:{w:8,d:7,h:3.4,wall:'#2b2440',roof:'#7b4fa3',glow:'#ff4fd8'},lounge:{w:7.5,d:6.5,h:3,wall:'#5a2a35',roof:'#b23a48',glow:'#ffb0c8'},cinema:{w:8.5,d:7.5,h:4,wall:'#3a2f35',roof:'#d23b4b',glow:'#ffe94f'},
+  mall:{w:9,d:8,h:4.4,wall:'#e9e6e0',roof:'#2f6fb3',glow:'#9fd3ff'},tvStation:{w:7,d:7,h:6.5,wall:'#c9d6df',roof:'#3d6a8a',glow:'#9fd3ff'},radio:{w:6.5,d:6,h:5.5,wall:'#efe1cc',roof:'#e08a3d',glow:'#ffd08a'},
+  market:{w:9,d:7,h:2,wall:'#a98763',roof:'#d9573f',glow:'#ffd08a'},gym:{w:8,d:7,h:3.2,wall:'#3b3f46',roof:'#2f3237',glow:'#9fffb0'},hospital:{w:8.5,d:7.5,h:4.6,wall:'#f4f8f6',roof:'#3d9a7a',glow:'#ff6b6b'},
+  worship:{w:7,d:7,h:3.6,wall:'#f6efdf',roof:'#c9a46a',glow:'#ffe9a8'},eventHall:{w:9,d:8,h:3.6,wall:'#f7efdc',roof:'#c9a227',glow:'#ffe9a8'},stadium:{w:9,d:10,h:3.2,wall:'#cfd5d6',roof:'#2f7a55',glow:'#ffffff'},
+  park:{w:0,d:0,h:0},airport:{w:9,d:6,h:3.8,wall:'#f2f4f7',roof:'#5b6fa8',glow:'#9fd3ff'},beach:{w:0,d:0,h:0}};
+// Places drawn by venueScene.
+const VENUE_SCENES=['nightclub','lounge','cinema','mall','tvStation','radio','market','gym','hospital','worship','eventHall','stadium','park','airport','beach'];
 // Rides where you can see the rider.
 const OPEN_RIDES=['bicycle','motorbike','okada','scooter'];
 // Where the parrot's perch stands at home.
@@ -38,6 +46,21 @@ const REGULARS={
     {career:'founder',x:2.7,z:-2.4,heading:Math.PI,pose:'chat',aside:{x:-1.2,z:3.3,heading:Math.PI,pose:'sit'}},
     {career:'web3',x:-.2,z:3.3,heading:Math.PI,pose:'sit'},
   ],
+  nightclub:[{career:'musician',x:-.6,z:.1,heading:.4,pose:'dance'},{career:'actor',x:.7,z:-.9,heading:-.6,pose:'shoki'},{career:'vlogger',x:-3.4,z:-1,heading:-Math.PI/2,pose:'chat'}],
+  lounge:[{career:'actor',x:3,z:2.3,heading:Math.PI,pose:'sit',seat:.5},{career:'founder',x:3.4,z:-1.3,heading:-Math.PI/2,pose:'gesture'}],
+  cinema:[{career:'vlogger',x:-1.9,z:2.8,heading:Math.PI,pose:'sit',seat:.5},{career:'actor',x:1.9,z:.4,heading:Math.PI,pose:'sit',seat:.5},{career:'tennis',x:.95,z:4,heading:Math.PI,pose:'sit',seat:.5}],
+  mall:[{career:'streamer',x:-.6,z:-3.4,heading:Math.PI,pose:'scroll'},{career:'actor',x:3.2,z:3.5,heading:0,pose:'sit',seat:.45},{career:'musician',x:-3.6,z:2,heading:Math.PI},{career:'vlogger',x:1,z:0,heading:.8}],
+  tvStation:[{career:'actor',x:-1,z:-2.8,heading:0,pose:'gesture'},{career:'developer',x:-3,z:-.1,heading:Math.PI,pose:'chat'},{career:'vlogger',x:-1.5,z:3.4,heading:Math.PI,pose:'sit',seat:.6}],
+  radio:[{career:'musician',x:0,z:-3.6,heading:Math.PI,pose:'gesture'}],
+  market:[{career:'musician',x:-3.4,z:-2.1,heading:Math.PI,pose:'chat'},{career:'actor',x:3.4,z:1.9,heading:0,pose:'gesture'},{career:'vlogger',x:-1,z:2.8,heading:2.6},{career:'football',x:1.6,z:-1.5,heading:-1.2}],
+  gym:[{career:'football',x:1.8,z:-3.6,heading:Math.PI,pose:'sport'},{career:'wrestling',x:-3.5,z:1.5,heading:0,pose:'sport'},{career:'tennis',x:-1.8,z:-3.6,heading:Math.PI,pose:'sport'}],
+  hospital:[{career:'developer',x:-3,z:1.8,heading:Math.PI,pose:'chat'},{career:'actor',x:1.9,z:3.6,heading:Math.PI,pose:'sit',seat:.5},{career:'founder',x:0,z:-3.6,heading:0,pose:'sleep'}],
+  worship:[{career:'musician',x:-2.4,z:0,heading:Math.PI,pose:'sit',seat:.5},{career:'founder',x:2.4,z:1.4,heading:Math.PI,pose:'sit',seat:.5},{career:'actor',x:0,z:-3.6,heading:0,pose:'gesture'}],
+  eventHall:[{career:'musician',x:-.8,z:.6,heading:.5,pose:'shoki'},{career:'actor',x:.9,z:-.5,heading:-.5,pose:'dance'},{career:'founder',x:-3.5,z:-1.05,heading:0,pose:'sit',seat:.5},{career:'vlogger',x:3.5,z:2.95,heading:Math.PI,pose:'sit',seat:.5}],
+  stadium:[{career:'football',x:-1.5,z:-1.5,heading:1,pose:'sport'},{career:'football',x:1.4,z:1.2,heading:-2,pose:'sport'},{career:'basketball',x:4.85,z:-1.5,heading:-Math.PI/2,pose:'victory'}],
+  park:[{career:'vlogger',x:0,z:3.5,heading:Math.PI,pose:'sit',seat:.5},{career:'tennis',x:2.6,z:1,heading:0,pose:'sport'},{career:'musician',x:-2.4,z:-.2,heading:Math.PI,pose:'sitFloor'}],
+  airport:[{career:'founder',x:-3.6,z:-2.4,heading:Math.PI,pose:'chat'},{career:'actor',x:-.95,z:2,heading:Math.PI,pose:'sit',seat:.5},{career:'developer',x:1.9,z:.8,heading:Math.PI,pose:'scroll'}],
+  beach:[{career:'football',x:3.4,z:-1.2,heading:-1,pose:'sport'},{career:'actor',x:1.4,z:-.2,heading:0,pose:'sitFloor'},{career:'musician',x:-1,z:3.4,heading:0,pose:'sport'}],
   plaza:[
     {career:'vlogger',x:-3.1,z:-1.5,heading:Math.PI},
     {career:'actor',x:-3,z:2.15,heading:Math.PI,pose:'sit',seat:.62},
@@ -45,7 +68,7 @@ const REGULARS={
   ],
 };
 // The area kept clear while you train: [minX, maxX, minZ, maxZ].
-const TRAINING_ZONES={sports:[-3.3,3.3,-4.3,4.3],studio:[1,4.7,-4.3,-.9],creator:[1,4.7,-4.3,-.9],tech:[1,4.7,-4.3,-.9]};
+const TRAINING_ZONES={stadium:[-3.9,3.9,-4.4,4.4],sports:[-3.3,3.3,-4.3,4.3],studio:[1,4.7,-4.3,-.9],creator:[1,4.7,-4.3,-.9],tech:[1,4.7,-4.3,-.9]};
 export const worldObjects = (location,furniture=[]) => ({
   home:[
     {name:'Kitchen',icon:'♨',x:-3.6,z:-2.5,vx:-3.2,vz:-4,need:'hunger',verb:'Cook & eat'},
@@ -71,6 +94,21 @@ export const worldObjects = (location,furniture=[]) => ({
       if(use)return {name:def.name,icon:use.icon,x:f.x,z:f.z+.75,vx:f.x,vz:f.z,verb:use.verb,item:f.item,useItem:true,amount:use.amount,useNeed:use.need};
       return {name:f.item==='trophyShelf'?'Display table':def.name||'Display table',icon:'◇',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Admire',pose:null};})
   ],
+  nightclub:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.dance.name,icon:VENUE_ACTS.dance.icon,x:0,z:-0.4,act:'dance',face:0},{name:VENUE_ACTS.djSet.name,icon:VENUE_ACTS.djSet.icon,x:0,z:-2.9,act:'djSet',face:0},{name:VENUE_ACTS.bar.name,icon:VENUE_ACTS.bar.icon,x:-3.1,z:0.4,act:'bar',face:-1.5708}],
+  lounge:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.chill.name,icon:VENUE_ACTS.chill.icon,x:-3,z:2.3,act:'chill',face:3.1416},{name:VENUE_ACTS.karaoke.name,icon:VENUE_ACTS.karaoke.icon,x:0,z:-2.9,act:'karaoke',face:0},{name:VENUE_ACTS.network.name,icon:VENUE_ACTS.network.icon,x:2.4,z:-0.4,act:'network',face:0}],
+  cinema:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.film.name,icon:VENUE_ACTS.film.icon,x:0,z:1.6,act:'film',face:3.1416}],
+  mall:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.shop.name,icon:VENUE_ACTS.shop.icon,x:-2.4,z:-2.6,act:'shop',face:3.1416},{name:VENUE_ACTS.foodCourt.name,icon:VENUE_ACTS.foodCourt.icon,x:2.4,z:2,act:'foodCourt',face:0}],
+  tvStation:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.interview.name,icon:VENUE_ACTS.interview.icon,x:0.9,z:-2.3,act:'interview',face:0},{name:VENUE_ACTS.talkShow.name,icon:VENUE_ACTS.talkShow.icon,x:0,z:3,act:'talkShow',face:3.1416}],
+  radio:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.airplay.name,icon:VENUE_ACTS.airplay.icon,x:-1.2,z:-2.4,act:'airplay',face:3.1416},{name:VENUE_ACTS.callIn.name,icon:VENUE_ACTS.callIn.icon,x:1.8,z:-2.4,act:'callIn',face:3.1416}],
+  market:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.stalls.name,icon:VENUE_ACTS.stalls.icon,x:0,z:-0.6,act:'stalls',face:3.1416},{name:VENUE_ACTS.snack.name,icon:VENUE_ACTS.snack.icon,x:3,z:2.2,act:'snack',face:3.1416}],
+  gym:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.workout.name,icon:VENUE_ACTS.workout.icon,x:0,z:-1,act:'workout',face:3.1416}],
+  hospital:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.checkup.name,icon:VENUE_ACTS.checkup.icon,x:2.6,z:-2.4,act:'checkup',face:0}],
+  worship:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.reflect.name,icon:VENUE_ACTS.reflect.icon,x:0,z:1.2,act:'reflect',face:3.1416}],
+  eventHall:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.owambe.name,icon:VENUE_ACTS.owambe.icon,x:0,z:0,act:'owambe',face:3.1416}],
+  stadium:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.match.name,icon:VENUE_ACTS.match.icon,x:4.4,z:0.4,act:'match',face:-1.5708}],
+  park:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.jog.name,icon:VENUE_ACTS.jog.icon,x:0,z:2.4,act:'jog',face:0},{name:VENUE_ACTS.picnic.name,icon:VENUE_ACTS.picnic.icon,x:-2.6,z:-2,act:'picnic',face:0},{name:VENUE_ACTS.yoga.name,icon:VENUE_ACTS.yoga.icon,x:2.6,z:-2.6,act:'yoga',face:0}],
+  airport:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.flight.name,icon:VENUE_ACTS.flight.icon,x:0,z:1.4,act:'flight',face:3.1416}],
+  beach:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.swim.name,icon:VENUE_ACTS.swim.icon,x:0,z:3.6,act:'swim',face:0},{name:VENUE_ACTS.sunbathe.name,icon:VENUE_ACTS.sunbathe.icon,x:-2.6,z:0.2,act:'sunbathe',face:0},{name:VENUE_ACTS.beachBall.name,icon:VENUE_ACTS.beachBall.icon,x:2.6,z:-1.6,act:'beachBall',face:0}],
   sports:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:'Training pitch',icon:'⚽',x:0,z:-1,action:'practice'},{name:'Clubhouse',icon:'⌂',x:-3,z:-2.1,action:'career'},{name:'Scout Kai',icon:'☺',x:3.4,z:2,action:'phone'}],
   studio:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:'Recording desk',icon:'♫',x:-3.2,z:-2.3,action:'career'},{name:'Rehearsal stage',icon:'♬',x:2.5,z:-2,action:'practice'},{name:'Producer Nova',icon:'☺',x:2.5,z:2,action:'phone'}],
   creator:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:'Director Sola',icon:'☺',x:-2.6,z:1.8,action:'phone'},{name:'Camera set',icon:'▷',x:-2,z:-1,action:'career'},{name:'Editing station',icon:'⌘',x:3,z:-2,action:'practice'},{name:'Lounge',icon:'▱',x:1,z:3,need:'social'}],
@@ -291,6 +329,17 @@ export class World {
     else if(key==='creator'){this.shadowRect(x,z,8,7,3);this.box(x,z,8,7,3,'#f1cbb9');this.box(x,z,8.4,7.4,.3,'#c46f59',3);windows(8,7,1,1.9);this.box(x,z+3.56,3.4,.12,1.2,night?'#8fdcff':'#3b4a5c',.5);this.box(x,z+4.1,4.5,1,.1,'#e8836b',1.9);}
     else if(key==='tech'){this.shadowRect(x,z,8.4,8.4,7.5);this.box(x,z,8.4,8.4,.5,'#d9e4e1');this.box(x,z,6,6,7,'#b6dbe5',.5);this.box(x,z,6.3,6.3,.3,'#4f7f8c',7.5);windows(6,6,5,1.4);this.round(x+1.8,z-1.8,.12,.12,1.6,'#7d8c8f',7.8);}
     else if(key==='sports'){this.floor(x,z,6.3,8.4,'#7fa788');for(let r=-4;r<4;r++)this.floor(x,z+r+.5,6.2,.96,r%2?'#86ad8d':'#7ca584',.01);this.floor(x,z,6,.04,'#f3f1d8',.02);for(const s of [-1,1]){this.shadowRect(x+s*4.4,z,1.4,7.4,1.3);this.box(x+s*4.4,z,1.4,7.4,1.3,'#c9b28d');this.box(x,z+s*4.15,1.6,.1,.9,'#f0ebd7');this.round(x+s*5,z-4.8,.14,.14,4.6,'#8a948a');this.box(x+s*5,z-4.8,.7,.3,.35,night?'#fff3c4':'#dfe3d6',4.6);}}
+    else if(VENUE_LOOKS[key]){const v=VENUE_LOOKS[key];
+      if(key==='park'){for(const [dx,dz,sz] of [[-3,-3,1.1],[3,-2.6,1],[-2.6,3,1],[3.2,3,1.2],[0,0,1.3]])this.tree(x+dx,z+dz,sz);this.floor(x,z,11,1,'#e7dcc2',.01);return;}
+      if(key==='stadium'){this.floor(x,z,7,8,'#7fa788',.01);for(const s of [-1,1]){this.box(x+s*4.3,z,1.6,9,v.h,v.wall);this.box(x,z+s*4.8,7,1.2,v.h*.8,v.wall);}return;}
+      if(key==='market'){for(const [dx,dz,c] of [[-3,-2.5,'#d9573f'],[0,-2.5,'#2f6fb3'],[3,-2.5,'#2fae6b'],[-3,1.5,'#f2b33d'],[0,1.5,'#7b4fa3'],[3,1.5,'#e05a9a']]){this.box(x+dx,z+dz,2,1.2,.8,'#a98763');this.box(x+dx,z+dz,2.4,1.6,.08,c,2);}return;}
+      if(key==='beach')return;
+      this.shadowRect(x,z,v.w,v.d,v.h);this.box(x,z,v.w,v.d,v.h,v.wall);this.box(x,z,v.w+.3,v.d+.3,.3,v.roof,v.h);windows(v.w,v.d,Math.max(1,Math.floor((v.h-.6)/1.3)));
+      this.box(x,z+v.d/2+.06,v.w*.55,.1,.7,night?v.glow:v.roof,v.h-.95);
+      if(key==='worship'){this.box(x-v.w/2+1,z-v.d/2+1,1.2,1.2,v.h+2.6,v.wall);this.round(x-v.w/2+1,z-v.d/2+1,.7,.7,.9,'#c9a46a',v.h+2.6);this.round(x+1,z,2.2,2.2,1.4,'#3d9a7a',v.h+.2);}
+      if(key==='tvStation'||key==='radio'){this.round(x+v.w/2-1,z-v.d/2+1,.15,.15,3,'#8a948a',v.h);this.round(x+v.w/2-1,z-v.d/2+1,.5,.5,.5,'#d23b4b',v.h+3);}
+      if(key==='airport'){this.floor(x,z-9,3,14,'#5b6168',.01);for(let i=-6;i<=6;i+=2)this.floor(x,z-9+i,.2,.9,'#f3f1d8',.02);this.box(x+3,z-8,3.2,.9,.5,'#f7f7f7',.3);this.box(x+3,z-8,.9,3.2,.12,'#f7f7f7',.5);}
+    }
     else if(key==='plaza'){this.floor(x,z,11,2,'#e3d8bd');this.floor(x,z,2,11,'#e3d8bd');this.shadowRect(x-3.1,z-3.3,3,2.2,2);this.box(x-3.1,z-3.3,3,2.2,2,'#d6bb92');this.box(x-3.1,z-3.3,3.2,2.35,.2,'#82977c',2);this.shadowRect(x+3.1,z-3.3,3,2.2,1.8);this.box(x+3.1,z-3.3,3,2.2,1.8,'#e3cfad');this.box(x+3.1,z-3.3,3.2,2.35,.2,'#bda57e',1.8);this.round(x,z,1.7,1.7,.4,'#cfe3e8');this.round(x,z,.3,.3,.9,'#e8f4f6',.3);}
   }
   house(h,x,z,night){
@@ -317,13 +366,14 @@ export class World {
     const deal=RIDES[key]||TRANSIT[key];if(!deal)return;const c=deal.color,X=(l,w)=>along==='x'?[l,w]:[w,l],at=(f,side=0)=>along==='x'?[x+f,z+side]:[x+side,z+f];
     const part=(f,side,l,w,h,y,tone)=>{const [px,pz]=at(f,side),[bw,bd]=X(l,w);this.box(px,pz,bw,bd,h,tone,y+lift);};
     const disc=(f,side,size,thick,y,tone)=>{const [px,pz]=at(f,side),[bw,bd]=X(size,thick);this.round(px,pz,bw,bd,size,tone,y+lift);};
+    const axles=(span,track)=>{for(const a of [-1,1])for(const b of [-1,1]){const [dx,dz]=X(a*span,b*track);this.round(x+dx,z+dz,.3,.3,.3,'#1d1f22',lift);}};
     // Two-wheelers, the keke, the danfo, taxis, the limousine and the helicopter.
     if(key==='bicycle'){for(const f of [-.45,.45])disc(f,0,.55,.06,0,'#1d1f22');part(0,0,.9,.06,.06,.42,c);part(-.15,0,.06,.06,.4,.3,c);part(-.2,0,.25,.12,.05,.72,'#2b2b2b');part(.42,0,.06,.45,.05,.85,'#2b2b2b');return;}
     if(key==='motorbike'||key==='okada'){for(const f of [-.55,.55])disc(f,0,.5,.14,0,'#1d1f22');part(0,0,1.15,.3,.32,.32,c);part(.15,0,.4,.32,.22,.6,shade(c,1.3));part(-.25,0,.5,.3,.08,.66,'#1d1f22');part(.55,0,.08,.55,.06,.85,'#2b2b2b');return;}
     if(key==='keke'){disc(.6,0,.4,.12,0,'#1d1f22');for(const s of [-.4,.4])disc(-.45,s,.4,.12,0,'#1d1f22');part(0,0,1.35,.9,.55,.22,c);part(0,0,1.2,.95,.06,1.25,'#2b2b2b');for(const s of [-.42,.42])part(.45,s,.05,.05,.5,.78,'#2b2b2b');part(0,0,1.36,.92,.06,.5,'#2fae6b');return;}
-    if(key==='danfo'){wheels(.95,.52);part(0,0,2.7,1.2,1.05,.2,c);part(0,0,2.72,1.22,.07,.55,'#1d1f22');part(0,0,2.72,1.22,.07,.78,'#1d1f22');part(.1,0,2.1,1.22,.32,.86,'#2b3440');part(0,0,2.7,1.2,.08,1.25,shade(c,.85));return;}
-    if(key==='taxi'){wheels(.62,.42);part(0,0,1.8,.95,.5,.15,c);part(0,0,1.1,.85,.42,.65,'#2b3440');part(0,0,1.82,.97,.08,.45,'#f2f2f0');part(0,0,.4,.25,.12,1.07,'#f2c230');return;}
-    if(key==='limo'){wheels(1.25,.48);part(0,0,3.3,1.08,.48,.12,c);part(-.1,0,2.5,.98,.36,.6,'#14161a');part(0,0,3.32,1.1,.04,.45,'#c9ccc8');return;}
+    if(key==='danfo'){axles(.95,.52);part(0,0,2.7,1.2,1.05,.2,c);part(0,0,2.72,1.22,.07,.55,'#1d1f22');part(0,0,2.72,1.22,.07,.78,'#1d1f22');part(.1,0,2.1,1.22,.32,.86,'#2b3440');part(0,0,2.7,1.2,.08,1.25,shade(c,.85));return;}
+    if(key==='taxi'){axles(.62,.42);part(0,0,1.8,.95,.5,.15,c);part(0,0,1.1,.85,.42,.65,'#2b3440');part(0,0,1.82,.97,.08,.45,'#f2f2f0');part(0,0,.4,.25,.12,1.07,'#f2c230');return;}
+    if(key==='limo'){axles(1.25,.48);part(0,0,3.3,1.08,.48,.12,c);part(-.1,0,2.5,.98,.36,.6,'#14161a');part(0,0,3.32,1.1,.04,.45,'#c9ccc8');return;}
     if(key==='helicopter'){const spin=(performance.now()/90|0)%2;this.round(x,z,1.6,1.1,1.05,c,.3+lift);part(-1.2,0,1.5,.16,.16,.75,c);part(-1.9,0,.12,.1,.5,.7,shade(c,.8));part(.35,0,.6,.9,.5,.55,'#2b3440');for(const s of [-.42,.42])part(0,s,1.6,.07,.06,0,'#2b2b2b');this.box(x,z,spin?3.4:.12,spin?.12:3.4,.04,'#2b2b2b',1.38+lift);this.round(x,z,.12,.12,.12,'#2b2b2b',1.3+lift);return;}
     const body=(l,w,h,y,tone)=>{const [bw,bd]=X(l,w);this.box(x,z,bw,bd,h,tone,y);};
     const wheels=(span,track)=>{for(const a of [-1,1])for(const b of [-1,1]){const [dx,dz]=X(a*span,b*track);this.round(x+dx,z+dz,.3,.3,.3,'#1d1f22',0);}};
@@ -347,7 +397,7 @@ export class World {
     // Bridge and island resort across the lagoon.
     this.floor(ox,oz+16,3.2,12,'#a7aaa2',.02);for(const s of [-1,1])this.box(ox+s*1.7,oz+16,.12,12,.5,'#e6e1d4');
     if(this.onScreen(ox,oz+28,10)){this.floor(ox,oz+28,16,9,'#ecdfba');this.floor(ox+4,oz+29,3.2,2.2,'#a8dcea',.01);this.shadowRect(ox-2,oz+27.5,6,3.5,4);this.box(ox-2,oz+27.5,6,3.5,4,'#f6f4ee');this.box(ox-2,oz+27.5,6.3,3.8,.3,'#5f8fa3',4);for(let b=0;b<3;b++)this.box(ox-2,oz+29.3,5,.05,.5,night?'#ffd98a':'#9ec3d6',.8+b*1.1);for(const dx of [-7,-5,6.5])this.palm(ox+dx,oz+28+(dx%2));}
-    for(const [key,lot] of Object.entries(TOWN))if(key!==this.location||this.state?.trip){const x=lot.x+ox,z=lot.z+oz;if(!this.onScreen(x,z,8))continue;this.floor(x,z,11,11,'#d4e1c3');this.exterior(key,x,z,night);if(!far)for(const [dx,dz] of [[-6.2,-6.2],[6.2,-6.2],[-6.2,6.2],[6.2,6.2]])this.palm(x+dx,z+dz);}
+    for(const [key,lot] of Object.entries(TOWN))if(key!==this.location||this.state?.trip){const x=lot.x+ox,z=lot.z+oz;if(!this.onScreen(x,z,8))continue;if(key!=='beach')this.floor(x,z,11,11,key==='park'?'#b4d39c':'#d4e1c3');this.exterior(key,x,z,night);if(!far)for(const [dx,dz] of [[-6.2,-6.2],[6.2,-6.2],[-6.2,6.2],[6.2,6.2]])this.palm(x+dx,z+dz);}
     for(const block of CITY.blocks){const x=block.x+ox,z=block.z+oz;if(!this.onScreen(x,z,8))continue;
       if(block.kind==='park'){this.floor(x,z,11,11,'#b4d39c');const pts=[];for(let i=0;i<18;i++){const a=i/18*Math.PI*2;pts.push([x+Math.cos(a)*3.2,0,z+Math.sin(a)*2.2-.5]);}this.polygon(pts,night?'#5d7f9e':'#9fd3e0');this.floor(x,z+3.6,11,.9,'#e7dcc2',.01);this.floor(x-4,z,.9,11,'#e7dcc2',.01);for(const [dx,dz,s] of [[-3.8,-3.8,1],[3.6,-3.6,1.2],[3.8,3.2,.9],[-2,3.8,.8],[1.5,4.2,1]])this.tree(x+dx,z+dz,s);continue;}
       this.floor(x,z,11,11,block.kind==='downtown'?'#d9dbd2':'#cddcbd');
@@ -443,6 +493,7 @@ export class World {
       this.box(-4.1,-3.6,1.7,2,1.65,'#d5bf95');this.box(-4.1,-3.6,1.9,2.2,.2,'#8b9d7e',1.65);
       for(let z=-2;z<=2;z+=1.4){this.box(4.3,z,.7,1,.5,'#c9b28d');this.box(4.6,z,.2,1,.9,'#c9b28d');}
       this.plant(-4.4,3,1.4);
+    }else if(VENUE_SCENES.includes(l)){this.venueScene(l);
     }else if(['studio','creator','tech'].includes(l)){
       const colors={studio:['#dacac2','#b5a3c5'],creator:['#ded0bd','#d4a38c'],tech:['#cbd8d3','#83acb2']},[floor,accent]=colors[l];
       for(let x=-5;x<=5;x++)for(let z=-5;z<=5;z++)this.floor(x,z,.99,.99,(x+z)%2?floor:shade(floor,1.025));
@@ -472,14 +523,15 @@ export class World {
     this.paintPeople();
     // Using a placed home item: stand in front of it (or sit on it) in that item's pose.
     const using=this.state.recovery?.item&&!this.visitedHome,usedDef=using&&ITEMS[this.state.recovery.item]?.use,usedSpot=using&&this.state.furniture.find(f=>f.item===this.state.recovery.item);
-    let mishap=this.freshMishap(),need=using?null:this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=(usedDef?usedDef.pose||'watch':null)||(mishap&&!need?MISHAP_POSES[mishap.need]:null)||({energy:'sleep',fun:this.state.recovery?.yacht?'dance':this.pose?.kind==='sit'?'sit':'tv',hygiene:'shower',bladder:'toilet',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
+    let mishap=this.freshMishap(),need=using||this.state.recovery?.act?null:this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=(usedDef?usedDef.pose||'watch':null)||(mishap&&!need?MISHAP_POSES[mishap.need]:null)||({energy:'sleep',fun:this.state.recovery?.yacht?'dance':this.pose?.kind==='sit'?'sit':'tv',hygiene:'shower',bladder:'toilet',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
     const emote=this.emote&&performance.now()<this.emote.until&&!this.moving&&!this.state.recovery&&!this.state.active?this.emote.kind:null;
     if(emote&&!using)pose=emote;
+    const actDef=this.state.recovery?.act&&VENUE_ACTS[this.state.recovery.act],actSpot=actDef&&worldObjects(this.location).find(o=>o.act===this.state.recovery.act);if(actDef)pose=actDef.pose;
     if(this.state.recovery?.yacht){pose='dance';}
-    const pos=this.state.recovery?.yacht?{x:4,z:7.1}:usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
+    const pos=actSpot?{x:actSpot.x,z:actSpot.z}:this.state.recovery?.yacht?{x:4,z:7.1}:usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
     if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride){this.ride(this.state.trip.ride,p.x,p.z,p.axis,this.state.trip.ride==='helicopter'?6:0);if(OPEN_RIDES.includes(this.state.trip.ride))this.human(p.x,p.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),pose:'sit',seat:.7,heading:p.heading});this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state)});this.actor={x:p.x,z:p.z,pose:null};}return;}
     if(this.state.ride){if(this.interior())this.ride(this.state.ride,-2.5,7.4,'x');else this.ride(this.state.ride,-7.1,2.6,'z');}
-    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),walk:this.moving,pose,seat:usedDef?.seat,heading:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
+    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),walk:this.moving,pose,seat:usedDef?.seat??actDef?.seat,heading:actSpot?actSpot.face:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
     this.actor={...pos,pose};
     // Mishap props: a growing puddle, or stink clouds drifting up.
     if(mishap?.need==='bladder'&&!need){const r=Math.min(1,mishap.age/2500);this.round(pos.x,pos.z+.15,.25+.75*r,.2+.6*r,.008,'#e3cc45',.004);}
@@ -518,6 +570,55 @@ export class World {
   say(id,text){this.speech??=new Map();this.speech.set(id,{text:String(text).slice(0,70),until:performance.now()+6500});this.draw();}
   // A toilet facing into the room: pedestal, bowl, seat with water, raised lid and a cistern behind.
   toilet(x,z){this.round(x,z+.05,.36,.46,.3,'#efede4');this.round(x,z,.6,.78,.16,'#fbfaf3',.28);this.round(x,z,.6,.78,.04,'#ffffff',.44);this.round(x,z+.02,.36,.5,.02,'#a9cfd6',.465);this.box(x,z+.36,.52,.05,.5,'#ffffff',.48);this.box(x,z+.5,.66,.24,.6,'#f7f6ec',.3);this.box(x,z+.5,.7,.28,.05,'#ffffff',.9);this.round(x,z+.5,.1,.1,.03,'#c9ccc8',.95);}
+  // The new places around the city. Each has its own layout; activities sit at the points in worldObjects.
+  venueScene(l){
+    const t=this.reduced?0:performance.now()/1000,night=this.daylight().night,B=(...a)=>this.box(...a),R=(...a)=>this.round(...a),F=(...a)=>this.floor(...a);
+    const walls=(h,c1,c2)=>this.walls(h,c1,c2,5.3,.2),seatRow=(z,n,c,face=1)=>{for(let i=0;i<n;i++){const x=(i-(n-1)/2)*.95;B(x,z,.7,.6,.45,c);B(x,z+face*.28,.7,.12,.85,c);}};
+    const table=(x,z,c='#e8e2d4')=>{R(x,z,.9,.9,.05,c,.72);R(x,z,.08,.08,.72,'#7a5a43');},plant=(x,z,s=1)=>this.plant(x,z,s);
+    if(l==='nightclub'){F(0,0,11,11,'#1d1b26');walls(2.8,'#2b2440','#251f38');
+      for(let i=-2;i<=1;i++)for(let j=-2;j<=1;j++){const hue=['#e05a9a','#5a8fe0','#e0c85a','#5ae0b0'][(i+j+8+Math.floor(t*2))%4];F(i+.5,j+.1,.96,.96,hue,.02);}
+      B(0,-3.9,2.6,1,.95,'#3a3352');B(0,-3.9,2.7,1.1,.08,'#7b4fa3',.95);for(const s of [-.6,.6])R(s,-3.8,.45,.45,.06,'#111',.99);for(const s of [-1,1]){B(s*2,-4.2,.7,.7,1.6,'#141218');R(s*2,-3.84,.4,.03,.4,'#555',.9);}
+      B(-4.3,0,1,3.4,1.05,'#4a2d5e');B(-4.3,0,1.2,3.6,.08,'#e0c85a',1.05);for(let i=-1;i<=1;i++)R(-4.3,i*1.1,.15,.15,.25,['#f2b33d','#d23b4b','#2fae6b'][i+1],1.1);
+      for(const z of [-4.9])for(let i=0;i<5;i++)B(-4+i*2,z,1.2,.05,.06,['#ff4fd8','#4fd8ff','#ffe94f'][i%3],2.3);}
+    else if(l==='lounge'){F(0,0,11,11,'#3b2a2a');walls(2.6,'#4a3434','#433030');F(0,1.2,7,4,'#6b2a3a',.015);
+      for(const s of [-1,1]){B(s*3,2.7,2.2,.9,.45,'#8e2f45');B(s*3,3.1,2.2,.2,.95,'#8e2f45');table(s*3,1.7,'#d9b38c');}
+      B(0,-3.8,3,1.4,.3,'#2b2b2b');R(0,-3.3,.05,.05,1.3,'#888',.3);R(0,-3.3,.09,.09,.18,'#555',1.55);B(0,-4.9,2.4,.08,1.3,night?'#5b8fd6':'#3b5f8f',.9);
+      B(3.9,-2,1,3,1.05,'#5a3a2a');B(3.9,-2,1.2,3.2,.08,'#c9a46a',1.05);plant(-4.4,-4.2,1.2);plant(4.4,4.2,1);}
+    else if(l==='cinema'){F(0,0,11,11,'#2a2428');walls(3,'#3a2f35','#342a30');B(0,-5,8.5,.12,3.2,'#111',.4);B(0,-4.92,8,.04,2.9,night?'#c8d8f0':'#e8eef6',.55);
+      for(const z of [.4,1.6,2.8,4])seatRow(z,7,'#a3263a');B(-4.6,3,.6,1,1.2,'#e0c85a');R(-4.6,3,.5,.5,.4,'#f2e6c4',1.2);}
+    else if(l==='mall'){F(0,0,11,11,'#e9e6e0');walls(3,'#f3f1ec','#eeece6');
+      [['#2f6fb3','👗'],['#d23b4b','👟'],['#2fae6b','📱']].forEach(([c],i)=>{const x=-3.4+i*3.4;B(x,-4.6,2.8,.6,2.4,'#f7f6f3');B(x,-4.28,2.5,.04,1.6,'#bce4fa',.2);B(x,-4.3,2.8,.08,.5,c,2.1);R(x-.6,-3.9,.4,.4,1.3,'#c9c4bc');});
+      for(const [x,z] of [[1.6,2],[3.2,2],[1.6,3.5],[3.2,3.5]]){table(x,z);R(x-.55,z,.4,.4,.45,'#e07a5f');R(x+.55,z,.4,.4,.45,'#e07a5f');}B(-3.6,2.8,2.4,1.2,1,'#e8a23a');plant(-1,1,1.2);plant(1,-1.2,1);}
+    else if(l==='tvStation'){F(0,0,11,11,'#1f2a33');walls(3,'#2b3a46','#26343f');F(0,-2.4,6,3.4,'#3d6a8a',.02);B(-1,-3.4,1.4,.6,.75,'#d9d9d9');B(.9,-2.9,1.6,.75,.42,'#c9a46a');B(.9,-3.25,1.6,.15,.85,'#c9a46a');B(0,-4.9,4.2,.08,2,night?'#5b8fd6':'#4a7fc0',.6);
+      for(const s of [-1,1]){R(s*3,-.6,.1,.1,1.4,'#2b2b2b');B(s*3,-.6,.5,.7,.4,'#1d1f22',1.4);R(s*4.3,-3.8,.08,.08,2.2,'#2b2b2b');B(s*4.3,-3.8,.5,.3,.3,'#fff3c4',2.2);}
+      for(const [i,z] of [2.6,3.4,4.2].entries())B(0,z,7,.7,.3+i*.3,'#5b6168');}
+    else if(l==='radio'){F(0,0,11,11,'#e9e3d8');walls(2.6,'#f1ece2','#ece6db');B(0,-3.2,5,.08,2.2,'#bce4fa',.0);B(0,-4.2,4,1,.8,'#3b3f46');for(const x of [-1.2,1.8]){R(x,-3.9,.04,.04,.4,'#2b2b2b',.8);R(x,-3.9,.08,.08,.14,'#555',1.2);B(x,-2.2,.55,.55,.48,'#e08a3d');}B(0,-4.9,1.8,.06,.4,night||Math.sin(t*2)>0?'#ff4f4f':'#7a2a2a',2);plant(-4.4,3.6,1.2);B(3.6,2.6,1.6,.8,.75,'#c9a46a');}
+    else if(l==='market'){F(0,0,11,11,'#cdb88f');
+      [['#d9573f',-3.4,-3],['#2f6fb3',0,-3],['#2fae6b',3.4,-3],['#f2b33d',-3.4,1],['#7b4fa3',0,1.2],['#e05a9a',3.4,1]].forEach(([c,x,z])=>{B(x,z,2.2,1.2,.8,'#a98763');for(const dx of [-.6,0,.6])R(x+dx,z,.4,.4,.25,['#f39c3d','#2fae6b','#d23b4b','#f2c230'][(Math.abs(Math.round(x+dx*3)))%4],.8);for(const s of [-1,1])R(x+s*1.05,z+.55,.06,.06,2,'#7a5a43');B(x,z,2.6,1.6,.08,c,2);});
+      R(3,3,.9,.9,.6,'#f2c230');B(3,3,1.2,.8,.7,'#c9a46a');}
+    else if(l==='gym'){F(0,0,11,11,'#2f3237');walls(2.8,'#3b3f46','#373a40');B(0,-5.2,8,.05,1.8,'#bce4fa',.4);
+      for(let i=-2;i<=2;i++){const x=i*1.8;B(x,-3.6,.7,1.4,.16,'#1d1f22');B(x,-4.2,.66,.22,.08,'#4b5059',1.1);for(const s of [-1,1])B(x+s*.32,-4.2,.06,.06,1.1,'#55595f');}
+      for(const x of [-3.5,3.5]){B(x,1.5,.42,1.15,.42,'#2f3237');B(x,1.5,.44,1.1,.08,'#b23a48',.42);B(x,.95,1.1,.04,.04,'#b9bcc2',1.05);}F(0,1.5,3,2.4,'#4a6b5a',.02);}
+    else if(l==='hospital'){F(0,0,11,11,'#eef3f1');walls(2.8,'#f4f8f6','#eff4f2');
+      for(const x of [-2.6,0,2.6]){B(x,-3.6,1,1.9,.5,'#f7f7f7');B(x,-4.4,1,.2,.9,'#c9ccc8');R(x,-4.2,.7,.35,.18,'#ffffff',.5);B(x+.62,-3.6,.04,2,1.8,'#a9d8cf',.05);}
+      B(-3,2.5,2.6,.8,1.05,'#3d9a7a');B(-3,2.5,2.8,1,.06,'#ffffff',1.05);for(let i=0;i<4;i++){B(1+i*.9,3.6,.6,.6,.45,'#7fb7d9');}B(0,-5.2,1.2,.04,1.2,'#d23b4b',1.2);}
+    else if(l==='worship'){F(0,0,11,11,'#efe6d2');walls(3.4,'#f6efdf','#f2ead8');F(0,-.2,1.6,8,'#9b2335',.015);
+      for(const z of [-1.4,0,1.4,2.8])for(const s of [-1,1]){B(s*2.4,z,3,.5,.45,'#8b6a4c');B(s*2.4,z+.27,3,.1,.9,'#8b6a4c');}
+      B(0,-4.4,2.4,1,1,'#c9a46a');B(0,-4.4,2.5,1.1,.06,'#ffffff',1);for(const s of [-1,1])B(s*4.2,-5.2,.9,.05,2.2,['#5aa7c0','#e9c46a'][s>0?1:0],.8);}
+    else if(l==='eventHall'){F(0,0,11,11,'#f2ead6');walls(3.2,'#f7efdc','#f3ead5');F(0,0,4,4,'#e8d5a8',.015);
+      for(const [x,z] of [[-3.5,-2],[3.5,-2],[-3.5,2],[3.5,2],[0,3.6]]){R(x,z,1.3,1.3,.06,'#ffffff',.74);R(x,z,.1,.1,.74,'#c9a227');R(x,z,.25,.25,.35,'#d4af37',.8);for(let k=0;k<4;k++){const a=k*Math.PI/2;R(x+Math.cos(a)*.95,z+Math.sin(a)*.95,.38,.38,.48,'#c9a227');}}
+      B(0,-4.4,5,1.2,.5,'#7a1f2b');B(0,-4.95,5,.1,2.4,'#c9a227',.5);for(const x of [-2,2])R(x,-.5,.6,.6,.4,'#ffe9a8',2.7);}
+    else if(l==='stadium'){F(0,0,11,11,'#6f9a6f');F(0,0,8,9,'#7fa788',.01);for(let z=-4;z<4;z++)F(0,z+.5,7.9,.96,z%2?'#86ad8d':'#7ca584',.015);F(0,0,7.8,.04,'#f3f1d8',.02);R(0,0,1.6,1.6,.01,'#f3f1d8',.02);R(0,0,1.45,1.45,.012,'#7fa788',.021);
+      for(const s of [-1,1])for(let i=0;i<3;i++)B(s*(4.5+i*.45),0,.45,9.5,.35+i*.35,['#2f7a55','#ffffff','#2f7a55'][i]);for(const s of [-1,1])B(0,s*4.55,1.6,.1,.9,'#f0ebd7');}
+    else if(l==='park'){F(0,0,11,11,'#a9cf8f');F(0,2.4,11,1,'#e7dcc2',.012);F(2.6,0,1,11,'#e7dcc2',.012);
+      const pts=[];for(let i=0;i<18;i++){const a=i/18*Math.PI*2;pts.push([-2.4+Math.cos(a)*1.8,0,1.2+Math.sin(a)*.9]);}this.polygon(pts,night?'#5d7f9e':'#9fd3e0');
+      for(const [x,z,s] of [[-4,-4,1.2],[4.2,-4,1],[-4.3,3.8,1.1],[4.3,4,1.2],[-1,-4.2,.9]])this.tree(x,z,s);B(0,3.4,1.6,.45,.45,'#8b6a4c');B(0,3.6,1.6,.1,.85,'#8b6a4c');F(-2.6,-2,1.6,1.2,'#e05a5a',.015);}
+    else if(l==='airport'){F(0,0,11,11,'#e6e8ec');walls(3.4,'#f2f4f7','#edf0f4');B(0,-5.2,9,.08,2.4,'#bce4fa',.6);B(1.5,-6.6,5,1,1,'#f7f7f7',.9);B(1.5,-6.6,1.2,4,.15,'#f7f7f7',1.2);
+      for(const z of [.8,2])seatRow(z,6,'#5b6fa8',1);for(const x of [-3.6,-1.4])B(x,-3,1.8,.7,1.05,'#5b6fa8');B(3.6,-3.4,2.2,.1,1,'#1d1f22',1.6);B(3.6,-3.34,2,.02,.85,'#f2c230',1.68);}
+    else if(l==='beach'){F(0,0,11,11,'#ecdcae');F(0,4,11,3.2,night?'#58789a':'#7cc4d8',.02);F(0,2.3,11,.3,'#f6efd8',.025);
+      for(const [x,z,c] of [[-2.6,-.6,'#e05a5a'],[1.4,-.8,'#2b7fd6'],[-4,-3,'#f2c230']]){R(x,z,.06,.06,1.8,'#c9c4bc');R(x,z,1.6,1.6,.3,c,1.7);B(x+.6,z+.6,.6,1.4,.12,'#ffffff',.25);}
+      for(const s of [-1,1])B(2.6+s*1.6,-1.6,.08,.08,1.2,'#ffffff');B(2.6,-1.6,3.2,.04,.04,'#ffffff',1.2);for(const [x,z] of [[-4.4,-4.4],[4.4,-4.2]])this.palm(x,z,1);}
+  }
   // Placeable home items, built from simple shapes; each faces +z, where you stand to use it.
   furnitureModel(item,x,z){
     const t=this.reduced?0:performance.now()/1000,night=this.daylight().night;
