@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { WORK_SCENES } from './public/careerText.js';
-import { FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace, homeRooms, npcOpinion, OPINIONS, NPC_NAMES, CLASH_MEDALS, medalTier } from './public/content.js';
+import { QUESTS, QUEST_GRADUATION, FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace, homeRooms, npcOpinion, OPINIONS, NPC_NAMES, CLASH_MEDALS, medalTier } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -585,4 +585,30 @@ export function act(s,input,now,rng=Math.random) {
     default:throw new GameError('Unknown action.');
   }
   return s;
+}
+
+// Starter quests: an action that matches an unfinished quest completes it (in any order).
+const QUEST_CHECKS={
+  walk:i=>i.type==='move',
+  emote:i=>i.type==='emote',
+  need:i=>i.type==='recover'||i.type==='useItem',
+  practise:i=>i.type==='start'&&i.kind==='practice',
+  post:i=>i.type==='post',
+  travel:i=>i.type==='travel'&&i.location!=='home',
+  talk:i=>i.type==='talk'||i.type==='chatRegular',
+  work:i=>(i.type==='start'&&i.kind!=='practice')||(i.type==='venueAct'&&VENUE_ACTS[i.act]?.venue!=='gym'),
+  gym:(i,s)=>(i.type==='venueAct'&&VENUE_ACTS[i.act]?.venue==='gym')||(i.type==='gymGrab')||(s.location==='gym'&&i.type==='recover'),
+  shop:i=>i.type==='buy'||i.type==='order',
+  dress:i=>i.type==='wear'||i.type==='equip'||i.type==='claimWear',
+  home:i=>i.type==='place',
+  friend:i=>i.type==='friend',
+  chat:i=>i.type==='chat',
+  clash:i=>i.type==='battleCreate'||i.type==='battleJoin',
+};
+export function questProgress(s,input,now){
+  const q=s.quests??={done:[]};let fresh=null;
+  for(const quest of QUESTS){if(q.done.includes(quest.key)||!QUEST_CHECKS[quest.key]?.(input,s))continue;
+    q.done.push(quest.key);addFame(s,quest.reward,`Quest: ${quest.title}`,now);log(s,`✅ Quest complete: ${quest.title} (+${quest.reward} fame)`,now);fresh=quest.key;}
+  if(fresh)q.last={key:fresh,at:now};
+  if(!q.graduated&&QUESTS.every(quest=>q.done.includes(quest.key))){q.graduated=now;addFame(s,QUEST_GRADUATION.fame,'Starter quests complete',now);s.awards.push({id:id(),name:QUEST_GRADUATION.name,career:s.career,at:now});log(s,`🎓 All starter quests done: ${QUEST_GRADUATION.name} (+${QUEST_GRADUATION.fame} fame)`,now);}
 }

@@ -3,7 +3,7 @@ import { CLASH, CLASH_ACTIONS, CHEER } from './public/clashText.js';
 import { CLASH_MEDALS, medalTier, isBigger, clashStake } from './public/content.js';
 import { randomBytes, createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline } from './game.mjs';
+import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline, questProgress } from './game.mjs';
 import { CAREERS, BALANCE, clamp, perksFor, WEAR, SPOUSE_SHARE, SPOUSE_REASON } from './public/content.js';
 export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS profiles(id TEXT PRIMARY KEY, room TEXT, location TEXT, career TEXT, fame INTEGER, trend INTEGER, seen INTEGER, dating INTEGER, crew INTEGER, outside INTEGER, data TEXT NOT NULL);\n CREATE INDEX IF NOT EXISTS profiles_room ON profiles(room,seen);\n CREATE INDEX IF NOT EXISTS profiles_seen ON profiles(seen);\n CREATE INDEX IF NOT EXISTS profiles_fame ON profiles(fame);\n CREATE INDEX IF NOT EXISTS profiles_career ON profiles(career,seen);";
 // Who counts as online, and the room a player is in (a home, or a public place).
@@ -451,6 +451,7 @@ try {
             if(state.battle)fail(!['travel','start','recover','visit','switch'].includes(input.type),'You are in a battle. Finish or leave it first.');
             if(input.type==='finish'&&collaborativeFinish(playerId,state,input,now)){}
             else if(!social(playerId,state,input,now))act(state,input,now);
+            questProgress(state,input,now);
             if(input.type==='travel')state.visiting=null;
           }
           captureEligibility(state,now);persist(playerId,state);db.prepare('INSERT INTO requests VALUES(?,?)').run(playerId,input.requestId);return state;

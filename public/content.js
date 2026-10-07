@@ -699,3 +699,24 @@ export const medalTier = (medal, record = {}) => CLASH_MEDALS[medal].tiers.filte
 export const isBigger = (theirs = 0, yours = 0) => theirs >= yours * 2 && theirs - yours >= 100;
 // What a Fame Clash is worth: about 1% of the loser's fame (at least 1, if they have any).
 export const clashStake = loserFame => loserFame > 0 ? Math.max(1, Math.round(loserFame * .01)) : 0;
+
+// Starter quests: fifteen first steps that teach how Palm City works. Any order counts;
+// the HUD shows the next one. Each pays a little fame, and finishing them all earns an award.
+export const QUESTS = [
+  {key: 'walk', icon: '👣', title: 'Take a stroll', how: 'Tap the floor anywhere to walk there.', reward: 10},
+  {key: 'emote', icon: '😄', title: 'Express yourself', how: 'Tap the 😀 button on the right and pick an expression.', reward: 10},
+  {key: 'need', icon: '🍲', title: 'Look after yourself', how: 'Your needs sit at the bottom. Tap the fridge, bed or a need to top one up.', reward: 15},
+  {key: 'practise', icon: '🎯', title: 'Sharpen a skill', how: 'Tap Practise and choose one of your career skills.', reward: 20},
+  {key: 'post', icon: '📰', title: 'Say something to your fans', how: 'Open the phone (top right), then Feed, and make a post.', reward: 20},
+  {key: 'travel', icon: '🗺️', title: 'Head into the city', how: 'Open the phone and the Map app, then pick a place to go.', reward: 20},
+  {key: 'talk', icon: '🗣️', title: 'Meet a local', how: 'Tap a character in town and choose to talk to them.', reward: 20},
+  {key: 'work', icon: '⭐', title: 'Do your first job', how: 'Tap Go to work, then Start work, and make your choices.', reward: 30},
+  {key: 'gym', icon: '🏋️', title: 'Hit the gym', how: 'Travel to Iron Palm Gym and use any machine.', reward: 25},
+  {key: 'shop', icon: '🛍️', title: 'Treat yourself', how: 'Buy something from the Market or Shopping app.', reward: 25},
+  {key: 'dress', icon: '👗', title: 'Change your look', how: 'Open Wardrobe and wear something new.', reward: 20},
+  {key: 'home', icon: '🛋️', title: 'Make it home', how: 'Open My stuff and place an item in your home.', reward: 25},
+  {key: 'friend', icon: '👥', title: 'Make a friend', how: 'Open Social, find a player and add them as a friend.', reward: 30},
+  {key: 'chat', icon: '💬', title: 'Start a conversation', how: 'Send a chat message where you are, or message a friend.', reward: 25},
+  {key: 'clash', icon: '⚔️', title: 'Step into a Fame Clash', how: 'Open Battles and start or join a Fame Clash.', reward: 40},
+];
+export const QUEST_GRADUATION = {name: 'Palm City Starter', fame: 250};

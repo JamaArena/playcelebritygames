@@ -438,3 +438,23 @@ test('fame clash maths: stakes are 1% of the loser, bigger means double and 100 
   assert.equal(medalTier('clashFighter',{fought:120}),3);assert.equal(medalTier('clashFighter',{fought:500}),5);assert.equal(medalTier('clashFighter',{fought:49}),1);
   const old=make();old.clashRecord={fought:3,won:1};old.awards.push({id:'x',name:'Clash winner ★',medal:'clashWinner',tier:1,career:old.career,at:T});reconcile(old,T+1);assert.ok(!old.awards.some(w=>w.medal==='clashWinner'),'old medals are re-graded');assert.equal(medalTier('giantSlayer',{giantWins:5}),4);assert.equal(medalTier('weightClass',{bigFought:25}),4);
 });
+test('starter quests complete in any order, pay fame once, and graduate with an award', async () => {
+  const { questProgress } = await import('../game.mjs');
+  const { QUESTS, QUEST_GRADUATION } = await import('../public/content.js');
+  assert.equal(QUESTS.length, 15);
+  const s = make(), fame = s.fame || 0;
+  questProgress(s, { type: 'emote' }, T);
+  assert.deepEqual(s.quests.done, ['emote']);
+  assert.equal(s.fame, fame + QUESTS.find(q => q.key === 'emote').reward);
+  questProgress(s, { type: 'emote' }, T);
+  assert.equal(s.fame, fame + QUESTS.find(q => q.key === 'emote').reward, 'a quest pays once');
+  questProgress(s, { type: 'travel', location: 'home' }, T);
+  assert.ok(!s.quests.done.includes('travel'), 'going home is not heading into the city');
+  const inputs = { walk: { type: 'move' }, need: { type: 'recover' }, practise: { type: 'start', kind: 'practice' }, post: { type: 'post' }, travel: { type: 'travel', location: 'plaza' }, talk: { type: 'talk' }, work: { type: 'start', kind: 'produce' }, gym: { type: 'gymGrab' }, shop: { type: 'buy' }, dress: { type: 'wear' }, home: { type: 'place' }, friend: { type: 'friend' }, chat: { type: 'chat' }, clash: { type: 'battleCreate' } };
+  for (const input of Object.values(inputs)) questProgress(s, input, T + 1);
+  assert.equal(s.quests.done.length, 15);
+  assert.ok(s.quests.graduated, 'all fifteen graduate');
+  assert.ok(s.awards.some(a => a.name === QUEST_GRADUATION.name));
+  const awards = s.awards.length; questProgress(s, { type: 'move' }, T + 2);
+  assert.equal(s.awards.length, awards, 'graduation happens once');
+});

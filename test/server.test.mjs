@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { randomUUID } from 'node:crypto';
+import { QUESTS } from '../public/content.js';
 
 test('HTTP persistence, idempotency, social permissions, collaboration and seasonal settlement',async t=>{
   const directory=mkdtempSync(path.join(tmpdir(),'celebrity-life-test-'));
@@ -93,7 +94,9 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   assert.equal(settled.season.id,2);assert.equal(settled.state.awards.filter(award=>award.id.startsWith('season:1')).length,1);
   const fameAfter=settled.state.fame;assert.ok(fameAfter>=100,'the season award adds fame');await a.call();assert.equal((await a.call()).data.state.fame,fameAfter);
   // 1v1 battle: challenge, accept, alternate turns until one side is knocked out; fame changes hands once.
-  fixture(aId,s=>{s.fame=100;s.needs.energy=90;s.charges=5;});fixture(bId,s=>{s.fame=30;s.needs.energy=90;s.charges=5;});
+  // Starter quests are already done here, so their rewards don't change the fame being tested.
+  const veteran=s=>{s.quests={done:QUESTS.map(q=>q.key),graduated:1};};
+  fixture(aId,s=>{s.fame=100;s.needs.energy=90;s.charges=5;veteran(s);});fixture(bId,s=>{s.fame=30;s.needs.energy=90;s.charges=5;veteran(s);});
   await goTo(a,aId,'plaza');await goTo(b,bId,'plaza');
   const challenge=await a.call({type:'battleCreate',mode:1,opponent:bId});assert.equal(challenge.status,200);
   const battleId=challenge.data.battles[0].id;assert.equal((await b.call()).data.battles[0].invited,bId);
