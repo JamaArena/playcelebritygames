@@ -2,6 +2,7 @@ import { fanClubSize, PROMPTS, RIVAL, TEAM, TAILOR_COLORS, TATTOOS, VENUE_ACTS, 
 import { World, worldObjects } from './world.js';
 import { World3D } from './world3d.js';
 import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS } from './sound.js';
+import { OPINIONS } from './content.js';
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=value=>Math.floor(value).toLocaleString();
@@ -157,6 +158,7 @@ const onWorldObject=object=>{
   if(object.decision!==undefined){chooseDecision(object.decision);return;}
   if(object.travel){closeTray();send({type:'travel',location:object.travel});return;}
   if(object.person){const p=object.person,friend=state.friends.includes(p.id);selectedObject=null;if(p.ride&&RIDES[p.ride])toast(`${RIDES[p.ride].icon} ${p.name} drives a ${RIDES[p.ride].name}.`);pie(object,[[`${CAREERS[p.career]?.icon||'🙂'} ${escape(CAREERS[p.career]?.name||'Player')} <small>${escape(B.tiers[p.tier||0][0])}</small>`,'page','data-page="phone"'],friend?['✉ Message','directMessage',`data-player="${p.id}"`]:['➕ Add friend','friend',`data-player="${p.id}"`],['💬 Local chat','page','data-page="phone"'],['⚔ Challenge 1v1','battleCreate',`data-mode="1" data-opponent="${p.id}"`]]);return;}
+  if(object.regular){const g=object.regular;selectedObject=null;pie(object,[[`💬 Socialise <small>${escape(CAREERS[g.career]?.name||'Local')}</small>`,'chatRegular',`data-npc="${g.id}" data-x="${g.x}" data-z="${g.z}" data-name="${escape(g.name)}"`]]);return;}
   if(object.house){const p=object.house,friend=state.friends.includes(p.id);pie(object,[friend?['✉ Ask for an invite','directMessage',`data-player="${p.id}"`]:['➕ Add friend','friend',`data-player="${p.id}"`],['📇 Contacts','page','data-page="phone"']]);toast(`Visiting ${p.name}’s home needs their invitation.`);return;}
   selectedObject=object;$('#objects').hidden=true;const def=CAREERS[state.career],c=state.careers[state.career];
   // Venue spots only serve the careers based there; point everyone else to their own venue.
@@ -772,6 +774,9 @@ document.addEventListener('click',async event=>{
     case 'logoutGuest':try{await auth({type:'logout',deleteGuest:true});}catch(e){toast(e.message);break;}location.reload();break;
     case 'collectReward':{const el=$('#reward');if(el)el.hidden=true;floatReward('✨ Collected!');chime('coin');break;}
     case 'noticeOkay':notices.shift();nextNotice();break;
+    case 'chatRegular':{closeTray();const target={regular:true,x:Number(d.x),z:Number(d.z),vx:Number(d.x),vz:Number(d.z)};
+      world.approach(target,()=>whenIdle(async()=>{const data=await send({type:'chatRegular',npc:d.npc},{keepModal:true});const c=data?.state?.lastChat;if(!c)return;const o=OPINIONS[c.kind],line=c.line.replace(/\{you\}/g,state.name).replace(/\{career\}/g,(CAREERS[state.career]?.name||'star').toLowerCase());
+        world.chatWith={id:d.npc,until:performance.now()+8000};world.draw();babble(line,voiceFor(d.npc));setTimeout(()=>express(o.sound==='hmm'?'huh':o.sound,voiceFor(d.npc)),900);showNotice(o.icon,o.title(d.name),`“${line}”`,null);}));break;}
     case 'soundToggle':setSound(d.key,!soundPrefs()[d.key]);soundMenu();break;
     case 'getUp':await send({type:'cancel'});break;
     case 'travel':await send({type:'travel',location:d.location});break;

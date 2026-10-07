@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace, homeRooms } from './public/content.js';
+import { FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace, homeRooms, npcOpinion, OPINIONS, NPC_NAMES } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -554,6 +554,15 @@ export function act(s,input,now,rng=Math.random) {
     case 'useVip': {
       const deal=SPONSORSHIPS[input.item];requireRule(deal&&s.vip?.[input.item],'Claim this sponsorship first.');
       if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')moveHome(s,input.item,now);else s.equipped.clothes=input.item;break;
+    }
+    case 'chatRegular': {
+      // Socialise with someone at a venue: how they feel about you depends on your fame.
+      const [place,index]=String(input.npc||'').split(':');requireRule(place===s.location&&s.location!=='home'&&/^\d+$/.test(index||''),'Walk over to them first.');
+      requireRule(!s.trip,'Wait until you arrive.');requireRule(!s.active&&!s.recovery,'Finish what you are doing first.');
+      const {kind,line}=npcOpinion(input.npc,s.fame||0,Math.floor(now/86_400_000)),o=OPINIONS[kind];s.npcChats??={};
+      if(now-(s.npcChats[input.npc]??-Infinity)>=600_000){s.needs.social=clamp(s.needs.social+o.social);s.needs.fun=clamp(s.needs.fun+o.fun);s.npcChats[input.npc]=now;}
+      for(const [k,at] of Object.entries(s.npcChats))if(now-at>86_400_000)delete s.npcChats[k];
+      s.lastChat={npc:input.npc,kind,line,at:now};break;
     }
     case 'switch':requireRule(CAREERS[input.career]&&!s.active&&!s.recovery,'Finish your activity and choose a valid career.');requireRule(input.career!=='adult'||input.adult===true,'Confirm an adult character.');if(!s.careers[input.career])s.careers[input.career]=newCareer(input.career,0);s.career=input.career;break;
     case 'acceptOffer': {

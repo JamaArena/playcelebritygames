@@ -1,6 +1,6 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, VENUE_ACTS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt, homeRooms, extensionSpot } from './content.js';
+import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, VENUE_ACTS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt, homeRooms, extensionSpot, npcName } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 // On the sofa you face the room; watching TV you sit at the end and turn toward the screen.
@@ -874,7 +874,8 @@ export class World {
   paintCrowd(l){
     const list=REGULARS[l];if(!list)return;const training=this.training(),t=this.reduced?0:performance.now()/1000,a=this.actor||this.player;
     const stage=this.performer(l),looks=spot=>stage&&!spot.seat&&!['work','sleep','sport','perform','dance','shoki','victory'].includes(spot.pose)&&Math.hypot(stage.x-spot.x,stage.z-spot.z)>.6?Math.atan2(stage.x-spot.x,stage.z-spot.z):null;
-    list.forEach((r,n)=>{const spot=training&&r.aside?r.aside:r,face=spot.watch&&training?Math.atan2(a.x-spot.x,a.z-spot.z):looks(spot)??spot.heading;
+    const talking=this.chatWith&&this.chatWith.until>performance.now()?this.chatWith.id:null;
+    list.forEach((r,n)=>{const spot=training&&r.aside?r.aside:r,face=talking===`${l}:${n}`||spot.watch&&training?Math.atan2(a.x-spot.x,a.z-spot.z):looks(spot)??spot.heading;
       this.human(spot.x,spot.z,SKIN_TONES[(n*3+l.length+CROWD_SEED)%SKIN_TONES.length],{...this.look(r.career),...this.extra(n+l.length),pose:spot.pose||null,heading:face,seat:spot.seat});});
     // The passing drill: a ball rolls back and forth between the two players.
     if(l==='sports'&&!training){const k=.5-.5*Math.cos(t*1.6);this.round(-1+2*k,-2.4,.2,.2,.2,'#f8f5e8',Math.abs(Math.sin(t*1.6))*.15);}
@@ -913,6 +914,8 @@ export class World {
     const ctx=this.ctx,tag=(x,z,text)=>{const p=this.project(x,2.05,z);ctx.font='600 9px Segoe UI';ctx.textAlign='center';const w=ctx.measureText(text).width+14;ctx.fillStyle='#fffef5dd';ctx.beginPath();ctx.roundRect(p.x-w/2,p.y-8,w,16,8);ctx.fill();ctx.fillStyle='#49614f';ctx.fillText(text,p.x,p.y+3);};
     const npc=NPCS.find(n=>n.location===this.location),spot=npc&&worldObjects(this.location).find(o=>o.action==='phone');if(npc&&this.zoom>=.55)tag(spot?.x??2.5,spot?.z??2,`${npc.role} ${npc.name}`);
     const here=TOWN[this.location]||TOWN.home;this.peopleHits=[];
+    // Venue regulars can be tapped to socialise.
+    if(this.interior()&&this.location!=='home'){const training=this.training();for(const [n,r] of (REGULARS[this.location]||[]).entries()){const spot=training&&r.aside?r.aside:r;this.peopleHits.push({regular:{id:`${this.location}:${n}`,name:npcName(this.location,n),career:r.career,x:spot.x,z:spot.z},screen:this.project(spot.x,1.1,spot.z)});}}
     for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1))continue;this.peopleHits.push({player:p,screen:this.project(x,1.1,z)});if((p.location===this.location&&this.zoom>=.45)||this.zoom>=.85||this.hover?.player?.id===p.id)tag(x,z,(this.friends?.includes(p.id)?'♥ ':'')+(p.crew?.badge?p.crew.badge+' ':'')+p.name);}
     this.houseHits=[];if(!this.interior())for(const [index,owner] of this.owners||[]){const h=CITY.houses[index],x=h.x-here.x,z=h.z-here.z;if(!this.onScreen(x,z,2))continue;const screen=this.project(x,h.h+.9,z);this.houseHits.push({house:owner,screen});if(this.zoom>=.5||this.hover?.house?.id===owner.id){ctx.font='600 9px Segoe UI';ctx.textAlign='center';const label=`🏠 ${owner.name}`,w=ctx.measureText(label).width+14;ctx.fillStyle='#153d32d9';ctx.beginPath();ctx.roundRect(screen.x-w/2,screen.y-8,w,16,8);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(label,screen.x,screen.y+3);}}
     if(!this.interior())for(const b of this.billboards||[]){const here=TOWN[this.location]||TOWN.home,p=this.project(b.x,7.1,b.z);if(p.x<-60||p.x>this.width+60||p.y<-30||p.y>this.height+30)continue;ctx.font='700 11px Segoe UI';ctx.textAlign='center';const label=`★ ${b.name}`,w=ctx.measureText(label).width+16;ctx.fillStyle='#1d1f22e6';ctx.beginPath();ctx.roundRect(p.x-w/2,p.y-9,w,18,9);ctx.fill();ctx.fillStyle='#f2c230';ctx.fillText(label,p.x,p.y+4);}
@@ -927,7 +930,7 @@ export class World {
     // Arranging: a tap moves the preview there; tapping the same spot again (or a click after hovering it) places it.
     if(this.placement){const point=this.unproject(x,y),p=this.placement,nx=Math.round(point.x*2)/2,nz=Math.round(point.z*2)/2;if(p.x===nx&&p.z===nz&&p.shown){this.onObject({placement:{item:p.item,id:p.id,x:nx,z:nz}});return;}p.x=nx;p.z=nz;p.shown=true;this.onPlacement?.(canPlace(this.state.furniture,p.id,nx,nz,this.homeKey()));this.draw();return;}
     const pin=this.pins?.find(p=>Math.hypot(p.screen.x-x,p.screen.y-y)<24);if(pin){this.onObject({travel:pin.travel});return;}
-    const person=this.peopleHits?.find(p=>Math.hypot(p.screen.x-x,p.screen.y-y)<22);if(person){this.onObject({person:person.player,name:person.player.name,screen:person.screen});return;}
+    const person=this.peopleHits?.find(p=>Math.hypot(p.screen.x-x,p.screen.y-y)<22);if(person){if(person.regular){const g=person.regular;this.onObject({regular:g,name:g.name,label:g.name,x:g.x,z:g.z,vx:g.x,vz:g.z,screen:person.screen});return;}this.onObject({person:person.player,name:person.player.name,screen:person.screen});return;}
     const home=this.houseHits?.find(h=>Math.hypot(h.screen.x-x,h.screen.y-y)<26);if(home){this.onObject({house:home.house,name:`${home.house.name}’s home`,screen:home.screen});return;}
     const choice=this.choiceTargets?.find(o=>Math.hypot(o.screen.x-x,o.screen.y-y)<30);if(choice){this.onObject({decision:choice.index});return;}
     // Only a tap on the object itself opens it; anywhere else is a walk.
@@ -968,9 +971,11 @@ export class World {
   }
   walkToObject(name){const object=worldObjects(this.location,this.visitedHome?.furniture||this.state.furniture,this.visitedHome?[]:Object.keys(this.state.inventory||{}),this.homeKey()).find(o=>o.key===name);if(object)this.onObject(object);}
   approach(object,callback){
-    const furniture=this.visitedHome?.furniture||this.state.furniture;
-    if(walkable(this.location,object.x,object.z,furniture,this.homeKey())){this.walk(object.x,object.z,callback);return;}
-    const points=[];for(const radius of [.8,1.1,1.4])for(let i=0;i<16;i++){const x=(object.vx??object.x)+Math.cos(i*Math.PI/8)*radius,z=(object.vz??object.z)+Math.sin(i*Math.PI/8)*radius;if(walkable(this.location,x,z,furniture,this.homeKey()))points.push({x,z});}
+    const furniture=this.visitedHome?.furniture||this.state.furniture,person=object.person||object.regular||object.action==='phone';
+    // People: stop about an arm's length away and turn to face them, never walk into them.
+    if(person){const tx=object.vx??object.x,tz=object.vz??object.z,done=callback;callback=()=>{this.heading=Math.atan2(tx-this.player.x,tz-this.player.z);this.draw();done?.();};}
+    if(!person&&walkable(this.location,object.x,object.z,furniture,this.homeKey())){this.walk(object.x,object.z,callback);return;}
+    const points=[];for(const radius of person?[.85,1.05,1.3]:[.8,1.1,1.4])for(let i=0;i<16;i++){const x=(object.vx??object.x)+Math.cos(i*Math.PI/8)*radius,z=(object.vz??object.z)+Math.sin(i*Math.PI/8)*radius;if(walkable(this.location,x,z,furniture,this.homeKey()))points.push({x,z});}
     points.sort((a,b)=>Math.hypot(a.x-this.player.x,a.z-this.player.z)-Math.hypot(b.x-this.player.x,b.z-this.player.z));
     if(points.length)this.walk(points[0].x,points[0].z,callback);else this.onObject({blocked:true});
   }

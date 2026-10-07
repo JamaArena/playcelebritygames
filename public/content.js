@@ -601,3 +601,66 @@ function placeCheck(furniture,piece,x,z,home){
   const spots=[...HOME_SPOTS,...rooms.map(r=>[r.object.x,r.object.z])];
   return spots.every(p=>walkable('home',p[0],p[1],[{x,z}],home)&&near(p))&&next.every(f=>near([f.x,f.z+.75]));
 }
+
+// ---- Strangers' opinions: tap anyone in a venue to socialise. ----
+// The more famous you are, the more people know you, and the more of those love or hate you rather than shrug.
+export const NPC_NAMES = ['Tunde', 'Ada', 'Kemi', 'Chidi', 'Bisi', 'Femi', 'Ngozi', 'Seyi', 'Ifeoma', 'Musa', 'Zainab', 'Uche', 'Bola', 'Emeka', 'Funke', 'Dayo', 'Amaka', 'Tobi', 'Yemi', 'Halima', 'Kunle', 'Nneka', 'Sola', 'Ibrahim'];
+const opinionHash = text => [...String(text)].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) >>> 0, 2166136261);
+export const npcName = (location, index) => NPC_NAMES[opinionHash(location + '#' + index) % NPC_NAMES.length];
+export const OPINIONS = {
+  unknown: {icon: '🤷', title: name => `${name} doesn't know you`, social: 6, fun: 0, sound: 'huh', lines: [
+    "Sorry, have we met? I'm terrible with faces.",
+    "Who? You'll have to remind me what you do.",
+    "Nice to meet you! Are you new around Palm City?",
+    "Hmm, you look like someone's cousin. Are you?",
+    "I don't really follow celebrities, so… hi?",
+    "Wait, should I know you? My bad if I should.",
+    "Never heard of you, but your outfit is nice.",
+    "Are you lost? This place gets busy.",
+    "Oh, hello! I thought you were the delivery guy.",
+    "No idea who you are, but welcome, sha.",
+  ]},
+  neutral: {icon: '😐', title: name => `${name} has no strong feelings`, social: 8, fun: 0, sound: 'hmm', lines: [
+    "Oh, it's you, {you}. I've seen your stuff around. It's fine.",
+    "{you}! I know the name. Can't say I'm a fan or a hater.",
+    "You're that {career}, right? Cool, cool.",
+    "My sister likes your work. Me? I'm undecided.",
+    "I've heard of you. Haven't made up my mind yet.",
+    "You again? Everyone's talking about you. I'm just watching.",
+    "Not bad, not bad. Keep going, I guess.",
+    "I saw your last post. It was… a post.",
+    "You're doing your thing. Respect, I suppose.",
+    "Famous people, eh? You all look taller on screen.",
+  ]},
+  love: {icon: '😍', title: name => `${name} loves you!`, social: 12, fun: 4, sound: 'yay', lines: [
+    "OMG, {you}! I literally have your poster on my wall!",
+    "Can I get a selfie? My friends will never believe this!",
+    "You're the reason I started believing in myself. Thank you!",
+    "{you}!! Your last release is on repeat in my car.",
+    "I've been a fan since day one. Before all this fame!",
+    "Please sign my shirt. I'm never washing it again.",
+    "You're even more amazing in person, wow.",
+    "My whole family stans you. Mummy prays for you!",
+    "Is it really you?! I'm shaking right now.",
+    "Keep winning, {you}! We're all rooting for you!",
+  ]},
+  hate: {icon: '😒', title: name => `${name} can't stand you`, social: 3, fun: -3, sound: 'ugh', lines: [
+    "Oh great, {you}. Don't you have a camera to pose for?",
+    "Overrated. I said what I said.",
+    "My cousin's band is better than anything you've done.",
+    "Please don't talk to me. I'm still annoyed about your last post.",
+    "You think you're a big deal, abi? Hmm.",
+    "Everybody's talking about you and I don't see why.",
+    "I unfollowed you last week. Felt good.",
+    "Fame changed you. I can tell.",
+    "Your fans are so loud. Too loud.",
+    "Can you move? You're blocking my view, superstar.",
+  ]},
+};
+// Same person, same day, same fame bracket: same opinion. As fame grows, more know you and fewer shrug.
+export function npcOpinion(npcId, fame = 0, day = 0) {
+  const h = opinionHash(`${npcId}:${day}:${Math.floor(Math.log2(fame + 2))}`), r1 = (h % 1000) / 1000, r2 = ((h >>> 10) % 1000) / 1000;
+  const known = Math.min(.96, Math.max(.04, Math.log10(fame + 1) / 6)), strong = Math.min(.92, .3 + known * .65);
+  const kind = r1 >= known ? 'unknown' : r2 >= strong ? 'neutral' : ((h >>> 20) % 100) < 58 ? 'love' : 'hate';
+  return {kind, line: OPINIONS[kind].lines[(h >>> 7) % OPINIONS[kind].lines.length]};
+}
