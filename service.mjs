@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline } from './game.mjs';
-import { CAREERS, BALANCE, clamp, perksFor } from './public/content.js';
+import { CAREERS, BALANCE, clamp, perksFor, WEAR } from './public/content.js';
 export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL);";
 export function createGameService(db,{secureCookies=false,sendEmail=null}={}) {
 db.exec(schema);
@@ -68,7 +68,7 @@ function captureEligibility(s,now){
 const TOWN_PLAYER_LIMIT=120,ACTIVE_DEVICE_MS=45_000;
 class OtherDevice extends Error {}
 const roomFor=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
-function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,hairColor:s.hairColor||'black',tattoos:s.tattoos||[],build:s.build||'average',height:s.height||'average',career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,wear:s.wear||null,emote:s.emote||null,posts:(s.posts||[]).slice(0,3),headlines:(s.headlines||[]).slice(0,2),dating:!!s.dating?.open,datingLikes:s.dating?.open?s.dating.likes.slice(0,50):[],home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<45_000};}
+function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,hairColor:s.hairColor||'black',tattoos:s.tattoos||[],build:s.build||'average',height:s.height||'average',career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,wear:s.wear||null,emote:s.emote||null,crew:s.crew||null,bodyguard:!!s.team?.bodyguard,posts:(s.posts||[]).slice(0,3),headlines:(s.headlines||[]).slice(0,2),dating:!!s.dating?.open,datingLikes:s.dating?.open?s.dating.likes.slice(0,50):[],home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<45_000};}
 function snapshot(playerId,s,now){
   const account=accountOf(playerId);
   if(!s)return {state:null,serverNow:now,account};
@@ -239,6 +239,11 @@ function social(playerId,s,input,now){
       if(input.recipient){const target=load(input.recipient);fail(target&&!target.blocks.includes(playerId)&&!s.blocks.includes(input.recipient),'Direct contact is unavailable.');fail(s.friends.includes(input.recipient),'Add this person as a friend first.');}
       db.prepare('INSERT INTO messages VALUES(?,?,?,?,?,?)').run(id(),playerId,roomFor(playerId,s),input.recipient||null,body,now);break;
     }
+    case 'gift':{
+      const target=load(input.playerId);fail(target&&s.friends.includes(input.playerId)&&!target.blocks.includes(playerId),'Send gifts to a friend.');fail(clock()-(s.giftAt||0)>=10*60_000,'One gift every 10 minutes.');
+      const wear=WEAR[input.item];fail(input.item==='suya'||(wear&&(wear.fame===0||s.closet?.[input.item])),'Choose something you own, or suya.');
+      if(input.item==='suya'){target.takeaway??={};target.takeaway.suya=(target.takeaway.suya||0)+1;}else{target.closet??={};target.closet[input.item]=true;}
+      const label=input.item==='suya'?'some suya':wear.name.toLowerCase();s.giftAt=clock();log(s,`🎁 You sent ${target.name} ${label}.`,now);log(target,`🎁 ${s.name} sent you ${label}!`,now);persist(input.playerId,target);break;}
     case 'friend':{const target=load(input.playerId);fail(target&&input.playerId!==playerId&&!target.blocks.includes(playerId),'That player is unavailable.');if(!s.friends.includes(input.playerId))s.friends.push(input.playerId);break;}
     case 'block':fail(input.playerId!==playerId&&load(input.playerId),'Unknown player.');if(!s.blocks.includes(input.playerId))s.blocks.push(input.playerId);s.friends=s.friends.filter(p=>p!==input.playerId);break;
     case 'unblock':s.blocks=s.blocks.filter(p=>p!==input.playerId);break;

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -33,6 +33,7 @@ export function refill(s, now) {
 }
 export function learn(s, careerKey, skill, points, eventId) {
   if (s.learningEvents.includes(eventId)) return;
+  if(s.team?.mentor)points=Math.round(points*1.25);
   const entry=s.careers[careerKey]?.skills[skill];
   if (!entry) return;
   s.learningEvents.push(eventId);
@@ -72,6 +73,7 @@ export function reconcile(s, now) {
   if(s.pet&&dt<=30_000)for(const [k,rate] of Object.entries(PET_CARE.decay))s.pet[k]=clamp(s.pet[k]-rate*dt/3600_000);
   mishaps(s,now);
   if(dt<=30_000)lifeEvents(s,now);
+  if(dt<=30_000&&s.team?.manager&&now>=(s.nextGigAt||0)){const fam=CAREERS[s.career]?.family,acts=Object.entries(VENUE_ACTS).filter(([,a])=>!a.menu&&(!a.family||a.family===fam));const [key]=acts[Math.floor(Math.random()*acts.length)];s.gig={id:id(),act:key,until:now+GIG.windowMs,bonus:Math.max(20,Math.round((s.fame||0)*.005))};s.nextGigAt=now+GIG.everyMs;log(s,`🧑‍💼 Your manager booked you: ${VENUE_ACTS[key].name} at ${LOCATIONS[VENUE_ACTS[key].venue].name} within 10 minutes for +${s.gig.bonus} fame.`,now);}
   s.lastSeen=now;
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
     item.level=item.upgrade.target; item.upgrade=null; log(s,`${ITEMS[key].name} reached level ${item.level}.`,now);
@@ -97,7 +99,7 @@ export function mishaps(s,now){
   s.mishapAt??={};if(now-(s.mishap?.at||0)<MISHAP.gapMs)return;
   for(const [need,m] of Object.entries(MISHAPS)){
     if(s.needs[need]>MISHAP.at||s.recovery?.need===need||now-(s.mishapAt[need]||0)<MISHAP.cooldownMs)continue;
-    const lost=Math.min(s.fame||0,Math.round(Math.max(MISHAP.minFame,(s.fame||0)*m.fame)*(1-(perksFor(s).scandal||0)/100)));
+    const lost=Math.min(s.fame||0,Math.round(Math.max(MISHAP.minFame,(s.fame||0)*m.fame)*(1-(perksFor(s).scandal||0)/100)*(s.papsUntil>now?1.5:1)*(s.team?.bodyguard?.8:1)));
     addFame(s,-lost,m.title,now);s.mishapAt[need]=now;headline(s,`${s.name}: ${m.title.toLowerCase().replace(/^you /,'')}! ${m.icon}`,now);for(const [k,v] of Object.entries(m.set))s.needs[k]=v;
     s.mishap={id:id(),need,at:now,lost};log(s,`${m.icon} ${m.title}. ${m.text} −${lost.toLocaleString('en-US')} fame.`,now);return;
   }
@@ -107,13 +109,14 @@ export function lifeEvents(s,now,rng=Math.random){
   if(s.nextEventAt==null){s.nextEventAt=now+LIFE_EVENT.firstMs;return;}
   if(now<s.nextEventAt||s.trip)return;
   const family=CAREERS[s.career]?.family,home=s.location==='home'&&!s.visiting;
-  const options=Object.entries(LIFE_EVENTS).filter(([,e])=>(!e.family||e.family===family)&&(!e.where||(e.where==='home')===home));
+  const options=Object.entries(LIFE_EVENTS).filter(([,e])=>(!e.family||e.family===family)&&(!e.where||(e.where==='home')===home)&&(s.fame||0)>=(e.minFame||0)&&!(e.guarded&&s.team?.bodyguard)&&!(e.prompt&&s.prompt));
   const total=options.reduce((n,[,e])=>n+e.weight,0);let pick=rng()*total,key=options[0][0];
   for(const [k,e] of options){pick-=e.weight;if(pick<=0){key=k;break;}}
   const e=LIFE_EVENTS[key];let delta=0,text=e.text;
   if(e.fame){const [share,min]=e.fame,raw=share>0?Math.max(min,(s.fame||0)*share):Math.min(min,(s.fame||0)*share);delta=Math.round(raw<0?raw*(1-(perksFor(s).scandal||0)/100):raw);if(delta<0)delta=Math.max(delta,-(s.fame||0));addFame(s,delta,e.title,now);if(key==='luckyBreak'||key==='slip'||key==='sneeze')headline(s,`${s.name}: ${e.title.toLowerCase().replace(/^you /,'')} ${e.icon}`,now);}
   for(const [k,v] of Object.entries(e.needs||{}))s.needs[k]=clamp(s.needs[k]+v);
   if(key==='powerCut'){if(upgradesFor(s).generator)text='Power cut! Your generator kicked in, so nothing stopped.';else s.powerCut={until:now+LIFE_EVENT.powerCutMs};}
+  if(e.prompt)s.prompt={id:id(),kind:e.prompt,at:now};if(e.paps)s.papsUntil=now+10*60_000;if(e.visit)s.familyVisit=now+5*60_000;
   s.lifeEvent={id:id(),kind:key,at:now,delta,text};log(s,`${e.icon} ${e.title}. ${text}${delta?` ${delta>0?'+':'−'}${Math.abs(delta).toLocaleString('en-US')} fame.`:''}`,now);
   const [lo,hi]=LIFE_EVENT.gapMs;s.nextEventAt=now+lo+Math.round(rng()*(hi-lo));
 }
@@ -130,10 +133,12 @@ export function finishRecovery(s,now){
     s.actFameAt??={};if(act.fame&&(!act.family||act.family===fam)&&now-(s.actFameAt[r.act]||0)>=10*60_000){s.actFameAt[r.act]=now;addFame(s,act.fame,act.name,now);}
     if(act.fitness)s.fitness=Math.min(FITNESS.max,(s.fitness||0)+FITNESS.perWorkout*act.fitness);
     if(act.groceries)s.groceries=(s.groceries||0)+act.groceries;
+    if(s.gig?.act===r.act&&now<=s.gig.until+act.ms){addFame(s,s.gig.bonus,'Manager gig',now);log(s,`🧑‍💼 Gig done! +${s.gig.bonus} fame.`,now);s.gig=null;}
+    if(act.charity&&now-(s.charityAt||0)>=30*60_000){s.charityAt=now;headline(s,`${s.name} spent the day volunteering at Palm General 🤲`,now);}
     if(act.interview&&now-(s.interviewAt||0)>=30*60_000){s.interviewAt=now;const good=Math.random()<.65,delta=good?Math.max(20,Math.round((s.fame||0)*.01)):-Math.max(10,Math.round((s.fame||0)*.005));addFame(s,delta,good?'TV interview':'Awkward TV interview',now);headline(s,good?`${s.name} charmed viewers on PCTV 📺`:`${s.name}'s awkward PCTV interview goes viral 😬`,now);log(s,good?`📺 The interview went great! +${delta} fame.`:`📺 That interview did not go well. ${delta} fame.`,now);}
   }
   const used=r.item&&ITEMS[r.item]?.use;if(used?.fitness&&share>=.5)s.fitness=Math.min(FITNESS.max,(s.fitness||0)+FITNESS.perWorkout*used.fitness);
-  const train=used?.learn;if(train&&(CAREERS[s.career].family===train.family||CAREERS[s.career].family===used.learnAlso)&&share>=.5)learn(s,s.career,CAREERS[s.career].focus,Math.round(train.points*share),`item:${r.id}`);
+  const train=used?.learn;if(train&&(train.family==='*'||CAREERS[s.career].family===train.family||CAREERS[s.career].family===used.learnAlso)&&share>=.5)learn(s,s.career,CAREERS[s.career].focus,Math.round(train.points*share),`item:${r.id}`);
   log(s,share>=1?`${r.label} completed.`:`${r.label}: stopped early, +${Math.round(amount*share)} ${r.need}.`,now);
 }
 // Insights land while you watch: due = 1 at 10s, +1 every 30s after, capped at WATCH_MAX.
@@ -415,6 +420,26 @@ export function act(s,input,now,rng=Math.random) {
       if(s.tattoos.includes(input.spot)){s.tattoos=s.tattoos.filter(t=>t!==input.spot);log(s,`🖋️ Laser removal done: ${TATTOOS[input.spot].toLowerCase()}.`,now);}
       else{s.tattoos.push(input.spot);log(s,`🖋️ New ink: ${TATTOOS[input.spot].toLowerCase()}.`,now);}break;
     }
+    // Choices for life moments (a fan's selfie, a journalist's question).
+    case 'answerPrompt': {
+      const p=s.prompt;requireRule(p&&p.id===input.id,'That moment has passed.');const option=PROMPTS[p.kind]?.options[input.choice];requireRule(option,'Choose an answer.');s.prompt=null;
+      const failed=option.risk&&Math.random()<option.risk,[share,min]=failed?option.riskFame:option.fame||[0,0];
+      if(share||min){const raw=share>0?Math.max(min,(s.fame||0)*share):Math.min(min,(s.fame||0)*share);addFame(s,Math.round(raw),p.kind==='journalist'?'Journalist quote':'Fan selfie',now);}
+      for(const [k,v] of Object.entries(option.needs||{}))s.needs[k]=clamp(s.needs[k]+v);if(option.emote)s.emote={kind:option.emote,at:now};
+      log(s,failed?option.riskText:option.text,now);if(p.kind==='journalist')headline(s,failed?`${s.name}'s shade at ${RIVAL.name} backfires 😬`:`${s.name} on ${RIVAL.name}: "${option.fame[0]>.005?'Stay mad.':'We wish him well.'}"`,now);break;
+    }
+    // Beef with your rival: a diss track that can win or lose fame.
+    case 'beef': {
+      requireRule(s.beefAt==null||now-s.beefAt>=RIVAL.cooldownMs,'Let it cool down before the next diss track.');requireRule(!s.trip,'Wait until you arrive.');s.beefAt=now;
+      const level=s.careers[s.career].skills[CAREERS[s.career].focus].level,win=Math.random()<Math.min(.85,.3+level*.07);
+      const delta=win?Math.max(30,Math.round((s.fame||0)*.015)):-Math.max(15,Math.round((s.fame||0)*.0075));addFame(s,delta,win?'Won a beef':'Lost a beef',now);
+      headline(s,win?`${s.name} wins the beef with ${RIVAL.name} 🔥`:`${RIVAL.name} wins round one against ${s.name} 🥊`,now);log(s,win?`🔥 Your diss track landed. +${delta} fame.`:`🥊 ${RIVAL.name} clapped back harder. ${delta} fame.`,now);break;
+    }
+    case 'hire': {const who=TEAM[input.who];requireRule(who,'Unknown role.');requireRule((s.fame||0)>=who.fame,`A ${who.name.toLowerCase()} works with players who have ${who.fame.toLocaleString('en-US')} fame.`);s.team={...(s.team||{}),[input.who]:{since:now}};if(input.who==='manager')s.nextGigAt=now+60_000;log(s,`${who.icon} Hired a ${who.name.toLowerCase()}.`,now);break;}
+    case 'dismiss': {requireRule(s.team?.[input.who],'Nobody to let go.');delete s.team[input.who];if(input.who==='manager')s.gig=null;break;}
+    // Crews: a name and a badge you share with friends.
+    case 'crewCreate': case 'crewJoin': {const name=text(input.name,24);requireRule(name.length>=2,'Give the crew a name.');s.crew={name,badge:text(input.badge,4)||'⭐',since:now};log(s,`${s.crew.badge} You ${input.type==='crewCreate'?'started':'joined'} the ${name} crew.`,now);break;}
+    case 'crewLeave': {requireRule(s.crew,'You are not in a crew.');s.crew=null;break;}
     case 'post': {
       const body=text(input.body,POSTS.max);requireRule(body,'Write something to post.');
       const fans=Math.round(Math.sqrt(s.fame||0)*(2+Math.random()*3));s.posts=[{id:id(),at:now,body,likes:fans},...(s.posts||[])].slice(0,20);s.needs.social=clamp(s.needs.social+3);
