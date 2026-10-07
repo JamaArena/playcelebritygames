@@ -551,3 +551,9 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 .phone-app-screen .phone-status{padding-right:16px}
 .phone-app .phone-back{display:flex;align-items:center;gap:6px;font-family:var(--fun);font-weight:600;font-size:15px;color:#2f86f2;padding:10px 14px}
 @media(max-height:560px){#modal.as-phone .phone-device{--ph:calc(100dvh - 56px);margin-top:40px}}
+/* Text always fits its bubble: long labels wrap inside the pill instead of spilling out */
+.tray-options>*,.item-card button,#modal .actions button,.phone-app button,.v2-actions button,.idle-actions button,.pie-option,.sim-choice,.object-button{white-space:normal;min-width:0;max-width:100%;overflow-wrap:anywhere;line-height:1.2;text-align:center}
+.tray-options button{padding:10px 12px;display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap}
+.pie-option{max-width:min(260px,calc(100vw - 32px))}
+.item-card,.v2-tile,.v2-row,.person,.reward-tile{min-width:0;overflow-wrap:anywhere}
+.v2-tile small{white-space:normal;overflow-wrap:anywhere;line-height:1.15}
