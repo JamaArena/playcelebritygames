@@ -1,14 +1,13 @@
 import { getDatabase } from '@netlify/database';
 import type { Config } from '@netlify/functions';
-import { handlePersistentRequest } from '../../storage.mjs';
+import { handlePersistentRequest, readPulse } from '../../storage.mjs';
 import { resendSender } from '../../email.mjs';
 
 export default async function handler(request: Request) {
   const path = new URL(request.url).pathname;
   if (path === '/api/pulse' && request.method === 'GET') {
     try {
-      const { rows } = await getDatabase().pool.query('SELECT at FROM celebrity.pulse WHERE id = 1');
-      return Response.json({ at: Number(rows[0]?.at || 0) }, { headers: { 'Cache-Control': 'no-store' } });
+      return await readPulse(getDatabase().pool, request.url);
     } catch { return Response.json({ at: 0 }, { status: 503, headers: { 'Cache-Control': 'no-store' } }); }
   }
   if (!['/api/state', '/api/action', '/api/auth'].includes(path)) return Response.json({ error: 'Endpoint not found.' }, { status: 404 });

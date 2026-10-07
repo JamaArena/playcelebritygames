@@ -61,6 +61,7 @@ export function opportunities(s) {
   const c=s.careers[s.career],def=CAREERS[s.career];
   return {trial:discovery(c,def), launch:s.outputs.some(o=>o.career===s.career&&o.kind==='build'&&!o.released), affiliation:c.offer};
 }
+export const ACTIVE_GAP_MS=70_000;
 export function reconcile(s, now) {
   // Saves from before fame points: rescale reach to the new venue sizes and derive fame once.
   if((s.version||1)<2){let reach=0;for(const c of Object.values(s.careers)){c.audience*=100;reach+=c.audience;}s.fame=(s.fame||0)+fameFor(reach);for(const o of s.outputs)o.gain*=100;s.version=2;}
@@ -73,15 +74,15 @@ export function reconcile(s, now) {
   // Clash medals follow the current names and star thresholds.
   if(s.awards?.some(w=>w.medal))s.awards=s.awards.flatMap(w=>{if(!w.medal||!CLASH_MEDALS[w.medal])return [w];const tier=medalTier(w.medal,s.clashRecord||{});return tier?[{...w,tier,name:`${CLASH_MEDALS[w.medal].name} ${'★'.repeat(tier)}`}]:[];});
   refill(s,now);
-  // Heartbeats arrive every 20 seconds; gaps up to 30 seconds count as active. Offline needs never decay.
+  // Heartbeats arrive every 45 seconds; gaps up to 70 seconds count as active. Offline needs never decay.
   const dt=Math.max(0,now-s.lastSeen);
   const perks=perksFor(s),up=upgradesFor(s);if(s.location==='home'&&!s.visiting&&up.hygiene)perks.hygiene=(perks.hygiene||0)+up.hygiene;
-  if(dt<=30_000)for(const [need,rate] of Object.entries(B.decay))s.needs[need]=clamp(s.needs[need]-rate*(1-(perks[need]||0)/100)*dt/3600_000);
-  if(s.pet&&dt<=30_000)for(const [k,rate] of Object.entries(PET_CARE.decay))s.pet[k]=clamp(s.pet[k]-rate*dt/3600_000);
+  if(dt<=ACTIVE_GAP_MS)for(const [need,rate] of Object.entries(B.decay))s.needs[need]=clamp(s.needs[need]-rate*(1-(perks[need]||0)/100)*dt/3600_000);
+  if(s.pet&&dt<=ACTIVE_GAP_MS)for(const [k,rate] of Object.entries(PET_CARE.decay))s.pet[k]=clamp(s.pet[k]-rate*dt/3600_000);
   mishaps(s,now);
   if((s.fame||0)>=FAME_MARKS.hallOfFame&&!s.hallOfFame){s.hallOfFame=now;headline(s,`${s.name} is inducted into the Palm City Hall of Fame 🌟`,now);log(s,'🌟 You were inducted into the Hall of Fame!',now);}
-  if(dt<=30_000)lifeEvents(s,now);
-  if(dt<=30_000&&s.team?.manager&&now>=(s.nextGigAt||0)){const fam=CAREERS[s.career]?.family,acts=Object.entries(VENUE_ACTS).filter(([,a])=>!a.menu&&!a.moment&&!a.album&&!a.tour&&!a.careers&&!a.minFame&&!a.minOutputs&&(!a.family||a.family===fam));const [key]=acts[Math.floor(Math.random()*acts.length)];s.gig={id:id(),act:key,until:now+GIG.windowMs,bonus:Math.max(20,Math.round((s.fame||0)*.005))};s.nextGigAt=now+GIG.everyMs;log(s,`🧑‍💼 Your manager booked you: ${VENUE_ACTS[key].name} at ${LOCATIONS[VENUE_ACTS[key].venue].name} within 10 minutes for +${s.gig.bonus} fame.`,now);}
+  if(dt<=ACTIVE_GAP_MS)lifeEvents(s,now);
+  if(dt<=ACTIVE_GAP_MS&&s.team?.manager&&now>=(s.nextGigAt||0)){const fam=CAREERS[s.career]?.family,acts=Object.entries(VENUE_ACTS).filter(([,a])=>!a.menu&&!a.moment&&!a.album&&!a.tour&&!a.careers&&!a.minFame&&!a.minOutputs&&(!a.family||a.family===fam));const [key]=acts[Math.floor(Math.random()*acts.length)];s.gig={id:id(),act:key,until:now+GIG.windowMs,bonus:Math.max(20,Math.round((s.fame||0)*.005))};s.nextGigAt=now+GIG.everyMs;log(s,`🧑‍💼 Your manager booked you: ${VENUE_ACTS[key].name} at ${LOCATIONS[VENUE_ACTS[key].venue].name} within 10 minutes for +${s.gig.bonus} fame.`,now);}
   s.lastSeen=now;
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
     item.level=item.upgrade.target; item.upgrade=null; log(s,`${ITEMS[key].name} reached level ${item.level}.`,now);

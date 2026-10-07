@@ -56,3 +56,54 @@ test('Netlify Postgres persists cold requests, serializes retries and rolls back
   const count = await pool.query('SELECT count(*) FROM celebrity.players');
   assert.equal(Number(count.rows[0].count), 1);
 });
+
+test('Netlify check-ins load only nearby rows, pulses are per place and player, and deletes persist', async t => {
+  const database = new NetlifyDB({ logger: () => {} });
+  const connectionString = await database.start();
+  const pool = new pg.Pool({ connectionString, max: 1 });
+  t.after(async () => { await pool.end(); await database.stop(); });
+  await database.applyMigrations('netlify/database/migrations');
+  const { readPulse } = await import('../storage.mjs');
+  const queries = [];
+  const spy = { async connect() {
+    const client = await pool.connect();
+    return { release: () => client.release(), query: (sql, params) => { queries.push(sql); return client.query(sql, params); } };
+  } };
+  const player = () => {
+    let cookie = '';
+    return async (path, input) => {
+      const request = new Request('https://city.example/api/' + path, {
+        method: input ? 'POST' : 'GET', headers: { Cookie: cookie, ...(input ? { 'Content-Type': 'application/json' } : {}) },
+        ...(input ? { body: JSON.stringify({ requestId: randomUUID(), ...input }) } : {}),
+      });
+      const response = await handlePersistentRequest(spy, request);
+      const setCookie = response.headers.get('set-cookie');
+      if (setCookie) cookie = setCookie.split(';')[0];
+      return { status: response.status, data: await response.json() };
+    };
+  };
+  const ada = player(), ben = player();
+  await ada('state'); await ben('state');
+  assert.equal((await ada('action', { type: 'create', name: 'Ada', career: 'musician', origin: 0 })).status, 200);
+  assert.equal((await ben('action', { type: 'create', name: 'Ben', career: 'actor', origin: 0 })).status, 200);
+  queries.length = 0;
+  const seen = (await ada('state')).data;
+  assert.equal(seen.state.name, 'Ada');
+  assert.ok(seen.players.some(p => p.name === 'Ben' && p.online), 'other players come from their public cards');
+  assert.ok(!seen.players.some(p => 'blocks' in p), 'block lists stay private');
+  assert.ok(queries.some(sql => sql.includes('pg_advisory_xact_lock_shared')), 'check-ins share the city lock');
+  assert.ok(!queries.some(sql => /^SELECT \* FROM celebrity\.\w+$/.test(sql)), 'check-ins never load whole tables');
+  const pulse = async keys => (await (await readPulse(pool, 'https://city.example/api/pulse' + (keys ? '?keys=' + keys : ''))).json()).at;
+  const adaId = seen.playerId, benId = (await ben('state')).data.playerId;
+  const before = await pulse('p:' + benId);
+  await ada('action', { type: 'travel', location: 'studio' });
+  assert.ok(await pulse('p:' + adaId) > 0, 'an action wakes the player');
+  assert.ok(await pulse(`room:home:${adaId}`) > 0, 'and the room they left');
+  assert.equal(await pulse('p:' + benId), before, 'but not people elsewhere');
+  assert.ok(await pulse() > 0, 'older pages still get the city-wide pulse');
+  assert.equal((await readPulse(pool, 'https://city.example/api/pulse?keys=bad%20key')).status, 400);
+  assert.equal((await ben('auth', { type: 'logout', deleteGuest: true })).status, 200);
+  assert.equal(Number((await pool.query('SELECT count(*) FROM celebrity.players WHERE id = $1', [benId])).rows[0].count), 0, 'deleted guests are removed from Postgres');
+  assert.equal(Number((await pool.query('SELECT count(*) FROM celebrity.profiles WHERE id = $1', [benId])).rows[0].count), 0, 'with their public card');
+  assert.ok(!(await ada('state')).data.players.some(p => p.name === 'Ben'));
+});

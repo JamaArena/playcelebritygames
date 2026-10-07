@@ -101,7 +101,7 @@ test('upgrades need rising fame and time, finish offline once, preserve ownershi
 });
 test('needs fill up as you go: getting up early keeps a share, completion applies once',()=>{
   const s=make();s.needs.hunger=10;act(s,{type:'recover',need:'hunger'},T);act(s,{type:'cancel'},T+30_000);assert.ok(Math.abs(s.needs.hunger-30)<.5,'half the time gives half the meal');s.needs.hunger=10;
-  act(s,{type:'recover',need:'hunger'},T+20_000);reconcile(s,T+80_000);assert.ok(s.needs.hunger>=45);const hunger=s.needs.hunger;reconcile(s,T+140_000);assert.equal(s.needs.hunger,hunger);
+  act(s,{type:'recover',need:'hunger'},T+20_000);reconcile(s,T+80_000);assert.ok(s.needs.hunger>=45);const hunger=s.needs.hunger;reconcile(s,T+300_000);assert.equal(s.needs.hunger,hunger);
 });
 test('build and launch consume separate charges and cannot launch a product twice',()=>{
   const s=make('founder');go(s);complete(s,'build');const product=s.outputs[0];assert.equal(product.released,false);assert.equal(s.careers.founder.audience,0);assert.equal(s.fame,0);

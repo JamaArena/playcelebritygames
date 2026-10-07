@@ -1,6 +1,6 @@
 import pg from 'pg';
 import { readFileSync } from 'node:fs';
-import { handlePersistentRequest } from './storage.mjs';
+import { handlePersistentRequest, readPulse } from './storage.mjs';
 import { resendSender } from './email.mjs';
 
 const migrations = [
@@ -9,6 +9,7 @@ const migrations = [
   new URL('./netlify/database/migrations/0003_battles/migration.sql', import.meta.url),
   new URL('./netlify/database/migrations/0004_accounts/migration.sql', import.meta.url),
   new URL('./netlify/database/migrations/0005_active-device/migration.sql', import.meta.url),
+  new URL('./netlify/database/migrations/0006_profiles-pulses/migration.sql', import.meta.url),
 ];
 let pool, ready;
 async function database() {
@@ -42,8 +43,7 @@ export async function cloudRequest(request) {
   try {
     const db = await database();
     if (pathname === '/api/pulse' && request.method === 'GET') {
-      const { rows } = await db.query('SELECT at FROM celebrity.pulse WHERE id = 1');
-      return Response.json({ at: Number(rows[0]?.at || 0) }, { headers: { 'Cache-Control': 'no-store' } });
+      return await readPulse(db, request.url);
     }
     return await handlePersistentRequest(db, request, {
       sendEmail: resendSender(process.env.RESEND_API_KEY, process.env.EMAIL_FROM),

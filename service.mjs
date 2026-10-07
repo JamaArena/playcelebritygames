@@ -5,15 +5,39 @@ import { randomBytes, createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline } from './game.mjs';
 import { CAREERS, BALANCE, clamp, perksFor, WEAR, SPOUSE_SHARE, SPOUSE_REASON } from './public/content.js';
-export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL);";
-export function createGameService(db,{secureCookies=false,sendEmail=null}={}) {
+export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS profiles(id TEXT PRIMARY KEY, room TEXT, location TEXT, career TEXT, fame INTEGER, trend INTEGER, seen INTEGER, dating INTEGER, crew INTEGER, outside INTEGER, data TEXT NOT NULL);\n CREATE INDEX IF NOT EXISTS profiles_room ON profiles(room,seen);\n CREATE INDEX IF NOT EXISTS profiles_seen ON profiles(seen);\n CREATE INDEX IF NOT EXISTS profiles_fame ON profiles(fame);\n CREATE INDEX IF NOT EXISTS profiles_career ON profiles(career,seen);";
+// Who counts as online, and the room a player is in (a home, or a public place).
+export const ONLINE_MS=100_000;
+export const roomOf=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
+// Everything a player's update reads besides their own save, as small capped queries.
+// The cloud adapters run the same queries against Postgres to load only these rows.
+export function relatedQueries(playerId,s,now){
+  const room=roomOf(playerId,s),cut=now-ONLINE_MS,ids=[...new Set([...(s.friends||[]),...(s.invitations||[]).map(i=>i.from),...(s.proposals||[]).map(p=>p.from),s.spouse?.id,s.visiting].filter(Boolean))].slice(0,300);
+  return {
+    profiles:[
+      ['SELECT * FROM profiles WHERE room=? AND seen>? ORDER BY seen DESC LIMIT 100',[room,cut]],
+      ['SELECT * FROM profiles ORDER BY fame DESC LIMIT 25',[]],
+      ['SELECT * FROM profiles WHERE seen>? ORDER BY trend DESC LIMIT 10',[now-86_400_000]],
+      ['SELECT * FROM profiles WHERE seen>? AND outside=1 ORDER BY seen DESC LIMIT 150',[cut]],
+      ['SELECT * FROM profiles ORDER BY seen DESC LIMIT 40',[]],
+      ['SELECT * FROM profiles WHERE career=? ORDER BY seen DESC LIMIT 20',[s.career]],
+      ['SELECT * FROM profiles WHERE dating=1 ORDER BY seen DESC LIMIT 20',[]],
+      ['SELECT * FROM profiles WHERE crew=1 ORDER BY seen DESC LIMIT 30',[]],
+      ...(ids.length?[[`SELECT * FROM profiles WHERE id IN (${ids.map(()=>'?').join(',')})`,ids]]:[]),
+    ],
+    messages:['SELECT * FROM messages WHERE (location=? AND recipient IS NULL) OR recipient=? OR (sender=? AND recipient IS NOT NULL) ORDER BY at DESC LIMIT 50',[room,playerId,playerId]],
+    battles:['SELECT * FROM battles WHERE state LIKE ? OR (state LIKE ? AND state LIKE ?)',[`%${playerId}%`,'%"status":"open"%',`%"location":"${s.location}"%`]],
+    agreements:['SELECT * FROM agreements WHERE state LIKE ?',[`%${playerId}%`]],
+  };
+}
+export function createGameService(db,{secureCookies=false,sendEmail=null,fast=false}={}) {
 db.exec(schema);
 const read=db.prepare('SELECT * FROM players WHERE id=?');
 const save=db.prepare('UPDATE players SET state=? WHERE id=?');
 const clock=()=>Date.now();
 const hash=v=>createHash('sha256').update(v).digest('hex');
 const load=playerId=>{const row=read.get(playerId);return row?JSON.parse(row.state):null;};
-const persist=(playerId,s)=>save.run(JSON.stringify(s),playerId);
+const persist=(playerId,s)=>{save.run(JSON.stringify(s),playerId);if(s)saveProfile(playerId,s);};
 const fail=(condition,message)=>{if(!condition)throw new GameError(message);};
 let season=db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get();
 if(!season){const starts=clock();db.prepare('INSERT INTO seasons(id,starts,ends) VALUES(1,?,?)').run(starts,starts+BALANCE.seasonMs);}
@@ -68,21 +92,37 @@ function captureEligibility(s,now){
     }
   }
 }
-const TOWN_PLAYER_LIMIT=120,ACTIVE_DEVICE_MS=45_000;
+const TOWN_PLAYER_LIMIT=120,ACTIVE_DEVICE_MS=ONLINE_MS;
 class OtherDevice extends Error {}
-const roomFor=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
-function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,hairColor:s.hairColor||'black',tattoos:s.tattoos||[],build:s.build||'average',height:s.height||'average',career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,wear:s.wear||null,emote:s.emote||null,crew:s.crew||null,spouse:s.spouse?.name||null,verified:(s.fame||0)>=50_000,hallOfFame:s.hallOfFame||null,trend:(s.fameLog||[]).filter(e=>clock()-e.at<86_400_000).reduce((n,e)=>n+e.delta,0),bodyguard:!!s.team?.bodyguard,posts:(s.posts||[]).slice(0,3),headlines:(s.headlines||[]).slice(0,2),dating:!!s.dating?.open,datingLikes:s.dating?.open?s.dating.likes.slice(0,50):[],home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<45_000};}
+const roomFor=roomOf;
+function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,hairColor:s.hairColor||'black',tattoos:s.tattoos||[],build:s.build||'average',height:s.height||'average',career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,wear:s.wear||null,emote:s.emote||null,crew:s.crew||null,spouse:s.spouse?.name||null,verified:(s.fame||0)>=50_000,hallOfFame:s.hallOfFame||null,trend:(s.fameLog||[]).filter(e=>clock()-e.at<86_400_000).reduce((n,e)=>n+e.delta,0),bodyguard:!!s.team?.bodyguard,posts:(s.posts||[]).slice(0,3),headlines:(s.headlines||[]).slice(0,2),dating:!!s.dating?.open,datingLikes:s.dating?.open?s.dating.likes.slice(0,50):[],home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<ONLINE_MS};}
+// A player's public card, kept beside their save so updates never have to read everyone's saves.
+let upsertProfile=null;
+function saveProfile(playerId,s){
+  if(!s?.careers)return;const p=publicProfile(playerId,s);delete p.online;
+  upsertProfile??=db.prepare('INSERT INTO profiles(id,room,location,career,fame,trend,seen,dating,crew,outside,data) VALUES(?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET room=excluded.room,location=excluded.location,career=excluded.career,fame=excluded.fame,trend=excluded.trend,seen=excluded.seen,dating=excluded.dating,crew=excluded.crew,outside=excluded.outside,data=excluded.data');
+  upsertProfile.run(playerId,p.sceneRoom,s.location,s.career,Math.round(p.fame||0),Math.round(p.trend||0),s.lastSeen||0,p.dating?1:0,s.crew?1:0,s.location!=='home'||s.trip?1:0,JSON.stringify({...p,blocks:s.blocks||[]}));
+}
+// One-off: players saved before profiles existed get their card now.
+if(!fast)for(const row of db.prepare("SELECT p.id,p.state FROM players p LEFT JOIN profiles f ON f.id=p.id WHERE f.id IS NULL AND p.state!='null'").all())saveProfile(row.id,JSON.parse(row.state));
 function snapshot(playerId,s,now){
   const account=accountOf(playerId);
   if(!s)return {state:null,serverNow:now,account};
-  const players=db.prepare('SELECT id,state FROM players WHERE id!=?').all(playerId).flatMap(row=>{const p=JSON.parse(row.state);return p?[publicProfile(row.id,p)]:[];}).filter(p=>!s.blocks.includes(p.id));
-  const scenePlayers=players.filter(p=>p.sceneRoom===roomFor(playerId,s)&&p.online&&!load(p.id)?.blocks.includes(playerId));
+  // Only the people this player can see or needs: here, friends, the stars, recently active, peers. Never everyone.
+  const q=relatedQueries(playerId,s,now),room=roomFor(playerId,s),rows=new Map();
+  for(const [sql,args] of q.profiles)for(const r of db.prepare(sql).all(...args))if(r.id!==playerId&&!rows.has(r.id))rows.set(r.id,r);
+  const raw=db.prepare(q.messages[0]).all(...q.messages[1]),missing=[...new Set(raw.map(m=>m.sender))].filter(x=>x!==playerId&&!rows.has(x));
+  if(missing.length)for(const r of db.prepare(`SELECT * FROM profiles WHERE id IN (${missing.map(()=>'?').join(',')})`).all(...missing))rows.set(r.id,r);
+  const cards=[...rows.values()].map(r=>({...JSON.parse(r.data),online:now-Number(r.seen)<ONLINE_MS})),blockedMe=new Set(cards.filter(p=>(p.blocks||[]).includes(playerId)).map(p=>p.id));
+  const players=cards.filter(p=>!s.blocks.includes(p.id)).map(({blocks,...p})=>p),byId=new Map(players.map(p=>[p.id,p]));
+  nameOf=id=>id===playerId?s.name:byId.get(id)?.name??(()=>{const r=db.prepare('SELECT data FROM profiles WHERE id=?').get(id);return r?JSON.parse(r.data).name:'Player';})();
+  const scenePlayers=players.filter(p=>p.sceneRoom===room&&p.online&&!blockedMe.has(p.id));
   // Everyone online in a public place, wherever they are in town; homes stay private. Capped per response.
-  const townPlayers=players.filter(p=>p.online&&(p.location!=='home'||p.trip)&&p.sceneRoom!==roomFor(playerId,s)&&!load(p.id)?.blocks.includes(playerId))
+  const townPlayers=players.filter(p=>p.online&&(p.location!=='home'||p.trip)&&p.sceneRoom!==room&&!blockedMe.has(p.id))
     .sort((x,y)=>Number(s.friends.includes(y.id))-Number(s.friends.includes(x.id))).slice(0,TOWN_PLAYER_LIMIT)
     .map(({id,name,color,hair,hairColor,build,height,career,location,position3d,tier,fame,ride,clothes,trip})=>({id,name,color,hair,hairColor,build,height,career,location,position3d,tier,fame,ride,clothes,trip}));
-  const messages=db.prepare('SELECT * FROM messages WHERE (location=? AND recipient IS NULL) OR recipient=? OR (sender=? AND recipient IS NOT NULL) ORDER BY at DESC LIMIT 50').all(roomFor(playerId,s),playerId,playerId).filter(m=>!s.blocks.includes(m.sender)).reverse().map(m=>({...m,name:load(m.sender)?.name||'Visitor'}));
-  const agreements=db.prepare('SELECT * FROM agreements').all().map(r=>JSON.parse(r.state)).filter(a=>a.participants.includes(playerId)&&['pending','running'].includes(a.status));
+  const messages=raw.filter(m=>!s.blocks.includes(m.sender)).reverse().map(m=>({...m,name:nameOf(m.sender)||'Visitor'}));
+  const agreements=db.prepare(q.agreements[0]).all(...q.agreements[1]).map(r=>JSON.parse(r.state)).filter(a=>a.participants.includes(playerId)&&['pending','running'].includes(a.status));
   const visiting=s.visiting?load(s.visiting):null;
   const battles=battlesFor(playerId,s,now);
   return {state:view(s,now),account,playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture,home:visiting.home||null}:null,season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
@@ -178,7 +218,7 @@ function battleAction(playerId,s,input,now){
   else if(input.type==='battleStart'){
     fail(b.status==='open'&&b.host===playerId,'Only the host starts an open battle.');fail(b.teams.every(t=>t.length===b.mode),`Both teams need ${b.mode} fighter${b.mode>1?'s':''}.`);
     const states=Object.fromEntries(b.teams.flat().map(p=>[p,p===playerId?s:load(p)]));
-    for(const [p,ps] of Object.entries(states)){if(p!==playerId)reconcile(ps,now);fail(ps.location===b.location&&now-ps.lastSeen<45_000,`${ps.name} needs to be here and online.`);fail(ps.charges>0,`${ps.name} has no career charges left.`);fail(ps.needs.energy>=20,`${ps.name} is too tired to battle.`);fail(!ps.active&&!ps.recovery,`${ps.name} is busy with an activity.`);}
+    for(const [p,ps] of Object.entries(states)){if(p!==playerId)reconcile(ps,now);fail(ps.location===b.location&&now-ps.lastSeen<ONLINE_MS,`${ps.name} needs to be here and online.`);fail(ps.charges>0,`${ps.name} has no career charges left.`);fail(ps.needs.energy>=20,`${ps.name} is too tired to battle.`);fail(!ps.active&&!ps.recovery,`${ps.name} is busy with an activity.`);}
     for(const [p,ps] of Object.entries(states)){ps.charges--;if(ps.refillAnchor===null)ps.refillAnchor=now;b.fighters[p]=fighterStats(ps);if(p!==playerId)persist(p,ps);}
     // A secret: the smaller player sometimes has a lucky shirt day and the crowd backs them whatever the gap.
     {const [x,y]=[b.teams[0][0],b.teams[1][0]],fx=b.fighters[x].fame,fy=b.fighters[y].fame;if(fx!==fy&&Math.random()<.1)b.lucky=fx<fy?x:y;}
@@ -193,12 +233,13 @@ function battleAction(playerId,s,input,now){
   else return false;
   saveBattle(b);return true;
 }
+let nameOf=id=>load(id)?.name||'Player';
 function battlesFor(playerId,s,now){
-  const rows=db.prepare('SELECT state FROM battles').all().map(r=>JSON.parse(r.state));
+  const q=relatedQueries(playerId,s,now).battles,rows=db.prepare(q[0]).all(...q[1]).map(r=>JSON.parse(r.state));
   for(const b of rows)if(b.status==='running'&&b.teams.flat().includes(playerId)&&tickBattle(b,now))saveBattle(b);
-  const names=ids=>ids.map(p=>({id:p,name:load(p)?.name||'Player'}));
+  const names=ids=>ids.map(p=>({id:p,name:nameOf(p)}));
   return rows.filter(b=>b.teams.flat().includes(playerId)?(b.status!=='done'&&b.status!=='cancelled')||now-(b.endedAt||b.createdAt)<5*60_000:b.status==='open'&&b.location===s?.location)
-    .map(({lucky,...b})=>({...b,teamNames:b.teams.map(names),stake:b.status==='done'?null:clashStake(Math.min(...b.teams.flat().map(id=>load(id)?.fame||0)))}));
+    .map(({lucky,...b})=>({...b,teamNames:b.teams.map(names),stake:b.status==='done'?null:clashStake(Math.min(...b.teams.flat().map(id=>id===playerId?s.fame||0:Number(db.prepare('SELECT fame FROM profiles WHERE id=?').get(id)?.fame||0))))}));
 }
 // Accounts: email + one-time code, no passwords. A code proves the email; the account then owns this
 // browser's character (or the one already linked to that email when logging in on a new device).
@@ -243,14 +284,14 @@ async function authAction(playerId,token,input,now,res){
   if(input.type==='logout'){
     // Guests have nothing to come back to: logging out deletes the guest character for good.
     if(!accountOf(playerId)){fail(input.deleteGuest===true,'Guests lose their character when they log out. Confirm to continue.');fail(!load(playerId)?.battle,'Finish your battle first.');
-      db.prepare('DELETE FROM players WHERE id=?').run(playerId);res.setHeader('Set-Cookie',`celebrity=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secureCookies?'; Secure':''}`);return [200,{loggedOut:true,deleted:true}];}
+      db.prepare('DELETE FROM players WHERE id=?').run(playerId);db.prepare('DELETE FROM profiles WHERE id=?').run(playerId);res.setHeader('Set-Cookie',`celebrity=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secureCookies?'; Secure':''}`);return [200,{loggedOut:true,deleted:true}];}
     if(token){db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hash(token));db.prepare('UPDATE players SET token_hash=? WHERE token_hash=?').run(hash(randomBytes(32).toString('hex')),hash(token));}
     res.setHeader('Set-Cookie',`celebrity=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secureCookies?'; Secure':''}`);return [200,{loggedOut:true}];
   }
   if(input.type==='newLife'){
     fail(accountOf(playerId),'Sign in to start a new life.');fail(input.confirm==='NEW LIFE','Type NEW LIFE to confirm.');
     const s=load(playerId);if(s?.battle)throw new GameError('Finish your battle first.');
-    db.prepare('UPDATE players SET state=? WHERE id=?').run('null',playerId);return [200,{reset:true}];
+    db.prepare('UPDATE players SET state=? WHERE id=?').run('null',playerId);db.prepare('DELETE FROM profiles WHERE id=?').run(playerId);return [200,{reset:true}];
   }
   throw new GameError('Unknown account action.');
 }
