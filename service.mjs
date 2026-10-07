@@ -30,14 +30,17 @@ export function relatedQueries(playerId,s,now){
     agreements:['SELECT * FROM agreements WHERE state LIKE ?',[`%${playerId}%`]],
   };
 }
-export function createGameService(db,{secureCookies=false,sendEmail=null,fast=false}={}) {
+export function createGameService(db,{secureCookies=false,sendEmail=null,fast=false,onChange=null}={}) {
+// While an action runs, the rooms and players it touched (for live nudges).
+let touched=null;const touch=(...keys)=>{if(touched)for(const k of keys)if(k)touched.add(k);};
+const touchPlayer=(playerId,s)=>{if(!touched)return;touch('p:'+playerId);const old=read.get(playerId);for(const st of [s,old&&JSON.parse(old.state)])if(st?.location)touch('room:'+roomOf(playerId,st));};
 db.exec(schema);
 const read=db.prepare('SELECT * FROM players WHERE id=?');
 const save=db.prepare('UPDATE players SET state=? WHERE id=?');
 const clock=()=>Date.now();
 const hash=v=>createHash('sha256').update(v).digest('hex');
 const load=playerId=>{const row=read.get(playerId);return row?JSON.parse(row.state):null;};
-const persist=(playerId,s)=>{save.run(JSON.stringify(s),playerId);if(s)saveProfile(playerId,s);};
+const persist=(playerId,s)=>{touchPlayer(playerId,s);save.run(JSON.stringify(s),playerId);if(s)saveProfile(playerId,s);};
 const fail=(condition,message)=>{if(!condition)throw new GameError(message);};
 let season=db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get();
 if(!season){const starts=clock();db.prepare('INSERT INTO seasons(id,starts,ends) VALUES(1,?,?)').run(starts,starts+BALANCE.seasonMs);}
@@ -135,7 +138,7 @@ const BATTLE={turnMs:30_000,stakes:{1:50},modes:[1],rounds:3,crowd:100};
 const CLASH_ODDS={brag:[.55,.05],shade:[.62,.04],violence:[.5,.06],charm:[.74,.03]},CLASH_HIT={brag:[14,2.4],shade:[11,1.9],violence:[18,2.8],charm:[7,1.1]},CLASH_BACK={brag:[11,1.1],shade:[8,.9],violence:[14,1.4],charm:[5,.5]};
 const SIGNATURES={sport:'Power play',music:'Show-stopper riff',creator:'Viral moment',acting:'Scene stealer',tech:'Pitch-perfect demo'};
 const loadBattle=battleId=>{const row=db.prepare('SELECT state FROM battles WHERE id=?').get(battleId);return row?JSON.parse(row.state):null;};
-const saveBattle=b=>db.prepare('INSERT INTO battles VALUES(?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state').run(b.id,JSON.stringify(b));
+const saveBattle=b=>(touch(...b.teams.flat().map(p=>'p:'+p),b.location&&'room:'+b.location),db.prepare('INSERT INTO battles VALUES(?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state').run(b.id,JSON.stringify(b)));
 function fighterStats(ps){
   const skills=Object.values(ps.careers[ps.career].skills).map(s=>s.level),best=Math.max(...skills),average=skills.reduce((a,b)=>a+b,0)/skills.length;
   const max=BATTLE.crowd;
@@ -309,7 +312,7 @@ function social(playerId,s,input,now){
       const body=String(input.body||'').trim();fail(body.length>0&&body.length<=300,'Use a message of 1–300 characters.');fail(input.recipient,'Chat is between friends. Pick a friend to message.');
       const previous=db.prepare('SELECT at FROM messages WHERE sender=? ORDER BY at DESC LIMIT 1').get(playerId);fail(!previous||now-previous.at>=1000,'Wait a moment before sending again.');
       if(input.recipient){const target=load(input.recipient);fail(target&&!target.blocks.includes(playerId)&&!s.blocks.includes(input.recipient),'Direct contact is unavailable.');fail(s.friends.includes(input.recipient),'Add this person as a friend first.');}
-      db.prepare('INSERT INTO messages VALUES(?,?,?,?,?,?)').run(id(),playerId,roomFor(playerId,s),input.recipient||null,body,now);break;
+      db.prepare('INSERT INTO messages VALUES(?,?,?,?,?,?)').run(id(),playerId,roomFor(playerId,s),input.recipient||null,body,now);touch(input.recipient?'p:'+input.recipient:'room:'+roomFor(playerId,s));break;
     }
     case 'gift':{
       const target=load(input.playerId);fail(target&&s.friends.includes(input.playerId)&&!target.blocks.includes(playerId),'Send gifts to a friend.');fail(clock()-(s.giftAt||0)>=10*60_000,'One gift every 10 minutes.');
@@ -343,7 +346,7 @@ function social(playerId,s,input,now){
       const audienceShare=Number(input.audienceShare);
       fail(audienceShare>=0&&audienceShare<=100,'Shares must be between 0 and 100.');
       const a={id:id(),host:playerId,participants:[playerId,input.playerId],accepted:[playerId],career:s.career,title:String(input.title||'Together in the city').slice(0,70),audienceShares:[audienceShare/100,1-audienceShare/100],status:'pending',at:now};
-      db.prepare('INSERT INTO agreements VALUES(?,?)').run(a.id,JSON.stringify(a));break;
+      db.prepare('INSERT INTO agreements VALUES(?,?)').run(a.id,JSON.stringify(a));touch(...a.participants.map(p=>'p:'+p));break;
     }
     case 'collabAccept':case 'collabStart':case 'collabCancel': {
       const row=db.prepare('SELECT state FROM agreements WHERE id=?').get(input.agreementId);const a=row?JSON.parse(row.state):null;
@@ -364,7 +367,7 @@ function social(playerId,s,input,now){
         }
         a.status='running';
       }
-      db.prepare('UPDATE agreements SET state=? WHERE id=?').run(JSON.stringify(a),a.id);break;
+      db.prepare('UPDATE agreements SET state=? WHERE id=?').run(JSON.stringify(a),a.id);touch(...a.participants.map(p=>'p:'+p));break;
     }
     default:return false;
   }
@@ -376,7 +379,7 @@ function collaborativeFinish(playerId,s,input,now) {
   const a=JSON.parse(db.prepare('SELECT state FROM agreements WHERE id=?').get(agreementId).state);
   const activity=s.active;fail(activity.id===input.activityId&&activity.beat>=activity.totalBeats&&now>=activity.readyAt,'Finish your decisions and final commentary.');
   a.ready??=[];if(!a.ready.includes(playerId))a.ready.push(playerId);
-  if(a.ready.length<a.participants.length){db.prepare('UPDATE agreements SET state=? WHERE id=?').run(JSON.stringify(a),a.id);return true;}
+  if(a.ready.length<a.participants.length){db.prepare('UPDATE agreements SET state=? WHERE id=?').run(JSON.stringify(a),a.id);touch(...a.participants.map(p=>'p:'+p));return true;}
   const states=a.participants.map(p=>p===playerId?s:load(p));
   fail(states.every(ps=>ps.active?.agreementId===a.id),'A participant has left. The host can cancel.');
   const quality=Math.round(states.flatMap(ps=>ps.active.outcomes).reduce((n,o)=>n+o.score,0)/states.flatMap(ps=>ps.active.outcomes).length);
@@ -392,14 +395,15 @@ function collaborativeFinish(playerId,s,input,now) {
     evaluate(ps,a.career);captureEligibility(ps,now);log(ps,`Collaboration completed: ${audience.toLocaleString('en-US')} ${CAREERS[a.career].audience} · +${fame} fame.`,now);
     if(a.participants[i]!==playerId)persist(a.participants[i],ps);
   }
-  a.status='completed';a.quality=quality;db.prepare('UPDATE agreements SET state=? WHERE id=?').run(JSON.stringify(a),a.id);return true;
+  a.status='completed';a.quality=quality;db.prepare('UPDATE agreements SET state=? WHERE id=?').run(JSON.stringify(a),a.id);touch(...a.participants.map(p=>'p:'+p));return true;
 }
 
 async function body(req){
   let size=0,chunks=[];for await(const chunk of req){size+=chunk.length;if(size>16_384)throw new GameError('Request too large.');chunks.push(chunk);}return JSON.parse(Buffer.concat(chunks).toString()||'{}');
 }
 
-return async function handle(request) {
+const playerForCookie=cookie=>{const token=String(cookie||'').match(/(?:^|;\s*)celebrity=([a-f0-9]{64})/)?.[1];if(!token)return null;const h=hash(token);return (db.prepare('SELECT id FROM players WHERE token_hash=?').get(h)||db.prepare('SELECT player_id AS id FROM sessions WHERE token_hash=?').get(h))?.id||null;};
+return Object.assign(async function handle(request) {
 const url=new URL(request.url);
 const req=Readable.from(request.body?[Buffer.from(await request.arrayBuffer())]:[]);
 req.url=url.pathname;req.method=request.method;req.headers=Object.fromEntries(request.headers);req.headers.host=url.host;
@@ -433,7 +437,8 @@ try {
       }
       if(req.method==='POST'&&url.pathname==='/api/action') {
         const input=await body(req);fail(typeof input.requestId==='string'&&input.requestId.length<=80,'An action identifier is required.');
-        const s=transact(()=>{
+        touched=new Set();let s;
+        try{s=transact(()=>{
           let state=load(playerId);
           if(db.prepare('SELECT 1 FROM requests WHERE player_id=? AND request_id=?').get(playerId,input.requestId))return state;
           // The starting story is drawn here, not chosen: a humble start or the best start (with a car).
@@ -449,12 +454,12 @@ try {
             if(input.type==='travel')state.visiting=null;
           }
           captureEligibility(state,now);persist(playerId,state);db.prepare('INSERT INTO requests VALUES(?,?)').run(playerId,input.requestId);return state;
-        });json(200,snapshot(playerId,s,now));
+        });onChange?.([...touched]);}finally{touched=null;}json(200,snapshot(playerId,s,now));
       }
       if(!payload)json(404,{error:'Endpoint not found.'});
     }
 
 }catch(error){if(error instanceof OtherDevice){json(409,{error:'Celebrity Games is open on another device.',code:'other_device'});return new Response(JSON.stringify(payload),{status,headers});}if(!(error instanceof GameError)&&!(error instanceof SyntaxError))console.error(error);json(error instanceof GameError||error instanceof SyntaxError?400:500,{error:error instanceof GameError?error.message:'The request could not be completed.'});}
 return new Response(JSON.stringify(payload??{error:'Endpoint not found.'}),{status:payload?status:404,headers});
-};
+},{playerForCookie});
 }

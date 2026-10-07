@@ -102,7 +102,9 @@ function notice(data,own){
 let seenLifeEvent=null;
 function showLifeEvent(s){
   const e=s?.lifeEvent,def=e&&LIFE_EVENTS[e.kind];if(!def||seenLifeEvent===e.id)return;const first=seenLifeEvent===null;seenLifeEvent=e.id;
-  if(first&&Date.now()+offset-e.at>60_000)return;
+  // Remembered across reloads (such as a 2D/3D switch) so the same moment never pops up twice.
+  let shown=null;try{shown=localStorage.getItem('cg.lifeEvent');localStorage.setItem('cg.lifeEvent',e.id);}catch{}
+  if(first&&(shown===e.id||Date.now()+offset-e.at>60_000))return;
   showNotice(def.icon,`${def.title}!`,e.text,e.delta);world.say('me',def.icon);
 }
 // Life moments that ask for a choice: a fan's selfie, a journalist's question.
@@ -121,7 +123,7 @@ function showMishap(s){
   if(modalPage){toast(`${def.icon} ${def.title}! −${m.lost.toLocaleString('en-US')} fame.`);world.playMishap(m);}else showModal('mishap',card,false);
 }
 function receive(data,own=false){notice(data,own);const before=state;snapshot=data;state=data.state;if(before&&state&&before.name===state.name)celebrate(before,state);offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();showMishap(state);showLifeEvent(state);showPrompt(state);drawMinimap();
-  $('#loading').hidden=true;lastUpdate=Date.now();scheduleHeartbeat(); // every update (an action or a refresh) restarts the 45s countdown
+  $('#loading').hidden=true;lastUpdate=Date.now();scheduleHeartbeat();liveFollow?.(); // every update (an action or a refresh) restarts the 45s countdown
   if(!state){if(!data.account){if(modalPage!=='auth')authScreen('signup');}else if(modalPage!=='create')creation(data.account);return;}
   if(!welcomed){welcomed=true;setTimeout(()=>welcome(data),0);}
   $('#app').hidden=false;render();if(modalPage==='thread'&&$('#threadLog')){const log=$('#threadLog'),atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<40;log.innerHTML=threadMessages(threadWith);if(atBottom)log.scrollTop=log.scrollHeight;}if(modalPage==='battle'&&!own)battleView();world.update(state,data.scenePlayers||[],data.visitedHome,data.townPlayers||[],data.players||[],state.friends);
@@ -196,17 +198,21 @@ const onWorldObject=object=>{
   pie(object,[...watch,[`${object.icon} ${escape(object.verb||'Use')}${object.need?` <small>+${B.recovery[object.need][0]} ${escape(needs[object.need][0])}, stop any time</small>`:''}`,'useObject'],['🚶 Go here','goObject']]);
 };
 // The world view is 3D (WebGL) everywhere: places, the street, trips and the city map.
-// Add ?renderer=2d to the address to force the 2D view. Without WebGL the game stays 2D.
+// Players can pick 2D Lite instead (Profile → Graphics), for lower-end phones; ?renderer=2d forces it too.
+// Without WebGL the game falls back to 2D and says so.
+const savedGraphics=(()=>{try{return localStorage.getItem('cg.graphics');}catch{return null;}})();
+let graphicsMode=savedGraphics==='2d'||/[?&]renderer=2d/.test(location.search)?'2d':'3d';
+function setGraphics(mode){try{localStorage.setItem('cg.graphics',mode);}catch{}if(mode!==graphicsMode){toast(mode==='2d'?'Switching to 2D Lite…':'Switching to 3D…');setTimeout(()=>location.reload(),400);}}
 function makeWorld(){
   const flat=new World($('#world'),onWorldMove,onWorldObject);let deep=null;
-  try{if(!/[?&]renderer=2d/.test(location.search))deep=new World3D($('#world3d'),$('#world3dGL'),onWorldMove,onWorldObject);}catch(error){console.warn('3D view unavailable; using 2D.',error);}
+  try{if(graphicsMode==='3d')deep=new World3D($('#world3d'),$('#world3dGL'),onWorldMove,onWorldObject);}catch(error){console.warn('3D view unavailable; using 2D.',error);graphicsMode='fallback';}
   if(!deep)return flat;
   const views=[flat,deep];let active=flat;deep.paused=true;
   const swap=()=>{const next=deep;if(next===active)return;
     for(const key of ['player','target','heading','pose','moving','waypoints','pending','speed','people','speech','zoom','angle','pitch','lift','pan','npcTalkUntil','lampOff','fridgeOpen','windowOpen','placement','previewHome'])next[key]=active[key];
     active.paused=true;next.paused=false;active=next;$('#world').style.display=active===flat?'':'none';$('#world3dWrap').style.display=active===deep?'':'none';active.draw();};
   return new Proxy({},{
-    get(_,key){if(key==='update')return (...args)=>{for(const view of views)view.update(...args);swap();};const value=active[key];return typeof value==='function'?value.bind(active):value;},
+    get(_,key){if(key==='update')return (...args)=>{for(const view of views)try{view.update(...args);}catch(error){console.error(error);}swap();};const value=active[key];return typeof value==='function'?value.bind(active):value;},
     set(_,key,value){for(const view of views)view[key]=value;if(key==='overview')swap();return true;},
   });
 }
@@ -619,6 +625,7 @@ function profile(){const season=snapshot.season,c=state.careers[state.career],de
   <section class="v2-section"><h3>Awards <small>${state.awards.length}</small></h3>${state.awards.length?`<div class="v2-awards">${state.awards.slice().reverse().map(a=>`<div class="v2-award"><span>${awardIcon(a.name)}</span>${escape(a.name)}</div>`).join('')}</div>`:'<p class="empty">Your first award is out there.</p>'}</section>
   <section class="v2-section"><h3>Career history <small>latest</small></h3>${outputs(state.outputs)}</section>
   <details class="v2-more"><summary>Season ${season.id} rules</summary><p>${new Date(season.starts).toLocaleDateString()} – ${new Date(season.ends).toLocaleDateString()}. Release something this season with 10,000 lifetime reach in that career to qualify. Score: 40% reach gained, 35% quality, 25% engagement. Winners get a permanent award and 100 fame.</p></details>
+  <section class="v2-section"><h3>Graphics</h3>${graphicsMode==='fallback'?'<p class="empty">3D isn’t available on this device or browser, so you’re playing in 2D Lite. Turning on hardware acceleration in your browser settings may enable 3D.</p>':`<div class="v2-row"><div><strong>${graphicsMode==='2d'?'2D Lite':'3D'}</strong><small>${graphicsMode==='2d'?'Lighter and faster, for lower-end phones.':'Full 3D. Switch to 2D Lite if the game feels slow.'}</small></div>${graphicsMode==='2d'?button('Use 3D','graphics','data-mode="3d"','primary'):button('Use 2D Lite','graphics','data-mode="2d"')}</div>`}</section>
   <section class="v2-section"><h3>Account</h3>${snapshot.account?`<div class="v2-row"><div><strong>@${escape(snapshot.account.username)}</strong><small>${escape(snapshot.account.email)}</small></div>${button('Log out','logout')}${button('New life','newLife','','quiet')}</div>`:`<div class="v2-row"><div><strong>Playing as a guest</strong><small>Save your character to play on any device.</small></div>${button('Save my character','authTab','data-tab="signup"','primary')}</div>`}</section>`);}
 function phone(tab='people'){
   phoneTab=tab;let html=`<span class="eyebrow">YOUR PEOPLE</span><h2>A city feels better together.</h2><p class="modal-intro">Find people, battle and collaborate. Messages are in the ✉️ Chat app, friends only.</p><div class="tabs">${[['people','People'],['battles','Battles'],['collabs','Collaborations']].map(([key,label])=>button(label,'phoneTab',`data-tab="${key}"`,key===tab?'active':'')).join('')}</div>`;
@@ -788,6 +795,8 @@ document.addEventListener('click',async event=>{
     case 'divorce':await send({type:'divorce'});break;
     case 'ambience':soundMenu();break;
     case 'ambienceToggle':toggleAmbience();soundMenu();break;
+    case 'graphicsToggle':setGraphics(graphicsMode==='2d'?'3d':'2d');break;
+    case 'graphics':if(modalPage==='graphicsOffer')closeModal();setGraphics(d.mode);if(modalPage==='profile')profile();break;
     case 'minimap':minimapOn=!minimapOn;try{localStorage.setItem('cg.minimap',minimapOn?'1':'0');}catch{}drawMinimap();break;
     case 'retirePicker':retirePicker();break;
     case 'retire':await send({type:'retire',career:d.career});break;
@@ -896,7 +905,20 @@ let liveTimer,pulseAt=null;const soon=()=>{clearTimeout(liveTimer);liveTimer=set
 const pulseKeys=()=>state&&snapshot?.playerId?`room:${state.location==='home'?`home:${state.visiting||snapshot.playerId}`:state.location},p:${snapshot.playerId}`:'';
 let pulseFor='';
 const pollPulse=()=>setInterval(async()=>{if(document.hidden)return;try{const keys=pulseKeys(),r=await fetch('/api/pulse'+(keys?`?keys=${encodeURIComponent(keys)}`:''));if(!r.ok)return;const {at}=await r.json();if(pulseAt!==null&&pulseFor===keys&&at!==pulseAt)soon();pulseAt=at;pulseFor=keys;}catch{}},10000);
-try{const live=new EventSource('/api/live');let opened=false;live.onmessage=soon;live.onopen=()=>opened=true;live.onerror=()=>{if(!opened){live.close();pollPulse();}};}catch{pollPulse();}
+// Live updates: a WebSocket that follows your room and you, and nudges a refresh when either changes.
+// Hosts without sockets (Netlify, Vercel) fall back to asking /api/pulse every 10s.
+let liveFollow=null,polling=false;
+const startPolling=()=>{if(!polling){polling=true;pollPulse();}};
+function connectLive(delay=1000){
+  if(typeof WebSocket!=='function'){startPolling();return;}
+  let ws,opened=false,followed='';
+  try{ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/api/ws`);}catch{startPolling();return;}
+  const follow=()=>{const keys=pulseKeys();if(ws.readyState===1&&keys&&keys!==followed){followed=keys;ws.send(JSON.stringify({keys:keys.split(',')}));}};
+  ws.onopen=()=>{opened=true;liveFollow=follow;follow();soon();};
+  ws.onmessage=()=>{if(!document.hidden)soon();};
+  ws.onclose=()=>{liveFollow=null;if(!opened&&delay>=8000){startPolling();return;}setTimeout(()=>connectLive(opened?1000:delay*2),delay);};
+}
+connectLive();
 // Hosting is billed per request. Every action returns fresh state at once; after that the full refresh
 // (also the online heartbeat) runs 45s after the last update, never while hidden. Returning refreshes at once.
 function scheduleHeartbeat(){clearTimeout(heartbeat);if(elsewhere)return;heartbeat=setTimeout(async()=>{if(document.hidden){scheduleHeartbeat();return;}await refresh();scheduleHeartbeat();},45000);}
@@ -904,3 +926,17 @@ scheduleHeartbeat();
 // Coming back after a real absence refreshes at once; quick app switches don't.
 let hiddenAt=0;document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();return;}if(Date.now()-hiddenAt>=10_000&&Date.now()-lastUpdate>=5_000)refresh();});
 setInterval(()=>{if(state&&!busy){renderActivity();clock();const bt=$('#battleTimer'),bb=(snapshot.battles||[]).find(x=>x.id===battleId);if(bt&&bb)bt.textContent=duration(bb.turnEndsAt-now());const next=$('#chargeRefill');if(next&&state.refillAnchor!==null)next.textContent=`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`;}},1000);
+
+// Tell players when 3D couldn't start, and offer 2D Lite once when 3D runs slowly on this device.
+{
+  // The side pill shows the other view: 2D while in 3D, 3D while in 2D Lite (hidden when 3D can't start).
+  const toggle=$('#graphicsToggle');if(toggle&&graphicsMode!=='fallback'){const other=graphicsMode==='2d'?'3D':'2D';toggle.hidden=false;toggle.textContent=other;toggle.title=toggle.ariaLabel=other==='2D'?'Switch to 2D Lite (faster)':'Switch to 3D';}
+  const once=key=>{try{if(localStorage.getItem(key))return false;localStorage.setItem(key,'1');}catch{}return true;};
+  if(graphicsMode==='fallback'&&once('cg.graphicsFallbackSeen'))setTimeout(()=>toast('3D isn’t available here, so you’re playing in 2D Lite.'),3000);
+  if(graphicsMode==='3d'&&savedGraphics!=='3d'){
+    let frames=0,slow=0;const start=performance.now();
+    const tick=()=>{frames++;requestAnimationFrame(tick);};requestAnimationFrame(tick);
+    const check=setInterval(()=>{const fps=frames/5;frames=0;if(document.hidden||!state)return;slow=fps<20?slow+1:0;
+      if(slow>=3||performance.now()-start>120_000){clearInterval(check);if(slow>=3&&once('cg.graphicsOffered'))showModal('graphicsOffer',`<span class="eyebrow">GRAPHICS</span><h2>Running slowly?</h2><p class="modal-intro">3D looks choppy on this device. 2D Lite is lighter and smoother. You can switch back any time in Profile → Graphics.</p>${button('Use 2D Lite','graphics','data-mode="2d"','primary wide')}${button('Keep 3D','graphics','data-mode="3d"','secondary wide')}`);}},5000);
+  }
+}

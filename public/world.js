@@ -1,6 +1,6 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, VENUE_ACTS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt, homeRooms, extensionSpot, npcName, obstacles } from './content.js';
+import { arrivalSpot, NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, VENUE_ACTS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt, homeRooms, extensionSpot, npcName, obstacles } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 // On the sofa you face the room; watching TV you sit at the end and turn toward the screen.
@@ -190,7 +190,7 @@ export class World {
     for(const id of [...this.people.keys()])if(!seen.has(id))this.people.delete(id);
     this.friends=friends;this.owners=new Map();this.ownersKey='';for(const r of residents){let i=[...r.id].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7)%CITY.houses.length;for(let n=0;n<CITY.houses.length&&this.owners.has(i);n++)i=(i+1)%CITY.houses.length;if(!this.owners.has(i)){this.owners.set(i,r);this.ownersKey+=i+(r.home||'')+',';}}
     if(this.state?.recovery&&!state.recovery)this.pose=null;
-    if(this.location!==state.location){this.player={...state.position3d};this.target={...this.player};this.moving=false;this.pending=null;this.pose=null;if(this.location&&this.zoom<.9)this.flyTo(1);this.pan={x:0,z:0};}
+    if(this.location!==state.location){this.player={...(state.position3d||arrivalSpot(state.location))};this.target={...this.player};this.moving=false;this.pending=null;this.pose=null;if(this.location&&this.zoom<.9)this.flyTo(1);this.pan={x:0,z:0};}
     this.serverOffset=state.serverNow-Date.now();this.state=state;this.location=state.location;this.players=players;this.visitedHome=visitedHome;this.draw();
   }
   // Tilting up flattens heights toward a top view.
@@ -244,6 +244,8 @@ export class World {
   box(x,z,w,d,h,color,y=0){this.meshes.push({x,z,w,d,h,color,y,depth:(x*Math.sin(this.angle)+z*Math.cos(this.angle))+Math.max(w,d)*.1});}
   floor(x,z,w,d,color,y=0){this.polygon([[x-w/2,y,z-d/2],[x+w/2,y,z-d/2],[x+w/2,y,z+d/2],[x-w/2,y,z+d/2]],color);}
   paintBox(m){const{x,z,w,d,h,color,y}=m,x0=x-w/2,x1=x+w/2,z0=z-d/2,z1=z+d/2;
+    // A shape with a missing size or position is skipped instead of stopping the whole frame.
+    if(!m.limb&&![x,y,z,w,h,d].every(Number.isFinite)){if(!this.badShape){this.badShape=true;console.warn('Skipped a shape with a missing size:',JSON.stringify(m).slice(0,200));}return;}
     if(m.head){const p=this.project(x,y+h/2,z),ctx=this.ctx,rx=w*this.scale/2,ry=h*this.scale/2,facing=Math.cos(m.heading-this.angle),side=Math.sin(m.heading-this.angle),front=facing>-.25,detail=rx>3.2;
       const style=m.style||'curls',blob=(dx,dy,rw,rh)=>{ctx.beginPath();ctx.ellipse(p.x+dx*rx,p.y+dy*ry,rw*rx,rh*ry,0,0,Math.PI*2);ctx.fill();};
       // Hair has two layers: volume and length behind the face, then the cap on top.
@@ -394,6 +396,8 @@ export class World {
   walls(h,toneZ,toneX,edge=5.35,t=.18){const c=Math.cos(this.angle),s=Math.sin(this.angle),stub=.18;
     this.box(0,-edge,11,t,c>0?h:stub,toneZ);this.box(0,edge,11,t,c<0?h:stub,toneZ);this.box(-edge,0,t,11,s>0?h:stub,toneX);this.box(edge,0,t,11,s<0?h:stub,toneX);}
   human(x,z,skin,{hair='#2b211c',style='curls',outfit='#8ea9a4',pants='#34435e',shoes='#f4f1ea',walk=false,pose=null,heading=0,gait=this.gait,smile=1,build='average',height='average'}={}){
+    // A person without a position is skipped; a missing direction means facing forward.
+    if(!Number.isFinite(x)||!Number.isFinite(z)){if(!this.badHuman){this.badHuman=true;console.warn('Skipped a person with no position:',pose);}return;}if(!Number.isFinite(heading))heading=0;
     if(pose==='run'){pose=null;walk=true;gait=performance.now()/1000*11;}
     pose=EMOTE_2D[pose]||pose;if(pose==='sit'||pose==='work'){const f=this.seatAt(x,z);if(f!=null)heading=f;}
     // Build widens or narrows the body (hips and shoulders separately); height stretches standing poses.
