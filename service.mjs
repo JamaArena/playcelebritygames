@@ -1,4 +1,6 @@
+import { randomUUID } from 'node:crypto';
 import { CLASH, CLASH_ACTIONS, CHEER } from './public/clashText.js';
+import { CLASH_MEDALS, medalTier, isBigger, clashStake } from './public/content.js';
 import { randomBytes, createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline } from './game.mjs';
@@ -97,7 +99,7 @@ const saveBattle=b=>db.prepare('INSERT INTO battles VALUES(?,?) ON CONFLICT(id) 
 function fighterStats(ps){
   const skills=Object.values(ps.careers[ps.career].skills).map(s=>s.level),best=Math.max(...skills),average=skills.reduce((a,b)=>a+b,0)/skills.length;
   const max=BATTLE.crowd;
-  return {name:ps.name,career:ps.career,color:ps.color,hair:ps.hair,power:best,hp:max,max,fatigue:(100-ps.needs.energy)/100,guard:false,ko:false,signature:SIGNATURES[CAREERS[ps.career].family]||'Signature move',aim:(perksFor(ps).battle||0)/100};
+  return {name:ps.name,career:ps.career,color:ps.color,hair:ps.hair,fame:ps.fame||0,power:best,hp:max,max,fatigue:(100-ps.needs.energy)/100,guard:false,ko:false,signature:SIGNATURES[CAREERS[ps.career].family]||'Signature move',aim:(perksFor(ps).battle||0)/100};
 }
 function battleLog(b,text,now){b.log.unshift({text,at:now});b.log=b.log.slice(0,30);}
 function nextTurn(b,now){
@@ -110,7 +112,8 @@ function resolveMove(b,fighterId,move,targetId,now,rng=Math.random){
   if(move==='guard'){const lost=5;f.hp=Math.max(0,f.hp-lost);if(!f.hp)f.ko=true;b.last={attacker:fighterId,defender:targetKey,action:'freeze',line:`${f.name} freezes and says nothing.`,clap:`${target.name} just laughs.`,won:false,audience:'“Say something!” the crowd boos.',change:-lost,n:(b.last?.n||0)+1,at:now};battleLog(b,`${f.name} froze up: −${lost} crowd.`,now);}
   else{
     fail(CLASH[move],'Pick brag, shade, violence or charm.');fail(target,'Nobody left to clash with.');
-    const [base,per]=CLASH_ODDS[move],p=clamp(base+per*(f.power-target.power)-.1*f.fatigue+(f.aim||0),.12,.9),won=rng()<p;
+    const [base,per]=CLASH_ODDS[move],fameEdge=clamp(Math.log10(((f.fame||0)+10)/((target.fame||0)+10))*.12,-.3,.3);
+    let p=clamp(base+per*(f.power-target.power)+fameEdge-.1*f.fatigue+(f.aim||0)-(target.aim||0)/2,.05,.95);if(b.lucky===fighterId)p=.93;else if(b.lucky===targetKey)p=.1;const won=rng()<p;
     const [line,winClap,loseClap]=CLASH[move][Math.floor(rng()*CLASH[move].length)%CLASH[move].length],fill=t=>t.replaceAll('{a}',f.name).replaceAll('{b}',target.name);
     let change;
     if(won){const [d0,d1]=CLASH_HIT[move];change=Math.round(d0+d1*f.power+rng()*4);target.hp=Math.max(0,target.hp-change);if(!target.hp)target.ko=true;if(move==='charm')f.hp=Math.min(f.max,f.hp+6);}
@@ -124,14 +127,24 @@ function resolveMove(b,fighterId,move,targetId,now,rng=Math.random){
   // Three turns each: after round 3 the bigger crowd wins (a tie is a draw).
   if(b.round>BATTLE.rounds){const crowd=[0,1].map(t=>b.teams[t].reduce((n,id)=>n+b.fighters[id].hp,0));finishBattle(b,crowd[0]===crowd[1]?null:crowd[0]>crowd[1]?0:1,now);}
 }
+// Clash records and medals: each medal climbs from one to five stars.
+function clashRecord(ps,{won,bigger},now){
+  const r=ps.clashRecord={fought:0,won:0,bigFought:0,giantWins:0,...(ps.clashRecord||{})},before=Object.fromEntries(Object.keys(CLASH_MEDALS).map(k=>[k,medalTier(k,r)]));
+  r.fought++;if(won)r.won++;if(bigger){r.bigFought++;if(won)r.giantWins++;}
+  for(const [key,m] of Object.entries(CLASH_MEDALS)){const tier=medalTier(key,r);if(tier>before[key]){ps.awards=ps.awards.filter(a=>a.medal!==key);ps.awards.push({id:randomUUID(),name:`${m.name} ${'★'.repeat(tier)}`,medal:key,tier,career:ps.career,at:now});log(ps,`${m.icon} Medal: ${m.name} ${'★'.repeat(tier)}`,now);}}
+}
 function finishBattle(b,winner,now){
-  b.status='done';b.winner=winner;b.endedAt=now;const stake=winner==null?0:BATTLE.stakes[b.mode]||50;
-  if(winner==null){for(const pid of b.teams.flat()){const ps=load(pid);if(!ps)continue;ps.battle=null;b.fighters[pid].fameChange=0;log(ps,'Fame Clash: a draw. Nobody gains or loses fame.',now);persist(pid,ps);}battleLog(b,'It’s a draw! The crowd is split.',now);return;}
+  b.status='done';b.winner=winner;b.endedAt=now;delete b.lucky;
+  const [x,y]=[b.teams[0][0],b.teams[1][0]],fameOf=id=>b.fighters[id]?.fame||0,bigger=id=>isBigger(fameOf(id===x?y:x),fameOf(id));
+  if(winner==null){for(const pid of b.teams.flat()){const ps=load(pid);if(!ps)continue;ps.battle=null;b.fighters[pid].fameChange=0;clashRecord(ps,{won:false,bigger:bigger(pid)},now);log(ps,'Fame Clash: a draw. Nobody gains or loses fame.',now);persist(pid,ps);}battleLog(b,'It’s a draw! The crowd is split.',now);return;}
+  // The winner takes about 1% of the loser's fame: beating someone small is worth little, losing to them costs little.
+  const loserId=b.teams[1-winner][0],stake=clashStake(load(loserId)?.fame||0);
   for(const [t,team] of b.teams.entries())for(const pid of team){const ps=load(pid);if(!ps)continue;ps.battle=null;
+    clashRecord(ps,{won:t===winner,bigger:bigger(pid)},now);
     const before=ps.fame||0;addFame(ps,t===winner?stake:-stake,t===winner?'Fame Clash won':'Fame Clash lost',now);const change=(ps.fame||0)-before;b.fighters[pid].fameChange=change;
     if(t===winner)evaluate(ps,ps.career);
     log(ps,`Fame Clash ${t===winner?'won':'lost'}: ${change>=0?'+':''}${change} fame.`,now);persist(pid,ps);}
-  battleLog(b,`${b.fighters[b.teams[winner][0]].name} wins the crowd! ${stake} fame changes hands.`,now);
+  battleLog(b,`${b.fighters[b.teams[winner][0]].name} wins the crowd! ${stake.toLocaleString('en-US')} fame changes hands.`,now);
 }
 // Expired turns auto-guard so an absent player cannot stall everyone else.
 function tickBattle(b,now){let changed=false;for(let n=0;n<40&&b.status==='running'&&now>=b.turnEndsAt;n++){const at=b.turnEndsAt;resolveMove(b,b.order[b.turn],'guard',null,at);changed=true;}return changed;}
@@ -167,6 +180,8 @@ function battleAction(playerId,s,input,now){
     const states=Object.fromEntries(b.teams.flat().map(p=>[p,p===playerId?s:load(p)]));
     for(const [p,ps] of Object.entries(states)){if(p!==playerId)reconcile(ps,now);fail(ps.location===b.location&&now-ps.lastSeen<45_000,`${ps.name} needs to be here and online.`);fail(ps.charges>0,`${ps.name} has no career charges left.`);fail(ps.needs.energy>=20,`${ps.name} is too tired to battle.`);fail(!ps.active&&!ps.recovery,`${ps.name} is busy with an activity.`);}
     for(const [p,ps] of Object.entries(states)){ps.charges--;if(ps.refillAnchor===null)ps.refillAnchor=now;b.fighters[p]=fighterStats(ps);if(p!==playerId)persist(p,ps);}
+    // A secret: the smaller player sometimes has a lucky shirt day and the crowd backs them whatever the gap.
+    {const [x,y]=[b.teams[0][0],b.teams[1][0]],fx=b.fighters[x].fame,fy=b.fighters[y].fame;if(fx!==fy&&Math.random()<.1)b.lucky=fx<fy?x:y;}
     b.order=[];for(let i=0;i<b.mode;i++)b.order.push(b.teams[0][i],b.teams[1][i]);
     b.status='running';b.turn=0;b.turnEndsAt=now+BATTLE.turnMs;battleLog(b,`Fight! ${b.fighters[b.order[0]].name} moves first.`,now);
   }
@@ -183,7 +198,7 @@ function battlesFor(playerId,s,now){
   for(const b of rows)if(b.status==='running'&&b.teams.flat().includes(playerId)&&tickBattle(b,now))saveBattle(b);
   const names=ids=>ids.map(p=>({id:p,name:load(p)?.name||'Player'}));
   return rows.filter(b=>b.teams.flat().includes(playerId)?(b.status!=='done'&&b.status!=='cancelled')||now-(b.endedAt||b.createdAt)<5*60_000:b.status==='open'&&b.location===s?.location)
-    .map(b=>({...b,teamNames:b.teams.map(names),stake:BATTLE.stakes[b.mode]}));
+    .map(({lucky,...b})=>({...b,teamNames:b.teams.map(names),stake:b.status==='done'?null:clashStake(Math.min(...b.teams.flat().map(id=>load(id)?.fame||0)))}));
 }
 // Accounts: email + one-time code, no passwords. A code proves the email; the account then owns this
 // browser's character (or the one already linked to that email when logging in on a new device).

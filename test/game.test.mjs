@@ -429,3 +429,11 @@ test('careers: every skill has its own name and ten things to learn; work scenes
   assert.ok(WORK_SCENES.developer.some(([,opts])=>opts.includes(v.active.choices[0].label)),'with developer choices');
   const g=make();g.location='gym';for(const act_ of ['treadmillRun','benchPress','squats','spinBike','punchBag','rower']){act(g,{type:'venueAct',act:act_},T);assert.equal(g.recovery.act,act_);g.recovery=null;}
 });
+
+test('fame clash maths: stakes are 1% of the loser, bigger means double and 100 more, medals climb to five stars',async()=>{
+  const {clashStake,isBigger,medalTier}=await import('../public/content.js');
+  assert.equal(clashStake(1_000_000),10_000);assert.equal(clashStake(1_000),10);assert.equal(clashStake(30),1);assert.equal(clashStake(0),0);
+  assert.ok(isBigger(1_000_000,1_000));assert.ok(!isBigger(150,100));assert.ok(!isBigger(80,30),'twice as much but not 100 more');
+  assert.equal(medalTier('clashWinner',{won:0}),0);assert.equal(medalTier('clashWinner',{won:1}),1);assert.equal(medalTier('clashWinner',{won:4}),3);assert.equal(medalTier('clashWinner',{won:10}),5);
+  assert.equal(medalTier('clashFighter',{fought:12}),3);assert.equal(medalTier('clashFighter',{fought:50}),5);assert.equal(medalTier('giantSlayer',{giantWins:5}),4);assert.equal(medalTier('weightClass',{bigFought:25}),4);
+});

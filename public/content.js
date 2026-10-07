@@ -686,3 +686,16 @@ export function npcOpinion(npcId, fame = 0, day = 0) {
   const kind = r1 >= known ? 'unknown' : r2 >= strong ? 'neutral' : ((h >>> 20) % 100) < 58 ? 'love' : 'hate';
   return {kind, line: OPINIONS[kind].lines[(h >>> 7) % OPINIONS[kind].lines.length]};
 }
+
+// Fame Clash medals, each with five star tiers.
+export const CLASH_MEDALS = {
+  clashWinner: {name: 'Clash winner', icon: '🏆', stat: 'won', tiers: [1, 2, 3, 5, 10]},
+  clashFighter: {name: 'Clash fighter', icon: '🥊', stat: 'fought', tiers: [1, 5, 12, 25, 50]},
+  weightClass: {name: 'Punched outta your weight class', icon: '🥋', stat: 'bigFought', tiers: [1, 5, 12, 25, 50]},
+  giantSlayer: {name: 'Giant slayer', icon: '🗡️', stat: 'giantWins', tiers: [1, 2, 3, 5, 10]},
+};
+export const medalTier = (medal, record = {}) => CLASH_MEDALS[medal].tiers.filter(n => (record[CLASH_MEDALS[medal].stat] || 0) >= n).length;
+// A bigger opponent: at least twice your fame and at least 100 more.
+export const isBigger = (theirs = 0, yours = 0) => theirs >= yours * 2 && theirs - yours >= 100;
+// What a Fame Clash is worth: about 1% of the loser's fame (at least 1, if they have any).
+export const clashStake = loserFame => loserFame > 0 ? Math.max(1, Math.round(loserFame * .01)) : 0;

@@ -107,7 +107,11 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   assert.equal(battle.status,'done');
   const aEnd=(await a.call()).data.state,bEnd=(await b.call()).data.state;
   assert.ok(battle.last&&battle.last.line&&battle.last.clap&&battle.last.audience,'each turn has a move, a clapback and a crowd verdict');assert.ok(battle.round<=4,'three turns each at most');
-  if(battle.winner===0){assert.equal(aEnd.fame,150);assert.equal(bEnd.fame,0,'fame never drops below zero');}else if(battle.winner===1){assert.equal(bEnd.fame,80);assert.equal(aEnd.fame,50);}else{assert.equal(aEnd.fame,100);assert.equal(bEnd.fame,30,'a draw changes nothing');}
+  // The winner takes about 1% of the loser's fame (at least 1).
+  if(battle.winner===0){assert.equal(aEnd.fame,101);assert.equal(bEnd.fame,29);}else if(battle.winner===1){assert.equal(bEnd.fame,31);assert.equal(aEnd.fame,99);}else{assert.equal(aEnd.fame,100);assert.equal(bEnd.fame,30,'a draw changes nothing');}
+  assert.ok(!('lucky' in battle),'the lucky shirt day stays a secret');
+  for(const end of [aEnd,bEnd])assert.ok(end.awards.some(w=>w.medal==='clashFighter'&&w.tier===1),'everyone who fought gets Clash fighter ★');
+  if(battle.winner!=null)assert.ok([aEnd,bEnd][battle.winner].awards.some(w=>w.medal==='clashWinner'&&w.name==='Clash winner ★'),'the winner gets Clash winner ★');
   assert.equal(aEnd.battle,null);assert.equal(bEnd.battle,null);
   assert.equal((await a.call({type:'battleMove',battleId,move:'brag',target:bId})).status,400,'finished battles take no more moves');
   assert.equal((await a.call({type:'battleCreate',mode:3})).status,400,'only 1v1 Fame Clashes');
