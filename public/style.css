@@ -639,15 +639,15 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 #modal .phone-device .phone-app :is(.clash-action,.dm-convo,.action-tile,.sheet-row,.choice,.v2-ring,.v2-award,.slot-tab,.sound-row,.text-button){white-space:normal;overflow:visible}
 #modal .phone-device .phone-app button:not(:disabled):active{transform:scale(.97)}
 #modal .phone-device .phone-app button:disabled{opacity:.4;cursor:not-allowed}
-#modal .phone-device .phone-app :is(button.primary,button.secondary,button.tint,button.danger,button.quiet){display:inline-flex;align-items:center;justify-content:center;gap:6px;height:48px;max-width:100%;padding:0 18px;border:0;border-radius:var(--r-btn);font:600 15px/1 var(--display);letter-spacing:.1px;text-shadow:none;cursor:pointer;vertical-align:middle}
+#modal .phone-device .phone-app :is(button.primary,button.secondary,button.tint,button.danger,button.quiet){display:inline-block;height:48px;line-height:48px!important;text-align:center;max-width:100%;padding:0 18px;border:0;border-radius:var(--r-btn);font:600 15px/1 var(--display);letter-spacing:.1px;text-shadow:none;cursor:pointer;vertical-align:middle}
 #modal .phone-device .phone-app button.primary{background:linear-gradient(180deg,#5fd36f,var(--brand));color:#fff;box-shadow:0 6px 16px -6px rgba(47,168,79,.7),inset 0 1px 0 rgba(255,255,255,.35),inset 0 -2px 0 var(--brand-deep)}
 #modal .phone-device .phone-app button.secondary{background:#fff;color:var(--ink);box-shadow:0 0 0 1px rgba(0,0,0,.08),0 1px 2px rgba(22,32,60,.08)}
-#modal .phone-device .phone-app button.tint{height:36px;padding:0 14px;border-radius:999px;font-size:13px;font-weight:700;background:color-mix(in srgb,var(--c,var(--blue)) 13%,#fff);color:color-mix(in srgb,var(--c,var(--blue)) 72%,#000);box-shadow:none}
+#modal .phone-device .phone-app button.tint{height:36px;line-height:36px!important;padding:0 14px;border-radius:999px;font-size:13px;font-weight:700;background:color-mix(in srgb,var(--c,var(--blue)) 13%,#fff);color:color-mix(in srgb,var(--c,var(--blue)) 72%,#000);box-shadow:none}
 #modal .phone-device .phone-app button.danger{background:rgba(229,72,77,.10);color:var(--rose);box-shadow:none}
 #modal .phone-device .phone-app button.quiet{background:var(--mist);color:var(--ink-soft);box-shadow:none}
-#modal .phone-device .phone-app button:is(.primary,.secondary,.danger,.quiet).small{height:36px;padding:0 14px;border-radius:14px;font-size:13px}
-#modal .phone-device .phone-app button.round{width:36px;height:36px;padding:0;border-radius:50%;font-size:15px}
-#modal .phone-device .phone-app button.wide{display:flex;width:100%;margin:10px 0}
+#modal .phone-device .phone-app button:is(.primary,.secondary,.danger,.quiet).small{height:36px;line-height:36px!important;padding:0 14px;border-radius:14px;font-size:13px}
+#modal .phone-device .phone-app button.round{width:36px;height:36px;line-height:36px!important;padding:0;border-radius:50%;font-size:15px}
+#modal .phone-device .phone-app button.wide{display:block;width:100%;margin:10px 0}
 #modal .phone-device .phone-app button.glass{height:34px;border:0;border-radius:999px;padding:0 14px;background:rgba(255,255,255,.2);color:#fff;font:600 13px var(--display);box-shadow:inset 0 0 0 1px rgba(255,255,255,.3)}
 #modal .phone-device .phone-app .actions{display:flex;flex-wrap:wrap;gap:8px}
 #modal .phone-device .phone-app .text-button{background:none;border:0;color:var(--rose);font:600 12px var(--display);padding:0 4px}
@@ -859,7 +859,7 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 .phone-app .perk-chip{padding:5px 10px;border-radius:999px;background:var(--mist);color:var(--ink);font:600 12px var(--display)}.phone-app .perk-chip.none{white-space:normal}
 
 /* career: one big action, coloured action tiles */
-#modal .phone-device .phone-app .hero-cta{height:52px;margin:6px 0 10px;font-size:16px}
+#modal .phone-device .phone-app .hero-cta{height:52px;line-height:52px!important;margin:6px 0 10px;font-size:16px}
 .phone-app .hero-cta span{font-size:20px}
 .phone-app .action-tiles{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 #modal .phone-device .phone-app .action-tile{display:grid;align-content:center;justify-items:start;gap:4px;height:72px;padding:0 14px;border:0;border-radius:18px;background:color-mix(in srgb,var(--c) 12%,#fff);color:color-mix(in srgb,var(--c) 75%,#000);font:700 13px var(--display);text-align:left;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--c) 18%,transparent);cursor:pointer}
@@ -910,7 +910,7 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 .phone-app .vs-badge{display:grid;place-items:center;width:58px;height:58px;border-radius:50%;background:linear-gradient(180deg,#f5b942,#d97706);color:#3b2300;font:700 24px var(--display);transform:rotate(-8deg);box-shadow:0 0 0 4px rgba(245,185,66,.22),0 8px 20px -6px rgba(245,185,66,.8)}
 .phone-app .vs-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:0 0 16px}
 .phone-app .vs-chips span{padding:5px 10px;border-radius:999px;background:rgba(255,255,255,.1);font:600 12px var(--display)}
-#modal .phone-device .phone-app .battle-cta{display:flex;align-items:center;justify-content:center;width:100%;height:56px;border:0;border-radius:20px;background:linear-gradient(180deg,#f97316,#e11d48);color:#fff;font:700 18px var(--display);box-shadow:0 8px 20px -6px rgba(225,29,72,.7),inset 0 1px 0 rgba(255,255,255,.35);cursor:pointer}
+#modal .phone-device .phone-app .battle-cta{display:block;line-height:56px;text-align:center;width:100%;height:56px;border:0;border-radius:20px;background:linear-gradient(180deg,#f97316,#e11d48);color:#fff;font:700 18px var(--display);box-shadow:0 8px 20px -6px rgba(225,29,72,.7),inset 0 1px 0 rgba(255,255,255,.35);cursor:pointer}
 .phone-app .arena-rules{margin:12px 0 0;padding:10px 14px;border-radius:16px;background:rgba(255,255,255,.07)}
 .phone-app .arena-rules summary{font:600 13px var(--display);cursor:pointer}
 #modal .phone-device .phone-app .arena-rules p{color:#cfd3e6;margin:8px 0 2px}
@@ -1087,3 +1087,6 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 .quest-row.done{opacity:.6}.quest-row.done .quest-icon{background:linear-gradient(#bdeec4,#7fd38f);box-shadow:inset 0 -3px 0 #4fae62}
 .quest-row.current{background:#fff7dc;border-color:#f0d27c;box-shadow:0 3px 10px #d9a52a2a}
 @media(max-width:700px){.quest-chip{top:118px;left:12px;padding:7px 10px 7px 7px}.quest-icon{width:32px;height:32px;font-size:18px}.quest-text strong{font-size:12px}.quest-text em{font-size:9.5px}}
+
+.phone-app .headline.lead{font:600 15px/1.3 var(--display)}
+#modal .phone-device .phone-app .v2-tiles{grid-template-columns:repeat(2,1fr)}
