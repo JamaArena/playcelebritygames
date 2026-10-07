@@ -121,7 +121,7 @@ function showMishap(s){
   if(modalPage){toast(`${def.icon} ${def.title}! −${m.lost.toLocaleString('en-US')} fame.`);world.playMishap(m);}else showModal('mishap',card,false);
 }
 function receive(data,own=false){notice(data,own);const before=state;snapshot=data;state=data.state;if(before&&state&&before.name===state.name)celebrate(before,state);offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();showMishap(state);showLifeEvent(state);showPrompt(state);drawMinimap();
-  $('#loading').hidden=true;lastUpdate=Date.now();scheduleHeartbeat(); // every update (an action or a refresh) restarts the 20s countdown
+  $('#loading').hidden=true;lastUpdate=Date.now();scheduleHeartbeat(); // every update (an action or a refresh) restarts the 45s countdown
   if(!state){if(!data.account){if(modalPage!=='auth')authScreen('signup');}else if(modalPage!=='create')creation(data.account);return;}
   if(!welcomed){welcomed=true;setTimeout(()=>welcome(data),0);}
   $('#app').hidden=false;render();if(modalPage==='thread'&&$('#threadLog')){const log=$('#threadLog'),atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<40;log.innerHTML=threadMessages(threadWith);if(atBottom)log.scrollTop=log.scrollHeight;}if(modalPage==='battle'&&!own)battleView();world.update(state,data.scenePlayers||[],data.visitedHome,data.townPlayers||[],data.players||[],state.friends);
@@ -892,11 +892,14 @@ await refresh();
 // Real-time: the local server pushes a ping after any player's action; polling remains the heartbeat and fallback.
 let liveTimer,pulseAt=null;const soon=()=>{clearTimeout(liveTimer);liveTimer=setTimeout(()=>{if(!busy)refresh();},150);};
 // Fallback for hosts without a push channel (Netlify): poll a one-row change counter, fetch state only when it moves.
-const pollPulse=()=>setInterval(async()=>{if(document.hidden)return;try{const r=await fetch('/api/pulse');if(!r.ok)return;const {at}=await r.json();if(pulseAt!==null&&at!==pulseAt)soon();pulseAt=at;}catch{}},5000);
+// Ask only about changes where you are or to you (not the whole city), every 10s.
+const pulseKeys=()=>state&&snapshot?.playerId?`room:${state.location==='home'?`home:${state.visiting||snapshot.playerId}`:state.location},p:${snapshot.playerId}`:'';
+let pulseFor='';
+const pollPulse=()=>setInterval(async()=>{if(document.hidden)return;try{const keys=pulseKeys(),r=await fetch('/api/pulse'+(keys?`?keys=${encodeURIComponent(keys)}`:''));if(!r.ok)return;const {at}=await r.json();if(pulseAt!==null&&pulseFor===keys&&at!==pulseAt)soon();pulseAt=at;pulseFor=keys;}catch{}},10000);
 try{const live=new EventSource('/api/live');let opened=false;live.onmessage=soon;live.onopen=()=>opened=true;live.onerror=()=>{if(!opened){live.close();pollPulse();}};}catch{pollPulse();}
 // Hosting is billed per request. Every action returns fresh state at once; after that the full refresh
-// (also the online heartbeat) runs 20s after the last update, never while hidden. Returning refreshes at once.
-function scheduleHeartbeat(){clearTimeout(heartbeat);if(elsewhere)return;heartbeat=setTimeout(async()=>{if(document.hidden){scheduleHeartbeat();return;}await refresh();scheduleHeartbeat();},20000);}
+// (also the online heartbeat) runs 45s after the last update, never while hidden. Returning refreshes at once.
+function scheduleHeartbeat(){clearTimeout(heartbeat);if(elsewhere)return;heartbeat=setTimeout(async()=>{if(document.hidden){scheduleHeartbeat();return;}await refresh();scheduleHeartbeat();},45000);}
 scheduleHeartbeat();
 // Coming back after a real absence refreshes at once; quick app switches don't.
 let hiddenAt=0;document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();return;}if(Date.now()-hiddenAt>=10_000&&Date.now()-lastUpdate>=5_000)refresh();});
