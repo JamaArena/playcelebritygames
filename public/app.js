@@ -2,7 +2,7 @@ import { fanClubSize, PROMPTS, RIVAL, TEAM, TAILOR_COLORS, TATTOOS, VENUE_ACTS, 
 import { World, worldObjects } from './world.js';
 import { World3D } from './world3d.js';
 import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS } from './sound.js';
-import { OPINIONS, npcOpinion, npcName } from './content.js';
+import { OPINIONS, npcOpinion, npcName, QUESTS, QUEST_GRADUATION } from './content.js';
 import { CLASH_ACTIONS } from './clashText.js';
 import { skillName, learnLine } from './careerText.js';
 const $=selector=>document.querySelector(selector);
@@ -293,7 +293,7 @@ async function startAtObject(input){
 }
 let tripTimer;
 function render(){
-  setMood(state?.trip?'road':state?.location);
+  setMood(state?.trip?'road':state?.location);questHud();
   if(!modalPage||modalPage!=='create')tip(state.location==='home'?'home':state.location==='street'||state.trip?'city':'venue');
   // Refresh the moment a trip, practice or recovery finishes instead of waiting for the next heartbeat.
   clearTimeout(tripTimer);const due=Math.min(...[state.trip?.arrives,state.active?.kind==='practice'?state.active.readyAt:null,state.recovery?.endsAt].filter(Boolean));if(Number.isFinite(due))tripTimer=setTimeout(()=>refresh(),Math.max(500,due-now()+400));
@@ -711,7 +711,7 @@ function phoneWidget(){const model=PHONES[state.phone]||PHONES.basic,count=alert
   return `<button class="phone-widget skin-${PHONES[state.phone]?state.phone:'basic'}" data-action="openPhone" style="--phone:${model.color}" aria-label="Open your phone${count?`, ${count} alerts`:''}"><span class="phone-mini">📱${count?`<i>${count}</i>`:''}</span><span class="phone-line"><strong>✦ ${fmt(state.fame||0)}</strong><small>fame · ${B.tiers[state.careers[state.career].tier][0]}</small></span><span class="phone-line"><strong>⚡ ${state.charges}/10</strong><small id="chargeRefill">${state.refillAnchor===null?'charged':`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></span></button>`;}
 // The last app depends on who you are: Log out for accounts, Account for guests.
 const accountApp=()=>['logout','🚪','Log out'];
-const APPS=[['map','🗺️','Map'],['career','⭐','Career'],['phone','💬','Social'],['battles','⚔️','Battles'],['inventory','🏠','My stuff'],['wardrobe','👗','Wardrobe'],['chat','✉️','Chat'],['friends','👥','Friends'],['feed','📰','Feed'],['music','🎵','Music'],['wallet','💰','Fame wallet'],['team','🧑‍💼','My team'],['crews','⭐','Crews'],['news','🗞️','News'],['dating','💘','Dating'],['calendar','📅','Calendar'],['camera','📷','Camera'],['shopping','🛒','Shopping'],['shop','🛍️','Market'],['vip','🏁','Palm Motors'],['profile','🪪','Profile'],['life','❤️','My life'],['nearby','📍','Nearby'],['tips','💡','Tips'],['upgrade','📲','Upgrade']];
+const APPS=[['map','🗺️','Map'],['career','⭐','Career'],['phone','💬','Social'],['battles','⚔️','Battles'],['inventory','🏠','My stuff'],['wardrobe','👗','Wardrobe'],['chat','✉️','Chat'],['friends','👥','Friends'],['feed','📰','Feed'],['music','🎵','Music'],['wallet','💰','Fame wallet'],['team','🧑‍💼','My team'],['crews','⭐','Crews'],['news','🗞️','News'],['dating','💘','Dating'],['calendar','📅','Calendar'],['camera','📷','Camera'],['shopping','🛒','Shopping'],['shop','🛍️','Market'],['vip','🏁','Palm Motors'],['quests','🎯','Quests'],['profile','🪪','Profile'],['life','❤️','My life'],['nearby','📍','Nearby'],['tips','💡','Tips'],['upgrade','📲','Upgrade']];
 // Each phone tier has its own look and feel; cheaper phones lag and sometimes hang (only ever a delay).
 function phoneModel(){const key=PHONES[state.phone]?state.phone:'basic';return {key,...PHONES[key]};}
 function phoneHome(){
@@ -722,7 +722,7 @@ function phoneHome(){
   showModal('phoneHome',`<div class="phone-device skin-${model.key}${model.key==='basic'?'':' ios'}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen">${phoneStatus(model)}${['pro','gold'].includes(model.key)?'':`<div class="phone-hello"><strong>${escape(state.name)}</strong><small>✦ ${fmt(state.fame||0)} fame · ${escape(LOCATIONS[state.location].name)}</small></div>`}${widgets}<div class="app-grid">${apps.map(icon).join('')}</div>${['pro','gold'].includes(model.key)?`<div class="phone-dock">${APPS.filter(([k])=>dock.includes(k)).map(icon).join('')}</div>`:''}${model.key==='basic'?'':'<div class="ios-homebar" aria-hidden="true"></div>'}<div class="phone-overlay" id="phoneOverlay" hidden></div></div></div>`);
 }
 const APP_NAMES=Object.fromEntries(APPS.map(([key,,label])=>[key,label]));
-function launch(key){if(key==='logout'){confirmLogout();return;}({map,phone:()=>phone('people'),battles:()=>phone('battles'),career,inventory,wardrobe,chat:chatApp,friends:friendsApp,team:teamApp,crews:crewsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,upgrade:phoneStore}[key]||phoneHome)();}
+function launch(key){if(key==='logout'){confirmLogout();return;}({map,phone:()=>phone('people'),battles:()=>phone('battles'),career,inventory,wardrobe,chat:chatApp,friends:friendsApp,team:teamApp,crews:crewsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,quests:questsApp,upgrade:phoneStore}[key]||phoneHome)();}
 // Budget phones make you wait, and now and then the app hangs. You can always wait or close it.
 function openApp(key){
   // Links between apps (not from the phone's home screen) open straight away, without the phone's loading lag.
@@ -795,6 +795,7 @@ document.addEventListener('click',async event=>{
     case 'divorce':await send({type:'divorce'});break;
     case 'ambience':soundMenu();break;
     case 'ambienceToggle':toggleAmbience();soundMenu();break;
+    case 'questCard':{let hidden=false;try{hidden=localStorage.getItem('cg.questsHidden')==='1';localStorage.setItem('cg.questsHidden',hidden?'0':'1');}catch{}questHud();questsApp();break;}
     case 'graphicsToggle':setGraphics(graphicsMode==='2d'?'3d':'2d');break;
     case 'graphics':if(modalPage==='graphicsOffer')closeModal();setGraphics(d.mode);if(modalPage==='profile')profile();break;
     case 'minimap':minimapOn=!minimapOn;try{localStorage.setItem('cg.minimap',minimapOn?'1':'0');}catch{}drawMinimap();break;
@@ -939,4 +940,29 @@ setInterval(()=>{if(state&&!busy){renderActivity();clock();const bt=$('#battleTi
     const check=setInterval(()=>{const fps=frames/5;frames=0;if(document.hidden||!state)return;slow=fps<20?slow+1:0;
       if(slow>=3||performance.now()-start>120_000){clearInterval(check);if(slow>=3&&once('cg.graphicsOffered'))showModal('graphicsOffer',`<span class="eyebrow">GRAPHICS</span><h2>Running slowly?</h2><p class="modal-intro">3D looks choppy on this device. 2D Lite is lighter and smoother. You can switch back any time in Profile → Graphics.</p>${button('Use 2D Lite','graphics','data-mode="2d"','primary wide')}${button('Keep 3D','graphics','data-mode="3d"','secondary wide')}`);}},5000);
   }
+}
+
+// Starter quests: a card on screen with the next step, a Quests app with all fifteen, and a
+// celebration each time one is done. The card can be tucked away; the app always has the list.
+let seenQuest=null;
+const questsHidden=()=>{try{return localStorage.getItem('cg.questsHidden')==='1';}catch{return false;}};
+function questHud(){
+  if(!state)return;const q=state.quests||{done:[]},done=q.done||[],next=QUESTS.find(x=>!done.includes(x.key));
+  // The first state seen just records where things stand; later completions celebrate.
+  if(seenQuest===null)seenQuest=q.last?q.last.key+q.last.at:'';
+  if(q.last&&seenQuest!==q.last.key+q.last.at){const first=false;seenQuest=q.last.key+q.last.at;const quest=QUESTS.find(x=>x.key===q.last.key);
+    if(!first&&quest)showNotice('✅','Quest complete!',`${quest.icon} ${quest.title}${next?` · Next: ${next.title}`:''}`,quest.reward);
+    if(!first&&q.graduated===q.last.at)showNotice('🎓',QUEST_GRADUATION.name,'You finished every starter quest. Palm City is yours.',QUEST_GRADUATION.fame);}
+  let chip=$('#questChip');
+  if(!next||questsHidden()){chip?.remove();return;}
+  if(!chip){chip=document.createElement('button');chip.id='questChip';chip.className='quest-chip';chip.dataset.action='app';chip.dataset.app='quests';$('.world-card').append(chip);}
+  chip.innerHTML=`<span class="quest-icon">${next.icon}</span><span class="quest-text"><small>QUEST ${done.length+1}/${QUESTS.length}</small><strong>${escape(next.title)}</strong><em>${escape(next.how)}</em></span>`;
+}
+function questsApp(){
+  const done=state.quests?.done||[],count=QUESTS.filter(x=>done.includes(x.key)).length,next=QUESTS.find(x=>!done.includes(x.key));
+  showModal('quests',`<span class="eyebrow">🎯 STARTER QUESTS</span><h2>${next?'Learn the ropes':'All done, superstar!'}</h2>
+  <p class="modal-intro">Fifteen first steps in Palm City, in any order. Each pays fame, and finishing them all earns the <strong>${QUEST_GRADUATION.name}</strong> award (+${QUEST_GRADUATION.fame} fame).</p>
+  <div class="quest-progress"><i style="width:${Math.round(count/QUESTS.length*100)}%"></i><span>${count}/${QUESTS.length}</span></div>
+  <div class="quest-list">${QUESTS.map(x=>{const ok=done.includes(x.key);return `<div class="quest-row${ok?' done':''}${x===next?' current':''}"><span class="quest-icon">${ok?'✅':x.icon}</span><div><strong>${escape(x.title)}</strong><small>${escape(x.how)}</small></div><b>+${x.reward}</b></div>`;}).join('')}</div>
+  ${next?button(questsHidden()?'Show the quest card':'Hide the quest card','questCard','','secondary wide'):''}`);
 }
