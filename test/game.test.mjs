@@ -354,3 +354,12 @@ test('career moments: gated by career and outputs, once a day, tours over three 
   assert.equal(s.tour,null);assert.ok(s.awards.some(a=>a.name==='Sold-out tour'));
   act(s,{type:'retire',career:'actor'},t);assert.equal(s.career,'actor');assert.ok(s.careers.musician.retired);assert.ok(s.awards.some(a=>a.name==='Musician legacy'));
 });
+test('fame: brand deals, exclusives, magazine covers, scandals, the fan club and the Hall of Fame',()=>{
+  const s=make();s.fame=40_000;s.location='plaza';
+  assert.throws(()=>act(s,{type:'wear',item:'palmColaTee'},T),/exclusive/);
+  act(s,{type:'claim',item:'palmCola'},T);act(s,{type:'wear',item:'palmColaTee'},T);act(s,{type:'claim',item:'zoomPhones'},T);assert.equal(s.phone,'pro');
+  // At 10,000+ fame the fan club defends you: mishaps cost 10% less (plus any outfit perks).
+  s.wear={};s.needs.bladder=1;s.nextEventAt=Infinity;s.lastSeen=T;reconcile(s,T+1000);assert.equal(s.mishap.lost,Math.round(Math.max(10,s.fame*0+40_000*.03)*.9));
+  s.mishap=null;s.prompt=null;s.location='home';s.nextEventAt=0;const kinds=new Set();for(let i=0;i<40;i++){s.nextEventAt=0;s.prompt=null;lifeEvents(s,T+i,()=>i/40);kinds.add(s.lifeEvent.kind);}assert.ok(kinds.has('magazineCover')&&kinds.has('scandal'));
+  s.fame=150_000;s.lastSeen=T+10_000;reconcile(s,T+11_000);assert.ok(s.hallOfFame);assert.match(s.headlines.find(h=>/Hall of Fame/.test(h.text)).text,/River/);
+});

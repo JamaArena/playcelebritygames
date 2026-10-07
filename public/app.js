@@ -67,7 +67,7 @@ function showMishap(s){
   const card=`<div class="mishap-card"><div class="mishap-icon" aria-hidden="true">${def.icon}</div><span class="eyebrow">CAUGHT ON CAMERA</span><h2>${escape(def.title)}!</h2><p>${escape(def.text)}</p><strong class="mishap-fame">−${m.lost.toLocaleString('en-US')} fame</strong><small>Keep your ${escape(m.need)} above ${MISHAP.at}% to avoid moments like this.</small>${button('Ugh, fine','closeMishap','','primary wide')}</div>`;
   if(modalPage){toast(`${def.icon} ${def.title}! −${m.lost.toLocaleString('en-US')} fame.`);world.playMishap(m);}else showModal('mishap',card,false);
 }
-function receive(data,own=false){notice(data,own);snapshot=data;state=data.state;offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();showMishap(state);showLifeEvent(state);showPrompt(state);
+function receive(data,own=false){notice(data,own);snapshot=data;state=data.state;offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();showMishap(state);showLifeEvent(state);showPrompt(state);drawMinimap();
   $('#loading').hidden=true;lastUpdate=Date.now();scheduleHeartbeat(); // every update (an action or a refresh) restarts the 20s countdown
   if(!state){if(!data.account){if(modalPage!=='auth')authScreen('signup');}else if(modalPage!=='create')creation(data.account);return;}
   if(!welcomed){welcomed=true;setTimeout(()=>welcome(data),0);}
@@ -295,8 +295,8 @@ function wardrobe(){
   const fame=state.fame||0,wear=state.wear||{},closet=state.closet||{},perks=wearPerks(wear),atPlaza=state.location==='plaza';
   const tabs=Object.entries(WEAR_SLOTS).map(([key,name])=>`<button class="chip ${key===wardrobeSlot?'on':''}" data-action="wardrobeSlot" data-slot="${key}" aria-pressed="${key===wardrobeSlot}">${escape(name)}${wear[key]?' ✓':''}</button>`).join('');
   const active=Object.entries(perks).map(([key,v])=>`<li>✦ ${escape(PERKS[key].label(v))}</li>`).join('')||'<li>No perks yet. Claim clothes at Palm Boutique and wear them.</li>';
-  const cards=Object.entries(WEAR).filter(([,w])=>w.slot===wardrobeSlot).map(([key,w])=>{
-    const owned=w.fame===0||closet[key],worn=wear[w.slot]===key;
+  const cards=Object.entries(WEAR).filter(([k,w])=>w.slot===wardrobeSlot&&(!w.exclusive||closet[k])).map(([key,w])=>{
+    const owned=(w.fame===0&&!w.exclusive)||closet[key],worn=wear[w.slot]===key;
     const action=worn?button('Take off','takeOff',`data-slot="${w.slot}"`):owned?button('Wear','wear',`data-item="${key}"`,'primary'):fame<w.fame?button(`🔒 ${fmt(w.fame-fame)} fame to go`,'noop','disabled'):atPlaza?button('Claim free','claimWear',`data-item="${key}"`,'primary'):button('Claim at Palm plaza','travel','data-location="plaza"');
     return `<div class="item-card wear-card ${worn?'worn':''}"><span class="wear-swatch" style="--c:${w.color}"></span><h3>${escape(w.name)}</h3><p>${escape(w.note)}</p>${w.perk?`<div class="perk">✦ ${escape(PERKS[w.perk[0]].label(w.perk[1]))}</div>`:'<div class="perk none">No perk</div>'}<div class="shop-price">${w.fame?`✦ ${fmt(w.fame)} fame`:'Free basic'}${owned&&w.fame?' · Owned':''}</div>${action}</div>`;}).join('');
   showModal('wardrobe',`<span class="eyebrow">WARDROBE</span><h2>Dress for the moment.</h2><p class="modal-intro">What you wear shows on your character, and perks add up across your outfit. New pieces are free with fame at Palm Boutique in Palm plaza.</p><div class="perk-summary"><strong>Active perks</strong><ul>${active}</ul></div><div class="chip-row wear-tabs">${tabs}</div><div class="item-grid">${cards}</div>`);
@@ -340,7 +340,8 @@ function walletApp(){
 function newsApp(){
   const top=[...snapshot.players].sort((a,b)=>(b.fame||0)-(a.fame||0))[0],items=[...(state.headlines||[]),...snapshot.players.filter(p=>p.id!==me()).flatMap(p=>p.headlines||[])].sort((a,b)=>b.at-a.at).slice(0,25);
   const weather=weatherAt(now()),season=festivalAt(now());
-  showModal('news',`<span class="eyebrow">PALM CITY NEWS</span><h2>Today's headlines</h2>${top?`<div class="headline lead">👑 ${escape(top.name)} leads Palm City with ✦ ${fmt(top.fame||0)} fame</div>`:''}${season==='independence'?'<div class="headline">🇳🇬 Green and white everywhere as Palm City celebrates Independence week</div>':''}${weather==='rain'?'<div class="headline">🌧 Heavy rain floods streets; trips running slow</div>':weather==='harmattan'?'<div class="headline">🌫 Harmattan haze settles over the lagoon</div>':''}${items.map(h=>`<div class="headline">${escape(h.text)} <small>${ago(h.at)}</small></div>`).join('')||'<p class="empty">A quiet news day. Make some headlines.</p>'}`);
+  const trending=[...snapshot.players].filter(p=>p.trend>0).sort((a,b)=>b.trend-a.trend).slice(0,5),legends=snapshot.players.filter(p=>p.hallOfFame);
+  showModal('news',`<span class="eyebrow">PALM CITY NEWS</span><h2>Today's headlines</h2>${trending.length?`<h3>🔥 Trending today</h3>${trending.map((p,i)=>`<div class="ledger"><span>${i+1}. ${escape(p.name)}${p.verified?' ✔':''}</span><strong class="up">+${fmt(p.trend)}</strong></div>`).join('')}`:''}${legends.length?`<h3>🌟 Hall of Fame</h3>${legends.map(p=>`<div class="ledger"><span>${escape(p.name)} ✔</span><small>since ${new Date(p.hallOfFame).toLocaleDateString()}</small></div>`).join('')}`:''}<h3>Headlines</h3>${top?`<div class="headline lead">👑 ${escape(top.name)} leads Palm City with ✦ ${fmt(top.fame||0)} fame</div>`:''}${season==='independence'?'<div class="headline">🇳🇬 Green and white everywhere as Palm City celebrates Independence week</div>':''}${weather==='rain'?'<div class="headline">🌧 Heavy rain floods streets; trips running slow</div>':weather==='harmattan'?'<div class="headline">🌫 Harmattan haze settles over the lagoon</div>':''}${items.map(h=>`<div class="headline">${escape(h.text)} <small>${ago(h.at)}</small></div>`).join('')||'<p class="empty">A quiet news day. Make some headlines.</p>'}`);
 }
 function datingApp(){
   const open=!!state.dating?.open,likes=state.dating?.likes||[],people=snapshot.players.filter(p=>p.id!==me()&&p.dating);
@@ -408,6 +409,29 @@ function giftPicker(playerId){
   const p=playerById(playerId),owned=Object.entries(WEAR).filter(([k,w])=>w.fame>0&&state.closet?.[k]);
   showModal('gift',`<span class="eyebrow">SEND A GIFT</span><h2>Something for ${escape(p?.name||'your friend')}</h2><p class="modal-intro">They get their own copy; you keep yours. One gift every 10 minutes.</p><div class="actions">${button('🍢 Suya','gift',`data-player="${playerId}" data-item="suya"`,'primary')}${owned.map(([k,w])=>button(`👕 ${escape(w.name)}`,'gift',`data-player="${playerId}" data-item="${k}"`)).join('')}</div>`);
 }
+// Ambient sound: a soft city hum with birds by day or crickets at night, and a beat in party venues. Off by default.
+let ambience=null;
+function toggleAmbience(){
+  if(ambience){try{ambience.ctx.close();}catch{}ambience=null;$('[data-action=ambience]')?.classList.remove('on');return;}
+  let ctx;try{ctx=new AudioContext();}catch{toast('Sound is not available here.');return;}
+  const out=ctx.createGain();out.gain.value=.05;out.connect(ctx.destination);
+  const noise=ctx.createBuffer(1,ctx.sampleRate*2,ctx.sampleRate),data=noise.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=(Math.random()*2-1)*.5;
+  const hum=ctx.createBufferSource();hum.buffer=noise;hum.loop=true;const lp=ctx.createBiquadFilter();lp.type='lowpass';lp.frequency.value=380;hum.connect(lp).connect(out);hum.start();
+  const chirp=()=>{if(!ambience)return;const night=world.daylight().night,party=['nightclub','eventHall','lounge'].includes(state.location),t=ctx.currentTime;
+    if(party){for(let i=0;i<8;i++){const k=ctx.createOscillator(),g=ctx.createGain();k.frequency.setValueAtTime(110,t+i*.25);k.frequency.exponentialRampToValueAtTime(40,t+i*.25+.15);g.gain.setValueAtTime(.8,t+i*.25);g.gain.exponentialRampToValueAtTime(.001,t+i*.25+.2);k.connect(g).connect(out);k.start(t+i*.25);k.stop(t+i*.25+.2);}}
+    else{const o=ctx.createOscillator(),g=ctx.createGain();o.frequency.value=night?4200:2400+Math.random()*1800;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(night?.12:.2,t+.03);g.gain.exponentialRampToValueAtTime(.001,t+(night?.08:.18));o.connect(g).connect(out);o.start(t);o.stop(t+.2);}
+    ambience.timer=setTimeout(chirp,party?2000:600+Math.random()*1600);};
+  ambience={ctx};chirp();$('[data-action=ambience]')?.classList.add('on');
+}
+// Mini map: a small overview of Palm City with you and your friends.
+let minimapOn=(()=>{try{return localStorage.getItem('cg.minimap')!=='0';}catch{return true;}})();
+function drawMinimap(){
+  const c=$('#minimap');if(!c)return;c.hidden=!minimapOn||!state;if(c.hidden)return;const g=c.getContext('2d'),w=c.width,h=c.height,sx=x=>(x+76)/152*w,sz=z=>(z+60)/100*h;
+  g.clearRect(0,0,w,h);g.fillStyle='#c4d4ad';g.fillRect(0,0,w,h);g.fillStyle='#93c9d8';g.fillRect(0,sz(9),w,h-sz(9));g.fillStyle='#dcd8cc';for(const z of [8,-8,-24,-40,-56])g.fillRect(0,sz(z)-1,w,2);for(const x of [-72,-56,-40,-24,-8,8,24,40,56,72])g.fillRect(sx(x)-1,0,2,sz(9));
+  for(const [key,lot] of Object.entries(TOWN)){g.fillStyle=LOCATIONS[key]?.color||'#888';g.fillRect(sx(lot.x)-3,sz(lot.z)-3,6,6);}
+  for(const p of snapshot.players||[]){if(!state.friends.includes(p.id)||!TOWN[p.location==='street'?'home':p.location])continue;const l=TOWN[p.location==='street'?'home':p.location];g.fillStyle='#e05a9a';g.beginPath();g.arc(sx(l.x)+3,sz(l.z)-3,2.5,0,7);g.fill();}
+  const here=TOWN[state.location==='street'?'home':state.location];if(here){g.fillStyle='#ffffff';g.strokeStyle='#153d32';g.lineWidth=1.5;g.beginPath();g.arc(sx(here.x),sz(here.z),4,0,7);g.fill();g.stroke();}
+}
 const APP_PAGES={team:teamApp,crews:crewsApp,estate:estateAgent,barber:barberShop,tattoo:tattooShop,tailor:tailorShop,chat:chatApp,friends:friendsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp};
 function inventory(){
   showModal('inventory',`<span class="eyebrow">YOUR POSSESSIONS</span><h2>A place to call yours.</h2><p class="modal-intro">Furnish your apartment, equip a new look, and improve your tools.</p><div class="actions">${button('👗 Wardrobe','page','data-page="wardrobe"','primary')}${button('Visit market','travel','data-location="plaza"')}${button('Go home','travel','data-location="home"')}</div><div class="item-grid">${Object.entries(state.inventory).map(([key,item])=>{
@@ -441,7 +465,7 @@ function directMessage(playerId){const p=snapshot.players.find(p=>p.id===playerI
 function vip(){tip('vip');
   const fame=state.fame||0,claimed=state.vip||{};
   showModal('vip',`<span class="eyebrow">PALM MOTORS · SPONSORSHIPS</span><h2>Fame opens doors. And garages.</h2><p class="modal-intro">You have <strong>✦ ${fmt(fame)} fame</strong>. Sponsors give these to famous players for free. Fame isn't spent, and what you claim stays yours.</p><div class="item-grid">${Object.entries(SPONSORSHIPS).map(([key,d])=>{
-    const owned=claimed[key],using=d.kind==='ride'?state.ride===key:d.kind==='home'?state.home===key:state.equipped.clothes===key,ready=fame>=d.fame,verb={ride:['Driving ✓','Drive it'],home:['Living here ✓','Move in'],style:['Wearing ✓','Wear it'],yacht:['Moored ✓','Moored ✓']}[d.kind];
+    const owned=claimed[key],using=d.kind==='ride'?state.ride===key:d.kind==='home'?state.home===key:state.equipped.clothes===key,ready=fame>=d.fame,verb={ride:['Driving ✓','Drive it'],home:['Living here ✓','Move in'],style:['Wearing ✓','Wear it'],yacht:['Moored ✓','Moored ✓'],brand:['Signed ✓','Signed ✓']}[d.kind];
     const action=owned?(using?button(verb[0],'noop','disabled'):button(verb[1],'useVip',`data-item="${key}"`)):ready?(state.location==='plaza'?button('Claim free ✦','claim',`data-item="${key}"`,'primary'):button('Claim at Palm Motors ↗','travel','data-location="plaza"','primary')):button(`🔒 ${fmt(d.fame)} fame`,'noop','disabled');
     return `<div class="item-card vip-card ${owned?'owned':''}"><div class="vip-icon" style="--tone:${d.color}">${d.icon}</div><h3>${escape(d.name)}</h3><small class="vip-sponsor">by ${escape(d.sponsor)}</small><p>${escape(d.description)}</p><div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,fame/d.fame*100)}%"></div></div><small>${owned?'Claimed':ready?'Ready to claim':`${fmt(d.fame-fame)} fame to go`}</small>${action}</div>`;
   }).join('')}</div>${garage()}`);
@@ -566,6 +590,8 @@ document.addEventListener('click',async event=>{
     case 'crewBadge':crewBadge=d.badge;crewsApp();break;
     case 'crewJoin':await send({type:'crewJoin',name:d.name,badge:d.badge},{keepModal:true});break;
     case 'giftPicker':giftPicker(d.player);break;
+    case 'ambience':toggleAmbience();break;
+    case 'minimap':minimapOn=!minimapOn;try{localStorage.setItem('cg.minimap',minimapOn?'1':'0');}catch{}drawMinimap();break;
     case 'retirePicker':retirePicker();break;
     case 'retire':await send({type:'retire',career:d.career});break;
     case 'gift':await send({type:'gift',playerId:d.player,item:d.item},{keepModal:true});break;

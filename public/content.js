@@ -170,6 +170,8 @@ export const WEAR = {
   agbada: {name: 'Agbada', slot: 'top', fame: 1500, fit: 'robe', color: '#f0e6d2', accent: '#c9a227', perk: ['fame', 5], note: 'Flowing robes for big occasions.'},
   stageOutfit: {name: 'Sparkly stage outfit', slot: 'top', fame: 2500, fit: 'jacket', color: '#7b4fa3', perk: ['success', 8], note: 'Made to catch the spotlight.'},
   eveningGown: {name: 'Evening gown', slot: 'top', fame: 3000, fit: 'gown', color: '#9b1b30', perk: ['scandal', 25], note: 'So elegant, the blogs forgive you.'},
+  palmColaTee: {name: 'Palm Cola tee', slot: 'top', fame: 0, exclusive: 'palmCola', fit: 'tee', color: '#d23b4b', perk: ['fame', 4], note: 'Brand-deal exclusive.'},
+  maisonGown: {name: 'Maison runway look', slot: 'top', fame: 0, exclusive: 'maisonDeal', fit: 'gown', color: '#1f1f24', perk: ['fame', 8], note: 'Brand-deal exclusive.'},
   redCarpetTux: {name: 'Red-carpet tux', slot: 'top', fame: 5000, fit: 'suit', color: '#111111', accent: '#d4af37', perk: ['fame', 10], note: 'Every camera finds you.'},
   // Bottoms: trousers, shorts or a skirt.
   jeans: {name: 'Classic jeans', slot: 'bottom', fame: 0, cut: 'trousers', color: '#34435e', note: 'They go with everything.'},
@@ -231,6 +233,7 @@ export const PET_CARE = {decay: {food: 10, joy: 8}, feed: 40, play: 30, cuddle: 
 // Everything that adjusts the rules for a character: worn perks, a happy pet and home upgrades.
 export function perksFor(s) {
   const totals = wearPerks(s?.wear), pet = s?.pet && PETS[s.pet.kind];
+  if ((s?.fame || 0) >= FAME_MARKS.fanClub) totals.scandal = Math.min((totals.scandal || 0) + 10, PERKS.scandal.cap);
   if (s?.fitness >= 1) totals.energy = Math.min((totals.energy || 0) + Math.floor(s.fitness), PERKS.energy.cap);
   if (pet && s.pet.food > PET_CARE.happy && s.pet.joy > PET_CARE.happy) totals[pet.perk[0]] = Math.min((totals[pet.perk[0]] || 0) + pet.perk[1], PERKS[pet.perk[0]].cap);
   return totals;
@@ -274,6 +277,8 @@ export const LIFE_EVENTS = {
   journalist: {icon: '📰', title: 'A journalist wants a quote', text: 'About your rival, of course.', weight: 2, minFame: 1000, prompt: 'journalist'},
   paparazzi: {icon: '📸', title: 'Paparazzi spotted you', text: 'Flashes everywhere. Careful: the next ten minutes are on camera.', weight: 2, where: 'out', minFame: 5000, fame: [.003, 10], guarded: true, paps: true},
   transferWindow: {icon: '📝', title: 'The transfer window is open', text: 'A bigger club wants you. Check your career offers.', weight: 2, family: 'sport', transfer: true},
+  magazineCover: {icon: '📰', title: 'You made a magazine cover', text: 'Palm Style put you on the cover. Fans are buying every copy.', fame: [.01, 100], weight: 1, minFame: 20_000, award: 'Cover star'},
+  scandal: {icon: '🫢', title: 'A scandal hit the blogs', text: 'An old post resurfaced. The comments are not kind.', fame: [-.015, -40], weight: 1, minFame: 10_000},
   rivalHit: {icon: '🥊', title: 'Your rival dropped a hit', text: 'Duke Adeyemi is all over the radio. Time to answer?', weight: 1, minFame: 2000},
   mumCalls: {icon: '📞', title: 'Mum called', text: '"Have you eaten?" You feel loved.', needs: {social: 15}, weight: 2},
   familyVisit: {icon: '👪', title: 'Family came to visit', text: 'Mum is on the sofa with jollof she brought.', needs: {social: 20, hunger: 15}, weight: 1, where: 'home', family: null, visit: true},
@@ -295,6 +300,9 @@ export const TEAM = {
 };
 // Career moments: once a day each; tours need all three stops within a day.
 export const MOMENT = {cooldownMs: 24 * 3_600_000, tourMs: 24 * 3_600_000, viralChance: .12};
+// Fame milestones: a fan club (defends you: 10% less fame lost in mishaps), the verified tick, billboards and the Hall of Fame.
+export const FAME_MARKS = {fanClub: 10_000, verified: 50_000, billboard: 25_000, hallOfFame: 100_000};
+export const fanClubSize = fame => fame >= FAME_MARKS.fanClub ? Math.round(Math.sqrt(fame) * 12) : 0;
 export const GIG = {everyMs: 15 * 60_000, windowMs: 10 * 60_000};
 // Home items that need electricity during a power cut (unless you own a generator).
 export const POWERED = ['gamingConsole', 'soundSystem', 'coffeeMachine', 'microwave', 'washingMachine', 'ringLight', 'studioMic'];
@@ -326,6 +334,7 @@ export const VENUE_ACTS = {
   ludo: {venue: 'park', name: 'Play Ludo & Ayo', icon: '🎲', need: 'fun', amount: 25, ms: 40_000, extra: {social: 15}, pose: 'sitFloor'},
   volunteer: {venue: 'hospital', name: 'Volunteer', icon: '🤲', need: 'social', amount: 20, ms: 60_000, extra: {fun: 10, energy: -5}, pose: 'chat', fame: 10, charity: true},
   // Career moments: big, risky beats for particular careers. Your focus skill sets the odds; wins can bring awards.
+  awardShow: {venue: 'eventHall', name: 'Attend the Palm Awards', icon: '🏅', need: 'social', amount: 30, ms: 75_000, extra: {fun: 20}, pose: 'sit', seat: .5, minFame: 1000, moment: {win: [.02, 120], lose: [.002, 10], award: 'Palm Award', headline: ['won at the Palm Awards 🏅', 'was nominated at the Palm Awards']}},
   final: {venue: 'stadium', name: 'Play the championship final', icon: '🏆', need: 'fun', amount: 30, ms: 75_000, extra: {energy: -20}, pose: 'sport', careers: ['football', 'basketball'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Champions', headline: ['lifted the championship trophy 🏆', 'fell short in the final']}},
   grandSlam: {venue: 'stadium', name: 'Play a grand slam final', icon: '🎾', need: 'fun', amount: 30, ms: 75_000, extra: {energy: -20}, pose: 'sport', careers: ['tennis'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Grand slam champion', headline: ['won the grand slam 🎾', 'lost a five-set epic']}},
   titleBelt: {venue: 'eventHall', name: 'Fight for the title belt', icon: '🥇', need: 'fun', amount: 30, ms: 60_000, extra: {energy: -25}, pose: 'sport', careers: ['wrestling'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Title belt', headline: ['is the new champion 🥇', 'lost the title fight']}},
@@ -383,6 +392,9 @@ export const SPONSORSHIPS = {
   limo: {name: 'Royal limousine', sponsor: 'Royal Limousines', fame: 50_000, kind: 'ride', icon: '🚘', color: '#111111', description: 'Arrive in style: fans notice, and you earn a little fame when you pull up.'},
   yacht: {name: 'Lagoon yacht', sponsor: 'Lagoon Marine', fame: 75_000, kind: 'yacht', icon: '🛥️', color: '#f2f2f0', description: 'Moored by your street. Throw yacht parties on the lagoon.'},
   helicopter: {name: 'SkyPalm helicopter', sponsor: 'SkyPalm Aviation', fame: 250_000, kind: 'ride', icon: '🚁', color: '#d4af37', description: 'Fly straight over the city. No roads, no traffic, no rain delays.'},
+  palmCola: {name: 'Palm Cola ambassador', sponsor: 'Palm Cola', fame: 3_000, kind: 'brand', icon: '🥤', color: '#d23b4b', grant: {wear: 'palmColaTee'}, description: 'A fizzy deal: an exclusive Palm Cola tee (+4% fame from your work).'},
+  zoomPhones: {name: 'Zoom Mobile face', sponsor: 'Zoom Mobile', fame: 8_000, kind: 'brand', icon: '📱', color: '#7b4fa3', grant: {phone: 'pro'}, description: 'They hand you a Pro edition phone, free.'},
+  maisonDeal: {name: 'Maison Palme muse', sponsor: 'Maison Palme', fame: 30_000, kind: 'brand', icon: '👗', color: '#1f1f24', grant: {wear: 'maisonGown'}, description: 'An exclusive runway look (+8% fame from your work).'},
   hypercar: {name: 'Vitesse hypercar', sponsor: 'Vitesse', fame: 100_000, kind: 'ride', icon: '🏁', color: '#1d4fa8', description: 'A hand-built hypercar for Icons only. A sponsorship deal, free to claim.'},
   studioFlat: {name: 'Cosy studio flat', sponsor: 'Palm Realty', fame: 0, kind: 'home', icon: '🛏️', color: '#9aa7b3', rest: 1, description: 'A cheap and cheerful starter home with a fresh coat of paint.'},
   duplex: {name: 'Lekki-style duplex', sponsor: 'Palm Realty', fame: 8_000, kind: 'home', icon: '🏘️', color: '#7a5a43', rest: .85, description: 'Two storeys, wood floors and room to grow. Home recovery is 15% faster.'},

@@ -105,7 +105,7 @@ export const worldObjects = (location,furniture=[],owned=[]) => ({
   gym:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.workout.name,icon:VENUE_ACTS.workout.icon,x:0,z:-1,act:'workout',face:3.1416}],
   hospital:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.volunteer.name,icon:VENUE_ACTS.volunteer.icon,x:-1.2,z:-1.4,act:'volunteer',face:3.1416},{name:VENUE_ACTS.checkup.name,icon:VENUE_ACTS.checkup.icon,x:2.6,z:-2.4,act:'checkup',face:0}],
   worship:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.reflect.name,icon:VENUE_ACTS.reflect.icon,x:0,z:1.2,act:'reflect',face:3.1416}],
-  eventHall:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.tourHall.name,icon:VENUE_ACTS.tourHall.icon,x:0,z:-3.5,act:'tourHall',face:0},{name:VENUE_ACTS.titleBelt.name,icon:VENUE_ACTS.titleBelt.icon,x:-1.6,z:-2.6,act:'titleBelt',face:0},{name:VENUE_ACTS.owambe.name,icon:VENUE_ACTS.owambe.icon,x:0,z:0,act:'owambe',face:3.1416}],
+  eventHall:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.awardShow.name,icon:VENUE_ACTS.awardShow.icon,x:-3.5,z:2.95,act:'awardShow',face:3.1416},{name:VENUE_ACTS.tourHall.name,icon:VENUE_ACTS.tourHall.icon,x:0,z:-3.5,act:'tourHall',face:0},{name:VENUE_ACTS.titleBelt.name,icon:VENUE_ACTS.titleBelt.icon,x:-1.6,z:-2.6,act:'titleBelt',face:0},{name:VENUE_ACTS.owambe.name,icon:VENUE_ACTS.owambe.icon,x:0,z:0,act:'owambe',face:3.1416}],
   stadium:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.tourStadium.name,icon:VENUE_ACTS.tourStadium.icon,x:1.4,z:2.6,act:'tourStadium',face:0},{name:VENUE_ACTS.grandSlam.name,icon:VENUE_ACTS.grandSlam.icon,x:-1.2,z:1.2,act:'grandSlam',face:0},{name:VENUE_ACTS.final.name,icon:VENUE_ACTS.final.icon,x:0,z:-1.2,act:'final',face:0},{name:VENUE_ACTS.match.name,icon:VENUE_ACTS.match.icon,x:4.4,z:0.4,act:'match',face:-1.5708}],
   park:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.ludo.name,icon:VENUE_ACTS.ludo.icon,x:-0.4,z:-3.6,act:'ludo',face:0},{name:VENUE_ACTS.jog.name,icon:VENUE_ACTS.jog.icon,x:0,z:2.4,act:'jog',face:0},{name:VENUE_ACTS.picnic.name,icon:VENUE_ACTS.picnic.icon,x:-2.6,z:-2,act:'picnic',face:0},{name:VENUE_ACTS.yoga.name,icon:VENUE_ACTS.yoga.icon,x:2.6,z:-2.6,act:'yoga',face:0}],
   airport:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.flight.name,icon:VENUE_ACTS.flight.icon,x:0,z:1.4,act:'flight',face:3.1416}],
@@ -186,6 +186,7 @@ export class World {
     this.last=performance.now();requestAnimationFrame(t=>this.frame(t));
   }
   update(state,players,visitedHome,townPlayers=[],residents=[],friends=[]){
+    this.townPlayers=townPlayers;this.starsKey=[state.fame>=25_000?state.name:'',...townPlayers.filter(p=>(p.fame||0)>=25_000).sort((a,b)=>b.fame-a.fame).slice(0,3).map(p=>p.name)].join(',');
     // Real players are kept in absolute town coordinates and glide toward each polled position.
     this.people??=new Map();const seen=new Set(),hereLot=TOWN[state.location]||TOWN.home;
     for(const p of [...players.map(p=>({...p,lot:hereLot,scene:true})),...townPlayers.map(p=>({...p,lot:TOWN[LOT(p.location)],scene:false}))]){if(!p.lot||!p.position3d)continue;
@@ -424,6 +425,9 @@ export class World {
     }
     if(!far){for(let x=-70;x<=70;x+=5)if(this.onScreen(ox+x,oz+10.7,2))this.palm(ox+x,oz+10.7);}
     if(this.state?.vip?.yacht)this.yacht(ox+TOWN.home.x+5,oz+TOWN.home.z+14.5);
+    // Billboards for the city's biggest stars (25,000+ fame), along the main road.
+    const stars=[...(this.state?.fame>=25_000?[{name:this.state.name,color:this.state.color,outfit:'#21634e'}]:[]),...[...(this.townPlayers||[])].filter(p=>(p.fame||0)>=25_000&&p.name!==this.state?.name).sort((a,b)=>b.fame-a.fame)].slice(0,3);
+    this.billboards=[];stars.forEach((star,i)=>{const bx=ox-40+i*40,bz=oz+11.4;this.round(bx,bz,.25,.25,4,'#5b6168');this.box(bx,bz,5,.3,2.6,'#1d1f22',4);this.box(bx,bz-.17,4.6,.04,2.2,'#f2ead6',4.2);this.round(bx-1.3,bz-.2,1.3,.05,1.3,star.color||'#c98d64',4.6);this.box(bx+.9,bz-.2,2,.04,.3,'#d4af37',5.6);this.billboards.push({x:bx,z:bz,name:star.name});});
     // Street lamps along the main roads; their heads glow after dark.
     if(!far)for(const z of [8,-8,-24,-40,-56])for(let x=-68;x<=68;x+=12){const lz=oz+z+2.3;if(!this.onScreen(ox+x,lz,2))continue;this.round(ox+x,lz,.1,.1,2.6,'#5b6168');this.box(ox+x,lz-.25,.18,.6,.08,'#5b6168',2.55);this.box(ox+x,lz-.5,.32,.32,.12,night?'#ffe9a8':'#d9dcd6',2.45);}
   }
@@ -444,7 +448,7 @@ export class World {
       for(let i=0;i<10;i++){const road=[8,-8,-24,-40,-56,8,-8,-24][i%8],dir=i%2?1:-1,along=(t*(3.2+i%3)+i*31)%150,u=dir>0?-75+along:75-along;
         if(i<8){const cz=road+dir*.75;if(this.onScreen(ox+u,oz+cz,2))this.car(ox+u,oz+cz,'x',CAR_TONES[i%CAR_TONES.length]);}
         else{const cx=[-8,24][i-8]+dir*.75,v=Math.max(-58,Math.min(9,u*.45-24));if(this.onScreen(ox+cx,oz+v,2))this.car(ox+cx,oz+v,'z',CAR_TONES[i%CAR_TONES.length]);}}
-      const walkers=far?0:14;for(let i=0;i<walkers;i++){const dir=i%2?1:-1,along=(t*1.1+i*17.3)%140,u=dir>0?-70+along:70-along,lane=[[6.1,'x'],[-6.1,'x'],[-9.9,'x'],[-22.1,'x'],[-25.9,'x'],[-38.1,'x'],[9.8,'x'],[-6.1,'z'],[6.1,'z'],[-22.1,'z'],[-9.9,'z'],[25.9,'z'],[-41.9,'x'],[-54.1,'x']][i];
+      const walkers=far?0:24;for(let i=0;i<walkers;i++){const dir=i%2?1:-1,along=(t*1.1+i*17.3)%140,u=dir>0?-70+along:70-along,lane=[[6.1,'x'],[-6.1,'x'],[-9.9,'x'],[-22.1,'x'],[-25.9,'x'],[-38.1,'x'],[9.8,'x'],[-6.1,'z'],[6.1,'z'],[-22.1,'z'],[-9.9,'z'],[25.9,'z'],[-41.9,'x'],[-54.1,'x']][i%14];
         const [px,pz]=lane[1]==='x'?[u,lane[0]]:[lane[0],Math.max(-58,Math.min(9,u*.45-24))];if(!this.onScreen(px+ox,pz+oz,2))continue;
         this.human(px+ox,pz+oz,SKIN_TONES[(i+CROWD_SEED)%SKIN_TONES.length],{...this.look(['football','musician','vlogger','actor','developer','tennis'][i%6]),...this.extra(i),walk:true,heading:lane[1]==='x'?dir*Math.PI/2:dir>0?0:Math.PI,gait:t*7+i});}
     }
@@ -759,6 +763,7 @@ export class World {
     const here=TOWN[this.location]||TOWN.home;this.peopleHits=[];
     for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1))continue;this.peopleHits.push({player:p,screen:this.project(x,1.1,z)});if((p.location===this.location&&this.zoom>=.45)||this.zoom>=.85||this.hover?.player?.id===p.id)tag(x,z,(this.friends?.includes(p.id)?'♥ ':'')+(p.crew?.badge?p.crew.badge+' ':'')+p.name);}
     this.houseHits=[];if(!this.interior())for(const [index,owner] of this.owners||[]){const h=CITY.houses[index],x=h.x-here.x,z=h.z-here.z;if(!this.onScreen(x,z,2))continue;const screen=this.project(x,h.h+.9,z);this.houseHits.push({house:owner,screen});if(this.zoom>=.5||this.hover?.house?.id===owner.id){ctx.font='600 9px Segoe UI';ctx.textAlign='center';const label=`⌂ ${owner.name}`,w=ctx.measureText(label).width+14;ctx.fillStyle='#153d32d9';ctx.beginPath();ctx.roundRect(screen.x-w/2,screen.y-8,w,16,8);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(label,screen.x,screen.y+3);}}
+    if(!this.interior())for(const b of this.billboards||[]){const here=TOWN[this.location]||TOWN.home,p=this.project(b.x,7.1,b.z);if(p.x<-60||p.x>this.width+60||p.y<-30||p.y>this.height+30)continue;ctx.font='700 11px Segoe UI';ctx.textAlign='center';const label=`★ ${b.name}`,w=ctx.measureText(label).width+16;ctx.fillStyle='#1d1f22e6';ctx.beginPath();ctx.roundRect(p.x-w/2,p.y-9,w,18,9);ctx.fill();ctx.fillStyle='#f2c230';ctx.fillText(label,p.x,p.y+4);}
     if(this.zoom<.5&&!this.interior()){ctx.textAlign='center';ctx.font=`700 ${Math.round(11+this.scale*.25)}px Segoe UI`;for(const [name,x,z] of DISTRICTS){const p=this.project(x-here.x,0,z-here.z);ctx.fillStyle='#ffffff';ctx.globalAlpha=.75;ctx.fillText(name.split('').join(' '),p.x,p.y);ctx.globalAlpha=1;}}
     const a=this.actor,low=Object.entries(this.state.needs).filter(([,v])=>v<30).sort((x,y)=>x[1]-y[1])[0];
     if(low&&!a.pose&&!this.moving&&!this.state.recovery&&!this.state.active){const p=this.project(a.x,1.95,a.z),bx=p.x+26,by=p.y-22;ctx.fillStyle='#fffef8f0';for(const [dx,dy,rad] of [[-17,15,2.5],[-11,9,4]]){ctx.beginPath();ctx.arc(bx+dx,by+dy,rad,0,Math.PI*2);ctx.fill();}ctx.beginPath();ctx.ellipse(bx,by-4,16,13,0,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#dfe5d6';ctx.lineWidth=1;ctx.stroke();ctx.font='14px "Segoe UI Emoji",sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText({hunger:'🍲',energy:'💤',fun:'🎮',social:'💬',hygiene:'🛁',bladder:'🚽'}[low[0]],bx,by-3);ctx.textBaseline='alphabetic';}

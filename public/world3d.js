@@ -397,7 +397,7 @@ export class World3D extends World {
     const day = this.daylight(); this.light(day);
     const inside = this.interior();
     this.island.visible = inside; this.city.visible = !inside; this.scene3.fog = inside ? null : this.fog;
-    if (!inside) { const key = [this.location, day.night, this.ownersKey, this.state.home, !!this.state.trip, festivalAt(Date.now()), !!this.state.vip?.yacht].join('|'); if (key !== this.cityKey) { this.cityKey = key; this.buildCity(day.night); } }
+    if (!inside) { const key = [this.location, day.night, this.ownersKey, this.state.home, !!this.state.trip, festivalAt(Date.now()), !!this.state.vip?.yacht, this.starsKey].join('|'); if (key !== this.cityKey) { this.cityKey = key; this.buildCity(day.night); } }
     for (const p of [this.boxes, this.balls, this.figures, this.toilets]) p.begin();
     this.meshes = []; if (!inside) this.townLife(); this.scene();
     for (const p of [this.boxes, this.balls, this.figures, this.toilets]) p.end();
