@@ -1138,3 +1138,7 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 #modal .phone-device .phone-app :is(.prow-main strong,.dm-text strong,.product-body strong,.promo-card strong,.post-card header strong,.quest-row strong,.stat-tile small,.gem-tile small,.medal small){font-family:var(--display);font-weight:600;letter-spacing:.1px}
 @media(prefers-reduced-motion:reduce){.phone-app .look .look-body,.phone-app .look .look-shadow,.phone-app .dress-stage .look.pop,.app-grid.tiles-in .app span{animation:none}.phone-app .dress-stage:has(.pop)::after{display:none}}
 .reduce-motion .phone-app .look .look-body,.reduce-motion .phone-app .look .look-shadow,.reduce-motion .phone-app .eq b{animation:none}
+
+/* Friends: the message button reads as a solid button; short screens shrink the clock so row 1 clears the dock */
+#modal .phone-device .phone-app button.round.tint[data-action=directMessage]{background:var(--c);color:#fff;font-size:17px;box-shadow:0 4px 10px -4px var(--c)}
+@media(max-height:740px){#modal .phone-device.ios .phone-clock{padding-top:0;padding-bottom:0;margin-bottom:0}#modal .phone-device.ios .phone-clock small{display:none}#modal .phone-device.ios .phone-clock strong{font-size:34px}#modal .phone-device.ios .home-screen .phone-card{margin-top:4px;margin-bottom:4px;padding-top:9px;padding-bottom:9px}#modal .phone-device.ios .home-screen:has(.phone-dock) .app-grid{padding-bottom:150px}}

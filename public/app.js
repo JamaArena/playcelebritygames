@@ -36,10 +36,11 @@ function hairSvg(style,x,y,r,c){
 const wornColor=(p,slot)=>{const k=p.wear?.[slot];return k&&WEAR[k]?(p.wear.tint?.[k]||WEAR[k].color):null;};
 // Character busts: a head-and-shoulders drawing from the player's look, cached per look. NPCs get a hairstyle from their name.
 const BUST_HAIR=['short','curls','afro','braids','bun','locs','fade','bob'],bustCache=new Map();
+const BUST_TOPS=['#8ea9a4','#e0794f','#4f7fd6','#c9a227','#8d5bc4','#3f9b6a','#d35d86','#2f3a4a'];
 function bustSvg(p){
-  const hair=p.hair||BUST_HAIR[[...(p.name||'')].reduce((n,ch)=>n+ch.codePointAt(0),0)%BUST_HAIR.length],key=[p.color,hair,p.hairColor,JSON.stringify(p.wear||'')].join('|');
+  const seed=[...(p.id||p.name||'')].reduce((n,ch)=>n*31+ch.codePointAt(0)>>>0,7),hair=p.hair||BUST_HAIR[seed%BUST_HAIR.length],fallbackTop=BUST_TOPS[(seed>>>3)%BUST_TOPS.length],key=[p.color,hair,p.hairColor,JSON.stringify(p.wear||''),p.wear?'':fallbackTop].join('|');
   if(bustCache.has(key))return bustCache.get(key);
-  const skin=escape(p.color),hc=escape(HAIR_COLORS[p.hairColor]||'#1d1714'),top=escape(wornColor(p,'top')||'#8ea9a4'),head=wornColor(p,'head'),face=wornColor(p,'face'),[back,front]=hairSvg(hair,32,27,12.5,hc);
+  const skin=escape(p.color),hc=escape(HAIR_COLORS[p.hairColor]||'#1d1714'),top=escape(wornColor(p,'top')||fallbackTop),head=wornColor(p,'head'),face=wornColor(p,'face'),[back,front]=hairSvg(hair,32,27,12.5,hc);
   const svg=`<svg viewBox="0 0 64 64" aria-hidden="true">${back}<path d="M7 66q0-19 25-19t25 19Z" fill="${top}"/><path d="M14 58q4-8 18-9" stroke="#fff" stroke-opacity=".25" stroke-width="3" fill="none" stroke-linecap="round"/><rect x="27.5" y="36" width="9" height="12" rx="4" fill="${skin}"/><circle cx="32" cy="27" r="12.5" fill="${skin}"/><ellipse cx="27" cy="22" rx="4" ry="2.6" fill="#fff" fill-opacity=".22"/>${front}<circle cx="27.6" cy="28.5" r="1.6" fill="#2b1d16"/><circle cx="36.4" cy="28.5" r="1.6" fill="#2b1d16"/><path d="M28.5 33q3.5 2.6 7 0" stroke="#2b1d16" stroke-width="1.5" fill="none" stroke-linecap="round"/>${face?`<rect x="23" y="25.5" width="18" height="5" rx="2.5" fill="${escape(face)}"/>`:''}${head?`<path d="M19 23q1-11 13-11t13 11Z" fill="${escape(head)}"/><rect x="31" y="20.5" width="17" height="3.5" rx="1.75" fill="${escape(head)}"/>`:''}</svg>`;
   bustCache.set(key,svg);return svg;
 }
