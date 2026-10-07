@@ -1,3 +1,4 @@
+import { CLASH, CLASH_ACTIONS, CHEER } from './public/clashText.js';
 import { randomBytes, createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline } from './game.mjs';
@@ -86,13 +87,16 @@ function snapshot(playerId,s,now){
 }
 // Turn-based team battles between real players. Stats come from career skills, energy and fame.
 // Winners gain fame; losers lose the same stake (never below zero). Each fighter spends one charge.
-const BATTLE={turnMs:30_000,stakes:{1:50,3:100,5:150},modes:[1,3,5]};
+// The Fame Clash: 1v1, three turns each. Pick brag, shade, violence or charm; the other side claps back automatically
+// and the audience picks a side. Losing the whole crowd ends it early; otherwise the bigger crowd wins after round 3.
+const BATTLE={turnMs:30_000,stakes:{1:50},modes:[1],rounds:3,crowd:100};
+const CLASH_ODDS={brag:[.55,.05],shade:[.62,.04],violence:[.5,.06],charm:[.74,.03]},CLASH_HIT={brag:[14,2.4],shade:[11,1.9],violence:[18,2.8],charm:[7,1.1]},CLASH_BACK={brag:[11,1.1],shade:[8,.9],violence:[14,1.4],charm:[5,.5]};
 const SIGNATURES={sport:'Power play',music:'Show-stopper riff',creator:'Viral moment',acting:'Scene stealer',tech:'Pitch-perfect demo'};
 const loadBattle=battleId=>{const row=db.prepare('SELECT state FROM battles WHERE id=?').get(battleId);return row?JSON.parse(row.state):null;};
 const saveBattle=b=>db.prepare('INSERT INTO battles VALUES(?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state').run(b.id,JSON.stringify(b));
 function fighterStats(ps){
   const skills=Object.values(ps.careers[ps.career].skills).map(s=>s.level),best=Math.max(...skills),average=skills.reduce((a,b)=>a+b,0)/skills.length;
-  const max=Math.round(70+6*average+Math.min(10,Math.floor((ps.fame||0)/10_000)));
+  const max=BATTLE.crowd;
   return {name:ps.name,career:ps.career,color:ps.color,hair:ps.hair,power:best,hp:max,max,fatigue:(100-ps.needs.energy)/100,guard:false,ko:false,signature:SIGNATURES[CAREERS[ps.career].family]||'Signature move',aim:(perksFor(ps).battle||0)/100};
 }
 function battleLog(b,text,now){b.log.unshift({text,at:now});b.log=b.log.slice(0,30);}
@@ -102,33 +106,38 @@ function nextTurn(b,now){
 }
 function resolveMove(b,fighterId,move,targetId,now,rng=Math.random){
   const f=b.fighters[fighterId],team=b.teams[0].includes(fighterId)?0:1;
-  if(move==='guard'){f.guard=true;f.hp=Math.min(f.max,f.hp+4);battleLog(b,`${f.name} guards and catches their breath.`,now);}
-  else if(move==='hype'){b.hype[team]=true;battleLog(b,`${f.name} hypes up the team. Next hit lands harder!`,now);}
+  const rivals=b.teams[1-team].filter(id=>!b.fighters[id].ko),targetKey=rivals.includes(targetId)?targetId:rivals[0],target=b.fighters[targetKey];
+  if(move==='guard'){const lost=5;f.hp=Math.max(0,f.hp-lost);if(!f.hp)f.ko=true;b.last={attacker:fighterId,defender:targetKey,action:'freeze',line:`${f.name} freezes and says nothing.`,clap:`${target.name} just laughs.`,won:false,audience:'“Say something!” the crowd boos.',change:-lost,n:(b.last?.n||0)+1,at:now};battleLog(b,`${f.name} froze up: −${lost} crowd.`,now);}
   else{
-    const target=b.fighters[targetId];fail(target&&!target.ko&&b.teams[1-team].includes(targetId),'Choose a standing opponent.');
-    const signature=move==='signature',p=signature?clamp(.5+.05*(f.power-6)-.1*f.fatigue,.1,.9):clamp(.88-.1*f.fatigue,.5,.95);const aimed=clamp(p+(f.aim||0),.1,.97);
-    if(rng()<aimed){
-      let damage=signature?16+2.6*f.power:8+1.6*f.power+rng()*4;if(b.hype[team]){damage*=1.25;b.hype[team]=false;}if(target.guard)damage/=2;damage=Math.round(damage);
-      target.hp=Math.max(0,target.hp-damage);if(!target.hp)target.ko=true;
-      battleLog(b,`${f.name} ${signature?`unleashes ${f.signature}`:'strikes'}: ${damage} damage to ${target.name}${target.ko?' · knocked out!':''}`,now);
-    }else battleLog(b,`${f.name}${signature?`'s ${f.signature}`:''} misses ${target.name}.`,now);
+    fail(CLASH[move],'Pick brag, shade, violence or charm.');fail(target,'Nobody left to clash with.');
+    const [base,per]=CLASH_ODDS[move],p=clamp(base+per*(f.power-target.power)-.1*f.fatigue+(f.aim||0),.12,.9),won=rng()<p;
+    const [line,winClap,loseClap]=CLASH[move][Math.floor(rng()*CLASH[move].length)%CLASH[move].length],fill=t=>t.replaceAll('{a}',f.name).replaceAll('{b}',target.name);
+    let change;
+    if(won){const [d0,d1]=CLASH_HIT[move];change=Math.round(d0+d1*f.power+rng()*4);target.hp=Math.max(0,target.hp-change);if(!target.hp)target.ko=true;if(move==='charm')f.hp=Math.min(f.max,f.hp+6);}
+    else{const [d0,d1]=CLASH_BACK[move];change=-Math.round(d0+d1*target.power+rng()*3);f.hp=Math.max(0,f.hp+change);if(!f.hp)f.ko=true;}
+    b.last={attacker:fighterId,defender:targetKey,action:move,line:fill(line),clap:fill(won?loseClap:winClap),won,audience:fill(CHEER(move,won?'a':'b',rng())),change,n:(b.last?.n||0)+1,at:now};
+    battleLog(b,won?`${f.name}’s ${CLASH_ACTIONS[move].name.toLowerCase()} lands: ${target.name} loses ${change} crowd.`:`${target.name} claps back: ${f.name} loses ${-change} crowd.`,now);
   }
   const standing=[0,1].map(t=>b.teams[t].some(id=>!b.fighters[id].ko));
-  if(!standing[0]||!standing[1])finishBattle(b,standing[0]?0:1,now);else nextTurn(b,now);
+  if(!standing[0]||!standing[1]){finishBattle(b,standing[0]?0:1,now);return;}
+  nextTurn(b,now);
+  // Three turns each: after round 3 the bigger crowd wins (a tie is a draw).
+  if(b.round>BATTLE.rounds){const crowd=[0,1].map(t=>b.teams[t].reduce((n,id)=>n+b.fighters[id].hp,0));finishBattle(b,crowd[0]===crowd[1]?null:crowd[0]>crowd[1]?0:1,now);}
 }
 function finishBattle(b,winner,now){
-  b.status='done';b.winner=winner;b.endedAt=now;const stake=BATTLE.stakes[b.mode];
+  b.status='done';b.winner=winner;b.endedAt=now;const stake=winner==null?0:BATTLE.stakes[b.mode]||50;
+  if(winner==null){for(const pid of b.teams.flat()){const ps=load(pid);if(!ps)continue;ps.battle=null;b.fighters[pid].fameChange=0;log(ps,'Fame Clash: a draw. Nobody gains or loses fame.',now);persist(pid,ps);}battleLog(b,'It’s a draw! The crowd is split.',now);return;}
   for(const [t,team] of b.teams.entries())for(const pid of team){const ps=load(pid);if(!ps)continue;ps.battle=null;
-    const before=ps.fame||0;addFame(ps,t===winner?stake:-stake,t===winner?'Battle won':'Battle lost',now);if(t===winner&&b.mode>1)headline(ps,`${ps.name}'s team won a ${b.mode}v${b.mode} battle ⚔`,now);const change=(ps.fame||0)-before;b.fighters[pid].fameChange=change;
+    const before=ps.fame||0;addFame(ps,t===winner?stake:-stake,t===winner?'Fame Clash won':'Fame Clash lost',now);const change=(ps.fame||0)-before;b.fighters[pid].fameChange=change;
     if(t===winner)evaluate(ps,ps.career);
-    log(ps,`${b.mode}v${b.mode} battle ${t===winner?'won':'lost'}: ${change>=0?'+':''}${change} fame.`,now);persist(pid,ps);}
-  battleLog(b,`Team ${winner?'B':'A'} wins! ${stake} fame per fighter changes hands.`,now);
+    log(ps,`Fame Clash ${t===winner?'won':'lost'}: ${change>=0?'+':''}${change} fame.`,now);persist(pid,ps);}
+  battleLog(b,`${b.fighters[b.teams[winner][0]].name} wins the crowd! ${stake} fame changes hands.`,now);
 }
 // Expired turns auto-guard so an absent player cannot stall everyone else.
-function tickBattle(b,now){let changed=false;for(let n=0;n<40&&b.status==='running'&&now>=b.turnEndsAt;n++){const at=b.turnEndsAt;resolveMove(b,b.order[b.turn],'guard',null,at);battleLog(b,'Time ran out, so they guarded automatically.',at);changed=true;}return changed;}
+function tickBattle(b,now){let changed=false;for(let n=0;n<40&&b.status==='running'&&now>=b.turnEndsAt;n++){const at=b.turnEndsAt;resolveMove(b,b.order[b.turn],'guard',null,at);changed=true;}return changed;}
 function battleAction(playerId,s,input,now){
   if(input.type==='battleCreate'){
-    const mode=Number(input.mode);fail(BATTLE.modes.includes(mode),'Choose 1v1, 3v3 or 5v5.');
+    fail(Number(input.mode||1)===1,'Fame Clashes are 1v1.');const mode=Number(input.mode);fail(BATTLE.modes.includes(mode),'Choose 1v1, 3v3 or 5v5.');
     fail(s.location!=='home'&&!s.visiting&&!s.trip,'Battles happen in public places around town.');fail(!s.battle,'You are already in a battle.');fail(!s.active&&!s.recovery,'Finish your current activity first.');
     let invited=null;if(input.opponent){const o=load(input.opponent);fail(o&&input.opponent!==playerId&&o.location===s.location&&!o.blocks.includes(playerId)&&!s.blocks.includes(input.opponent),'That player is not here to challenge.');fail(!o.battle,'That player is already battling.');invited=input.opponent;}
     const b={id:id(),mode,location:s.location,host:playerId,invited,status:'open',teams:[[playerId],[]],fighters:{},order:[],turn:0,round:1,hype:[false,false],log:[],createdAt:now};
@@ -163,7 +172,7 @@ function battleAction(playerId,s,input,now){
   }
   else if(input.type==='battleMove'){
     fail(b.status==='running','This battle is not running.');fail(b.order[b.turn]===playerId,'Wait for your turn.');
-    fail(['strike','signature','guard','hype'].includes(input.move),'Choose a move.');
+    fail(Object.keys(CLASH).includes(input.move),'Pick brag, shade, violence or charm.');
     if(b.status==='running'){persist(playerId,s);resolveMove(b,playerId,input.move,input.target,now);Object.assign(s,load(playerId));}
   }
   else return false;

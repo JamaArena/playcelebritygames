@@ -103,12 +103,14 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   const started=await a.call({type:'battleStart',battleId});assert.equal(started.status,200);assert.equal(started.data.state.charges,4);
   let battle=started.data.battles[0];assert.equal(battle.status,'running');
   for(let n=0;n<80&&battle.status==='running';n++){const mover=battle.order[battle.turn]===aId?a:b,target=battle.order[battle.turn]===aId?bId:aId;
-    const turn=await mover.call({type:'battleMove',battleId,move:'signature',target});assert.equal(turn.status,200);battle=turn.data.battles.find(x=>x.id===battleId);}
+    const turn=await mover.call({type:'battleMove',battleId,move:['brag','shade','violence','charm'][n%4],target});assert.equal(turn.status,200);battle=turn.data.battles.find(x=>x.id===battleId);}
   assert.equal(battle.status,'done');
   const aEnd=(await a.call()).data.state,bEnd=(await b.call()).data.state;
-  if(battle.winner===0){assert.equal(aEnd.fame,150);assert.equal(bEnd.fame,0,'fame never drops below zero');}else{assert.equal(bEnd.fame,80);assert.equal(aEnd.fame,50);}
+  assert.ok(battle.last&&battle.last.line&&battle.last.clap&&battle.last.audience,'each turn has a move, a clapback and a crowd verdict');assert.ok(battle.round<=4,'three turns each at most');
+  if(battle.winner===0){assert.equal(aEnd.fame,150);assert.equal(bEnd.fame,0,'fame never drops below zero');}else if(battle.winner===1){assert.equal(bEnd.fame,80);assert.equal(aEnd.fame,50);}else{assert.equal(aEnd.fame,100);assert.equal(bEnd.fame,30,'a draw changes nothing');}
   assert.equal(aEnd.battle,null);assert.equal(bEnd.battle,null);
-  assert.equal((await a.call({type:'battleMove',battleId,move:'strike',target:bId})).status,400,'finished battles take no more moves');
+  assert.equal((await a.call({type:'battleMove',battleId,move:'brag',target:bId})).status,400,'finished battles take no more moves');
+  assert.equal((await a.call({type:'battleCreate',mode:3})).status,400,'only 1v1 Fame Clashes');
   // Accounts: email + one-time code (the local server logs codes), multi-device sign-in, logout, new life.
   // The test server has no email key, so every code is the fallback 123456.
   const tolu=client(),phone=client();
