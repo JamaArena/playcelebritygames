@@ -156,10 +156,43 @@ function makeWorld(){
 }
 const world=makeWorld();
 world.onGround=closeTray;
+// Task queue: tap more things while you're busy and they run one after another.
+// Timed tasks (eating, sleeping, work) finish first; untimed ones (sitting, posing) give way after a few seconds.
+const taskQueue=[],QUEUE_MAX=5,UNTIMED_LINGER=3000;let lastTaskAt=0;
+function isBusyWithTimer(){return Boolean(state?.active||state?.recovery||state?.trip||taskQueue.length||world.moving&&lastTaskAt||world.pose&&Date.now()-lastTaskAt<UNTIMED_LINGER);}
+function queueTask(task){if(taskQueue.length>=QUEUE_MAX){toast(`Your queue is full (${QUEUE_MAX} tasks).`);return;}taskQueue.push(task);toast(`Queued: ${task.label} · ${taskQueue.length} in line`);renderActivity();}
+function pumpQueue(){
+  if(!taskQueue.length||!state||busy||state.active||state.recovery||state.trip||world.moving||modalPage==='create')return;
+  if(world.pose&&Date.now()-lastTaskAt<UNTIMED_LINGER)return;
+  const task=taskQueue.shift();world.pose=null;lastTaskAt=Date.now();task.run();renderActivity();
+}
+setInterval(pumpQueue,500);
+// Using a world object: walk over, then sit, eat, watch or act there.
+function useObject(object,use,watch){
+      (object.remote?cb=>cb():cb=>world.approach(object,cb))(()=>{
+        if(!use)return;
+        const perform=async()=>{
+          if(object.useItem){const data=await send({type:'useItem',item:object.item});if(data){world.pose=null;world.draw();}return;}
+          if(object.act){const data=await send({type:'venueAct',act:object.act});if(data){world.pose=null;world.draw();}return;}
+          if(object.need){const data=await send({type:'recover',need:object.need,watch,...(object.food?{food:object.food}:{})});if(!data)return;}
+          if(object.pose){const x=object.pose==='dine'?.5:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?-3.5:object.vx??object.x;const z=object.pose==='dine'?2.1:object.name==='Television'?2.1:object.name==='Coffee table'||object.name==='Sofa'?1.5:object.vz??object.z;world.pose={kind:object.pose,x,z,face:object.face};}
+          if(object.name==='Bedside lamp')world.lampOff=!world.lampOff;
+          if(object.name==='Fridge')world.fridgeOpen=!world.fridgeOpen;
+          if(object.name==='Window')world.windowOpen=!world.windowOpen;
+          if(object.name.includes('plant'))world.pose={kind:'water',x:object.x,z:object.z,expires:performance.now()+5000};
+          if(object.name==='Shower')world.pose={kind:'shower',x:4.3,z:.4};
+          if(object.name==='Kitchen')world.pose={kind:'cook',x:-3.2,z:-3.25};
+          if(object.name==='Fridge')toast('The fridge is fully stocked.');
+          world.draw();
+        };
+        lastTaskAt=Date.now();
+        if(busy){const timer=setInterval(()=>{if(!busy){clearInterval(timer);perform();}},50);}else perform();
+      });
+}
 function whenIdle(perform){if(!busy){perform();return;}const timer=setInterval(()=>{if(!busy){clearInterval(timer);perform();}},50);}
 async function startAtObject(input){
-  if(state.active||state.recovery){toast('Finish or stop your current action first.');return;}
-  closeTray();closeModal();const def=CAREERS[state.career];
+  if(isBusyWithTimer()){closeTray();closeModal();queueTask({icon:CAREERS[state.career].icon,label:input.kind==='practice'?`Practise ${input.skill}`:'Work',run:()=>startAtObject(input)});return;}
+  closeTray();closeModal();const def=CAREERS[state.career];lastTaskAt=Date.now();
   if(state.location!==def.location&&!(input.kind==='practice'&&state.location==='home'&&state.inventory.gear)){const data=await send({type:'travel',location:def.location});if(!data)return;if(data.state.trip){toast(`${tripVerb(data.state.trip.ride)} to ${LOCATIONS[def.location].name}. Start work when you arrive.`);return;}}
   const object=worldObjects(state.location,state.furniture).find(o=>o.action===(input.kind==='practice'?'practice':'career'));
   if(object)world.approach(object,()=>whenIdle(()=>send({type:'start',...input})));else await send({type:'start',...input});
@@ -202,6 +235,7 @@ function renderActivity(){
     else if(complete)html+=button('✦ Collect result','finish','data-id="'+a.id+'"','primary');
     else html+='<div class="sim-choices">'+a.choices.map((choice,index)=>button('<b>'+(({shoot:'⚽',shot:'◉',pass:'↗',dribble:'↝',tackle:'↘',intercept:'✋',mark:'◎',drive:'↝',general:['◌','✧','ϟ'][index%3],stop:'■'})[choice.action]||def.icon)+'</b><span>'+escape(choice.label)+'</span><small>'+Math.round(choice.probability*100)+'%</small>','decision','data-index="'+index+'" data-beat="'+a.beat+'" data-id="'+a.id+'" title="'+escape(choice.skill)+' · '+escape(choice.risk)+'"','sim-choice')).join('')+'</div>';
   }else html='<div class="idle-actions">'+button(def.icon+' '+(state.location===def.location?'Start work':'Go to work'),state.location===def.location?'prepare':'travel',state.location===def.location?'':'data-location="'+def.location+'"','primary')+button('✧ Practise','practice')+'</div>';
+  if(taskQueue.length)html+='<div class="task-queue"><small>Up next</small>'+taskQueue.map((t,i)=>button(`${escape(t.icon||'•')} ${escape(t.label)} <b aria-hidden="true">×</b>`,'unqueue',`data-index="${i}" aria-label="Remove ${escape(t.label)} from queue"`,'queue-chip')).join('')+'</div>';
   $('#activityCard').innerHTML=html;
 }
 async function chooseDecision(index){const a=state.active;if(!a)return;const chosen=a.choices[index];const data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});if(data&&motion)world.respond(chosen.action,data.state.active?.outcomes.at(-1)?.success);}
@@ -664,25 +698,10 @@ document.addEventListener('click',async event=>{
     case 'cook':if(selectedObject)selectedObject={...selectedObject,food:d.food}; // then use the kitchen with that dish
     case 'goObject':case 'useObject':case 'watchObject':{
       const object=selectedObject,use=d.action!=='goObject',watch=d.action==='watchObject';closeTray();closeModal();if(!object)break;
-      (object.remote?cb=>cb():cb=>world.approach(object,cb))(()=>{
-        if(!use)return;
-        const perform=async()=>{
-          if(object.useItem){const data=await send({type:'useItem',item:object.item});if(data){world.pose=null;world.draw();}return;}
-          if(object.act){const data=await send({type:'venueAct',act:object.act});if(data){world.pose=null;world.draw();}return;}
-          if(object.need){const data=await send({type:'recover',need:object.need,watch,...(object.food?{food:object.food}:{})});if(!data)return;}
-          if(object.pose){const x=object.pose==='dine'?.5:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?-3.5:object.vx??object.x;const z=object.pose==='dine'?2.1:object.name==='Television'?2.1:object.name==='Coffee table'||object.name==='Sofa'?1.5:object.vz??object.z;world.pose={kind:object.pose,x,z,face:object.face};}
-          if(object.name==='Bedside lamp')world.lampOff=!world.lampOff;
-          if(object.name==='Fridge')world.fridgeOpen=!world.fridgeOpen;
-          if(object.name==='Window')world.windowOpen=!world.windowOpen;
-          if(object.name.includes('plant'))world.pose={kind:'water',x:object.x,z:object.z,expires:performance.now()+5000};
-          if(object.name==='Shower')world.pose={kind:'shower',x:4.3,z:.4};
-          if(object.name==='Kitchen')world.pose={kind:'cook',x:-3.2,z:-3.25};
-          if(object.name==='Fridge')toast('The fridge is fully stocked.');
-          world.draw();
-        };
-        if(busy){const timer=setInterval(()=>{if(!busy){clearInterval(timer);perform();}},50);}else perform();
-      });break;
+      if(use&&isBusyWithTimer()){queueTask({icon:object.icon,label:object.verb||object.name,run:()=>useObject(object,use,watch)});break;}
+      useObject(object,use,watch);break;
     }
+    case 'unqueue':taskQueue.splice(Number(d.index),1);renderActivity();break;
     case 'practice':practice();break;
     case 'prepare':prepare(d.kind);break;
     case 'startPractice':await startAtObject({kind:'practice',skill:d.skill});break;
