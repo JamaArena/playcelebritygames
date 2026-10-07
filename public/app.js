@@ -1,4 +1,4 @@
-import { TRANSIT, TUNING, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace } from './content.js';
+import { TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace } from './content.js';
 import { World, worldObjects } from './world.js';
 import { World3D } from './world3d.js';
 const $=selector=>document.querySelector(selector);
@@ -76,7 +76,7 @@ async function send(input,{keepModal=false,quiet=false}={}){
     const data=await response.json();if(response.status===409&&data.code==='other_device'){playingElsewhere();return;}if(!response.ok)throw new Error(data.error||'Action unavailable.');
     if(!keepModal&&modalPage!=='create')closeModal();
     closeTray();receive(data,true);$('#connection').textContent='Saved to your city';
-    if(keepModal){if(modalPage==='phone')phone(phoneTab);else if(modalPage==='shop')shop();else if(modalPage==='inventory')inventory();else if(modalPage==='wardrobe')wardrobe();else if(modalPage==='career')career();else if(modalPage==='vip')vip();else if(modalPage==='phones')phoneStore();else if(modalPage==='battle')battleView();}
+    if(keepModal){if(modalPage==='phone')phone(phoneTab);else if(modalPage==='shop')shop();else if(modalPage==='inventory')inventory();else if(modalPage==='wardrobe')wardrobe();else if(APP_PAGES[modalPage])APP_PAGES[modalPage]();else if(modalPage==='career')career();else if(modalPage==='vip')vip();else if(modalPage==='phones')phoneStore();else if(modalPage==='battle')battleView();}
     if(!quiet&&input.type==='report')toast('Report recorded for the city operator.');
     return data;
   }catch(error){toast(error.message||'Could not connect. Your last saved progress is safe.');}
@@ -121,7 +121,7 @@ const onWorldObject=object=>{
   if(object.action==='phone'){pie(object,[['💬 Chat <small>+10 Social</small>','talkNpc'],['♧ Contacts','page','data-page="phone"'],['↗ Go here','goObject']]);return;}
   // The kitchen menu: the everyday meal plus every dish, with locked dishes showing the fame they need.
   if(object.name==='Kitchen'&&!state.visiting){const fame=state.fame||0,effects=f=>Object.entries(f.extra||{}).map(([n,v])=>` · ${v>0?'+':''}${v} ${needs[n][0]}`).join('');
-    showTray('♨ Kitchen menu','<div class="tray-options food-menu">'+button(`♨ Cook & eat <small>+${B.recovery.hunger[0]} Hunger</small>`,'useObject')+Object.entries(FOODS).map(([key,f])=>fame>=(f.fame||0)?button(`${f.icon} ${escape(f.name)} <small>+${f.hunger} Hunger${effects(f)}</small>`,'cook',`data-food="${key}"`):button(`🔒 ${escape(f.name)} <small>${fmt(f.fame)} fame</small>`,'noop','disabled')).join('')+'</div>');return;}
+    showTray(`♨ Kitchen menu${state.groceries?` · 🥕 ${state.groceries} groceries`:''}`,'<div class="tray-options food-menu">'+button(`♨ Cook & eat <small>+${B.recovery.hunger[0]} Hunger</small>`,'useObject')+Object.entries(FOODS).map(([key,f])=>f.takeaway&&!(state.takeaway?.[key]>0)?button(`${f.icon} ${escape(f.name)} <small>order on Shopping</small>`,'app','data-app="shopping"'):fame>=(f.fame||0)?button(`${f.icon} ${escape(f.name)} <small>+${f.hunger+(!f.takeaway&&state.groceries>0?GROCERY.bonus:0)} Hunger${effects(f)}${f.takeaway?` · you have ${state.takeaway[key]}`:''}</small>`,'cook',`data-food="${key}"`):button(`🔒 ${escape(f.name)} <small>${fmt(f.fame)} fame</small>`,'noop','disabled')).join('')+'</div>');return;}
   // Placed home items: use them for their effect.
   if(object.useItem){const def=ITEMS[object.item],effects=Object.entries(def.use.extra||{}).map(([n,v])=>` · ${v>0?'+':''}${v} ${needs[n][0]}`).join('');pie(object,[[`${object.icon} ${escape(object.verb)} <small>+${object.amount} ${escape(needs[object.useNeed][0])}${effects}</small>`,'useObject'],['↗ Go here','goObject']]);return;}
   const watch=object.name==='Television'&&!state.visiting?[[`📺 ${escape(WATCH[def.family].title)} <small>learn a little</small>`,'watchObject']]:[];
@@ -253,7 +253,9 @@ function updateCreationCareer(key){
   document.querySelectorAll('.career-option').forEach(b=>b.classList.toggle('selected',b.dataset.career===key));
   $('#careerExtras').innerHTML=`<div class="career-pick"><strong>${def.icon} ${escape(def.name)}</strong><small>${escape(def.umbrella)} · stories: ${def.origins.map(escape).join(' or ')}</small></div>`+(key==='musician'?'<div class="field"><label for="technique">Primary technique</label><select id="technique" name="technique"><option value="vocals">Vocals</option><option value="instrument">Instrument</option></select></div>':key==='adult'?'<label class="check"><input type="checkbox" name="adult" required> 18+ career. My character and everyone in their projects are adults. Expect flirty, suggestive themes; nothing explicit is shown.</label>':'');
 }
-function map(){world.overview=true;world.flyTo(.22);showTray('↗ Palm City','<div class="city-tiles">'+Object.entries(LOCATIONS).map(([key,l])=>button('<span>'+(TOWN[key]?.pin||'🚪')+'</span>'+escape(l.name),'travel','data-location="'+key+'"','city-tile')).join('')+'</div>'+travelModes()+'<small>Tap a pin on the map or a place here to head over.</small>');}
+function map(){world.overview=true;world.flyTo(.22);showTray('↗ Palm City','<div class="city-tiles">'+Object.entries(LOCATIONS).map(([key,l])=>button('<span>'+(TOWN[key]?.pin||'🚪')+'</span>'+escape(l.name)+(key!==state.location&&key!=='street'?'<small>'+eta(key)+'</small>':''),'travel','data-location="'+key+'"','city-tile')).join('')+'</div>'+travelModes()+'<small>Tap a pin on the map or a place here to head over.</small>');}
+// About how long a trip takes with your chosen way of travelling.
+function eta(key){const pref=state.travelMode||'own',mode=pref==='own'?(state.ride||'walk'):pref;if(!RIDE_SPEED[mode])return '';const ms=tripMs(state.location==='street'?'home':state.location,key,mode);return ms<60_000?`~${Math.round(ms/1000)}s`:`~${Math.round(ms/60000)} min`;}
 // How a trip reads: walking, cycling, flying, taking public transport, or driving.
 const tripVerb=ride=>!ride?'Walking':TRANSIT[ride]?`Taking a ${TRANSIT[ride].name.toLowerCase()}`:ride==='helicopter'?'Flying':ride==='bicycle'?'Cycling':'Driving';
 // How you travel: your own ride, walking, or public transport.
@@ -285,6 +287,75 @@ function wardrobe(){
     return `<div class="item-card wear-card ${worn?'worn':''}"><span class="wear-swatch" style="--c:${w.color}"></span><h3>${escape(w.name)}</h3><p>${escape(w.note)}</p>${w.perk?`<div class="perk">✦ ${escape(PERKS[w.perk[0]].label(w.perk[1]))}</div>`:'<div class="perk none">No perk</div>'}<div class="shop-price">${w.fame?`✦ ${fmt(w.fame)} fame`:'Free basic'}${owned&&w.fame?' · Owned':''}</div>${action}</div>`;}).join('');
   showModal('wardrobe',`<span class="eyebrow">WARDROBE</span><h2>Dress for the moment.</h2><p class="modal-intro">What you wear shows on your character, and perks add up across your outfit. New pieces are free with fame at Palm Boutique in Palm plaza.</p><div class="perk-summary"><strong>Active perks</strong><ul>${active}</ul></div><div class="chip-row wear-tabs">${tabs}</div><div class="item-grid">${cards}</div>`);
 }
+// Phone apps: chat inbox, friends, feed, music, fame wallet, news, dating, calendar, camera, shopping.
+const me=()=>snapshot.playerId,playerById=id=>snapshot.players.find(p=>p.id===id),ago=at=>{const m=Math.max(0,Math.round((now()-at)/60000));return m<1?'just now':m<60?`${m} min ago`:m<1440?`${Math.round(m/60)} h ago`:`${Math.round(m/1440)} d ago`;};
+function chatApp(){
+  const convos=new Map();for(const m of snapshot.messages.filter(m=>m.recipient)){const other=m.sender===me()?m.recipient:m.sender;if(!convos.has(other))convos.set(other,m);}
+  const rows=[...convos.entries()].map(([id,m])=>`<div class="person"><div class="avatar" style="background:${playerById(id)?.color||'#888'}">${escape((playerById(id)?.name||'?')[0])}</div><div class="person-info"><strong>${escape(playerById(id)?.name||'Player')}</strong><br><small>${m.sender===me()?'You: ':''}${escape(m.body.slice(0,60))} · ${ago(m.at)}</small></div>${state.friends.includes(id)?button('Reply','directMessage',`data-player="${id}"`):''}</div>`).join('');
+  showModal('chat',`<span class="eyebrow">CHAT</span><h2>Your messages</h2>${rows||'<p class="empty">No messages yet. Add friends in People, then message them here.</p>'}<div class="actions">${button('👥 Friends','app','data-app="friends"')}${button('💬 Local chat','page','data-page="phone"')}</div>`);
+}
+function friendsApp(){
+  const rows=state.friends.map(id=>{const p=playerById(id);if(!p)return '';return `<div class="person"><div class="avatar" style="background:${p.color}">${escape(p.name[0])}</div><div class="person-info"><strong>${escape(p.name)} ${p.online?'<span class="online">● online</span>':''}</strong><br><small>${escape(CAREERS[p.career]?.name||'')} · ✦ ${fmt(p.fame||0)} · ${escape(LOCATIONS[p.location]?.name||'')}</small></div><div class="actions">${button('Message','directMessage',`data-player="${id}"`)}${p.location!=='home'&&p.location!==state.location?button('Join','travel',`data-location="${p.location}"`):''}${button('Unfriend','unfriend',`data-player="${id}"`)}</div></div>`;}).join('');
+  showModal('friends',`<span class="eyebrow">FRIENDS</span><h2>Your people</h2>${rows||'<p class="empty">No friends yet. Tap a player in the world, or find them in People, and add them.</p>'}<div class="actions">${button('Find people','phoneTab','data-tab="people"')}</div>`);
+}
+function feedApp(){
+  const posts=[...(state.posts||[]).map(p=>({...p,name:state.name,color:state.color,mine:true})),...snapshot.players.filter(p=>p.id!==me()).flatMap(p=>(p.posts||[]).map(x=>({...x,name:p.name,color:p.color})))].sort((a,b)=>b.at-a.at).slice(0,40);
+  showModal('feed',`<span class="eyebrow">FEED</span><h2>What's happening</h2><form id="postForm" class="chat-form"><input class="chat-input" name="body" maxlength="280" required placeholder="Share an update with your fans…" aria-label="New post"><button class="primary" type="submit">Post</button></form><p class="empty">Posting lifts social a little, and earns a little fame at most every 10 minutes.</p>${posts.map(p=>`<div class="post"><div class="avatar" style="background:${p.color}">${escape(p.name[0])}</div><div><strong>${escape(p.name)}</strong> <small>${ago(p.at)}</small><p>${escape(p.body)}</p><small class="likes">❤ ${fmt(p.likes||0)} fan likes</small></div></div>`).join('')||'<p class="empty">No posts yet. Be the first.</p>'}`);
+}
+// A built-in playlist of fictional tracks, played with a tiny synth in the browser.
+const PLAYLIST=[['Lagos Night Drive','Kemi Vibes',96],['Island Boy','DJ Palm',104],['Jollof Summer','Tobi Ray',112],['Owambe Saturday','The Palm Band',120],['Third Mainland','Ayo Keys',100],['Danfo Dance','Shoki Kids',108],['Detty December','Amaka',116],['Harmattan Love','Femi Sol',92]];
+let music=null;
+function playSong(index){
+  stopSong();const [, , bpm]=PLAYLIST[index]||PLAYLIST[0];let audio;try{audio=new AudioContext();}catch{return;}
+  const beat=60/bpm,notes=[0,3,5,7,10,12],root=196*Math.pow(2,(index%5)/12),start=audio.currentTime+.05,gain=audio.createGain();gain.gain.value=.12;gain.connect(audio.destination);
+  for(let i=0;i<64;i++){const t=start+i*beat/2;
+    if(i%2===0){const k=audio.createOscillator(),g=audio.createGain();k.frequency.setValueAtTime(110,t);k.frequency.exponentialRampToValueAtTime(40,t+.15);g.gain.setValueAtTime(.9,t);g.gain.exponentialRampToValueAtTime(.001,t+.2);k.connect(g).connect(gain);k.start(t);k.stop(t+.2);}
+    if((i*7+index)%3!==1){const o=audio.createOscillator(),g=audio.createGain();o.type=i%4?'triangle':'square';o.frequency.value=root*Math.pow(2,notes[(i*5+index*3)%notes.length]/12);g.gain.setValueAtTime(.25,t);g.gain.exponentialRampToValueAtTime(.001,t+beat/2);o.connect(g).connect(gain);o.start(t);o.stop(t+beat/2);}}
+  music={audio,index};
+}
+function stopSong(){if(music){try{music.audio.close();}catch{}music=null;}}
+function musicApp(){
+  const mine=(state.outputs||[]).filter(o=>CAREERS[o.career]?.family==='music').slice(0,5).map((o,i)=>[o.title,state.name,100+i*4]);
+  const songs=[...mine,...PLAYLIST];
+  showModal('music',`<span class="eyebrow">MUSIC</span><h2>Now playing in Palm City</h2><p class="modal-intro">Listening for 30 seconds lifts your fun (+15). ${music?button('⏹ Stop','stopSong'):''}</p>${songs.map(([title,artist],i)=>`<div class="song ${music?.index===i-mine.length?'on':''}"><span>🎵</span><div><strong>${escape(title)}</strong><br><small>${escape(artist)}</small></div>${button('▶ Play','playSong',`data-index="${i-mine.length}" data-title="${escape(title)}"`)}</div>`).join('')}`);
+}
+function walletApp(){
+  const log=state.fameLog||[],gained=log.filter(e=>e.delta>0).reduce((n,e)=>n+e.delta,0),lost=log.filter(e=>e.delta<0).reduce((n,e)=>n-e.delta,0);
+  showModal('wallet',`<span class="eyebrow">FAME WALLET</span><h2>✦ ${fmt(state.fame||0)} fame</h2><div class="metric-grid"><div class="metric"><strong class="up">+${fmt(gained)}</strong><small>Recently gained</small></div><div class="metric"><strong class="down">−${fmt(lost)}</strong><small>Recently lost</small></div></div>${log.map(e=>`<div class="ledger"><span>${escape(e.reason)}</span><small>${ago(e.at)}</small><strong class="${e.delta>0?'up':'down'}">${e.delta>0?'+':'−'}${fmt(Math.abs(e.delta))}</strong></div>`).join('')||'<p class="empty">Your fame history starts with your next win (or mishap).</p>'}`);
+}
+function newsApp(){
+  const top=[...snapshot.players].sort((a,b)=>(b.fame||0)-(a.fame||0))[0],items=[...(state.headlines||[]),...snapshot.players.filter(p=>p.id!==me()).flatMap(p=>p.headlines||[])].sort((a,b)=>b.at-a.at).slice(0,25);
+  const weather=weatherAt(now()),season=festivalAt(now());
+  showModal('news',`<span class="eyebrow">PALM CITY NEWS</span><h2>Today's headlines</h2>${top?`<div class="headline lead">👑 ${escape(top.name)} leads Palm City with ✦ ${fmt(top.fame||0)} fame</div>`:''}${season==='independence'?'<div class="headline">🇳🇬 Green and white everywhere as Palm City celebrates Independence week</div>':''}${weather==='rain'?'<div class="headline">🌧 Heavy rain floods streets; trips running slow</div>':weather==='harmattan'?'<div class="headline">🌫 Harmattan haze settles over the lagoon</div>':''}${items.map(h=>`<div class="headline">${escape(h.text)} <small>${ago(h.at)}</small></div>`).join('')||'<p class="empty">A quiet news day. Make some headlines.</p>'}`);
+}
+function datingApp(){
+  const open=!!state.dating?.open,likes=state.dating?.likes||[],people=snapshot.players.filter(p=>p.id!==me()&&p.dating);
+  const rows=people.map(p=>{const liked=likes.includes(p.id),match=liked&&(p.datingLikes||[]).includes(me());return `<div class="person"><div class="avatar" style="background:${p.color}">${escape(p.name[0])}</div><div class="person-info"><strong>${escape(p.name)}</strong>${match?' <span class="match">💘 Match</span>':''}<br><small>${escape(CAREERS[p.career]?.name||'')} · ✦ ${fmt(p.fame||0)}</small></div><div class="actions">${match?button('Go on a date','goOnDate',`data-player="${p.id}" data-name="${escape(p.name)}"`,'primary'):liked?button('Liked ✓','noop','disabled'):button('♡ Like','datingLike',`data-player="${p.id}"`)}</div></div>`;}).join('');
+  showModal('dating',`<span class="eyebrow">DATING</span><h2>Find your person</h2><p class="modal-intro">Only players who turn dating on appear here. Like each other to match, then go on a date for a big social and fun lift.</p>${button(open?'Dating is on · turn off':'Turn dating on','datingOpen',`data-open="${open?'':'1'}"`,open?'':'primary')}${open?(rows||'<p class="empty">Nobody else has dating on right now. Check back later.</p>'):''}`);
+}
+function calendarApp(){
+  const slot=7_200_000,base=Math.floor(now()/slot)*slot,icon={rain:'🌧 Rain',harmattan:'🌫 Harmattan',clear:'☀ Clear'};
+  const forecast=Array.from({length:6},(_,i)=>{const t=base+i*slot;return `<div class="ledger"><span>${new Date(t).toLocaleTimeString([],{hour:'numeric'})}${i?'':' (now)'}</span><strong>${icon[weatherAt(t)]}</strong></div>`;}).join('');
+  const days=[];for(let d=0;d<120;d++){const t=now()+d*86_400_000,f=festivalAt(t),prev=festivalAt(t-86_400_000);if(f&&(f!==prev||d===0))days.push([t,f]);if(days.length>=4)break;}
+  const names={independence:'🇳🇬 Independence week',detty:'🎉 Detty December',christmas:'🎄 Christmas',newyear:'🎆 New Year'};
+  showModal('calendar',`<span class="eyebrow">CALENDAR</span><h2>What's coming up</h2><h3>Weather forecast</h3>${forecast}<h3>Festive seasons</h3>${days.map(([t,f])=>`<div class="ledger"><span>${names[f]}</span><strong>${new Date(t).toLocaleDateString([],{month:'short',day:'numeric'})}</strong></div>`).join('')||'<p class="empty">No festivals in the next few months.</p>'}${state.deliveries?.length?`<h3>Deliveries</h3>${state.deliveries.map(d=>`<div class="ledger"><span>📦 ${escape(d.name)}</span><strong>${duration(Math.max(0,d.at-now()))}</strong></div>`).join('')}`:''}`);
+}
+// Camera: photos of the 3D view, kept in a gallery on this device.
+const loadPhotos=()=>{try{return JSON.parse(localStorage.getItem('cg.photos')||'[]');}catch{return [];}};
+function cameraApp(){const photos=loadPhotos();showModal('camera',`<span class="eyebrow">CAMERA</span><h2>Snap the moment</h2><p class="modal-intro">Photos stay on this device. Your character strikes a selfie pose.</p>${button('📸 Take a photo','takePhoto','','primary wide')}<div class="gallery">${photos.map((p,i)=>`<figure><img src="${p.src}" alt="Photo at ${escape(p.place)}"><figcaption>${escape(p.place)} · ${ago(p.at)} <button class="text-button" data-action="deletePhoto" data-index="${i}">Delete</button></figcaption></figure>`).join('')||'<p class="empty">No photos yet.</p>'}</div>`);}
+function takePhoto(){
+  closeModal();world.emote={kind:'selfie',until:performance.now()+3000};send({type:'emote',emote:'selfie'},{keepModal:true,quiet:true});
+  setTimeout(()=>{const src=world.snapshotImage?.();if(!src){toast('The camera needs the 3D view.');return;}const photos=[{src,at:now(),place:LOCATIONS[state.location]?.name||'Palm City'},...loadPhotos()].slice(0,12);try{localStorage.setItem('cg.photos',JSON.stringify(photos));toast('📸 Saved to your gallery.');}catch{toast('Your gallery is full. Delete a photo first.');}},700);
+}
+function shoppingApp(){
+  const fame=state.fame||0,smart=state.phone&&state.phone!=='basic';
+  const card=(kind,key,name,note,need)=>`<div class="item-card"><h3>${escape(name)}</h3><p>${escape(note)}</p>${need&&fame<need?button(`🔒 ${fmt(need-fame)} fame to go`,'noop','disabled'):button('Order · arrives in 1 min','order',`data-kind="${kind}" data-item="${key}"`,'primary')}</div>`;
+  const items=Object.entries(ITEMS).filter(([k,i])=>!state.inventory[k]&&!i.slot).slice(0,30).map(([k,i])=>card('item',k,i.name,i.description,i.fame)).join('');
+  const clothes=Object.entries(WEAR).filter(([k,w])=>w.fame>0&&!state.closet?.[k]).map(([k,w])=>card('wear',k,w.name,w.note,w.fame)).join('');
+  const food=Object.entries(FOODS).filter(([,f])=>f.takeaway).map(([k,f])=>card('food',k,`${f.icon} ${f.name}`,`+${f.hunger} hunger, eat anywhere. You have ${state.takeaway?.[k]||0}.`)).join('');
+  showModal('shopping',`<span class="eyebrow">SHOPPING</span><h2>Delivered to your door</h2>${smart?'':'<p class="notice">Shopping needs a smartphone. Upgrade your phone in the Upgrade app.</p>'}${state.deliveries?.length?`<div class="notice">📦 On the way: ${state.deliveries.map(d=>escape(d.name)).join(', ')}</div>`:''}<h3>Takeaway</h3><div class="item-grid">${food}</div><h3>Groceries</h3><div class="item-grid">${card('groceries','groceries','🥕 Groceries pack',`10 meals' worth. Menu dishes give +${GROCERY.bonus} hunger. You have ${state.groceries||0}.`)}</div><h3>Home & gadgets</h3><div class="item-grid">${items||'<p class="empty">You own everything here.</p>'}</div><h3>Clothes</h3><div class="item-grid">${clothes||'<p class="empty">Your wardrobe is complete.</p>'}</div>`);
+}
+const APP_PAGES={chat:chatApp,friends:friendsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp};
 function inventory(){
   showModal('inventory',`<span class="eyebrow">YOUR POSSESSIONS</span><h2>A place to call yours.</h2><p class="modal-intro">Furnish your apartment, equip a new look, and improve your tools.</p><div class="actions">${button('👗 Wardrobe','page','data-page="wardrobe"','primary')}${button('Visit market','travel','data-location="plaza"')}${button('Go home','travel','data-location="home"')}</div><div class="item-grid">${Object.entries(state.inventory).map(([key,item])=>{
     const def=ITEMS[key];return `<div class="item-card"><h3>${def?.name||key[0].toUpperCase()+key.slice(1)}</h3><p>${def?.gadget?'Gadget · '+escape(def.description):def?.upgrade?'Home upgrade · always on':`Level ${item.level}${item.upgrade?` · upgrading to ${item.upgrade.target} in ${duration(item.upgrade.endsAt-now())}`:''}`}</p>${def?.slot?button(state.equipped[def.slot]===key?'Equipped':'Equip','equip',`data-item="${key}"`):''}${def?.gadget&&def.use?button(`${def.use.icon} ${escape(def.use.verb)}`,'useGadget',`data-item="${key}"`,'primary'):''}${def?.upgradable&&!item.upgrade&&item.level<10?button('Preview upgrade','previewUpgrade',`data-item="${key}"`):''}${def?.furniture?button('Place in home','placePreview',`data-item="${key}"`):''}</div>`;
@@ -371,7 +442,7 @@ function phoneWidget(){const model=PHONES[state.phone]||PHONES.basic,count=alert
   return `<button class="phone-widget skin-${PHONES[state.phone]?state.phone:'basic'}" data-action="openPhone" style="--phone:${model.color}" aria-label="Open your phone${count?`, ${count} alerts`:''}"><span class="phone-mini">📱${count?`<i>${count}</i>`:''}</span><span class="phone-line"><strong>✦ ${fmt(state.fame||0)}</strong><small>fame · ${B.tiers[state.careers[state.career].tier][0]}</small></span><span class="phone-line"><strong>ϟ ${state.charges}/10</strong><small id="chargeRefill">${state.refillAnchor===null?'charged':`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></span></button>`;}
 // The last app depends on who you are: Log out for accounts, Account for guests.
 const accountApp=()=>['logout','🚪','Log out'];
-const APPS=[['map','🗺️','Map'],['career','✦','Career'],['phone','💬','Social'],['battles','⚔','Battles'],['inventory','🏠','My stuff'],['wardrobe','👗','Wardrobe'],['shop','🛍️','Market'],['vip','🏁','Palm Motors'],['profile','♙','Profile'],['life','♡','My life'],['nearby','◇','Nearby'],['tips','💡','Tips'],['upgrade','📲','Upgrade']];
+const APPS=[['map','🗺️','Map'],['career','✦','Career'],['phone','💬','Social'],['battles','⚔','Battles'],['inventory','🏠','My stuff'],['wardrobe','👗','Wardrobe'],['chat','✉️','Chat'],['friends','👥','Friends'],['feed','📰','Feed'],['music','🎵','Music'],['wallet','💰','Fame wallet'],['news','🗞️','News'],['dating','💘','Dating'],['calendar','📅','Calendar'],['camera','📷','Camera'],['shopping','🛒','Shopping'],['shop','🛍️','Market'],['vip','🏁','Palm Motors'],['profile','♙','Profile'],['life','♡','My life'],['nearby','◇','Nearby'],['tips','💡','Tips'],['upgrade','📲','Upgrade']];
 // Each phone tier has its own look and feel; cheaper phones lag and sometimes hang (only ever a delay).
 function phoneModel(){const key=PHONES[state.phone]?state.phone:'basic';return {key,...PHONES[key]};}
 function phoneHome(){
@@ -382,7 +453,7 @@ function phoneHome(){
   showModal('phoneHome',`<div class="phone-device skin-${model.key}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen"><div class="phone-status"><span>${model.key==='basic'?time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false}):clockText}</span><span>${model.network} ${'▂▄▆█'.slice(0,model.key==='basic'?2:model.key==='smart'?3:4)}</span><span>${model.battery}% ${model.battery<30?'🪫':'🔋'}</span></div>${['pro','gold'].includes(model.key)?'':`<div class="phone-hello"><strong>${escape(state.name)}</strong><small>✦ ${fmt(state.fame||0)} fame · ${escape(LOCATIONS[state.location].name)}</small></div>`}${widgets}<div class="app-grid">${apps.map(icon).join('')}</div>${['pro','gold'].includes(model.key)?`<div class="phone-dock">${APPS.filter(([k])=>dock.includes(k)).map(icon).join('')}</div>`:''}<div class="phone-overlay" id="phoneOverlay" hidden></div></div></div>`);
 }
 const APP_NAMES=Object.fromEntries(APPS.map(([key,,label])=>[key,label]));
-function launch(key){if(key==='logout'){confirmLogout();return;}({map,phone:()=>phone('local'),battles:()=>phone('battles'),career,inventory,wardrobe,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,upgrade:phoneStore}[key]||phoneHome)();}
+function launch(key){if(key==='logout'){confirmLogout();return;}({map,phone:()=>phone('local'),battles:()=>phone('battles'),career,inventory,wardrobe,chat:chatApp,friends:friendsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,upgrade:phoneStore}[key]||phoneHome)();}
 // Budget phones make you wait, and now and then the app hangs. You can always wait or close it.
 function openApp(key){
   const model=phoneModel(),overlay=$('#phoneOverlay'),delay=model.lag[0]+Math.random()*(model.lag[1]-model.lag[0]);
@@ -427,6 +498,15 @@ document.addEventListener('click',async event=>{
     case 'emotes':showTray('😀 Emotes','<div class="tray-options emote-menu">'+Object.entries(EMOTES).map(([key,e])=>button(`${e.icon} ${escape(e.label)}`,'emote',`data-emote="${key}"`)).join('')+'</div>');break;
     case 'emote':{const e=EMOTES[d.emote];if(!e)break;closeTray();if(state.recovery||state.active){toast('Finish what you are doing first.');break;}world.emote={kind:d.emote,until:performance.now()+e.ms};if(d.emote==='selfie')world.say('me','📸 Selfie!');world.draw();send({type:'emote',emote:d.emote},{keepModal:true,quiet:true});break;}
     case 'react':await send({type:'chat',body:d.emoji},{keepModal:true});break;
+    case 'unfriend':await send({type:'unfriend',playerId:d.player},{keepModal:true});break;
+    case 'playSong':{playSong(Number(d.index));const data=await send({type:'listenMusic',song:d.title},{keepModal:true});if(!data)stopSong();else musicApp();break;}
+    case 'stopSong':stopSong();musicApp();break;
+    case 'datingOpen':await send({type:'datingOpen',open:!!d.open},{keepModal:true});break;
+    case 'datingLike':await send({type:'datingLike',playerId:d.player},{keepModal:true});break;
+    case 'goOnDate':await send({type:'goOnDate',name:d.name});break;
+    case 'takePhoto':takePhoto();break;
+    case 'deletePhoto':{const photos=loadPhotos();photos.splice(Number(d.index),1);try{localStorage.setItem('cg.photos',JSON.stringify(photos));}catch{}cameraApp();break;}
+    case 'order':await send({type:'order',kind:d.kind,item:d.item},{keepModal:true});break;
     case 'travelMode':{const data=await send({type:'travelMode',mode:d.mode},{keepModal:true});if(data)map();break;}
     case 'tune':case 'wash':case 'yachtParty':await send({type:d.action},{keepModal:true});break;
     case 'useGadget':await send({type:'useItem',item:d.item});break;
@@ -510,7 +590,7 @@ document.addEventListener('submit',async event=>{
   if(form.id==='createForm'){values.adult=values.adult==='on';const data=await send({type:'create',...values});if(data){modalPage=null;storyReel(data.state);}}
   if(form.id==='prepareForm')await send({type:'start',...values});
   if(form.id==='switchForm')await send({type:'switch',...values,adult:values.adult==='on'});
-  if(form.id==='chatForm'){await send({type:'chat',...values},{keepModal:true});}
+  if(form.id==='chatForm'){await send({type:'chat',...values},{keepModal:true});}else if(form.id==='postForm'){await send({type:'post',...values},{keepModal:true});}
   if(form.id==='directForm'){await send({type:'chat',...values});toast('Message sent.');}
   if(form.id==='collabForm')await send({type:'collabInvite',...values},{keepModal:true});
 });

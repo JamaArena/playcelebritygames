@@ -289,3 +289,16 @@ test('travel choices, tuning, the yacht and gadgets',()=>{
   s.inventory.vrHeadset={level:1};s.location='plaza';act(s,{type:'useItem',item:'vrHeadset'},T+600_000);assert.equal(s.recovery.item,'vrHeadset');
   const dev=make('developer');dev.inventory.laptop={level:1};dev.location='plaza';act(dev,{type:'start',kind:'practice',skill:'coding'},T);assert.equal(dev.active.kind,'practice');
 });
+test('phone apps: posts, deliveries, takeaway, groceries, dating, music and the fame wallet',()=>{
+  const s=make();s.fame=10_000;s.location='home';
+  act(s,{type:'post',body:'New single dropping Friday!'},T);assert.equal(s.posts[0].body,'New single dropping Friday!');assert.equal(s.fameLog[0].reason,'Social post');
+  s.phone='basic';assert.throws(()=>act(s,{type:'order',kind:'groceries'},T),/smartphone/);
+  s.phone='glow';act(s,{type:'order',kind:'groceries'},T);act(s,{type:'order',kind:'food',item:'suya'},T);act(s,{type:'order',kind:'wear',item:'cap'},T);
+  assert.throws(()=>act(s,{type:'recover',need:'hunger',food:'suya'},T+1000),/Order suya/);
+  s.lastSeen=T+60_000;reconcile(s,T+61_000);assert.equal(s.groceries,10);assert.equal(s.takeaway.suya,1);assert.ok(s.closet.cap);
+  s.location='plaza';act(s,{type:'recover',need:'hunger',food:'suya'},T+62_000);assert.equal(s.takeaway.suya,0);act(s,{type:'cancel'},T+62_000);
+  s.location='home';act(s,{type:'recover',need:'hunger',food:'jollof'},T+63_000);assert.equal(s.recovery.amount,75,'groceries add +15');assert.equal(s.groceries,9);act(s,{type:'cancel'},T+63_000);
+  act(s,{type:'datingOpen',open:true},T);act(s,{type:'datingLike',playerId:'p2'},T);act(s,{type:'goOnDate',name:'Zee'},T+64_000);assert.match(s.recovery.label,/Zee/);act(s,{type:'cancel'},T+64_000);
+  act(s,{type:'listenMusic',song:'Island Boy'},T+65_000);assert.equal(s.recovery.amount,15);
+  s.recovery=null;s.needs.bladder=1;s.lastSeen=T+300_000;reconcile(s,T+301_000);assert.match(s.headlines[0].text,/River/);assert.ok(s.fameLog[0].delta<0);
+});

@@ -1,6 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame } from './game.mjs';
+import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline } from './game.mjs';
 import { CAREERS, BALANCE, clamp, perksFor } from './public/content.js';
 export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL);";
 export function createGameService(db,{secureCookies=false,sendEmail=null}={}) {
@@ -44,7 +44,7 @@ function settleSeasons(now) {
         const entitlement=`season:${current.id}:${category}`,s=winner.player.state;
         if(s.awards.some(a=>a.id===entitlement))continue;
         s.awards.push({id:entitlement,name:`Season ${current.id} · ${CAREERS[winner.career].name} award`,career:winner.career,at:current.ends,score:winner.score});
-        addFame(s,100);log(s,`Season ${current.id} award: +100 fame.`,current.ends);
+        addFame(s,100,'Season award',current.ends);log(s,`Season ${current.id} award: +100 fame.`,current.ends);
       }
     }
     db.prepare('UPDATE seasons SET settled=1 WHERE id=?').run(current.id);
@@ -68,7 +68,7 @@ function captureEligibility(s,now){
 const TOWN_PLAYER_LIMIT=120,ACTIVE_DEVICE_MS=45_000;
 class OtherDevice extends Error {}
 const roomFor=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
-function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,hairColor:s.hairColor||'black',build:s.build||'average',height:s.height||'average',career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,wear:s.wear||null,emote:s.emote||null,home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<45_000};}
+function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,hairColor:s.hairColor||'black',build:s.build||'average',height:s.height||'average',career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,wear:s.wear||null,emote:s.emote||null,posts:(s.posts||[]).slice(0,3),headlines:(s.headlines||[]).slice(0,2),dating:!!s.dating?.open,datingLikes:s.dating?.open?s.dating.likes.slice(0,50):[],home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<45_000};}
 function snapshot(playerId,s,now){
   const account=accountOf(playerId);
   if(!s)return {state:null,serverNow:now,account};
@@ -119,7 +119,7 @@ function resolveMove(b,fighterId,move,targetId,now,rng=Math.random){
 function finishBattle(b,winner,now){
   b.status='done';b.winner=winner;b.endedAt=now;const stake=BATTLE.stakes[b.mode];
   for(const [t,team] of b.teams.entries())for(const pid of team){const ps=load(pid);if(!ps)continue;ps.battle=null;
-    const before=ps.fame||0;addFame(ps,t===winner?stake:-stake);const change=(ps.fame||0)-before;b.fighters[pid].fameChange=change;
+    const before=ps.fame||0;addFame(ps,t===winner?stake:-stake,t===winner?'Battle won':'Battle lost',now);if(t===winner&&b.mode>1)headline(ps,`${ps.name}'s team won a ${b.mode}v${b.mode} battle ⚔`,now);const change=(ps.fame||0)-before;b.fighters[pid].fameChange=change;
     if(t===winner)evaluate(ps,ps.career);
     log(ps,`${b.mode}v${b.mode} battle ${t===winner?'won':'lost'}: ${change>=0?'+':''}${change} fame.`,now);persist(pid,ps);}
   battleLog(b,`Team ${winner?'B':'A'} wins! ${stake} fame per fighter changes hands.`,now);
@@ -295,7 +295,7 @@ function collaborativeFinish(playerId,s,input,now) {
   for(let i=0;i<states.length;i++){
     const ps=states[i],c=ps.careers[a.career];
     const audience=i===states.length-1?gain-allocatedAudience:Math.floor(gain*a.audienceShares[i]);allocatedAudience+=audience;
-    c.audience+=audience;const fame=fameFor(audience);addFame(ps,fame);c.completed++;c.engagement=clamp(c.engagement+(quality-50)/10);
+    c.audience+=audience;const fame=fameFor(audience);addFame(ps,fame,'Collaboration',now);c.completed++;c.engagement=clamp(c.engagement+(quality-50)/10);
     const output={id:a.id,title:a.title,career:a.career,kind:'collaboration',quality,released:true,credits:states.map(p=>p.name),gain:audience,fame,at:now,tier};
     ps.outputs.unshift(output);ps.results.unshift({...output,learning:ps.active.outcomes.length*5});ps.active=null;
     evaluate(ps,a.career);captureEligibility(ps,now);log(ps,`Collaboration completed: ${audience.toLocaleString('en-US')} ${CAREERS[a.career].audience} · +${fame} fame.`,now);
