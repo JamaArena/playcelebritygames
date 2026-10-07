@@ -1,4 +1,4 @@
-import { VENUE_ACTS, TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace } from './content.js';
+import { TAILOR_COLORS, TATTOOS, VENUE_ACTS, TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace } from './content.js';
 import { World, worldObjects } from './world.js';
 import { World3D } from './world3d.js';
 const $=selector=>document.querySelector(selector);
@@ -123,6 +123,7 @@ const onWorldObject=object=>{
   if(object.name==='Kitchen'&&!state.visiting){const fame=state.fame||0,effects=f=>Object.entries(f.extra||{}).map(([n,v])=>` · ${v>0?'+':''}${v} ${needs[n][0]}`).join('');
     showTray(`♨ Kitchen menu${state.groceries?` · 🥕 ${state.groceries} groceries`:''}`,'<div class="tray-options food-menu">'+button(`♨ Cook & eat <small>+${B.recovery.hunger[0]} Hunger</small>`,'useObject')+Object.entries(FOODS).map(([key,f])=>f.takeaway&&!(state.takeaway?.[key]>0)?button(`${f.icon} ${escape(f.name)} <small>order on Shopping</small>`,'app','data-app="shopping"'):fame>=(f.fame||0)?button(`${f.icon} ${escape(f.name)} <small>+${f.hunger+(!f.takeaway&&state.groceries>0?GROCERY.bonus:0)} Hunger${effects(f)}${f.takeaway?` · you have ${state.takeaway[key]}`:''}</small>`,'cook',`data-food="${key}"`):button(`🔒 ${escape(f.name)} <small>${fmt(f.fame)} fame</small>`,'noop','disabled')).join('')+'</div>');return;}
   // Things to do at places around the city.
+  if(object.act&&VENUE_ACTS[object.act].menu){const a=VENUE_ACTS[object.act];pie(object,[[`${a.icon} ${escape(a.name)}`,'page',`data-page="${a.menu}"`],['↗ Go here','goObject']]);return;}
   if(object.act){const a=VENUE_ACTS[object.act],fam=CAREERS[state.career].family,extra=Object.entries(a.extra||{}).map(([n,v])=>` · ${v>0?'+':''}${v} ${needs[n][0]}`).join(''),bonus=(a.learn&&a.family===fam?' · trains your skill':'')+(a.fame&&(!a.family||a.family===fam)?' · a little fame':'')+(a.interview?' · fame on the line':'')+(a.fitness?' · fitness':'')+(a.groceries?` · +${a.groceries} groceries`:'');
     pie(object,[[`${a.icon} ${escape(a.name)} <small>+${a.amount} ${needs[a.need][0]}${extra}${bonus}</small>`,'useObject'],...(a.page?[['🛒 Shop now','app',`data-app="${a.page}"`]]:[]),['↗ Go here','goObject']]);return;}
   // Placed home items: use them for their effect.
@@ -358,7 +359,21 @@ function shoppingApp(){
   const food=Object.entries(FOODS).filter(([,f])=>f.takeaway).map(([k,f])=>card('food',k,`${f.icon} ${f.name}`,`+${f.hunger} hunger, eat anywhere. You have ${state.takeaway?.[k]||0}.`)).join('');
   showModal('shopping',`<span class="eyebrow">SHOPPING</span><h2>Delivered to your door</h2>${smart?'':'<p class="notice">Shopping needs a smartphone. Upgrade your phone in the Upgrade app.</p>'}${state.deliveries?.length?`<div class="notice">📦 On the way: ${state.deliveries.map(d=>escape(d.name)).join(', ')}</div>`:''}<h3>Takeaway</h3><div class="item-grid">${food}</div><h3>Groceries</h3><div class="item-grid">${card('groceries','groceries','🥕 Groceries pack',`10 meals' worth. Menu dishes give +${GROCERY.bonus} hunger. You have ${state.groceries||0}.`)}</div><h3>Home & gadgets</h3><div class="item-grid">${items||'<p class="empty">You own everything here.</p>'}</div><h3>Clothes</h3><div class="item-grid">${clothes||'<p class="empty">Your wardrobe is complete.</p>'}</div>`);
 }
-const APP_PAGES={chat:chatApp,friends:friendsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp};
+// Shops: barber & salon, tattoo parlour and tailor.
+let barberPick=null;
+function barberShop(){
+  barberPick??={hair:state.hair||'curls',hairColor:state.hairColor||'black'};const here=state.location==='mall';
+  showModal('barber',`<span class="eyebrow">BARBER & SALON · PALM MALL</span><h2>Fresh cut, fresh you</h2><div class="field"><label>Hairstyle</label><div class="choice-grid">${Object.entries(HAIRSTYLES).map(([k,n])=>`<button class="choice ${k===barberPick.hair?'on':''}" data-action="barberPick" data-hair="${k}">${escape(n)}</button>`).join('')}</div></div><div class="field"><label>Colour</label><div class="swatches">${Object.entries(HAIR_COLORS).map(([k,c])=>`<button class="swatch ${k===barberPick.hairColor?'on':''}" style="--c:${c}" data-action="barberPick" data-color="${k}" aria-label="${k}"></button>`).join('')}</div></div>${here?button('💈 Get this look','restyle','','primary wide'):button('Go to Palm Mall','travel','data-location="mall"','primary wide')}`);
+}
+function tattooShop(){
+  const mine=state.tattoos||[],here=state.location==='mall';
+  showModal('tattoo',`<span class="eyebrow">INK PALM · PALM MALL</span><h2>Tattoos</h2><p class="modal-intro">Add ink, or have it lasered off any time.</p>${Object.entries(TATTOOS).map(([k,n])=>`<div class="ledger"><span>${escape(n)}</span>${here?button(mine.includes(k)?'Laser it off':'Get it','tattoo',`data-spot="${k}"`,mine.includes(k)?'':'primary'):'<small>Visit Palm Mall</small>'}</div>`).join('')}`);
+}
+function tailorShop(){
+  const wear=state.wear||{},tops=Object.entries(WEAR).filter(([k,w])=>w.slot==='top'&&(w.fame===0||state.closet?.[k])),here=state.location==='market';
+  showModal('tailor',`<span class="eyebrow">TAILOR · THE MARKET</span><h2>Make it yours</h2><p class="modal-intro">Re-dye any top you own. ${here?'':'Visit the market tailor to change colours.'}</p>${tops.map(([k,w])=>`<div class="tailor-row"><strong>${escape(w.name)}</strong><div class="swatches">${TAILOR_COLORS.map(c=>`<button class="swatch ${(wear.tint?.[k]||w.color)===c?'on':''}" style="--c:${c}" ${here?`data-action="tailor" data-item="${k}" data-color="${c}"`:'disabled'} aria-label="Dye ${escape(w.name)} ${c}"></button>`).join('')}</div></div>`).join('')}`);
+}
+const APP_PAGES={barber:barberShop,tattoo:tattooShop,tailor:tailorShop,chat:chatApp,friends:friendsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp};
 function inventory(){
   showModal('inventory',`<span class="eyebrow">YOUR POSSESSIONS</span><h2>A place to call yours.</h2><p class="modal-intro">Furnish your apartment, equip a new look, and improve your tools.</p><div class="actions">${button('👗 Wardrobe','page','data-page="wardrobe"','primary')}${button('Visit market','travel','data-location="plaza"')}${button('Go home','travel','data-location="home"')}</div><div class="item-grid">${Object.entries(state.inventory).map(([key,item])=>{
     const def=ITEMS[key];return `<div class="item-card"><h3>${def?.name||key[0].toUpperCase()+key.slice(1)}</h3><p>${def?.gadget?'Gadget · '+escape(def.description):def?.upgrade?'Home upgrade · always on':`Level ${item.level}${item.upgrade?` · upgrading to ${item.upgrade.target} in ${duration(item.upgrade.endsAt-now())}`:''}`}</p>${def?.slot?button(state.equipped[def.slot]===key?'Equipped':'Equip','equip',`data-item="${key}"`):''}${def?.gadget&&def.use?button(`${def.use.icon} ${escape(def.use.verb)}`,'useGadget',`data-item="${key}"`,'primary'):''}${def?.upgradable&&!item.upgrade&&item.level<10?button('Preview upgrade','previewUpgrade',`data-item="${key}"`):''}${def?.furniture?button('Place in home','placePreview',`data-item="${key}"`):''}</div>`;
@@ -471,7 +486,7 @@ function lifePanel(){showModal('life',`<span class="eyebrow">YOUR DAILY LIFE</sp
 function nearby(){closeModal();$('#objects').hidden=false;$('#objects').scrollIntoView({block:'nearest'});toast('Tap anything nearby to use it.');}
 function tipsApp(){showModal('tips',`<span class="eyebrow">💡 TIPS</span><h2>How Palm City works</h2><div class="tips-list">${Object.values(TIPS).map(([title,body])=>`<div class="tip-item"><strong>${title}</strong><p>${body}</p></div>`).join('')}</div>`);}
 function phoneStore(){const fame=state.fame||0;showModal('phones',`<span class="eyebrow">📲 PHONE UPGRADES</span><h2>A better phone, on the house.</h2><p class="modal-intro">Phones unlock with fame and are free. You have ✦ ${fmt(fame)} fame.</p><div class="item-grid">${Object.entries(PHONES).map(([key,m])=>`<div class="item-card"><div class="vip-icon" style="--tone:${m.color}">📱</div><h3>${escape(m.name)}</h3><p>${escape(m.perk)}</p>${(state.phone||'basic')===key?button('In your pocket ✓','noop','disabled'):fame>=m.fame?button('Switch to this','phoneUpgrade',`data-item="${key}"`,'primary'):button(`🔒 ${fmt(m.fame)} fame`,'noop','disabled')}</div>`).join('')}</div>`);}
-function openPage(page){tip(page);({city:map,career,phone,inventory,wardrobe,profile,shop,vip,tips:tipsApp}[page]||map)();}
+function openPage(page){tip(page);({city:map,career,phone,inventory,wardrobe,profile,shop,vip,tips:tipsApp,barber:barberShop,tattoo:tattooShop,tailor:tailorShop,phones:phoneStore,shopping:shoppingApp}[page]||map)();}
 $('#mapButton').addEventListener('click',map);$('#cameraButton').addEventListener('click',()=>toast(`📷 ${world.rotate()}`));$('#closeModal').addEventListener('click',closeModal);
 $('#zoomIn').addEventListener('click',()=>world.setZoom(world.zoom*1.2));$('#zoomOut').addEventListener('click',()=>world.setZoom(world.zoom/1.2));$('#resetCamera').addEventListener('click',()=>world.resetCamera());
 $('.modal-backdrop').addEventListener('click',closeModal);$('#motionButton').addEventListener('click',()=>{motion=!motion;world.reduced=!motion;$('#motionButton').textContent=motion?'Motion on':'Motion reduced';});
@@ -510,6 +525,10 @@ document.addEventListener('click',async event=>{
     case 'takePhoto':takePhoto();break;
     case 'deletePhoto':{const photos=loadPhotos();photos.splice(Number(d.index),1);try{localStorage.setItem('cg.photos',JSON.stringify(photos));}catch{}cameraApp();break;}
     case 'order':await send({type:'order',kind:d.kind,item:d.item},{keepModal:true});break;
+    case 'barberPick':if(d.hair)barberPick.hair=d.hair;if(d.color)barberPick.hairColor=d.color;barberShop();break;
+    case 'restyle':{const data=await send({type:'restyle',...barberPick},{keepModal:true});if(data)barberPick=null;break;}
+    case 'tattoo':await send({type:'tattoo',spot:d.spot},{keepModal:true});break;
+    case 'tailor':await send({type:'tailor',item:d.item,color:d.color},{keepModal:true});break;
     case 'travelMode':{const data=await send({type:'travelMode',mode:d.mode},{keepModal:true});if(data)map();break;}
     case 'tune':case 'wash':case 'yachtParty':await send({type:d.action},{keepModal:true});break;
     case 'useGadget':await send({type:'useItem',item:d.item});break;

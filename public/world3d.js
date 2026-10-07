@@ -123,6 +123,8 @@ export class Figure {
     this.chain = part(new T.TorusGeometry(.072, .007, 6, 28), this.torso); this.chain.position.set(0, .545, .025); this.chain.rotation.x = Math.PI / 2 - .35;
     this.beads = [.068, .082].map((r, i) => { const b = part(new T.TorusGeometry(r, .013, 6, 24), this.torso); b.position.set(0, .555 - i * .025, .02 + i * .006); b.rotation.x = Math.PI / 2 - .3; return b; });
     this.watch = part(UNIT_BOX, this.arms[0].fore, .056, .03, .062); this.watch.position.y = -.23;
+    // Tattoos: a band round the left upper arm, script on the neck, a star on the right hand.
+    this.inkArm = part(new T.CylinderGeometry(.051, .049, .07, 16, 1, true), this.arms[0]); this.inkArm.position.y = -.13; this.inkNeck = part(UNIT_BOX, this.torso, .02, .05, .035); this.inkNeck.position.set(.05, .62, .02); this.inkHand = part(UNIT_BALL, this.arms[1].fore, .03, .03, .012); this.inkHand.position.set(0, -.3, .03);
     this.phone = part(UNIT_BOX, this.arms[1].fore, .05, .1, .01); this.phone.position.set(0, -.33, .035); this.phone.rotation.x = .3;
     this.headset = part(UNIT_BOX, this.head, .2, .085, .1); this.headset.position.set(0, .03, .09); this.camera = part(UNIT_BOX, this.head, .15, .1, .09); this.camera.position.set(0, .0, .2); this.lens = part(new T.CylinderGeometry(.035, .04, .07, 14), this.head); this.lens.rotation.x = Math.PI / 2; this.lens.position.set(.03, 0, .27);
     this.bag = part(UNIT_BOX, this.arms[1].fore, .2, .16, .07); this.bag.position.set(0, -.44, 0);
@@ -223,6 +225,7 @@ export class Figure {
     show([this.capDome, this.capBrim], head === 'cap', acc.head?.color); show([this.fila], head === 'fila', acc.head?.color); show([this.geleWrap, this.geleTop, this.geleFan], head === 'gele', acc.head?.color, 'gloss');
     show([this.band, ...this.cups], head === 'headphones', acc.head?.color, 'gloss');
     this.hair.visible = !(['cap', 'fila', 'gele'].includes(head) && !['long', 'braids', 'locs', 'ponytail', 'bob'].includes(o.style));
+    const ink = o.tattoos || [], inkTone = mix(skin, '#10161c', .7); show([this.inkArm], ink.includes('arm') && sleeves !== 'long', inkTone, 'skin'); show([this.inkNeck], ink.includes('neck'), inkTone, 'skin'); show([this.inkHand], ink.includes('hand'), inkTone, 'skin');
     show(this.studs, !!acc.ears, acc.ears?.color, 'gold'); show([this.chain], acc.neck?.id === 'chain', acc.neck?.color, 'gold'); show(this.beads, acc.neck?.id === 'beads', acc.neck?.color, 'gloss');
     show([this.watch], !!acc.wrist, acc.wrist?.color, 'gold'); show([this.bag, this.strap], !!acc.bag, acc.bag?.color, 'gloss');
     // Sleeping: lie the whole figure down along the bed, head toward the headboard.

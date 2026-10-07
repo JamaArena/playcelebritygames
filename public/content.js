@@ -259,6 +259,12 @@ export const VENUE_ACTS = {
   karaoke: {venue: 'lounge', name: 'Sing karaoke', icon: '🎤', need: 'fun', amount: 30, ms: 45_000, extra: {social: 10}, pose: 'perform', family: 'music', learn: 3},
   network: {venue: 'lounge', name: 'Network with VIPs', icon: '🤝', need: 'social', amount: 25, ms: 40_000, pose: 'gesture', fame: 5},
   film: {venue: 'cinema', name: 'Watch a film', icon: '🎬', need: 'fun', amount: 45, ms: 90_000, extra: {hunger: -5}, pose: 'sit', seat: .5, family: 'acting', learn: 3},
+  barber: {venue: 'mall', name: 'Barber & salon', icon: '💈', menu: 'barber'},
+  tattoo: {venue: 'mall', name: 'Ink Palm tattoos', icon: '🖋️', menu: 'tattoo'},
+  phoneShop: {venue: 'mall', name: 'Phone shop', icon: '📱', menu: 'phones'},
+  tailor: {venue: 'market', name: 'Tailor', icon: '🧵', menu: 'tailor'},
+  bukka: {venue: 'market', name: 'Eat at the bukka', icon: '🍲', need: 'hunger', amount: 60, ms: 30_000, extra: {social: 5}, pose: 'sit', seat: .45},
+  fineDining: {venue: 'lounge', name: 'Fine dining', icon: '🍽️', need: 'hunger', amount: 70, ms: 60_000, extra: {fun: 20, social: 10}, pose: 'sit', seat: .5, minFame: 500},
   shop: {venue: 'mall', name: 'Window-shop', icon: '🛍️', need: 'fun', amount: 20, ms: 30_000, pose: 'chat', page: 'shopping'},
   foodCourt: {venue: 'mall', name: 'Food court meal', icon: '🍔', need: 'hunger', amount: 45, ms: 30_000, extra: {fun: 5}, pose: 'sit', seat: .5},
   interview: {venue: 'tvStation', name: 'TV interview', icon: '🎙️', need: 'social', amount: 15, ms: 45_000, pose: 'gesture', interview: true},
@@ -280,6 +286,9 @@ export const VENUE_ACTS = {
   sunbathe: {venue: 'beach', name: 'Relax on the sand', icon: '🏖️', need: 'fun', amount: 30, ms: 45_000, extra: {energy: 5}, pose: 'sitFloor'},
   beachBall: {venue: 'beach', name: 'Beach football', icon: '⚽', need: 'fun', amount: 25, ms: 40_000, extra: {energy: -10, social: 10}, pose: 'sport', family: 'sport', learn: 3},
 };
+// Shops: tailor colours for your tops, and tattoo spots.
+export const TAILOR_COLORS = ['#e05a47', '#e8a23a', '#f2c230', '#2fae6b', '#3d9a7a', '#2f6fb3', '#7b4fa3', '#d9573f', '#111111', '#f4f2ee', '#c9a227', '#9b1b30'];
+export const TATTOOS = {arm: 'Upper-arm band', neck: 'Neck script', hand: 'Hand star'};
 // Fitness: workouts raise your fitness level, and each level means 1% less energy used (up to 10%).
 export const FITNESS = {max: 10, perWorkout: .25};
 // The kitchen menu. Each dish fills hunger over `ms` and may lift other needs; some unlock with fame.

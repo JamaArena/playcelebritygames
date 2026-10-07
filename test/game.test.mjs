@@ -311,3 +311,14 @@ test('new places: activities, fitness, market groceries, and the beach over the 
   const path=route('home','beach');assert.deepEqual(path.at(-1),{x:0,z:27});assert.ok(path.some(p=>p.x===0&&p.z===22),'crosses the bridge');assert.ok(tripMs('plaza','beach')>0);
   for(const [key,a] of Object.entries(VENUE_ACTS)){assert.ok(TOWN[a.venue],key);const spot=worldObjects(a.venue).find(o=>o.act===key);assert.ok(spot,`${key} has a spot`);}
 });
+test('shops: barber, tailor, tattoos, bukka and fine dining',()=>{
+  const s=make();s.fame=100;
+  assert.throws(()=>act(s,{type:'restyle',hair:'afro',hairColor:'blonde'},T),/Palm Mall/);
+  s.location='mall';act(s,{type:'restyle',hair:'afro',hairColor:'blonde'},T);assert.equal(s.hair,'afro');assert.equal(s.hairColor,'blonde');
+  act(s,{type:'tattoo',spot:'arm'},T);assert.deepEqual(s.tattoos,['arm']);act(s,{type:'tattoo',spot:'arm'},T);assert.deepEqual(s.tattoos,[]);
+  assert.throws(()=>act(s,{type:'venueAct',act:'barber'},T),/Unknown activity/);
+  s.location='market';act(s,{type:'tailor',item:'plainTee',color:'#7b4fa3'},T);assert.equal(s.wear.tint.plainTee,'#7b4fa3');
+  assert.throws(()=>act(s,{type:'tailor',item:'agbada',color:'#7b4fa3'},T),/top you own/);
+  act(s,{type:'venueAct',act:'bukka'},T);assert.equal(s.recovery.amount,60);act(s,{type:'cancel'},T);
+  s.location='lounge';assert.throws(()=>act(s,{type:'venueAct',act:'fineDining'},T),/500 fame/);
+});
