@@ -153,7 +153,7 @@ test('interaction points are walkable and blocked moves or placements spend noth
 });
 test('arranging the room: move furniture on half tiles, keep paths clear, store it and place it again',()=>{
   const s=make();s.inventory.chair={level:1};s.inventory.aquarium={level:1};
-  act(s,{type:'place',item:'chair',x:1,z:0},T);act(s,{type:'place',item:'chair',x:1.5,z:.5},T);assert.deepEqual(s.furniture,[{item:'chair',x:1.5,z:.5}]);
+  act(s,{type:'place',item:'chair',x:1,z:0},T);const chair=s.furniture[0].id;act(s,{type:'place',item:'chair',id:chair,x:1.5,z:.5},T);assert.deepEqual(s.furniture,[{id:chair,item:'chair',x:1.5,z:.5}]);
   assert.throws(()=>act(s,{type:'place',item:'aquarium',x:1.5,z:.5},T),/overlaps something/,'no stacking');
   assert.throws(()=>act(s,{type:'place',item:'aquarium',x:-4,z:-2.5},T),/blocks a path/,'cannot cover the kitchen spot');
   assert.throws(()=>act(s,{type:'place',item:'aquarium',x:1.2,z:-1},T),/blocks a path/,'half tiles only');
@@ -390,6 +390,18 @@ test('bigger homes add rooms you can walk into, use and furnish',()=>{
   const flat=make();flat.location='home';assert.throws(()=>act(flat,{type:'move',x:7.85,z:-1},T),/blocked/,'a studio flat has no guest room');
   act(s,{type:'recover',need:'hygiene',spot:'c'},T);assert.equal(s.recovery.spot,'c');assert.equal(s.recovery.label,'Soak in the hot tub');s.recovery=null;
   act(s,{type:'recover',need:'fun',spot:'c'},T);assert.equal(s.recovery.spot,undefined,'a spot only counts for its own need');s.recovery=null;
-  s.inventory.chair={level:1};assert.throws(()=>act(s,{type:'place',item:'chair',x:8,z:3},T),/blocks a path/,'not on the cinema seat');act(s,{type:'place',item:'chair',x:6.5,z:1.5},T);assert.deepEqual(s.furniture,[{item:'chair',x:6.5,z:1.5}],'furnish the new rooms');
+  s.inventory.chair={level:1};assert.throws(()=>act(s,{type:'place',item:'chair',x:8,z:3},T),/blocks a path/,'not on the cinema seat');act(s,{type:'place',item:'chair',x:6.5,z:1.5},T);assert.deepEqual(s.furniture.map(({item,x,z})=>({item,x,z})),[{item:'chair',x:6.5,z:1.5}],'furnish the new rooms');
   s.vip={townhouse:{at:T}};act(s,{type:'useVip',item:'townhouse'},T);assert.equal(s.home,'townhouse');assert.deepEqual(s.furniture,[],'furniture from a room you no longer have goes into storage');assert.ok(s.inventory.chair);
+});
+
+test('own as many pieces of furniture as you like, each placed or stored on its own',()=>{
+  const s=make();s.fame=1000;s.location='plaza';act(s,{type:'buy',item:'chair'},T);act(s,{type:'buy',item:'chair'},T);act(s,{type:'buy',item:'chair'},T);
+  assert.equal(s.inventory.chair.count,3);assert.throws(()=>act(s,{type:'buy',item:'laptop'},T)&&act(s,{type:'buy',item:'laptop'},T),/already have/,'gadgets stay one each');
+  s.location='home';act(s,{type:'place',item:'chair',x:1,z:0},T);act(s,{type:'place',item:'chair',x:-.5,z:-1},T);act(s,{type:'place',item:'chair',x:2,z:-1},T);
+  assert.equal(s.furniture.length,3);assert.equal(new Set(s.furniture.map(f=>f.id)).size,3,'each chair has its own id');
+  assert.throws(()=>act(s,{type:'place',item:'chair',x:0,z:-2.5},T),/already placed/,'a fourth needs a fourth chair');
+  const [first,second]=s.furniture.map(f=>f.id);act(s,{type:'place',item:'chair',id:second,x:0,z:-2.5},T);assert.deepEqual(s.furniture.find(f=>f.id===second),{id:second,item:'chair',x:0,z:-2.5},'moving one leaves the others');
+  act(s,{type:'store',item:'chair',id:first},T);assert.equal(s.furniture.length,2);assert.ok(!s.furniture.some(f=>f.id===first));
+  act(s,{type:'place',item:'chair',x:1,z:0},T);assert.equal(s.furniture.length,3,'stored chairs come back out');
+  const legacy=make();legacy.furniture=[{item:'chair',x:1,z:0}];legacy.inventory.chair={level:1};reconcile(legacy,T+1);assert.ok(legacy.furniture[0].id,'old saves get ids');assert.equal(legacy.inventory.chair.count,1);
 });

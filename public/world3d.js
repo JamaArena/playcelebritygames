@@ -410,7 +410,7 @@ export class World3D extends World {
     this.hits = [...worldObjects(this.location, this.visitedHome?.furniture || this.state.furniture, this.visitedHome ? [] : Object.keys(this.state.inventory || {}), this.homeKey()).map(object => ({ ...object, screen: this.project(object.vx ?? object.x, .6, object.vz ?? object.z) })), ...this.petHits()];
     this.hitRadius = Math.max(14, Math.min(30, this.scale * .42));
     ctx.font = '600 10px Segoe UI'; ctx.textAlign = 'center';
-    for (const o of this.hits.filter(o => o.name === this.hover?.name)) { const p = o.screen, w = ctx.measureText(o.name).width + 14; ctx.fillStyle = '#fff9'; ctx.beginPath(); ctx.roundRect(p.x - w / 2, p.y + 13, w, 17, 8); ctx.fill(); ctx.fillStyle = '#49614f'; ctx.fillText(o.name, p.x, p.y + 25); }
+    for (const o of this.hits.filter(o => o.key === this.hover?.key)) { const p = o.screen, w = ctx.measureText(o.label).width + 14; ctx.fillStyle = '#fff9'; ctx.beginPath(); ctx.roundRect(p.x - w / 2, p.y + 13, w, 17, 8); ctx.fill(); ctx.fillStyle = '#49614f'; ctx.fillText(o.label, p.x, p.y + 25); }
     this.canvas.dataset.zoom = String(Math.round(this.zoom * 100)); const label = document.querySelector('#zoomLevel'); if (label) label.textContent = `${Math.round(this.zoom * 100)}%`;
   }
 }

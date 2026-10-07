@@ -12,8 +12,14 @@ const now=()=>Date.now()+offset;
 const button=(label,action,attrs='',style='secondary')=>`<button class="${style}" data-action="${action}" ${attrs}>${label}</button>`;
 const careerOptions=(selected)=>Object.entries(CAREERS).map(([key,def])=>`<option value="${key}" ${key===selected?'selected':''}>${escape(def.name)}</option>`).join('');
 function toast(message){$('#toast').textContent=message;$('#toast').hidden=false;clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').hidden=true,5500);}
+// Every app opens on the phone's own screen: status bar on top, home bar at the bottom.
+const NOT_PHONE=['phoneHome','create','welcome','auth','newLife','logoutConfirm','elsewhere'];
+function phoneStatus(model){const time=new Date();return `<div class="phone-status"><span>${model.key==='basic'?time.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit',hour12:false}):time.toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</span><span>${model.network} ${'▂▄▆█'.slice(0,model.key==='basic'?2:model.key==='smart'?3:4)}</span><span>${model.battery}% ${model.battery<30?'🪫':'🔋'}</span></div>`;}
+function phoneFrame(body){const model=phoneModel();return `<div class="phone-device skin-${model.key}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen phone-app-screen">${phoneStatus(model)}<div class="phone-app">${body}</div><button class="phone-homebar" data-action="backToPhone" aria-label="Back to the home screen"></button></div></div>`;}
 function showModal(page,html,closable=true){
-  if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;$('#modalContent').innerHTML=(closable&&!['phoneHome','create','welcome','auth','newLife','logoutConfirm','elsewhere'].includes(page)?button('‹ Phone','backToPhone','','phone-back'):'')+html;$('#modal').classList.toggle('as-phone',page==='phoneHome');
+  if(!modalPage)previousFocus=document.activeElement;modalPage=page;$('#modal').hidden=false;$('#closeModal').hidden=!closable;
+  const inPhone=closable&&Boolean(state)&&!NOT_PHONE.includes(page),body=(closable&&!NOT_PHONE.includes(page)?button('‹ Phone','backToPhone','','phone-back'):'')+html;
+  $('#modalContent').innerHTML=inPhone?phoneFrame(body):body;$('#modal').classList.toggle('as-phone',page==='phoneHome'||inPhone);$('#modal').classList.toggle('phone-app-view',inPhone);
   const title=$('#modalContent h2');if(title)title.id='modalTitle';
   setTimeout(()=>$('#modalContent input, #modalContent button, #closeModal')?.focus(),0);
 }
@@ -93,20 +99,20 @@ function closeTray(){ if(world.previewHome){world.previewHome=null;world.draw();
 // Sims-style pie menu: the object's name in the centre, its interactions fanned around it.
 function pie(object,options){
   // Your own furniture can be moved or put away from its menu.
-  if(object.furniture&&state.location==='home'&&!snapshot.visitedHome&&!state.visiting)options=[...options,['✥ Move','moveItem',`data-item="${object.furniture}"`],['📦 Store','storeItem',`data-item="${object.furniture}"`]];
+  if(object.furniture&&state.location==='home'&&!snapshot.visitedHome&&!state.visiting)options=[...options,['✥ Move','moveItem',`data-item="${object.furniture}" data-id="${object.piece}"`],['📦 Store','storeItem',`data-item="${object.furniture}" data-id="${object.piece}"`]];
   $('#objectTray').hidden=true;
   const card=$('.world-card'),canvas=$('#world'),p=world.screenOf(object),n=options.length;
   const half=Math.min(170,card.clientWidth/2),x=Math.min(card.clientWidth-half,Math.max(half,canvas.offsetLeft+p.x)),y=Math.min(card.clientHeight-40,Math.max(80+n*44,canvas.offsetTop+p.y));
   // Options stack upward in one centred column above the object's name, so they never collide or leave the screen.
   const place=i=>({side:0,y:-46-(n-1-i)*44});
-  $('#pieMenu').innerHTML=button(escape(object.name),'closeTray','aria-label="Close '+escape(object.name)+' menu"','pie-center')+options.map(([label,action,attrs=''],i)=>{const p=place(i);return `<button class="pie-option side-${p.side<0?'left':p.side>0?'right':'mid'}" role="menuitem" style="--y:${p.y}px;--i:${i}" data-action="${action}" ${attrs}>${label}</button>`;}).join('');
+  $('#pieMenu').innerHTML=button(escape(object.label||object.name),'closeTray','aria-label="Close '+escape(object.label||object.name)+' menu"','pie-center')+options.map(([label,action,attrs=''],i)=>{const p=place(i);return `<button class="pie-option side-${p.side<0?'left':p.side>0?'right':'mid'}" role="menuitem" style="--y:${p.y}px;--i:${i}" data-action="${action}" ${attrs}>${label}</button>`;}).join('');
   Object.assign($('#pieMenu').style,{left:x+'px',top:y+'px'});$('#pieMenu').hidden=false;$('#pieMenu .pie-option')?.focus({preventScroll:true});
 }
 function showTray(title,html){$('#pieMenu').hidden=true;$('#objectTray').innerHTML='<header><h3>'+escape(title)+'</h3>'+button('×','closeTray','aria-label="Close object actions"','tray-close')+'</header>'+html;$('#objectTray').hidden=false;}
 const onWorldMove=position=>{closeTray();send({type:'move',...position},{keepModal:true,quiet:true});};
 const onWorldObject=object=>{
   if(object.blocked){toast(object.message||'Choose open ground.');return;}
-  if(object.placement){send({type:'place',...object.placement}).then(data=>{if(data){world.placement=null;closeTray();world.draw();toast(`${ITEMS[object.placement.item].name} placed.`);}});return;}
+  if(object.placement){send({type:'place',item:object.placement.item,...(object.placement.id?{id:object.placement.id}:{}),x:object.placement.x,z:object.placement.z}).then(data=>{if(data){world.placement=null;closeTray();world.draw();toast(`${ITEMS[object.placement.item].name} placed.`);}});return;}
   if(object.decision!==undefined){chooseDecision(object.decision);return;}
   if(object.travel){closeTray();send({type:'travel',location:object.travel});return;}
   if(object.person){const p=object.person,friend=state.friends.includes(p.id);selectedObject=null;if(p.ride&&RIDES[p.ride])toast(`${RIDES[p.ride].icon} ${p.name} drives a ${RIDES[p.ride].name}.`);pie(object,[[`${CAREERS[p.career]?.icon||'☺'} ${escape(CAREERS[p.career]?.name||'Player')} <small>${escape(B.tiers[p.tier||0][0])}</small>`,'page','data-page="phone"'],friend?['✉ Message','directMessage',`data-player="${p.id}"`]:['♡ Add friend','friend',`data-player="${p.id}"`],['💬 Local chat','page','data-page="phone"'],['⚔ Challenge 1v1','battleCreate',`data-mode="1" data-opponent="${p.id}"`]]);return;}
@@ -175,7 +181,7 @@ function useObject(object,use,watch){
       (object.remote?cb=>cb():cb=>world.approach(object,cb))(()=>{
         if(!use)return;
         const perform=async()=>{
-          if(object.useItem){const data=await send({type:'useItem',item:object.item});if(data){world.pose=null;world.draw();}return;}
+          if(object.useItem){const data=await send({type:'useItem',item:object.item,...(object.piece?{id:object.piece}:{})});if(data){world.pose=null;world.draw();}return;}
           if(object.act){const data=await send({type:'venueAct',act:object.act});if(data){world.pose=null;world.draw();}return;}
           if(object.need){const data=await send({type:'recover',need:object.need,watch,...(object.food?{food:object.food}:{}),...(object.spot?{spot:object.spot}:{})});if(!data)return;}
           if(object.pose){const x=object.pose==='dine'?.5:object.name==='Coffee table'||object.name==='Sofa'||object.name==='Television'?-3.5:object.vx??object.x;const z=object.pose==='dine'?2.1:object.name==='Television'?2.1:object.name==='Coffee table'||object.name==='Sofa'?1.5:object.vz??object.z;world.pose={kind:object.pose,x,z,face:object.face};}
@@ -211,7 +217,7 @@ function render(){
   $('#locationTitle').textContent=state.visiting?`${snapshot.players.find(p=>p.id===state.visiting)?.name||'Friend'}’s home`:state.location==='home'&&SPONSORSHIPS[state.home]?`Your ${SPONSORSHIPS[state.home].name.toLowerCase()}`:location.name;
   $('#locationSubtitle').textContent=location.subtitle;
   $('#locationEyebrow').textContent=state.location==='home'?'YOUR NEIGHBOURHOOD':'OUT IN PALM CITY';
-  $('#objects').innerHTML=worldObjects(state.location,snapshot.visitedHome?.furniture||state.furniture,[],snapshot.visitedHome?snapshot.visitedHome.home:state.home).map(o=>button(`${o.icon} ${escape(o.name)}`,'object',`data-name="${escape(o.name)}"`,'object-button')).join('')+(state.location==='home'?button('♧ Socialise','recover','data-need="social"','object-button')+(snapshot.visitedHome?'':button('🛋 Arrange room','arrangeRoom','','object-button')):'');
+  $('#objects').innerHTML=worldObjects(state.location,snapshot.visitedHome?.furniture||state.furniture,[],snapshot.visitedHome?snapshot.visitedHome.home:state.home).map(o=>button(`${o.icon} ${escape(o.label||o.name)}`,'object',`data-key="${escape(o.key||o.name)}"`,'object-button')).join('')+(state.location==='home'?button('♧ Socialise','recover','data-need="social"','object-button')+(snapshot.visitedHome?'':button('🛋 Arrange room','arrangeRoom','','object-button')):'');
   if(state.visiting)$('#objects').innerHTML=button('♡ Socialise','recover','data-need="social"','object-button')+button('↗ Leave visit','leaveVisit','','object-button');
   const moodValue=Object.values(state.needs).reduce((a,b)=>a+b,0)/6,moodLabel=moodValue>=75?'Very happy':moodValue>=55?'Content':moodValue>=30?'Uncomfortable':'Miserable';
   $('#needsHud').innerHTML=`<div class="sim-portrait" style="--skin:${escape(state.color)};--mood:${Math.round(moodValue*1.2)}" title="Mood ${Math.round(moodValue)}%"><span>${escape(state.name.slice(0,1).toUpperCase())}</span></div><div class="sim-meta"><strong>${escape(state.name)}</strong><small style="--mood:${Math.round(moodValue*1.2)}">${moodLabel}</small></div><div class="sim-needs">${Object.entries(needs).map(([key,[label]])=>button(`<label>${label}</label><i style="--need:${state.needs[key]}%;--hue:${Math.round(state.needs[key]*1.2)}"></i>`,'recover',`data-need="${key}" aria-label="${label} ${Math.round(state.needs[key])} percent. Recover ${label}." title="${label} · ${Math.round(state.needs[key])}%"`,'need-bar')).join('')}</div>`;
@@ -339,7 +345,7 @@ function skillRings(c){return `<div class="v2-rings">${Object.entries(c.skills).
 const awardIcon=name=>/champ|trophy|slam|belt|winner/i.test(name)?'🏆':/married/i.test(name)?'💍':/tour/i.test(name)?'🎤':/cover/i.test(name)?'📰':/fund/i.test(name)?'💼':/legacy/i.test(name)?'👋':/palm award/i.test(name)?'🏅':'⭐';
 
 async function recover(need){if(need==='social'){showTray('♡ Socialise','<div class="tray-options">'+button('♡ Chat','quickSocial')+button('♧ Contacts','page','data-page="phone"')+'</div>');return;}if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast(`${tripVerb(data.state.trip.ride)} home. Recover when you arrive.`);return;}}const object=worldObjects('home',state.furniture,Object.keys(state.inventory||{}),state.home).find(o=>o.need===need);if(object)world.onObject(object);}
-function shop(){const fame=state.fame||0;showModal('shop',`<span class="eyebrow">PALM CITY MARKET</span><h2>Make yourself at home.</h2><p class="modal-intro">No coins in Palm City: items unlock with fame and are free to claim. You have ✦ ${fmt(fame)} fame. Claim them at Palm plaza.</p><div class="item-grid">${Object.entries(ITEMS).map(([key,item])=>`<div class="item-card"><h3>${item.name}</h3><p>${item.description}</p><div class="shop-price">✦ ${fmt(item.fame)} fame</div>${state.inventory[key]?button('Owned ✓','noop','disabled'):fame>=item.fame?button('Claim free','buy',`data-item="${key}"`,'primary'):button(`🔒 ${fmt(item.fame-fame)} fame to go`,'noop','disabled')}</div>`).join('')}</div><h3 class="pet-heading">🐾 Pet stall</h3>${state.pet?`<p class="modal-intro">You have ${escape(state.pet.name)} the ${escape(PETS[state.pet.kind].name.toLowerCase())}. One pet at a time.</p>`:`<div class="item-grid">${Object.entries(PETS).map(([key,p])=>`<div class="item-card"><h3>${p.icon} ${p.name}</h3><p>${escape(p.note)}</p><div class="shop-price">✦ ${fmt(p.fame)} fame</div>${fame>=p.fame?`<input id="petName-${key}" class="pet-name" maxlength="20" placeholder="Name your ${p.name.toLowerCase()}" aria-label="Pet name">${state.location==='plaza'?button('Adopt','adoptPet',`data-kind="${key}"`,'primary'):button('Adopt at Palm plaza','travel','data-location="plaza"')}`:button(`🔒 ${fmt(p.fame-fame)} fame to go`,'noop','disabled')}</div>`).join('')}</div>`}`);}
+function shop(){const fame=state.fame||0;showModal('shop',`<span class="eyebrow">PALM CITY MARKET</span><h2>Make yourself at home.</h2><p class="modal-intro">No coins in Palm City: items unlock with fame and are free to claim. You have ✦ ${fmt(fame)} fame. Claim them at Palm plaza.</p><div class="item-grid">${Object.entries(ITEMS).map(([key,item])=>`<div class="item-card"><h3>${item.name}</h3><p>${item.description}</p><div class="shop-price">✦ ${fmt(item.fame)} fame</div>${state.inventory[key]&&!item.furniture?button('Owned ✓','noop','disabled'):fame>=item.fame?state.inventory[key]?button(`Claim another <small>you have ${state.inventory[key].count||1}</small>`,'buy',`data-item="${key}"`):button('Claim free','buy',`data-item="${key}"`,'primary'):button(`🔒 ${fmt(item.fame-fame)} fame to go`,'noop','disabled')}</div>`).join('')}</div><h3 class="pet-heading">🐾 Pet stall</h3>${state.pet?`<p class="modal-intro">You have ${escape(state.pet.name)} the ${escape(PETS[state.pet.kind].name.toLowerCase())}. One pet at a time.</p>`:`<div class="item-grid">${Object.entries(PETS).map(([key,p])=>`<div class="item-card"><h3>${p.icon} ${p.name}</h3><p>${escape(p.note)}</p><div class="shop-price">✦ ${fmt(p.fame)} fame</div>${fame>=p.fame?`<input id="petName-${key}" class="pet-name" maxlength="20" placeholder="Name your ${p.name.toLowerCase()}" aria-label="Pet name">${state.location==='plaza'?button('Adopt','adoptPet',`data-kind="${key}"`,'primary'):button('Adopt at Palm plaza','travel','data-location="plaza"')}`:button(`🔒 ${fmt(p.fame-fame)} fame to go`,'noop','disabled')}</div>`).join('')}</div>`}`);}
 // The wardrobe: tabs per slot, every piece with its perk; wear what you own, claim new pieces at Palm plaza.
 let wardrobeSlot='top';
 function wardrobe(){
@@ -504,25 +510,26 @@ function drawMinimap(){
   const here=TOWN[state.location==='street'?'home':state.location];if(here){g.fillStyle='#ffffff';g.strokeStyle='#153d32';g.lineWidth=1.5;g.beginPath();g.arc(sx(here.x),sz(here.z),4,0,7);g.fill();g.stroke();}
 }
 const APP_PAGES={thread:()=>chatThread(threadWith),team:teamApp,crews:crewsApp,estate:estateAgent,barber:barberShop,tattoo:tattooShop,tailor:tailorShop,chat:chatApp,friends:friendsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp};
+// Furniture in your inventory: how many you own, how many are out, place one from storage or put one away.
+function furnitureButtons(key,item){
+  const owned=item.count||1,out=state.furniture.filter(f=>f.item===key),stored=owned-out.length;
+  return `<p class="piece-count">🏠 ${out.length} placed · 📦 ${stored} in storage</p>${stored>0?button('Place one','placePreview',`data-item="${key}"`,'primary'):''}${out.length?button('📦 Store one','storeItem',`data-item="${key}" data-id="${out.at(-1).id}"`):''}`;
+}
 function inventory(){
   showModal('inventory',`<span class="eyebrow">YOUR POSSESSIONS</span><h2>A place to call yours.</h2><p class="modal-intro">Furnish your apartment, equip a new look, and improve your tools.</p><div class="actions">${button('👗 Wardrobe','page','data-page="wardrobe"','primary')}${button('Visit market','travel','data-location="plaza"')}${button('Go home','travel','data-location="home"')}</div><div class="item-grid">${Object.entries(state.inventory).map(([key,item])=>{
-    const def=ITEMS[key];return `<div class="item-card"><h3>${def?.name||key[0].toUpperCase()+key.slice(1)}</h3><p>${def?.gadget?'Gadget · '+escape(def.description):def?.upgrade?'Home upgrade · always on':`Level ${item.level}${item.upgrade?` · upgrading to ${item.upgrade.target} in ${duration(item.upgrade.endsAt-now())}`:''}`}</p>${def?.slot?button(state.equipped[def.slot]===key?'Equipped':'Equip','equip',`data-item="${key}"`):''}${def?.gadget&&def.use?button(`${def.use.icon} ${escape(def.use.verb)}`,'useGadget',`data-item="${key}"`,'primary'):''}${def?.upgradable&&!item.upgrade&&item.level<10?button('Preview upgrade','previewUpgrade',`data-item="${key}"`):''}${def?.furniture?(state.furniture.some(f=>f.item===key)?button('✥ Move','placePreview',`data-item="${key}"`)+button('📦 Store','storeItem',`data-item="${key}"`):button('Place in home','placePreview',`data-item="${key}"`)):''}</div>`;
+    const def=ITEMS[key];return `<div class="item-card"><h3>${def?.name||key[0].toUpperCase()+key.slice(1)}</h3><p>${def?.gadget?'Gadget · '+escape(def.description):def?.upgrade?'Home upgrade · always on':`Level ${item.level}${item.upgrade?` · upgrading to ${item.upgrade.target} in ${duration(item.upgrade.endsAt-now())}`:''}`}</p>${def?.slot?button(state.equipped[def.slot]===key?'Equipped':'Equip','equip',`data-item="${key}"`):''}${def?.gadget&&def.use?button(`${def.use.icon} ${escape(def.use.verb)}`,'useGadget',`data-item="${key}"`,'primary'):''}${def?.upgradable&&!item.upgrade&&item.level<10?button('Preview upgrade','previewUpgrade',`data-item="${key}"`):''}${def?.furniture?furnitureButtons(key,item):''}</div>`;
   }).join('')}</div>${state.pet?`<h3 class="pet-heading">${PETS[state.pet.kind].icon} ${escape(state.pet.name)}</h3><div class="pet-bars"><label>Food <i style="--v:${Math.round(state.pet.food)}%"></i></label><label>Happiness <i style="--v:${Math.round(state.pet.joy)}%"></i></label></div><p class="modal-intro">${state.pet.food>PET_CARE.happy&&state.pet.joy>PET_CARE.happy?'Happy pet: '+escape(PERKS[PETS[state.pet.kind].perk[0]].label(PETS[state.pet.kind].perk[1])):'Feed and play with your pet at home to get its perk back.'}</p>${button('Find a new home','rehomePet')}`:''}`);
 }
 function upgrade(item){const owned=state.inventory[item],cost=effort(owned.level,100),ready=(state.fame||0)>=cost,time=effort(owned.level,B.upgradeMs);showModal('upgrade',`<span class="eyebrow">A BETTER TOOL</span><h2>${ITEMS[item].name}</h2><p class="modal-intro">Level ${owned.level} → ${owned.level+1}</p><div class="notice">Needs ✦ ${fmt(cost)} fame (not spent) · ${duration(time)} minutes · no materials needed · no career charge.<br>Production quality bonus rises to +${owned.level*5}. Your current tool remains usable. This upgrade completes offline, applies once, and cannot be cancelled after starting. Maximum level 10.</div>${(ready?button('Start timed upgrade','upgrade',`data-item="${item}"`,'primary'):button(`🔒 ${fmt(cost-(state.fame||0))} fame to go`,'noop','disabled'))}`);}
-async function placement(item){closeModal();if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast('Heading home. Arrange your room when you arrive.');return;}}
-  const placed=state.furniture.find(f=>f.item===item);showTray((placed?'Move ':'Place ')+ITEMS[item].name,'<small class="placement-hint">Tap the floor to try a spot · green fits, red overlaps or blocks a path.</small><div class="tray-options">'+button('✓ Place here','placeHere','id="placeHere" disabled','primary')+(placed?button('📦 Store instead','storeItem',`data-item="${item}"`):'')+button('Done','closeTray')+'</div>');
+async function placement(item,id=null){closeModal();if(state.location!=='home'){const data=await send({type:'travel',location:'home'});if(!data)return;if(data.state.trip){toast('Heading home. Arrange your room when you arrive.');return;}}
+  const placed=id?state.furniture.find(f=>f.id===id):null;showTray((placed?'Move ':'Place ')+ITEMS[item].name,'<small class="placement-hint">Tap the floor to try a spot · green fits, red overlaps or blocks a path.</small><div class="tray-options">'+button('✓ Place here','placeHere','id="placeHere" disabled','primary')+(placed?button('📦 Store instead','storeItem',`data-item="${item}" data-id="${id}"`):'')+button('Done','closeTray')+'</div>');
   world.resetCamera();if(innerWidth<620)world.setZoom(.7); // see the whole room while arranging
-  world.placement={item,x:placed?.x??0,z:placed?.z??-1,spots:[],shown:Boolean(placed)};world.onPlacement(Boolean(placed)&&canPlace(state.furniture,item,placed.x,placed.z,state.home));world.draw();
+  world.placement={item,id,x:placed?.x??0,z:placed?.z??-1,spots:[],shown:Boolean(placed)};world.onPlacement(Boolean(placed)&&canPlace(state.furniture,id,placed.x,placed.z,state.home));world.draw();
   // Light up every spot that fits, a few rows at a time so the game stays responsive.
-  const p=world.placement;const east=Math.max(4,...homeRooms(state.home).map(r=>r.x1-.9));for(let x=-4;x<=east;x+=.5){await new Promise(r=>setTimeout(r));if(world.placement!==p)return;for(let z=-4;z<=4.5;z+=.5)if(canPlace(state.furniture,item,x,z,state.home))p.spots.push([x,z]);world.draw();}
+  const p=world.placement;const east=Math.max(4,...homeRooms(state.home).map(r=>r.x1-.9));for(let x=-4;x<=east;x+=.5){await new Promise(r=>setTimeout(r));if(world.placement!==p)return;for(let z=-4;z<=4.5;z+=.5)if(canPlace(state.furniture,id,x,z,state.home))p.spots.push([x,z]);world.draw();}
   if(!p.spots.length)toast('No free spot fits this right now. Store something to make room.');}
 // Arrange your room: every piece of furniture you own, placed or in storage.
-function arrangeRoom(){
-  const owned=Object.keys(state.inventory).filter(k=>ITEMS[k]?.furniture),placed=new Set(state.furniture.map(f=>f.item));
-  const card=k=>`<div class="item-card"><h3>${escape(ITEMS[k].use?.icon||{wardrobe:'👗',chair:'♙',ankaraRug:'🟥',floorLamp:'💡',wallArt:'🖼️',trophyShelf:'🏆'}[k]||'◇')} ${escape(ITEMS[k].name)}</h3><p>${placed.has(k)?'In your room':'In storage'}</p>${placed.has(k)?button('✥ Move','moveItem',`data-item="${k}"`,'primary')+button('📦 Store','storeItem',`data-item="${k}"`):button('Place','moveItem',`data-item="${k}"`,'primary')}</div>`;
-  showModal('arrange',`<span class="eyebrow">ARRANGE YOUR ROOM</span><h2>Make it yours</h2><p class="modal-intro">Move furniture anywhere there's space, or put it in storage and bring it back later. Paths to your bed, kitchen and door always stay clear.</p>${owned.length?`<h3>In your room</h3><div class="item-grid">${owned.filter(k=>placed.has(k)).map(card).join('')||'<p class="empty">Nothing placed yet.</p>'}</div><h3>Storage</h3><div class="item-grid">${owned.filter(k=>!placed.has(k)).map(card).join('')||'<p class="empty">Storage is empty.</p>'}</div>`:`<p class="empty">You don't own any furniture yet. ${button('Visit the market','travel','data-location="plaza"')}</p>`}`);
-}
+function arrangeRoom(){inventory();}
 function profile(){const season=snapshot.season,c=state.careers[state.career],def=CAREERS[state.career];showModal('profile',`${hero(escape(state.name.slice(0,1).toUpperCase()),escape(state.name),[`${def.icon} ${def.name}`,B.tiers[c.tier][0],...((state.fame||0)>=50_000?['✔ Verified']:[]),...(state.spouse?[`💍 ${escape(state.spouse.name)}`]:[]),...(state.crew?[`${escape(state.crew.badge)} ${escape(state.crew.name)}`]:[])],state.color)}
   ${tiles([['✦',fmt(state.fame||0),'Fame'],['🏆',state.awards.length,'Awards'],['🎬',state.outputs.length,'Works'],['💪',Math.floor(state.fitness||0),'Fitness'],['👥',fmt(fanClubSize(state.fame||0)),'Fan club']])}
   ${state.spouse?`<div class="v2-offer"><div><strong>💍 Married to ${escape(state.spouse.name)}</strong><small>You each earn 10% of the fame the other makes.</small></div></div>`:''}
@@ -717,11 +724,11 @@ document.addEventListener('click',async event=>{
     case 'logoutGuest':try{await auth({type:'logout',deleteGuest:true});}catch(e){toast(e.message);break;}location.reload();break;
     case 'getUp':await send({type:'cancel'});break;
     case 'travel':await send({type:'travel',location:d.location});break;
-    case 'object':world.walkToObject(d.name);break;
+    case 'object':world.walkToObject(d.key||d.name);break;
     case 'cook':if(selectedObject)selectedObject={...selectedObject,food:d.food}; // then use the kitchen with that dish
     case 'goObject':case 'useObject':case 'watchObject':{
       const object=selectedObject,use=d.action!=='goObject',watch=d.action==='watchObject';closeTray();closeModal();if(!object)break;
-      if(use&&isBusyWithTimer()){queueTask({icon:object.icon,label:object.verb||object.name,run:()=>useObject(object,use,watch)});break;}
+      if(use&&isBusyWithTimer()){queueTask({icon:object.icon,label:object.verb||object.label||object.name,run:()=>useObject(object,use,watch)});break;}
       useObject(object,use,watch);break;
     }
     case 'unqueue':taskQueue.splice(Number(d.index),1);renderActivity();break;
@@ -746,12 +753,12 @@ document.addEventListener('click',async event=>{
     case 'buy':case 'equip':case 'claim':case 'useVip':await send({type:d.action,item:d.item},{keepModal:true});break;
     case 'previewUpgrade':upgrade(d.item);break;
     case 'upgrade':await send({type:'upgrade',item:d.item});break;
-    case 'placePreview':case 'moveItem':closeTray();placement(d.item);break;
+    case 'placePreview':case 'moveItem':closeTray();placement(d.item,d.id||null);break;
     case 'arrangeRoom':arrangeRoom();break;
     case 'previewHome':previewHome(d.item);break;
     case 'previewMoveIn':await send({type:'useVip',item:d.item});break;
-    case 'placeHere':{const p=world.placement;if(p)onWorldObject({placement:{item:p.item,x:p.x,z:p.z}});break;}
-    case 'storeItem':{const data=await send({type:'store',item:d.item},{keepModal:true});if(data){closeTray();world.placement=null;world.draw();toast(`${ITEMS[d.item].name} stored. Place it again any time from Arrange room.`);if(modalPage==='arrange')arrangeRoom();else if(modalPage==='inventory')inventory();}break;}
+    case 'placeHere':{const p=world.placement;if(p)onWorldObject({placement:{item:p.item,id:p.id,x:p.x,z:p.z}});break;}
+    case 'storeItem':{const data=await send({type:'store',item:d.item,...(d.id?{id:d.id}:{})},{keepModal:true});if(data){closeTray();world.placement=null;world.draw();toast(`${ITEMS[d.item].name} stored. Place it again any time from Arrange room.`);if(modalPage==='inventory')inventory();}break;}
     case 'place':await send({type:'place',item:d.item,x:Number(d.x),z:Number(d.z)});break;
     case 'acceptOffer':await send({type:'acceptOffer'},{keepModal:true});break;
     case 'phoneTab':phone(d.tab);break;

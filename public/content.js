@@ -66,17 +66,17 @@ export const TOWN = {
 export const lotAt = (x, z) => Object.keys(TOWN).find(key => Math.abs(x - TOWN[key].x) <= 5.5 && Math.abs(z - TOWN[key].z) <= 5.5);
 export const ITEMS = {
   // There are no coins: items unlock at a fame level and are free to claim. Fame is never spent.
-  chair: {name: 'Lounge chair', fame: 25, description: 'Place it in a free spot at home.', furniture: true},
+  chair: {name: 'Chair', fame: 25, description: 'Place it in a free spot at home.', furniture: true},
   gear: {name: 'Career equipment', fame: 50, description: 'Practise at home. Production quality +5 per level above 1. Higher levels need more fame.', upgradable: true, slot: 'gear'},
   jacket: {name: 'Signature jacket', fame: 150, description: 'An emerald layer for your everyday look.', slot: 'clothes'},
-  trophyShelf: {name: 'Award shelf', fame: 1000, description: 'A place for the milestones you earn.', furniture: true},
+  trophyShelf: {name: 'Shelf', fame: 1000, description: 'A place for the milestones you earn.', furniture: true},
   // Home items: place them at home, then tap them to use. `use` says what they do while you use them;
   // `extra` changes other needs, `onItem` puts you on the item itself (a seat or a treadmill).
   wardrobe: {name: 'Wardrobe', fame: 20, description: 'Change outfits at home. Tap it to open your wardrobe.', furniture: true},
-  ankaraRug: {name: 'Ankara print rug', fame: 50, description: 'A bright patterned rug for the living room.', furniture: true},
-  floorLamp: {name: 'Floor lamp', fame: 30, description: 'A tall lamp for warm evenings.', furniture: true},
-  plants: {name: 'Indoor plant pack', fame: 40, description: 'Monstera and snake plants to water.', furniture: true, use: {verb: 'Water plants', icon: '❀', need: 'fun', amount: 5, ms: 10_000, pose: 'water'}},
-  mirror: {name: 'Full-length mirror', fame: 60, description: 'Check your look before you head out.', furniture: true, use: {verb: 'Check your look', icon: '🪞', need: 'fun', amount: 10, ms: 15_000, pose: 'gesture'}},
+  ankaraRug: {name: 'Rug', fame: 50, description: 'A bright patterned rug for the living room.', furniture: true},
+  floorLamp: {name: 'Lamp', fame: 30, description: 'A tall lamp for warm evenings.', furniture: true},
+  plants: {name: 'Plants', fame: 40, description: 'Monstera and snake plants to water.', furniture: true, use: {verb: 'Water plants', icon: '❀', need: 'fun', amount: 5, ms: 10_000, pose: 'water'}},
+  mirror: {name: 'Mirror', fame: 60, description: 'Check your look before you head out.', furniture: true, use: {verb: 'Check your look', icon: '🪞', need: 'fun', amount: 10, ms: 15_000, pose: 'gesture'}},
   beanBag: {name: 'Bean bag', fame: 80, description: 'A comfy seat for lazy afternoons.', furniture: true, use: {verb: 'Lounge', icon: '◒', need: 'fun', amount: 25, ms: 45_000, pose: 'sit', seat: .4, onItem: true}},
   bookshelf: {name: 'Bookshelf', fame: 100, description: 'Read a good book to unwind, and learn a little for your career.', furniture: true, use: {verb: 'Read a book', icon: '📖', need: 'fun', amount: 20, ms: 40_000, pose: 'chat', learn: {family: '*', points: 3}}},
   microwave: {name: 'Microwave', fame: 120, description: 'A fast, so-so meal when you are in a rush.', furniture: true, use: {verb: 'Quick meal', icon: '🍱', need: 'hunger', amount: 25, ms: 15_000, pose: 'chat'}},
@@ -108,12 +108,12 @@ export const ITEMS = {
   smartTv: {name: 'Bigger smart TV', fame: 1200, description: 'Watching your career on TV teaches up to 2 more insights.', upgrade: {insights: 2}},
   // More home items to place and use. `learn` trains your focus skill if your career is in that family.
   wallArt: {name: 'Wall art', fame: 70, description: 'A framed canvas on a stand.', furniture: true},
-  barStools: {name: 'Kitchen bar stools', fame: 110, description: 'Perch at the counter.', furniture: true, use: {verb: 'Sit at the bar', icon: '🪑', need: 'fun', amount: 8, ms: 20_000, pose: 'sit', seat: .62, onItem: true}},
-  balconySet: {name: 'Balcony chairs', fame: 260, description: 'Two chairs and a little table for slow afternoons.', furniture: true, use: {verb: 'Relax outside', icon: '☀', need: 'fun', amount: 18, ms: 30_000, pose: 'sit', seat: .46, onItem: true}},
-  ringLight: {name: 'Ring light & camera', fame: 350, description: 'Film clips at home. Creators train as they film.', furniture: true, use: {verb: 'Film a clip', icon: '💡', need: 'social', amount: 15, ms: 30_000, pose: 'perform', learn: {family: 'creator', points: 4}}},
-  piano: {name: 'Keyboard piano', fame: 650, description: 'Play for fun. Musicians train as they play.', furniture: true, use: {verb: 'Play piano', icon: '🎹', need: 'fun', amount: 25, ms: 40_000, pose: 'work', seat: .5, learn: {family: 'music', points: 4}}},
+  barStools: {name: 'Bar stools', fame: 110, description: 'Perch at the counter.', furniture: true, use: {verb: 'Sit at the bar', icon: '🪑', need: 'fun', amount: 8, ms: 20_000, pose: 'sit', seat: .62, onItem: true}},
+  balconySet: {name: 'Patio set', fame: 260, description: 'Two chairs and a little table for slow afternoons.', furniture: true, use: {verb: 'Relax outside', icon: '☀', need: 'fun', amount: 18, ms: 30_000, pose: 'sit', seat: .46, onItem: true}},
+  ringLight: {name: 'Ring light', fame: 350, description: 'Film clips at home. Creators train as they film.', furniture: true, use: {verb: 'Film a clip', icon: '💡', need: 'social', amount: 15, ms: 30_000, pose: 'perform', learn: {family: 'creator', points: 4}}},
+  piano: {name: 'Piano', fame: 650, description: 'Play for fun. Musicians train as they play.', furniture: true, use: {verb: 'Play piano', icon: '🎹', need: 'fun', amount: 25, ms: 40_000, pose: 'work', seat: .5, learn: {family: 'music', points: 4}}},
   bathtub: {name: 'Bathtub', fame: 700, description: 'Slower than a shower, but relaxing.', furniture: true, use: {verb: 'Take a bath', icon: '🛁', need: 'hygiene', amount: 60, ms: 60_000, pose: 'sitFloor', onItem: true, extra: {fun: 10}}},
-  studioMic: {name: 'Home studio mic', fame: 800, description: 'Record at home. Musicians train as they record.', furniture: true, use: {verb: 'Record vocals', icon: '🎙️', need: 'fun', amount: 15, ms: 40_000, pose: 'perform', learn: {family: 'music', points: 6}}},
+  studioMic: {name: 'Mic', fame: 800, description: 'Record at home. Musicians train as they record.', furniture: true, use: {verb: 'Record vocals', icon: '🎙️', need: 'fun', amount: 15, ms: 40_000, pose: 'perform', learn: {family: 'music', points: 6}}},
   trophyCabinet: {name: 'Trophy cabinet', fame: 1500, description: 'Shows off the awards you have won.', furniture: true, use: {verb: 'Admire your trophies', icon: '🏆', need: 'fun', amount: 10, ms: 10_000, pose: null}},
   weights: {name: 'Weight bench', fame: 1000, description: 'Lift weights: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Lift weights', icon: '🏋️', need: 'fun', amount: 20, ms: 40_000, pose: 'sport', extra: {energy: -10, hygiene: -15}}},
 };
@@ -521,12 +521,12 @@ export const ROOM_SLOTS={
   d:{x0:10.35,x1:15.35,z0:0,z1:5.35,north:false,door:{x:12.85,z:0,wall:'z'}},
 };
 export const ROOM_TYPES={
-  guest:{name:'Guest bedroom',object:{name:'Guest bed',icon:'☾',need:'energy',verb:'Sleep in the guest room',pose:'sleep',size:[1.9,2.4],onIt:true}},
-  office:{name:'Home office',object:{name:'Office desk',icon:'⌘',action:'practice',size:[1.8,.8]}},
-  cinema:{name:'Home cinema',object:{name:'Cinema screen',icon:'🎬',need:'fun',verb:'Watch a film',pose:'sit',size:[3,.3],gap:2}},
+  guest:{name:'Guest bedroom',object:{name:'Bed',icon:'☾',need:'energy',verb:'Sleep in the guest room',pose:'sleep',size:[1.9,2.4],onIt:true}},
+  office:{name:'Home office',object:{name:'Desk',icon:'⌘',action:'practice',size:[1.8,.8]}},
+  cinema:{name:'Home cinema',object:{name:'Screen',icon:'🎬',need:'fun',verb:'Watch a film',pose:'sit',size:[3,.3],gap:2}},
   spa:{name:'Spa room',object:{name:'Hot tub',icon:'♨',need:'hygiene',verb:'Soak in the hot tub',pose:'sit',size:[1.8,1.8],onIt:true}},
-  bar:{name:'Bar lounge',object:{name:'Home bar',icon:'🍹',need:'fun',verb:'Mix a mocktail',pose:'chat',size:[2.6,.7]}},
-  closet:{name:'Walk-in closet',object:{name:'Walk-in closet',icon:'👗',action:'wardrobe',size:[3.2,.7]}},
+  bar:{name:'Bar lounge',object:{name:'Bar',icon:'🍹',need:'fun',verb:'Mix a mocktail',pose:'chat',size:[2.6,.7]}},
+  closet:{name:'Walk-in closet',object:{name:'Closet',icon:'👗',action:'wardrobe',size:[3.2,.7]}},
   games:{name:'Games room',object:{name:'Pool table',icon:'🎱',need:'fun',verb:'Shoot pool',pose:'gesture',size:[2.2,1.3],centre:true}},
 };
 export const HOME_ROOMS={townhouse:{a:'guest'},duplex:{a:'guest',b:'office'},villa:{a:'guest',b:'cinema',c:'spa'},beachHouse:{a:'guest',b:'bar',c:'spa'},penthouse:{a:'guest',b:'cinema',c:'bar',d:'closet'},mansion:{a:'guest',b:'cinema',c:'spa',d:'games'}};
@@ -582,19 +582,20 @@ const HOME_DOOR = [-4.3,3.6];
 // Furniture goes on half-tile spots anywhere in the apartment, as long as nothing overlaps and you can still
 // walk from the front door to every built-in object and to the front of every piece of furniture.
 const placeCache=new Map();
-export function canPlace(furniture,item,x,z,home){
-  const memo=JSON.stringify([furniture,item,x,z,home]);if(placeCache.has(memo))return placeCache.get(memo);
-  const fits=placeCheck(furniture,item,x,z,home);if(placeCache.size>500)placeCache.clear();placeCache.set(memo,fits);return fits;
+// `piece` is the id of the furniture being moved, or null for a new piece from storage.
+export function canPlace(furniture,piece,x,z,home){
+  const memo=JSON.stringify([furniture,piece,x,z,home]);if(placeCache.has(memo))return placeCache.get(memo);
+  const fits=placeCheck(furniture,piece,x,z,home);if(placeCache.size>500)placeCache.clear();placeCache.set(memo,fits);return fits;
 }
-function placeCheck(furniture,item,x,z,home){
+function placeCheck(furniture,piece,x,z,home){
   const rooms=homeRooms(home);
   if(!Number.isInteger(x*2)||!Number.isInteger(z*2)||!(Math.abs(x)<=4&&z>=-4&&z<=3.5||rooms.some(r=>x>=r.x0+.9&&x<=r.x1-.9&&z>=r.z0+.9&&z<=r.z1-.9)))return false;
-  const others=furniture.filter(f=>f.item!==item),next=[...others,{item,x,z}];
+  const others=furniture.filter(f=>!piece||f.id!==piece),next=[...others,{id:piece||'new',x,z}];
   // The whole footprint must be clear (not just its centre), and you need room to stand in front of it.
   if(![[0,0],[-.4,-.4],[.4,-.4],[-.4,.4],[.4,.4]].every(([dx,dz])=>walkable('home',x+dx,z+dz,others,home))||!walkable('home',x,z+.75,next,home))return false;
   const grid=.3,key=(a,b)=>a+','+b,start=[Math.round(HOME_DOOR[0]/grid),Math.round(HOME_DOOR[1]/grid)],seen=new Set([key(...start)]),open=[start],reached=[];
   for(let i=0;i<open.length;i++){const [a,b]=open[i];reached.push([a*grid,b*grid]);for(const [da,db] of [[1,0],[-1,0],[0,1],[0,-1]]){const c=[a+da,b+db],k=key(...c);if(!seen.has(k)&&walkable('home',c[0]*grid,c[1]*grid,next,home)){seen.add(k);open.push(c);}}}
   const near=([px,pz])=>reached.some(([rx,rz])=>Math.hypot(rx-px,rz-pz)<=.6);
   const spots=[...HOME_SPOTS,...rooms.map(r=>[r.object.x,r.object.z])];
-  return spots.every(p=>walkable('home',p[0],p[1],[{item,x,z}],home)&&near(p))&&next.every(f=>near([f.x,f.z+.75]));
+  return spots.every(p=>walkable('home',p[0],p[1],[{x,z}],home)&&near(p))&&next.every(f=>near([f.x,f.z+.75]));
 }
