@@ -344,3 +344,13 @@ test('people: team hires, life-moment choices, beef with the rival, crews and ma
   s.nextGigAt=0;s.lastSeen=T+5000;reconcile(s,T+6000);assert.ok(s.gig&&VENUE_ACTS[s.gig.act],'the manager books a gig');
   const gig=s.gig,fame=s.fame;s.location=VENUE_ACTS[gig.act].venue;s.recovery=null;s.active=null;s.nextEventAt=Infinity;act(s,{type:'venueAct',act:gig.act},T+7000);reconcile(s,s.recovery.endsAt+1);assert.ok(s.fame>=fame+gig.bonus,'gig bonus paid');
 });
+test('career moments: gated by career and outputs, once a day, tours over three stops, and retirement',()=>{
+  const s=make('musician');s.fame=10_000;s.location='stadium';
+  assert.throws(()=>act(s,{type:'venueAct',act:'final'},T),/other careers/);
+  s.location='radio';assert.throws(()=>act(s,{type:'venueAct',act:'albumRelease'},T),/Release 3/);
+  s.outputs=[1,2,3].map(i=>({career:'musician',released:true,fame:100,title:`Song ${i}`}));act(s,{type:'venueAct',act:'albumRelease'},T);reconcile(s,s.recovery.endsAt+1);
+  assert.equal(s.fameLog[0].reason,'Album release');assert.throws(()=>act(s,{type:'venueAct',act:'albumRelease'},T+120_000),/Once a day/);
+  let t=T+200_000;for(const [venue,key] of [['nightclub','tourNightclub'],['eventHall','tourHall'],['stadium','tourStadium']]){s.location=venue;s.needs.energy=100;act(s,{type:'venueAct',act:key},t);reconcile(s,s.recovery.endsAt+1);t=s.lastSeen+1000;}
+  assert.equal(s.tour,null);assert.ok(s.awards.some(a=>a.name==='Sold-out tour'));
+  act(s,{type:'retire',career:'actor'},t);assert.equal(s.career,'actor');assert.ok(s.careers.musician.retired);assert.ok(s.awards.some(a=>a.name==='Musician legacy'));
+});

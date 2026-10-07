@@ -273,6 +273,7 @@ export const LIFE_EVENTS = {
   fanSelfie: {icon: '🤳', title: 'A fan wants a selfie', text: 'They are shaking with excitement.', weight: 3, where: 'out', minFame: 500, prompt: 'fanSelfie', guarded: true},
   journalist: {icon: '📰', title: 'A journalist wants a quote', text: 'About your rival, of course.', weight: 2, minFame: 1000, prompt: 'journalist'},
   paparazzi: {icon: '📸', title: 'Paparazzi spotted you', text: 'Flashes everywhere. Careful: the next ten minutes are on camera.', weight: 2, where: 'out', minFame: 5000, fame: [.003, 10], guarded: true, paps: true},
+  transferWindow: {icon: '📝', title: 'The transfer window is open', text: 'A bigger club wants you. Check your career offers.', weight: 2, family: 'sport', transfer: true},
   rivalHit: {icon: '🥊', title: 'Your rival dropped a hit', text: 'Duke Adeyemi is all over the radio. Time to answer?', weight: 1, minFame: 2000},
   mumCalls: {icon: '📞', title: 'Mum called', text: '"Have you eaten?" You feel loved.', needs: {social: 15}, weight: 2},
   familyVisit: {icon: '👪', title: 'Family came to visit', text: 'Mum is on the sofa with jollof she brought.', needs: {social: 20, hunger: 15}, weight: 1, where: 'home', family: null, visit: true},
@@ -292,6 +293,8 @@ export const TEAM = {
   manager: {name: 'Personal manager', icon: '🧑‍💼', fame: 2000, note: 'Books gigs: do the booked activity in time for bonus fame.'},
   bodyguard: {name: 'Bodyguard', icon: '🕶️', fame: 20_000, note: 'Keeps paparazzi and selfie-hunters away; mishaps cost 20% less fame.'},
 };
+// Career moments: once a day each; tours need all three stops within a day.
+export const MOMENT = {cooldownMs: 24 * 3_600_000, tourMs: 24 * 3_600_000, viralChance: .12};
 export const GIG = {everyMs: 15 * 60_000, windowMs: 10 * 60_000};
 // Home items that need electricity during a power cut (unless you own a generator).
 export const POWERED = ['gamingConsole', 'soundSystem', 'coffeeMachine', 'microwave', 'washingMachine', 'ringLight', 'studioMic'];
@@ -322,6 +325,18 @@ export const VENUE_ACTS = {
   callIn: {venue: 'radio', name: 'Call-in show', icon: '☎️', need: 'social', amount: 20, ms: 30_000, pose: 'chat'},
   ludo: {venue: 'park', name: 'Play Ludo & Ayo', icon: '🎲', need: 'fun', amount: 25, ms: 40_000, extra: {social: 15}, pose: 'sitFloor'},
   volunteer: {venue: 'hospital', name: 'Volunteer', icon: '🤲', need: 'social', amount: 20, ms: 60_000, extra: {fun: 10, energy: -5}, pose: 'chat', fame: 10, charity: true},
+  // Career moments: big, risky beats for particular careers. Your focus skill sets the odds; wins can bring awards.
+  final: {venue: 'stadium', name: 'Play the championship final', icon: '🏆', need: 'fun', amount: 30, ms: 75_000, extra: {energy: -20}, pose: 'sport', careers: ['football', 'basketball'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Champions', headline: ['lifted the championship trophy 🏆', 'fell short in the final']}},
+  grandSlam: {venue: 'stadium', name: 'Play a grand slam final', icon: '🎾', need: 'fun', amount: 30, ms: 75_000, extra: {energy: -20}, pose: 'sport', careers: ['tennis'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Grand slam champion', headline: ['won the grand slam 🎾', 'lost a five-set epic']}},
+  titleBelt: {venue: 'eventHall', name: 'Fight for the title belt', icon: '🥇', need: 'fun', amount: 30, ms: 60_000, extra: {energy: -25}, pose: 'sport', careers: ['wrestling'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Title belt', headline: ['is the new champion 🥇', 'lost the title fight']}},
+  premiere: {venue: 'cinema', name: 'Walk your movie premiere', icon: '🎬', need: 'social', amount: 30, ms: 60_000, pose: 'gesture', careers: ['actor', 'adult'], minOutputs: 2, moment: {win: [.02, 100], lose: [.005, 20], headline: ['dazzled at a premiere 🎬', "'s premiere got mixed reviews"]}},
+  pitch: {venue: 'tech', name: 'Pitch for a funding round', icon: '💼', need: 'social', amount: 15, ms: 60_000, pose: 'gesture', careers: ['founder'], moment: {win: [.025, 120], lose: [.005, 15], award: 'Funded founder', headline: ['closed a funding round 💼', "'s pitch didn't land"]}},
+  hackathon: {venue: 'tech', name: 'Enter the hackathon', icon: '⌨️', need: 'fun', amount: 25, ms: 75_000, extra: {energy: -15}, pose: 'work', careers: ['developer'], learn: 8, moment: {win: [.02, 100], lose: [.004, 10], award: 'Hackathon winner', headline: ['won the Palm hackathon ⌨️', 'shipped a bug at the hackathon']}},
+  tokenLaunch: {venue: 'tech', name: 'Launch a token project', icon: '🪙', need: 'fun', amount: 20, ms: 60_000, pose: 'gesture', careers: ['web3'], moment: {win: [.04, 150], lose: [-.01, -30], headline: ["'s launch sold out in minutes 🪙", "'s launch flopped. Ouch."]}},
+  albumRelease: {venue: 'radio', name: 'Release an album', icon: '💿', need: 'social', amount: 20, ms: 60_000, pose: 'perform', family: 'music', minOutputs: 3, album: true},
+  tourNightclub: {venue: 'nightclub', name: 'Tour stop: Club Neon show', icon: '🎤', need: 'fun', amount: 20, ms: 60_000, extra: {energy: -10}, pose: 'perform', family: 'music', tour: true},
+  tourHall: {venue: 'eventHall', name: 'Tour stop: Grand Event Hall show', icon: '🎤', need: 'fun', amount: 20, ms: 60_000, extra: {energy: -10}, pose: 'perform', family: 'music', tour: true},
+  tourStadium: {venue: 'stadium', name: 'Tour stop: stadium show', icon: '🎤', need: 'fun', amount: 25, ms: 75_000, extra: {energy: -15}, pose: 'perform', family: 'music', tour: true},
   stalls: {venue: 'market', name: 'Browse the stalls', icon: '🧺', need: 'fun', amount: 15, ms: 30_000, extra: {social: 10}, pose: 'chat', groceries: 5},
   snack: {venue: 'market', name: 'Buy puff-puff', icon: '🍩', need: 'hunger', amount: 20, ms: 15_000, extra: {fun: 5}, pose: 'chat'},
   workout: {venue: 'gym', name: 'Work out', icon: '🏋️', need: 'fun', amount: 15, ms: 45_000, extra: {energy: -12, hygiene: -15}, pose: 'sport', fitness: 1},
