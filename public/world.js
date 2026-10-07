@@ -293,16 +293,19 @@ export class World {
   rod(x,z,w,d,h,color,y=0){this.round(x,z,w,d,h,color,y);}
   // A chair whose sitter faces `face` (0 = +z); the backrest goes on the opposite side.
   // ---- Props: low-poly but recognisable. Each faces +z (toward the room) unless turned a quarter at a time. ----
+  // Seats register where they are and which way you face sitting on them, so nobody sits facing a backrest.
+  seat(x,z,face){(this.seats??=[]).push({x,z,face});}
+  seatAt(x,z){let best=null,d=.5;for(const s of this.seats||[]){const k=Math.hypot(s.x-x,s.z-z);if(k<d){d=k;best=s.face;}}return best;}
   prop(x,z,face=0){const s=Math.round(Math.sin(face)),c=Math.round(Math.cos(face)),sw=s!==0,at=(dx,dz)=>[x+dx*c+dz*s,z-dx*s+dz*c];
     const put=fn=>(dx,dz,w,d,h,col,y=0)=>{const [px,pz]=at(dx,dz);fn(px,pz,sw?d:w,sw?w:d,h,col,y);};
     return {box:put((...a)=>this.box(...a)),round:put((...a)=>this.round(...a)),rod:put((...a)=>this.rod(...a))};}
   // A dining chair: four legs, a cushioned seat, two back posts and a curved top rail.
-  chair(x,z,face=0,wood='#b38c63',cushion='#e8dcc6'){const p=this.prop(x,z,face);
+  chair(x,z,face=0,wood='#b38c63',cushion='#e8dcc6'){const p=this.prop(x,z,face);this.seat(x,z,face);
     for(const dx of [-.19,.19])for(const dz of [-.18,.18])p.rod(dx,dz,.045,.045,.45,wood);
     p.box(0,0,.46,.44,.05,wood,.45);p.box(0,.01,.42,.4,.05,cushion,.5);
     for(const dx of [-.19,.19])p.rod(dx,-.19,.045,.045,.5,wood,.5);p.box(0,-.19,.44,.05,.13,wood,.86);p.box(0,-.19,.36,.03,.2,wood,.62);}
   // An office chair: five-star base on castors, gas lift, padded seat and back, armrests.
-  officeChair(x,z,face=0,color='#2b2f36'){const p=this.prop(x,z,face),frame='#3a3d43';
+  officeChair(x,z,face=0,color='#2b2f36'){const p=this.prop(x,z,face),frame='#3a3d43';this.seat(x,z,face);
     p.box(0,0,.58,.06,.04,frame,.06);p.box(0,0,.06,.58,.04,frame,.06);for(const [dx,dz] of [[.28,0],[-.28,0],[0,.28],[0,-.28]])p.round(dx,dz,.07,.07,.07,'#16181b');
     p.rod(0,0,.06,.06,.36,'#9aa0a8',.08);p.box(0,0,.5,.48,.08,frame,.42);p.round(0,.02,.5,.48,.1,color,.46);
     p.rod(0,-.22,.05,.05,.2,frame,.46);p.round(0,-.25,.46,.1,.56,color,.6);
@@ -331,7 +334,7 @@ export class World {
   sofa(x,z,face=0,w=2.2,color='#8e2f45',accent='#e0b45e'){const p=this.prop(x,z,face),frame=shade(color,.82),n=Math.max(2,Math.round((w-.4)/.7)),cw=(w-.44)/n;
     for(const sx of [-1,1])for(const sz of [-1,1])p.rod(sx*(w/2-.1),sz*.36,.05,.05,.08,'#3b2f2a');
     p.box(0,0,w,.88,.22,frame,.08);p.box(0,-.37,w,.16,.72,frame,.08);
-    for(let i=0;i<n;i++){const dx=-w/2+.22+cw*(i+.5);p.round(dx,.06,cw-.03,.68,.16,color,.28);p.round(dx,-.26,cw-.04,.2,.44,color,.36);}
+    for(let i=0;i<n;i++){const dx=-w/2+.22+cw*(i+.5),c=Math.round(Math.cos(face)),s=Math.round(Math.sin(face));this.seat(x+dx*c+.1*s,z-dx*s+.1*c,face);p.round(dx,.06,cw-.03,.68,.16,color,.28);p.round(dx,-.26,cw-.04,.2,.44,color,.36);}
     for(const sx of [-1,1]){p.box(sx*(w/2-.11),0,.22,.88,.42,frame,.08);p.round(sx*(w/2-.11),0,.22,.88,.12,frame,.44);}
     p.round(w/2-.5,-.12,.3,.12,.28,accent,.44);}
   // A coffee table with legs and a lower shelf.
@@ -343,14 +346,14 @@ export class World {
   // A bar stool.
   stool(x,z,color='#e07a5f',h=.62){this.rod(x,z,.05,.05,h,'#3b3b3b');this.round(x,z,.34,.34,.03,'#3b3b3b');this.round(x,z,.26,.26,.012,'#55595f',h*.4);this.round(x,z,.38,.38,.07,color,h);}
   // A cinema or stadium seat: base, cushion, tall back, armrests.
-  theatreSeat(x,z,face=0,color='#a3263a'){const p=this.prop(x,z,face);p.box(0,0,.5,.5,.3,'#2b2b2b');p.round(0,.03,.48,.46,.14,color,.3);
+  theatreSeat(x,z,face=0,color='#a3263a'){const p=this.prop(x,z,face);this.seat(x,z,face);p.box(0,0,.5,.5,.3,'#2b2b2b');p.round(0,.03,.48,.46,.14,color,.3);
     p.round(0,-.22,.48,.14,.62,color,.36);for(const sx of [-1,1])p.box(sx*.27,0,.06,.46,.5,'#2b2b2b');}
   // A hospital bed: frame on castors, mattress, pillow, rails, a drip stand.
   hospitalBed(x,z,face=0){const p=this.prop(x,z,face);for(const sx of [-1,1])for(const sz of [-1,1]){p.rod(sx*.42,sz*.85,.05,.05,.3,'#9aa0a8');p.round(sx*.42,sz*.85,.07,.07,.07,'#2b2b2b');}
     p.box(0,0,.96,1.9,.08,'#c9ccd2',.3);p.round(0,0,.9,1.84,.16,'#ffffff',.38);p.round(0,-.7,.6,.3,.14,'#eef3f8',.52);p.box(0,.3,.92,1.1,.06,'#a9d8cf',.52);
     p.box(0,-.95,.96,.06,.55,'#c9ccd2',.3);for(const sx of [-1,1])p.box(sx*.48,.1,.03,.9,.18,'#c9ccd2',.56);p.rod(.65,-.75,.03,.03,1.6,'#9aa0a8');p.round(.65,-.75,.12,.06,.2,'#d8f0ff',1.45);}
   // A wooden pew: seat, back, carved end panels.
-  pew(x,z,w=3,face=0,wood='#8b6a4c'){const p=this.prop(x,z,face);p.box(0,0,w,.42,.06,wood,.42);p.box(0,-.2,w,.06,.5,wood,.48);
+  pew(x,z,w=3,face=0,wood='#8b6a4c'){const p=this.prop(x,z,face);{const c=Math.round(Math.cos(face)),s=Math.round(Math.sin(face));for(let dx=-w/2+.4;dx<=w/2-.3;dx+=.5)this.seat(x+dx*c,z-dx*s,face);}p.box(0,0,w,.42,.06,wood,.42);p.box(0,-.2,w,.06,.5,wood,.48);
     for(const sx of [-1,1]){p.box(sx*(w/2-.03),0,.06,.46,.92,shade(wood,.85));p.round(sx*(w/2-.03),-.2,.08,.12,.1,shade(wood,.85),.92);}p.box(0,.05,w-.1,.04,.3,shade(wood,.85),.08);}
   // A ring light on a stand and a camera on a tripod.
   ringLight(x,z,face=0){const p=this.prop(x,z,face),night=this.daylight().night;p.round(0,0,.36,.36,.03,'#2b2b2b');p.rod(0,0,.04,.04,1.45,'#2b2b2b',.03);
@@ -371,7 +374,7 @@ export class World {
   walls(h,toneZ,toneX,edge=5.35,t=.18){const c=Math.cos(this.angle),s=Math.sin(this.angle),stub=.18;
     this.box(0,-edge,11,t,c>0?h:stub,toneZ);this.box(0,edge,11,t,c<0?h:stub,toneZ);this.box(-edge,0,t,11,s>0?h:stub,toneX);this.box(edge,0,t,11,s<0?h:stub,toneX);}
   human(x,z,skin,{hair='#2b211c',style='curls',outfit='#8ea9a4',pants='#34435e',shoes='#f4f1ea',walk=false,pose=null,heading=0,gait=this.gait,smile=1,build='average',height='average'}={}){
-    pose=EMOTE_2D[pose]||pose;
+    pose=EMOTE_2D[pose]||pose;if(pose==='sit'||pose==='work'){const f=this.seatAt(x,z);if(f!=null)heading=f;}
     // Build widens or narrows the body (hips and shoulders separately); height stretches standing poses.
     const ctx=this.ctx,shape=BUILDS[build]||BUILDS.average,W=shape.w,H=shape.hip,S=shape.shoulders||W;
     if(pose==='faint')pose='sleep';
@@ -567,7 +570,7 @@ export class World {
       this.box(-.7,-4.25,.8,.9,1.85,'#f7f4e8');if(this.fridgeOpen){this.box(-.7,-3.77,.68,.03,1.5,'#849382',.12);for(const y of [.4,.85,1.3])this.box(-.7,-3.72,.65,.14,.06,'#f7f4e8',y);this.box(-.2,-3.55,.08,.55,1.75,'#eee9d8');}this.box(-.7,-3.78,.7,.025,.035,'#bbc4b4',1.2);this.box(-.44,-3.76,.04,.04,.4,'#a4b2a0',.65);
       this.box(2.5,-3.5,1.9,2.5,.45,'#b7a17d');this.box(2.5,-3.5,1.85,2.4,.2,'#fff9ee',.45);this.box(2.5,-3.1,1.85,1.45,.2,'#94b3a3',.65);this.round(2.5,-4.14,1.35,.5,.25,'#ffffff',.65);this.box(2.5,-4.75,2,.24,1.25,'#c6ae87');if(owns('kingBed')){this.box(2.5,-4.8,2.3,.3,1.75,'#7a5a43');for(const dx of [-.6,0,.6])this.round(2.5+dx,-4.66,.45,.08,.45,'#8e6a52',1.15);this.box(2.5,-2.7,1.9,.55,.05,'#d4af37',.86);}
       this.box(4.1,-4,.7,.65,.63,'#dcc5a1');this.rod(4.1,-4,.08,.08,.5,'#d2a765',.63);this.round(4.1,-4,.55,.5,.35,this.lampOff?'#aaa58d':'#ffedb8',.98);
-      this.floor(-2.4,1.5,3.8,3.2,'#e8ecdd',.015);this.box(-3.6,1.5,1.1,2.9,.48,'#b3c5ac');this.box(-3.98,1.5,.3,2.9,1,'#9ab393');for(const z of [.15,2.85])this.box(-3.5,z,1.2,.3,.8,'#afc1a3');for(const z of [.65,1.5,2.35])this.round(-3.55,z,.8,.75,.17,'#d4dec5',.48);if(owns('sectional')){this.box(-2.7,2.55,1.1,.8,.48,'#b3c5ac');this.round(-2.65,2.55,.85,.65,.17,'#d4dec5',.48);}
+      this.floor(-2.4,1.5,3.8,3.2,'#e8ecdd',.015);this.box(-3.6,1.5,1.1,2.9,.48,'#b3c5ac');this.box(-3.98,1.5,.3,2.9,1,'#9ab393');for(const z of [.15,2.85])this.box(-3.5,z,1.2,.3,.8,'#afc1a3');for(const z of [.65,1.5,2.35]){this.round(-3.55,z,.8,.75,.17,'#d4dec5',.48);this.seat(-3.5,z,Math.PI/2);}if(owns('sectional')){this.box(-2.7,2.55,1.1,.8,.48,'#b3c5ac');this.round(-2.65,2.55,.85,.65,.17,'#d4dec5',.48);}
       for(const dx of [-.4,.4])for(const dz of [-.55,.55])this.rod(-1.7+dx,1.5+dz,.08,.08,.48,'#d4a764');this.box(-1.7,1.5,1.2,1.5,.12,'#e7d5b7',.48);this.round(-1.7,1.5,.27,.27,.15,'#b38c63',.6);
       this.box(-2.8,4.4,2.9,.65,.55,'#c4ad8a');if(owns('smartTv')){this.box(-2.8,4.4,2.6,.1,1.35,'#1a1f1d',.62);this.box(-2.8,4.33,2.45,.02,1.2,this.daylight().night?'#5b8fd6':'#7fa6d9',.7);}else{this.box(-2.8,4.4,1.85,.13,1,'#455b4e',.65);this.box(-2.8,4.31,1.65,.025,.8,'#a9c9da',.75);}this.round(-2.8,4.26,.45,.04,.45,'#e7c18a',.9);
       for(const dx of [-.4,.4])for(const dz of [-.4,.4])this.rod(.5+dx,3+dz,.08,.08,.8,'#c99b68');this.box(.5,3,1.5,1.5,.15,'#f7f4e8',.8);this.round(.5,3,.5,.5,.025,'#e1b2da',.96);this.chair(.5,2.1);this.chair(.5,3.9,Math.PI);
@@ -622,7 +625,7 @@ export class World {
     const using=this.state.recovery?.item&&!this.visitedHome,usedDef=using&&ITEMS[this.state.recovery.item]?.use,usedSpot=using&&(ITEMS[this.state.recovery.item]?.extension||(this.state.furniture.find(f=>f.id===this.state.recovery.piece)||this.state.furniture.find(f=>f.item===this.state.recovery.item)));
     let mishap=this.freshMishap(),need=using||this.state.recovery?.act?null:this.state.recovery?.need,active=this.state.active,family=CAREERS[this.state.career].family,pose=(usedDef?usedDef.pose||'watch':null)||(mishap&&!need?MISHAP_POSES[mishap.need]:null)||({energy:'sleep',fun:this.state.recovery?.yacht?'dance':this.pose?.kind==='sit'?'sit':'tv',hygiene:'shower',bladder:'toilet',hunger:'cook',social:'chat'})[need]||(active&&!this.moving?(family==='sport'?'sport':family==='music'||family==='acting'?'perform':'work'):this.pose?.kind);
     const emote=this.emote&&performance.now()<this.emote.until&&!this.moving&&!this.state.recovery&&!this.state.active?this.emote.kind:null;
-    if(emote&&!using)pose=emote;
+    if(emote&&!using)pose=EMOTES[emote]?.pose||emote;
     const actDef=this.state.recovery?.act&&VENUE_ACTS[this.state.recovery.act],actSpot=actDef&&worldObjects(this.location).find(o=>o.act===this.state.recovery.act);if(actDef)pose=actDef.pose;
     const roomSpot=this.state.recovery?.spot&&this.location==='home'&&!this.visitedHome?homeRooms(this.state.home).find(r=>r.slot===this.state.recovery.spot)?.object:null;if(roomSpot)pose=roomSpot.pose;
     if(this.state.recovery?.yacht){pose='dance';}
@@ -652,7 +655,7 @@ export class World {
     const island=this.interior();
     if(island)this.paintIsland(light);
     else if(hasCanvas&&(key!==this.townKey||Math.abs(shift.x)>this.townPad*.8||Math.abs(shift.y)>this.townPad*.8)){this.townKey=key;this.renderTown(ctx);}
-    if(hasCanvas&&!island)this.stamp(this.layers.behind);this.meshes=[];if(island)this.islandTrees();else this.townLife();this.scene();const t1=performance.now();this.meshes.sort((a,b)=>Number(!!a.actor)-Number(!!b.actor)||a.depth-b.depth||a.y-b.y);for(const mesh of this.meshes)this.paintBox(mesh);
+    if(hasCanvas&&!island)this.stamp(this.layers.behind);this.meshes=[];this.seats=[];if(island)this.islandTrees();else this.townLife();this.scene();const t1=performance.now();this.meshes.sort((a,b)=>Number(!!a.actor)-Number(!!b.actor)||a.depth-b.depth||a.y-b.y);for(const mesh of this.meshes)this.paintBox(mesh);
     if(hasCanvas&&!island)this.stamp(this.layers.front);
     this.canvas.dataset.perf=`${this.meshes.length} meshes · scene ${(t1-t0).toFixed(1)}ms · paint ${(performance.now()-t1).toFixed(1)}ms`;
     if(light.dark){ctx.fillStyle=`rgba(24,34,72,${light.dark*.3})`;ctx.fillRect(0,0,r.width,r.height);}
@@ -670,7 +673,7 @@ export class World {
   // Local chat appears as a speech bubble over the speaker for a few seconds.
   // A short face-to-face chat: both gesture for a couple of seconds and the NPC's line pops up.
   talkTo(object,line){const heading=Math.atan2(object.x-this.player.x,object.z-this.player.z);this.heading=heading;this.pose={kind:'gesture',x:this.player.x,z:this.player.z,heading,expires:performance.now()+2600};this.npcTalkUntil=performance.now()+2600;this.say('npc',line);}
-  say(id,text){this.speech??=new Map();this.speech.set(id,{text:String(text).slice(0,70),until:performance.now()+6500});this.draw();}
+  say(id,text){this.onSpeak?.(id,text);this.speech??=new Map();this.speech.set(id,{text:String(text).slice(0,70),until:performance.now()+6500});this.draw();}
   // A toilet facing into the room: pedestal, bowl, seat with water, raised lid and a cistern behind.
   toilet(x,z){this.round(x,z+.05,.36,.46,.3,'#efede4');this.round(x,z,.6,.78,.16,'#fbfaf3',.28);this.round(x,z,.6,.78,.04,'#ffffff',.44);this.round(x,z+.02,.36,.5,.02,'#a9cfd6',.465);this.box(x,z+.36,.52,.05,.5,'#ffffff',.48);this.box(x,z+.5,.66,.24,.6,'#f7f6ec',.3);this.box(x,z+.5,.7,.28,.05,'#ffffff',.9);this.round(x,z+.5,.1,.1,.03,'#c9ccc8',.95);}
   // The new places around the city. Each has its own layout; activities sit at the points in worldObjects.
@@ -886,7 +889,7 @@ export class World {
   inTrainingZone(x,z){const zone=TRAINING_ZONES[this.location];return !!zone&&x>zone[0]&&x<zone[1]&&z>zone[2]&&z<zone[3];}
   paintPeople(){
     const here=TOWN[this.location]||TOWN.home;
-    const clear=this.training();for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride){this.ride(p.trip.ride,t.x,t.z,t.axis,p.trip.ride==='helicopter'?6:0);if(OPEN_RIDES.includes(p.trip.ride))this.human(t.x,t.z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),pose:'sit',seat:.7,heading:t.heading});}else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1)||(clear&&this.inTrainingZone(x,z)))continue;const emoting=p.emote&&!p.moving&&Date.now()+this.serverOffset-p.emote.at<(EMOTES[p.emote.kind]?.ms||0)?p.emote.kind:null;this.human(x,z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait,pose:emoting});}
+    const clear=this.training();for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride){this.ride(p.trip.ride,t.x,t.z,t.axis,p.trip.ride==='helicopter'?6:0);if(OPEN_RIDES.includes(p.trip.ride))this.human(t.x,t.z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),pose:'sit',seat:.7,heading:t.heading});}else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1)||(clear&&this.inTrainingZone(x,z)))continue;const emoting=p.emote&&!p.moving&&Date.now()+this.serverOffset-p.emote.at<(EMOTES[p.emote.kind]?.ms||0)?(EMOTES[p.emote.kind]?.pose||p.emote.kind):null;this.human(x,z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait,pose:emoting});}
   }
   // The home screen: a soft sky and a round lawn under the house, like a dollhouse on a table.
   paintIsland(light){const ctx=this.ctx,g=ctx.createLinearGradient(0,0,0,this.height);g.addColorStop(0,light.night?'#24324d':'#cfe3f4');g.addColorStop(1,light.night?'#3b4a66':'#eef5f9');ctx.fillStyle=g;ctx.fillRect(0,0,this.width,this.height);

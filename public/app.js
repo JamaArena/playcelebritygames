@@ -1,6 +1,7 @@
 import { fanClubSize, PROMPTS, RIVAL, TEAM, TAILOR_COLORS, TATTOOS, VENUE_ACTS, TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace, homeRooms } from './content.js';
 import { World, worldObjects } from './world.js';
 import { World3D } from './world3d.js';
+import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS } from './sound.js';
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=value=>Math.floor(value).toLocaleString();
@@ -55,10 +56,19 @@ function celebrate(a,b){
   if(a.recovery&&!b.recovery){const n=a.recovery.need,gained=Math.round((b.needs[n]||0)-(a.needs[n]||0));if(gained>0){floatReward(`${needs[n][1]} +${gained} ${needs[n][0]}`);return;}}
   const fame=(b.fame||0)-(a.fame||0);if(fame>0)floatReward(`⭐ +${fmt(fame)} fame`);
 }
+// Life events show as a popup in the middle of the screen; Okay closes it. More than one waits its turn.
+const notices=[];
+function showNotice(icon,title,text,delta){notices.push({icon,title,text,delta});if(notices.length===1)nextNotice();}
+function nextNotice(){
+  const n=notices[0];let el=$('#notice');if(!n){if(el)el.hidden=true;return;}
+  if(!el){el=document.createElement('div');el.id='notice';el.className='reward-overlay notice-overlay';document.body.appendChild(el);}
+  el.innerHTML=`<div class="notice-card" role="alertdialog" aria-modal="true" aria-labelledby="noticeTitle" aria-describedby="noticeText"><div class="gem gem-${n.delta<0?'pink':'gold'} notice-gem" aria-hidden="true">${n.icon}</div><h2 id="noticeTitle">${escape(n.title)}</h2><p id="noticeText">${escape(n.text)}</p>${n.delta?`<div class="notice-delta ${n.delta>0?'up':'down'}">${n.delta>0?'+':'−'}${fmt(Math.abs(n.delta))} fame</div>`:''}<button class="game-btn" data-action="noticeOkay">Okay</button></div>`;
+  el.hidden=false;chime('ding');setTimeout(()=>el.querySelector('button')?.focus(),50);
+}
 function showReward(title,subtitle,rewards){
   let el=$('#reward');if(!el){el=document.createElement('div');el.id='reward';el.className='reward-overlay';document.body.appendChild(el);}
   el.innerHTML=`<div class="reward-card" role="dialog" aria-modal="true" aria-labelledby="rewardTitle"><div class="reward-burst" aria-hidden="true"></div><div class="reward-check" aria-hidden="true">✔</div><h2 id="rewardTitle">${escape(title)}</h2><p>${escape(subtitle)}</p><div class="reward-tiles">${rewards.slice(0,4).map((r,i)=>`<div class="reward-tile" style="--i:${i}"><div class="gem gem-${r.gem}">${r.icon}</div><strong>${escape(r.value)}</strong><small>${escape(r.label)}</small></div>`).join('')}</div><button class="game-btn" data-action="collectReward">Collect Rewards</button></div>`;
-  el.hidden=false;setTimeout(()=>el.querySelector('button')?.focus(),50);
+  el.hidden=false;chime('reward');setTimeout(()=>el.querySelector('button')?.focus(),50);
 }
 function floatReward(text){const el=document.createElement('div');el.className='float-reward';el.textContent=text;document.body.appendChild(el);setTimeout(()=>el.remove(),1900);}
 // Glossy app icons: each app gets its own colour.
@@ -87,7 +97,7 @@ let seenLifeEvent=null;
 function showLifeEvent(s){
   const e=s?.lifeEvent,def=e&&LIFE_EVENTS[e.kind];if(!def||seenLifeEvent===e.id)return;const first=seenLifeEvent===null;seenLifeEvent=e.id;
   if(first&&Date.now()+offset-e.at>60_000)return;
-  toast(`${def.icon} ${def.title}! ${e.text}${e.delta?` ${e.delta>0?'+':'−'}${fmt(Math.abs(e.delta))} fame`:''}`);world.say('me',def.icon);
+  showNotice(def.icon,`${def.title}!`,e.text,e.delta);world.say('me',def.icon);
 }
 // Life moments that ask for a choice: a fan's selfie, a journalist's question.
 let seenPrompt=null;
@@ -195,6 +205,8 @@ function makeWorld(){
 }
 const world=makeWorld();
 world.onGround=closeTray;
+// Speech bubbles come with a gibberish voice, pitched per character.
+world.onSpeak=(id,text)=>babble(text,voiceFor(id==='me'?state?.name:id==='npc'?NPCS.find(n=>n.location===state?.location)?.name:id,id==='me'&&['curvy','petite'].includes(state?.build)?'high':undefined));
 world.onPlacement=fits=>{const b=$('#placeHere');if(b){b.disabled=!fits;b.innerHTML=fits?'✓ Place here':'✕ Doesn’t fit here';}};
 // Task queue: tap more things while you're busy and they run one after another.
 // Timed tasks (eating, sleeping, work) finish first; untimed ones (sitting, posing) give way after a few seconds.
@@ -239,6 +251,7 @@ async function startAtObject(input){
 }
 let tripTimer;
 function render(){
+  setMood(state?.trip?'road':state?.location);
   if(!modalPage||modalPage!=='create')tip(state.location==='home'?'home':state.location==='street'||state.trip?'city':'venue');
   // Refresh the moment a trip, practice or recovery finishes instead of waiting for the next heartbeat.
   clearTimeout(tripTimer);const due=Math.min(...[state.trip?.arrives,state.active?.kind==='practice'?state.active.readyAt:null,state.recovery?.endsAt].filter(Boolean));if(Number.isFinite(due))tripTimer=setTimeout(()=>refresh(),Math.max(500,due-now()+400));
@@ -517,6 +530,9 @@ function giftPicker(playerId){
   const p=playerById(playerId),owned=Object.entries(WEAR).filter(([k,w])=>w.fame>0&&state.closet?.[k]);
   showModal('gift',`<span class="eyebrow">SEND A GIFT</span><h2>Something for ${escape(p?.name||'your friend')}</h2><p class="modal-intro">They get their own copy; you keep yours. One gift every 10 minutes.</p><div class="actions">${button('🍢 Suya','gift',`data-player="${playerId}" data-item="suya"`,'primary')}${owned.map(([k,w])=>button(`👕 ${escape(w.name)}`,'gift',`data-player="${playerId}" data-item="${k}"`)).join('')}</div>`);
 }
+// The sound menu: music, voices and effects, and the ambient city sound, each on or off.
+function soundMenu(){const p=soundPrefs(),row=(key,label,on,action='soundToggle')=>`<button class="sound-row" role="switch" aria-checked="${on}" data-action="${action}" data-key="${key}"><span>${label}</span><i class="switch${on?' on':''}" aria-hidden="true"></i></button>`;
+  showTray('🔊 Sound','<div class="sound-rows">'+row('music','🎵 Music',p.music)+row('voices','🗣️ Voices & effects',p.voices)+row('ambience','🌆 City ambience',Boolean(ambience),'ambienceToggle')+'</div>');}
 // Ambient sound: a soft city hum with birds by day or crickets at night, and a beat in party venues. Off by default.
 let ambience=null;
 function toggleAmbience(){
@@ -704,7 +720,7 @@ document.addEventListener('click',async event=>{
     case 'closeTip':closeTip();break;
     case 'wardrobeSlot':wardrobeSlot=d.slot;wardrobe();break;
     case 'emotes':showTray('😀 Emotes','<div class="tray-options emote-menu">'+Object.entries(EMOTES).map(([key,e])=>button(`${e.icon} ${escape(e.label)}`,'emote',`data-emote="${key}"`)).join('')+'</div>');break;
-    case 'emote':{const e=EMOTES[d.emote];if(!e)break;closeTray();if(state.recovery||state.active){toast('Finish what you are doing first.');break;}world.emote={kind:d.emote,until:performance.now()+e.ms};if(d.emote==='selfie')world.say('me','📸 Selfie!');world.draw();send({type:'emote',emote:d.emote},{keepModal:true,quiet:true});break;}
+    case 'emote':{const e=EMOTES[d.emote];if(!e)break;closeTray();if(state.recovery||state.active){toast('Finish what you are doing first.');break;}world.emote={kind:d.emote,until:performance.now()+e.ms};express(EMOTE_SOUNDS[d.emote]);if(d.emote==='selfie')world.say('me','📸 Selfie!');world.draw();send({type:'emote',emote:d.emote},{keepModal:true,quiet:true});break;}
     case 'react':await send({type:'chat',body:d.emoji},{keepModal:true});break;
     case 'unfriend':await send({type:'unfriend',playerId:d.player},{keepModal:true});break;
     case 'playSong':{playSong(Number(d.index));const data=await send({type:'listenMusic',song:d.title},{keepModal:true});if(!data)stopSong();else musicApp();break;}
@@ -727,7 +743,8 @@ document.addEventListener('click',async event=>{
     case 'acceptProposal':case 'declineProposal':await send({type:d.action,playerId:d.player},{keepModal:true});break;
     case 'divorceAsk':showModal('divorce',`<div class="mishap-card"><div class="mishap-icon">💔</div><h2>End your marriage?</h2><p>You will stop sharing in each other's fame.</p><div class="actions">${button('Yes, end it','divorce','','primary')}${button('Keep it','app','data-app="friends"')}</div></div>`,false);break;
     case 'divorce':await send({type:'divorce'});break;
-    case 'ambience':toggleAmbience();break;
+    case 'ambience':soundMenu();break;
+    case 'ambienceToggle':toggleAmbience();soundMenu();break;
     case 'minimap':minimapOn=!minimapOn;try{localStorage.setItem('cg.minimap',minimapOn?'1':'0');}catch{}drawMinimap();break;
     case 'retirePicker':retirePicker();break;
     case 'retire':await send({type:'retire',career:d.career});break;
@@ -753,7 +770,9 @@ document.addEventListener('click',async event=>{
     case 'newLife':newLife();break;
     case 'logout':try{await auth({type:'logout'});}catch(e){toast(e.message);break;}location.reload();break;
     case 'logoutGuest':try{await auth({type:'logout',deleteGuest:true});}catch(e){toast(e.message);break;}location.reload();break;
-    case 'collectReward':{const el=$('#reward');if(el)el.hidden=true;floatReward('✨ Collected!');break;}
+    case 'collectReward':{const el=$('#reward');if(el)el.hidden=true;floatReward('✨ Collected!');chime('coin');break;}
+    case 'noticeOkay':notices.shift();nextNotice();break;
+    case 'soundToggle':setSound(d.key,!soundPrefs()[d.key]);soundMenu();break;
     case 'getUp':await send({type:'cancel'});break;
     case 'travel':await send({type:'travel',location:d.location});break;
     case 'object':world.walkToObject(d.key||d.name);break;

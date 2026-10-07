@@ -194,6 +194,8 @@ export const EMOTES = {
   shoki: {label: 'Shoki dance', icon: '🕺', ms: 9000},
   selfie: {label: 'Take a selfie', icon: '🤳', ms: 5000},
   laugh: {label: 'Laugh', icon: '😂', ms: 4000},
+  huh: {label: 'Huh?', icon: '🤨', ms: 2500, pose: 'chat'},
+  wow: {label: 'Wow!', icon: '😮', ms: 3000, pose: 'victory'},
   cry: {label: 'Cry', icon: '😢', ms: 5000},
   facepalm: {label: 'Facepalm', icon: '🤦', ms: 3500},
   victory: {label: 'Victory', icon: '🙌', ms: 4000},
