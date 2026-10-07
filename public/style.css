@@ -430,3 +430,91 @@ details.v2-more summary{cursor:pointer;font-weight:600;color:#21634e}
 .phone-homebar{flex:none;display:block;width:120px;height:5px;margin:7px auto 6px;padding:0;border:0;border-radius:4px;background:#0005;cursor:pointer}.phone-homebar:hover{background:#0008}
 .piece-count{font-size:11px;color:#5e715a;margin:2px 0 6px}
 .phone-app-screen .phone-status{padding-right:46px}#modal.phone-app-view .modal-close{top:13px;right:16px;width:26px;height:26px;font-size:15px;line-height:1;border-radius:50%;background:#0005;color:#fff}
+
+/* ===== Game skin: rounded type, glossy gems, chunky buttons, rewards ===== */
+/* Fredoka (SIL Open Font License), served from our own origin. */
+@font-face{font-family:'Fredoka';font-style:normal;font-weight:300 700;font-display:swap;src:url(/fonts/fredoka-latin.woff2) format('woff2')}
+:root{--fun:'Fredoka','Segoe UI',system-ui,sans-serif}
+h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie-option,.pie-center,#toast,.app small,.phone-hello strong{font-family:var(--fun)}
+.modal h2,.phone-app h2{font-weight:700;letter-spacing:.2px}
+@keyframes popIn{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.06);opacity:1}100%{transform:scale(1)}}
+@keyframes floatUp{0%{transform:translate(-50%,10px) scale(.8);opacity:0}15%{transform:translate(-50%,0) scale(1.08);opacity:1}100%{transform:translate(-50%,-70px) scale(1);opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shine{0%{background-position:-120% 0}100%{background-position:220% 0}}
+@keyframes stripes{to{background-position:28px 0}}
+
+/* Gems: glossy icon tiles */
+.gem{display:grid;place-items:center;width:64px;height:64px;margin:0 auto;border-radius:20px;font-size:32px;line-height:1;background:radial-gradient(ellipse 36% 22% at 36% 20%,#ffffffa8,#fff0),linear-gradient(160deg,var(--g1,#9fd8ff),var(--g2,#3d8ff0));box-shadow:inset 0 -5px 0 #0002,inset 0 3px 0 #fff7,0 5px 12px #0003}
+.gem-gold{--g1:#ffe98f;--g2:#f2a516}.gem-blue{--g1:#9fdcff;--g2:#2f86f2}.gem-green{--g1:#b4f59a;--g2:#36ad4a}.gem-pink{--g1:#ffc0de;--g2:#e5408f}.gem-purple{--g1:#dcc0ff;--g2:#8a4fe0}
+.gem-card{width:52px;height:52px;font-size:26px;border-radius:16px;margin-bottom:8px;--g1:#e9f6ff;--g2:#bfe1f7}
+
+/* Buttons: chunky glossy pills */
+#app button.primary,#modal button.primary,.object-tray button.primary,.phone-app button.primary{background:linear-gradient(#8ee060,#3fa52b);color:#fff;border:0;border-radius:999px;font-family:var(--fun);font-weight:600;letter-spacing:.2px;text-shadow:0 1px 0 #2a7d1b;box-shadow:inset 0 2px 0 #ffffff80,inset 0 -3px 0 #2c7f1c,0 4px 10px #2c7f1c40;transition:transform .08s,filter .15s}
+#app button.primary:hover,#modal button.primary:hover,.object-tray button.primary:hover{filter:brightness(1.06)}
+#app button.primary:active,#modal button.primary:active,.object-tray button.primary:active{transform:translateY(2px);box-shadow:inset 0 2px 0 #ffffff60,inset 0 -1px 0 #2c7f1c,0 2px 5px #2c7f1c40}
+.item-card button:not(.primary),.tray-options button:not(.primary),#modal .actions button:not(.primary),.idle-actions button:not(.primary),.v2-actions button:not(.primary){background:linear-gradient(#fff,#e7f3fb);color:#24506b;border:2px solid #fff;border-radius:999px;font-family:var(--fun);font-weight:600;box-shadow:inset 0 -3px 0 #c6dcea,0 3px 8px #24506b22}
+.item-card button:disabled,.tray-options button:disabled,#modal button.primary:disabled{background:linear-gradient(#f1f1ee,#dedfd8);color:#8a9088;text-shadow:none;box-shadow:inset 0 -3px 0 #c9cbc2;opacity:1}
+.game-btn{font-family:var(--fun);font-weight:700;font-size:20px;color:#fff;padding:14px 48px;border:0;border-radius:999px;background:linear-gradient(#a6e86a,#4fb52a);box-shadow:inset 0 3px 0 #ffffff90,inset 0 -5px 0 #2f8a17,0 8px 20px #0006;text-shadow:0 2px 0 #2f8a17;cursor:pointer;animation:popIn .4s .55s both}
+.game-btn:active{transform:translateY(3px);box-shadow:inset 0 3px 0 #ffffff90,inset 0 -2px 0 #2f8a17,0 4px 10px #0006}
+
+/* Cards and tiles */
+.item-card{text-align:center;border-radius:18px;background:linear-gradient(#ffffff,#f2f8fc);border:2px solid #fff;box-shadow:0 4px 0 #d6e5ee,0 10px 22px #0000000f}
+.item-card h3{font-family:var(--fun);font-weight:600}
+.shop-price{display:inline-block;margin:4px auto 8px;padding:3px 10px;border-radius:999px;background:linear-gradient(#fff3c2,#ffd86b);color:#7a5200;font-weight:600;box-shadow:inset 0 -2px 0 #e7b53c}
+.v2-tile{border-radius:18px;border:2px solid #fff;box-shadow:0 4px 0 #dde7e2,0 8px 18px #00000010}
+.v2-tile>span{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;font-size:20px;background:radial-gradient(ellipse 36% 22% at 36% 20%,#ffffffa8,#fff0),linear-gradient(160deg,#ffe98f,#f2a516);box-shadow:inset 0 -3px 0 #0002,inset 0 2px 0 #fff7,0 3px 8px #0002}
+.v2-tile:nth-child(5n+2)>span{background:radial-gradient(ellipse 36% 22% at 36% 20%,#ffffffa8,#fff0),linear-gradient(160deg,#ffc0de,#e5408f)}
+.v2-tile:nth-child(5n+3)>span{background:radial-gradient(ellipse 36% 22% at 36% 20%,#ffffffa8,#fff0),linear-gradient(160deg,#9fdcff,#2f86f2)}
+.v2-tile:nth-child(5n+4)>span{background:radial-gradient(ellipse 36% 22% at 36% 20%,#ffffffa8,#fff0),linear-gradient(160deg,#b4f59a,#36ad4a)}
+.v2-tile:nth-child(5n+5)>span{background:radial-gradient(ellipse 36% 22% at 36% 20%,#ffffffa8,#fff0),linear-gradient(160deg,#dcc0ff,#8a4fe0)}
+.v2-tile strong{font-size:20px;font-weight:700}
+
+/* Achievements: medals with ribbons */
+.v2-awards{display:grid;grid-template-columns:repeat(auto-fill,minmax(86px,1fr));gap:14px 8px}
+.v2-award{display:grid;justify-items:center;gap:6px;text-align:center;font-family:var(--fun);font-size:11px;font-weight:600;color:#3a3020;background:none;border:0;padding:0;line-height:1.2}
+.v2-award>span{position:relative;display:grid;place-items:center;width:58px;height:58px;border-radius:50%;font-size:26px;background:radial-gradient(ellipse 34% 22% at 36% 24%,#ffffffb0,#fff0),linear-gradient(145deg,#ffe98f,#e7a113 60%,#c57f06);border:3px solid #fff1b8;box-shadow:inset 0 -4px 0 #0002,0 4px 0 #b06f05,0 8px 16px #0003;animation:popIn .4s both}
+.v2-award>span::before,.v2-award>span::after{content:'';position:absolute;bottom:-14px;width:14px;height:22px;background:linear-gradient(#e5484d,#b8262b);z-index:-1;clip-path:polygon(0 0,100% 0,100% 100%,50% 75%,0 100%)}
+.v2-award>span::before{left:12px;transform:rotate(14deg)}.v2-award>span::after{right:12px;transform:rotate(-14deg);background:linear-gradient(#2f86f2,#1d5fb8)}
+
+/* Phone: glossy app icons */
+.app span{background:radial-gradient(ellipse 36% 22% at 36% 18%,#ffffff99,#fff0),linear-gradient(160deg,color-mix(in srgb,var(--a,#5b7cfa) 55%,#fff),var(--a,#5b7cfa));box-shadow:inset 0 -4px 0 #0003,inset 0 2px 0 #fff6,0 5px 12px #0003;border:0;transition:transform .12s}
+.app:hover span{transform:translateY(-2px) scale(1.05)}
+.app small{font-weight:600}
+
+/* Needs: icon gems and chunky bars */
+.need-bar{display:grid;grid-template-columns:22px 1fr;grid-template-rows:auto auto;column-gap:5px;align-items:center}
+.need-bar .need-gem{grid-row:span 2;display:grid;place-items:center;width:22px;height:22px;border-radius:8px;font-size:12px;font-style:normal;background:radial-gradient(ellipse 36% 22% at 36% 20%,#ffffffa8,#fff0),linear-gradient(160deg,#e9f6ff,#bfe1f7);box-shadow:inset 0 -2px 0 #0002,0 2px 4px #0002}
+.need-bar label{font-family:var(--fun);font-weight:600}
+.need-bar i{height:7px!important;border-radius:999px!important;box-shadow:inset 0 1px 2px #0003}
+
+/* Activity: gem icon, striped progress */
+.sim-status>span{display:grid;place-items:center;flex:none;width:36px;height:36px;border-radius:12px;font-size:19px;background:radial-gradient(ellipse 36% 22% at 36% 20%,#ffffffa8,#fff0),linear-gradient(160deg,#ffe98f,#f2a516);box-shadow:inset 0 -3px 0 #0002,0 3px 8px #0002}
+.sim-progress{height:9px;border-radius:999px;box-shadow:inset 0 1px 3px #0003}
+.sim-progress i{background:repeating-linear-gradient(-45deg,#5fc23a 0 10px,#4fb52a 10px 20px);border-radius:999px;animation:stripes .8s linear infinite}
+.sim-choice{border-radius:16px;border:2px solid #fff;background:linear-gradient(#ffffff,#eaf5ee);box-shadow:0 4px 0 #cfe2d4,0 6px 14px #0001;font-family:var(--fun)}
+.sim-choice:active{transform:translateY(2px)}
+
+/* Toast: a bouncy bubble */
+#toast{border-radius:18px;background:linear-gradient(135deg,#3a2f8f,#7b4fe0);border:2px solid #ffffff40;font-weight:500;font-size:13px;box-shadow:0 10px 30px #3a2f8f55;animation:popIn .3s both}
+
+/* Pie menu options */
+.pie-option{border-radius:999px!important;border:2px solid #fff!important;background:linear-gradient(#fff,#eaf5fb)!important;box-shadow:inset 0 -3px 0 #c6dcea,0 4px 10px #0002!important;font-weight:600}
+.pie-center{background:linear-gradient(#2c6e57,#183c32)!important;color:#fff!important;border:2px solid #fff!important;font-weight:600}
+
+/* Reward celebration */
+.reward-overlay{position:fixed;inset:0;z-index:80;display:grid;place-items:center;background:radial-gradient(circle at 50% 38%,#0000001a 0,#000000b0 75%);backdrop-filter:blur(3px)}
+.reward-overlay[hidden]{display:none}
+.reward-card{position:relative;isolation:isolate;width:min(600px,calc(100vw - 20px));text-align:center;color:#fff;padding:10px 8px 20px}
+.reward-burst{position:absolute;left:50%;top:-40px;width:340px;height:340px;margin-left:-170px;z-index:-1;border-radius:50%;background:repeating-conic-gradient(#ffffff2e 0 9deg,#fff0 9deg 22deg);-webkit-mask:radial-gradient(#000 25%,#0000 68%);mask:radial-gradient(#000 25%,#0000 68%);animation:spin 14s linear infinite}
+.reward-check{display:grid;place-items:center;width:84px;height:84px;margin:0 auto;border-radius:26px;font-size:50px;color:#fff;background:radial-gradient(ellipse 36% 22% at 36% 20%,#ffffffa8,#fff0),linear-gradient(160deg,#ff9ad0,#e0368a);box-shadow:inset 0 -6px 0 #0002,0 0 0 6px #ffffff30,0 0 40px #ff7ac0aa;transform:rotate(-8deg);animation:popIn .45s both}
+.reward-card h2{margin:12px 0 2px;font-family:var(--fun);font-weight:700;font-size:40px;color:#fff;text-shadow:0 3px 0 #00000055,0 0 24px #ffffff55;animation:popIn .4s .1s both}
+.reward-card>p{margin:0 0 16px;font-family:var(--fun);font-size:17px;font-weight:600;color:#fff;text-shadow:0 2px 0 #0006}
+.reward-tiles{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:24px}
+.reward-tile{width:148px;max-width:calc(33vw - 14px);padding:16px 8px 8px;border-radius:16px;border:3px solid #fff;background:linear-gradient(#f0f9ff,#c6e6fa);box-shadow:0 6px 0 #8fbfdd,0 14px 28px #0005;color:#23405a;animation:popIn .45s both;animation-delay:calc(var(--i) * .12s + .2s)}
+.reward-tile strong{display:block;margin-top:10px;font-family:var(--fun);font-weight:700;font-size:21px}
+.reward-tile small{display:block;margin-top:8px;padding:5px 4px;border-radius:9px;background:#fff;font-family:var(--fun);font-weight:600;font-size:12px;color:#38566e;text-transform:capitalize;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.float-reward{position:fixed;left:50%;top:92px;z-index:85;padding:8px 18px;border-radius:999px;font-family:var(--fun);font-weight:700;font-size:17px;color:#7a4b00;background:linear-gradient(#fff6c9,#ffd45e);border:2px solid #fff;box-shadow:0 6px 18px #0003;pointer-events:none;white-space:nowrap;animation:floatUp 1.8s ease-out both}
+@media(max-width:620px){.reward-card h2{font-size:32px}.reward-tile{padding:12px 6px 6px}.reward-tile .gem{width:52px;height:52px;font-size:26px}.reward-tile strong{font-size:17px}.game-btn{font-size:18px;padding:13px 38px}}
+@media(prefers-reduced-motion:reduce){.reward-burst,.sim-progress i{animation:none}.reward-tile,.reward-check,.reward-card h2,.game-btn,.v2-award>span,#toast{animation:none}.float-reward{animation-duration:.01s}}
+.phone-device:not(.skin-basic) .app span{background:radial-gradient(ellipse 36% 22% at 36% 18%,#ffffff99,#fff0),linear-gradient(160deg,color-mix(in srgb,var(--a,#5b7cfa) 55%,#fff),var(--a,#5b7cfa));border:0;box-shadow:inset 0 -4px 0 #0003,inset 0 2px 0 #fff6,0 5px 12px #0004;backdrop-filter:none}
+.v2-award{gap:18px}#modal h1,#modal h2,#modal h3,.phone-app h2,.phone-app h3,.object-tray h3,.topbar h1,.loading h1{font-family:var(--fun)!important;font-weight:700}

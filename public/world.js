@@ -71,30 +71,30 @@ const REGULARS={
 const TRAINING_ZONES={stadium:[-3.9,3.9,-4.4,4.4],sports:[-3.3,3.3,-4.3,4.3],studio:[1,4.7,-4.3,-.9],creator:[1,4.7,-4.3,-.9],tech:[1,4.7,-4.3,-.9]};
 export const worldObjects = (location,furniture=[],owned=[],home) => ({
   home:[
-    {name:'Kitchen',icon:'♨',x:-3.6,z:-2.5,vx:-3.2,vz:-4,need:'hunger',verb:'Cook & eat'},
-    {name:'Bed',icon:'☾',x:2.6,z:-1.8,vx:2.5,vz:-3.5,need:'energy',verb:'Sleep',pose:'sleep'},
-    {name:'Sofa',icon:'♡',x:-2.8,z:.3,vx:-3.6,vz:1.5,need:'fun',verb:'Sit & relax',pose:'sit',face:Math.PI/2},
-    {name:'Shower',icon:'♧',x:4,z:1.5,vx:4.3,vz:.4,need:'hygiene',verb:'Shower'},
-    {name:'Toilet',icon:'◡',x:4,z:2.35,vx:4.1,vz:3.3,need:'bladder',verb:'Use toilet',pose:'sit'},
-    {name:'Dining chair',icon:'♙',x:.1,z:1.4,vx:.5,vz:2.1,verb:'Sit',pose:'sit'},
-    {name:'Guest chair',icon:'♙',x:1.6,z:3.9,vx:.5,vz:3.9,verb:'Sit',pose:'sit',face:Math.PI},
-    {name:'Dining table',icon:'♨',x:.1,z:1.4,vx:.5,vz:3,verb:'Sit at table',pose:'dine'},
-    {name:'Television',icon:'▷',x:-2.8,z:3.7,vx:-2.8,vz:4.4,verb:'Watch TV',need:'fun',pose:'tv',face:SOFA_TV_FACE},
-    {name:'Fridge',icon:'❄',x:-.7,z:-3,vx:-.7,vz:-4.25,verb:'Open fridge'},
-    {name:'Bedside lamp',icon:'☀',x:4.1,z:-3.2,vx:4.1,vz:-4,verb:'Switch light'},
+    {name:'Kitchen',icon:'🍳',x:-3.6,z:-2.5,vx:-3.2,vz:-4,need:'hunger',verb:'Cook & eat'},
+    {name:'Bed',icon:'🛏️',x:2.6,z:-1.8,vx:2.5,vz:-3.5,need:'energy',verb:'Sleep',pose:'sleep'},
+    {name:'Sofa',icon:'🛋️',x:-2.8,z:.3,vx:-3.6,vz:1.5,need:'fun',verb:'Sit & relax',pose:'sit',face:Math.PI/2},
+    {name:'Shower',icon:'🚿',x:4,z:1.5,vx:4.3,vz:.4,need:'hygiene',verb:'Shower'},
+    {name:'Toilet',icon:'🚽',x:4,z:2.35,vx:4.1,vz:3.3,need:'bladder',verb:'Use toilet',pose:'sit'},
+    {name:'Dining chair',icon:'🪑',x:.1,z:1.4,vx:.5,vz:2.1,verb:'Sit',pose:'sit'},
+    {name:'Guest chair',icon:'🪑',x:1.6,z:3.9,vx:.5,vz:3.9,verb:'Sit',pose:'sit',face:Math.PI},
+    {name:'Dining table',icon:'🍽️',x:.1,z:1.4,vx:.5,vz:3,verb:'Sit at table',pose:'dine'},
+    {name:'Television',icon:'📺',x:-2.8,z:3.7,vx:-2.8,vz:4.4,verb:'Watch TV',need:'fun',pose:'tv',face:SOFA_TV_FACE},
+    {name:'Fridge',icon:'🧊',x:-.7,z:-3,vx:-.7,vz:-4.25,verb:'Open fridge'},
+    {name:'Bedside lamp',icon:'💡',x:4.1,z:-3.2,vx:4.1,vz:-4,verb:'Switch light'},
     {name:'Coffee table',icon:'☕',x:-.8,z:1.5,vx:-1.7,vz:1.5,verb:'Have a seat',pose:'sit',face:Math.PI/2},
-    {name:'Window',icon:'☀',x:-4.5,z:-1.8,vx:-5.2,vz:-2.5,verb:'Enjoy the view'},
-    {name:'Living plant',icon:'❀',x:-3.8,z:-.8,vx:-4.3,vz:-.8,verb:'Water plant'},
-    {name:'Bedroom plant',icon:'❀',x:3.6,z:-1.2,vx:4.35,vz:-1.2,verb:'Water plant'},
-    {name:'Work desk',icon:'⌘',x:.5,z:-3.1,vx:.5,vz:-4.2,action:'practice'},
+    {name:'Window',icon:'🪟',x:-4.5,z:-1.8,vx:-5.2,vz:-2.5,verb:'Enjoy the view'},
+    {name:'Living plant',icon:'🪴',x:-3.8,z:-.8,vx:-4.3,vz:-.8,verb:'Water plant'},
+    {name:'Bedroom plant',icon:'🪴',x:3.6,z:-1.2,vx:4.35,vz:-1.2,verb:'Water plant'},
+    {name:'Work desk',icon:'💻',x:.5,z:-3.1,vx:.5,vz:-4.2,action:'practice'},
     {name:'Front door',icon:'🚪',x:-4.6,z:3.6,vx:-5.1,vz:3.6,action:'exit'},
-    ...homeRooms(home).map(({object:o})=>({name:o.name,icon:o.icon,x:o.x,z:o.z,vx:o.vx,vz:o.vz,need:o.need,verb:o.verb,pose:o.pose,face:o.face,action:o.action,spot:o.spot})),
+    ...homeRooms(home).map(({object:o})=>({key:`room:${o.spot}`,name:o.name,icon:o.icon,x:o.x,z:o.z,vx:o.vx,vz:o.vz,need:o.need,verb:o.verb,pose:o.pose,face:o.face,action:o.action,spot:o.spot})),
     ...furniture.map((f,i)=>{const def=ITEMS[f.item]||{},use=def.use;
       const piece={key:`f:${f.id??i}`,furniture:f.item,piece:f.id};
-      if(f.item==='chair')return {...piece,name:'Chair',icon:'♙',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Sit',pose:'sit'};
+      if(f.item==='chair')return {...piece,name:'Chair',icon:'🪑',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Sit',pose:'sit'};
       if(f.item==='wardrobe')return {...piece,name:'Wardrobe',icon:'👗',x:f.x,z:f.z+.75,vx:f.x,vz:f.z,action:'wardrobe'};
       if(use)return {...piece,name:def.name,icon:use.icon,x:f.x,z:f.z+.75,vx:f.x,vz:f.z,verb:use.verb,item:f.item,useItem:true,amount:use.amount,useNeed:use.need};
-      return {...piece,name:def.name||'Shelf',icon:'◇',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Admire',pose:null};}),
+      return {...piece,name:def.name||'Shelf',icon:'🏆',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Admire',pose:null};}),
     ...Object.entries(ITEMS).filter(([key,def])=>def.extension&&owned.includes(key)).map(([key,def])=>({name:def.name,icon:def.use.icon,...extensionSpot(key,home),face:undefined,verb:def.use.verb,item:key,useItem:true,remote:true,amount:def.use.amount,useNeed:def.use.need})),
   ],
   nightclub:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.tourNightclub.name,icon:VENUE_ACTS.tourNightclub.icon,x:0,z:-3.4,act:'tourNightclub',face:0},{name:VENUE_ACTS.dance.name,icon:VENUE_ACTS.dance.icon,x:0,z:-0.4,act:'dance',face:0},{name:VENUE_ACTS.djSet.name,icon:VENUE_ACTS.djSet.icon,x:0,z:-2.9,act:'djSet',face:0},{name:VENUE_ACTS.bar.name,icon:VENUE_ACTS.bar.icon,x:-3.1,z:0.4,act:'bar',face:-1.5708}],
@@ -112,12 +112,12 @@ export const worldObjects = (location,furniture=[],owned=[],home) => ({
   park:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.ludo.name,icon:VENUE_ACTS.ludo.icon,x:-0.4,z:-3.6,act:'ludo',face:0},{name:VENUE_ACTS.jog.name,icon:VENUE_ACTS.jog.icon,x:0,z:2.4,act:'jog',face:0},{name:VENUE_ACTS.picnic.name,icon:VENUE_ACTS.picnic.icon,x:-2.6,z:-2,act:'picnic',face:0},{name:VENUE_ACTS.yoga.name,icon:VENUE_ACTS.yoga.icon,x:2.6,z:-2.6,act:'yoga',face:0}],
   airport:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.flight.name,icon:VENUE_ACTS.flight.icon,x:0,z:1.4,act:'flight',face:3.1416}],
   beach:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.swim.name,icon:VENUE_ACTS.swim.icon,x:0,z:3.6,act:'swim',face:0},{name:VENUE_ACTS.sunbathe.name,icon:VENUE_ACTS.sunbathe.icon,x:-2.6,z:0.2,act:'sunbathe',face:0},{name:VENUE_ACTS.beachBall.name,icon:VENUE_ACTS.beachBall.icon,x:2.6,z:-1.6,act:'beachBall',face:0}],
-  sports:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:'Training pitch',icon:'⚽',x:0,z:-1,action:'practice'},{name:'Clubhouse',icon:'⌂',x:-3,z:-2.1,action:'career'},{name:'Scout Kai',icon:'☺',x:3.4,z:2,action:'phone'}],
-  studio:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:'Recording desk',icon:'♫',x:-3.2,z:-2.3,action:'career'},{name:'Rehearsal stage',icon:'♬',x:2.5,z:-2,action:'practice'},{name:'Producer Nova',icon:'☺',x:2.5,z:2,action:'phone'}],
-  creator:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:'Director Sola',icon:'☺',x:-2.6,z:1.8,action:'phone'},{name:'Camera set',icon:'▷',x:-2,z:-1,action:'career'},{name:'Editing station',icon:'⌘',x:3,z:-2,action:'practice'},{name:'Lounge',icon:'▱',x:1,z:3,need:'social'}],
-  tech:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:VENUE_ACTS.tokenLaunch.name,icon:VENUE_ACTS.tokenLaunch.icon,x:1.6,z:1,act:'tokenLaunch',face:3.1416},{name:VENUE_ACTS.hackathon.name,icon:VENUE_ACTS.hackathon.icon,x:-1.6,z:-1.2,act:'hackathon',face:3.1416},{name:VENUE_ACTS.pitch.name,icon:VENUE_ACTS.pitch.icon,x:0.4,z:-0.6,act:'pitch',face:3.1416},{name:'Project desk',icon:'⌘',x:-3.2,z:-2.3,action:'career'},{name:'Practice lab',icon:'⬡',x:2.5,z:-2,action:'practice'},{name:'Builder Ari',icon:'☺',x:2,z:2,action:'phone'}],
+  sports:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:'Training pitch',icon:'⚽',x:0,z:-1,action:'practice'},{name:'Clubhouse',icon:'🏟️',x:-3,z:-2.1,action:'career'},{name:'Scout Kai',icon:'🧑',x:3.4,z:2,action:'phone'}],
+  studio:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:'Recording desk',icon:'🎚️',x:-3.2,z:-2.3,action:'career'},{name:'Rehearsal stage',icon:'🎤',x:2.5,z:-2,action:'practice'},{name:'Producer Nova',icon:'🧑',x:2.5,z:2,action:'phone'}],
+  creator:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:'Director Sola',icon:'🧑',x:-2.6,z:1.8,action:'phone'},{name:'Camera set',icon:'🎥',x:-2,z:-1,action:'career'},{name:'Editing station',icon:'🖥️',x:3,z:-2,action:'practice'},{name:'Lounge',icon:'🛋️',x:1,z:3,need:'social'}],
+  tech:[{name:'Exit',icon:'🚪',x:2.4,z:4.6,action:'leave'},{name:VENUE_ACTS.tokenLaunch.name,icon:VENUE_ACTS.tokenLaunch.icon,x:1.6,z:1,act:'tokenLaunch',face:3.1416},{name:VENUE_ACTS.hackathon.name,icon:VENUE_ACTS.hackathon.icon,x:-1.6,z:-1.2,act:'hackathon',face:3.1416},{name:VENUE_ACTS.pitch.name,icon:VENUE_ACTS.pitch.icon,x:0.4,z:-0.6,act:'pitch',face:3.1416},{name:'Project desk',icon:'💻',x:-3.2,z:-2.3,action:'career'},{name:'Practice lab',icon:'🧪',x:2.5,z:-2,action:'practice'},{name:'Builder Ari',icon:'🧑',x:2,z:2,action:'phone'}],
   street:[{name:'Front door',icon:'🚪',x:0,z:5.9,action:'enter'}],
-  plaza:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:'Palm Realty estate agent',icon:'🏡',x:-1.2,z:3.8,action:'estate'},{name:'City shop',icon:'◇',x:-3,z:-1.7,action:'shop'},{name:'Palm Motors',icon:'🏁',x:3.3,z:2.75,action:'vip'},{name:'Café',icon:'♨',x:3,z:-1.7,need:'social'},{name:'Park bench',icon:'▱',x:-2.5,z:1.6,need:'fun'},{name:'Creator Mika',icon:'☺',x:2.5,z:2.6,action:'phone'}],
+  plaza:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:'Palm Realty estate agent',icon:'🏡',x:-1.2,z:3.8,action:'estate'},{name:'City shop',icon:'🛍️',x:-3,z:-1.7,action:'shop'},{name:'Palm Motors',icon:'🏁',x:3.3,z:2.75,action:'vip'},{name:'Café',icon:'☕',x:3,z:-1.7,need:'social'},{name:'Park bench',icon:'🪑',x:-2.5,z:1.6,need:'fun'},{name:'Creator Mika',icon:'🧑',x:2.5,z:2.6,action:'phone'}],
 }[location]||[]).map(o=>({...o,key:o.key||o.name,label:OBJECT_LABELS[o.name]||o.name}));
 // Things are called what they are: a chair is a chair, wherever it stands.
 const OBJECT_LABELS={'Dining chair':'Chair','Guest chair':'Chair','Dining table':'Table','Coffee table':'Table','Bedside lamp':'Lamp','Living plant':'Plant','Bedroom plant':'Plant','Work desk':'Desk','Front door':'Door','Television':'TV'};
@@ -212,7 +212,7 @@ export class World {
       if(this.effect&&['shoot','shot','pass','drive','dribble'].includes(this.effect.action)){const f=Math.min(1,(performance.now()-this.effect.start)/1200);x+=(this.effect.action==='pass'?3-a.x:(this.effect.success?0:2)-a.x)*f;z+=(-4-a.z)*f;y+=Math.sin(f*Math.PI)*1.6;}
       const p=this.project(x,y,z),radius=this.scale*.115;ctx.fillStyle=this.state.career==='basketball'?'#db995d':'#f8f9ee';ctx.beginPath();ctx.arc(p.x,p.y,radius,0,Math.PI*2);ctx.fill();ctx.fillStyle='#54675a';ctx.beginPath();ctx.arc(p.x-radius*.3,p.y-radius*.2,radius*.3,0,Math.PI*2);ctx.fill();
     }
-    if(need||active){const p=this.project(a.x,2.15,a.z),end=need?this.state.recovery.endsAt:active.readyAt,start=need?this.state.recovery.startedAt??end-B.recovery[need][1]:active.kind==='practice'?active.startedAt:end-active.interval,f=Math.max(0,Math.min(1,(Date.now()+this.serverOffset-start)/(end-start)));ctx.beginPath();ctx.arc(p.x,p.y,15,0,Math.PI*2);ctx.fillStyle='#fffef3ed';ctx.fill();ctx.beginPath();ctx.arc(p.x,p.y,17,-Math.PI/2,-Math.PI/2+Math.PI*2*f);ctx.lineWidth=3;ctx.strokeStyle='#83ac89';ctx.stroke();ctx.font='16px Segoe UI';ctx.textAlign='center';ctx.fillStyle='#436b51';ctx.fillText(need?({energy:'Z',hunger:'♨',hygiene:'💧',bladder:'◡',fun:'▷',social:'♡'})[need]:CAREERS[this.state.career].icon,p.x,p.y+5);}
+    if(need||active){const p=this.project(a.x,2.15,a.z),end=need?this.state.recovery.endsAt:active.readyAt,start=need?this.state.recovery.startedAt??end-B.recovery[need][1]:active.kind==='practice'?active.startedAt:end-active.interval,f=Math.max(0,Math.min(1,(Date.now()+this.serverOffset-start)/(end-start)));ctx.beginPath();ctx.arc(p.x,p.y,15,0,Math.PI*2);ctx.fillStyle='#fffef3ed';ctx.fill();ctx.beginPath();ctx.arc(p.x,p.y,17,-Math.PI/2,-Math.PI/2+Math.PI*2*f);ctx.lineWidth=3;ctx.strokeStyle='#83ac89';ctx.stroke();ctx.font='16px Segoe UI';ctx.textAlign='center';ctx.fillStyle='#436b51';ctx.fillText(need?({energy:'💤',hunger:'🍗',hygiene:'💧',bladder:'🚽',fun:'🎉',social:'💬'})[need]:CAREERS[this.state.career].icon,p.x,p.y+5);}
     this.choiceTargets=[];
     if(active?.kind!=='practice'&&active?.choices&&active.beat<active.totalBeats&&Date.now()+this.serverOffset>=active.readyAt&&CAREERS[this.state.career].family==='sport')for(const [index,choice]of active.choices.entries()){
       const target=choice.action==='shoot'||choice.action==='shot'?{x:0,z:-4}:choice.action==='pass'?{x:index===1?-2.2:2.2,z:-2.5}:{x:(index-2)*1.1,z:.6},screen=this.project(target.x,.2,target.z);this.choiceTargets.push({index,screen});ctx.fillStyle='#f7fff0df';ctx.beginPath();ctx.arc(screen.x,screen.y,16,0,Math.PI*2);ctx.fill();ctx.strokeStyle='#7caa84';ctx.lineWidth=2;ctx.stroke();ctx.font='bold 10px Segoe UI';ctx.fillStyle='#345e48';ctx.textAlign='center';ctx.fillText(String(index+1),screen.x,screen.y+4);
@@ -588,7 +588,7 @@ export class World {
     if(this.moving){const t=this.project(this.target.x,.03,this.target.z);ctx.strokeStyle='#fff8';ctx.lineWidth=1.3;ctx.beginPath();ctx.ellipse(t.x,t.y,7,3.5,0,0,Math.PI*2);ctx.stroke();}
     this.hits=[...worldObjects(this.location,this.visitedHome?.furniture||this.state.furniture,this.visitedHome?[]:Object.keys(this.state.inventory||{}),this.homeKey()).map(object=>({...object,screen:this.project(object.vx??object.x,.6,object.vz??object.z)})),...this.petHits()];
     this.hitRadius=Math.max(14,Math.min(30,this.scale*.42));
-    ctx.font='600 10px Segoe UI';for(const o of this.hits.filter(o=>o.key===this.hover?.key)){const p=o.screen;const width=ctx.measureText(o.label).width+14;ctx.fillStyle='#fff9';ctx.beginPath();ctx.roundRect(p.x-width/2,p.y+13,width,17,8);ctx.fill();ctx.fillStyle='#49614f';ctx.fillText(o.label,p.x,p.y+25);}
+    ctx.font='600 10px Segoe UI';for(const o of this.hits.filter(o=>this.hover&&(o.key??o.name)===(this.hover.key??this.hover.name))){const p=o.screen;const width=ctx.measureText((o.label||o.name)).width+14;ctx.fillStyle='#fff9';ctx.beginPath();ctx.roundRect(p.x-width/2,p.y+13,width,17,8);ctx.fill();ctx.fillStyle='#49614f';ctx.fillText((o.label||o.name),p.x,p.y+25);}
   }
   // Local chat appears as a speech bubble over the speaker for a few seconds.
   // A short face-to-face chat: both gesture for a couple of seconds and the NPC's line pops up.
@@ -828,7 +828,7 @@ export class World {
     const npc=NPCS.find(n=>n.location===this.location),spot=npc&&worldObjects(this.location).find(o=>o.action==='phone');if(npc&&this.zoom>=.55)tag(spot?.x??2.5,spot?.z??2,`${npc.role} ${npc.name}`);
     const here=TOWN[this.location]||TOWN.home;this.peopleHits=[];
     for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1))continue;this.peopleHits.push({player:p,screen:this.project(x,1.1,z)});if((p.location===this.location&&this.zoom>=.45)||this.zoom>=.85||this.hover?.player?.id===p.id)tag(x,z,(this.friends?.includes(p.id)?'♥ ':'')+(p.crew?.badge?p.crew.badge+' ':'')+p.name);}
-    this.houseHits=[];if(!this.interior())for(const [index,owner] of this.owners||[]){const h=CITY.houses[index],x=h.x-here.x,z=h.z-here.z;if(!this.onScreen(x,z,2))continue;const screen=this.project(x,h.h+.9,z);this.houseHits.push({house:owner,screen});if(this.zoom>=.5||this.hover?.house?.id===owner.id){ctx.font='600 9px Segoe UI';ctx.textAlign='center';const label=`⌂ ${owner.name}`,w=ctx.measureText(label).width+14;ctx.fillStyle='#153d32d9';ctx.beginPath();ctx.roundRect(screen.x-w/2,screen.y-8,w,16,8);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(label,screen.x,screen.y+3);}}
+    this.houseHits=[];if(!this.interior())for(const [index,owner] of this.owners||[]){const h=CITY.houses[index],x=h.x-here.x,z=h.z-here.z;if(!this.onScreen(x,z,2))continue;const screen=this.project(x,h.h+.9,z);this.houseHits.push({house:owner,screen});if(this.zoom>=.5||this.hover?.house?.id===owner.id){ctx.font='600 9px Segoe UI';ctx.textAlign='center';const label=`🏠 ${owner.name}`,w=ctx.measureText(label).width+14;ctx.fillStyle='#153d32d9';ctx.beginPath();ctx.roundRect(screen.x-w/2,screen.y-8,w,16,8);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(label,screen.x,screen.y+3);}}
     if(!this.interior())for(const b of this.billboards||[]){const here=TOWN[this.location]||TOWN.home,p=this.project(b.x,7.1,b.z);if(p.x<-60||p.x>this.width+60||p.y<-30||p.y>this.height+30)continue;ctx.font='700 11px Segoe UI';ctx.textAlign='center';const label=`★ ${b.name}`,w=ctx.measureText(label).width+16;ctx.fillStyle='#1d1f22e6';ctx.beginPath();ctx.roundRect(p.x-w/2,p.y-9,w,18,9);ctx.fill();ctx.fillStyle='#f2c230';ctx.fillText(label,p.x,p.y+4);}
     if(this.zoom<.5&&!this.interior()){ctx.textAlign='center';ctx.font=`700 ${Math.round(11+this.scale*.25)}px Segoe UI`;for(const [name,x,z] of DISTRICTS){const p=this.project(x-here.x,0,z-here.z);ctx.fillStyle='#ffffff';ctx.globalAlpha=.75;ctx.fillText(name.split('').join(' '),p.x,p.y);ctx.globalAlpha=1;}}
     const a=this.actor,low=Object.entries(this.state.needs).filter(([,v])=>v<30).sort((x,y)=>x[1]-y[1])[0];
@@ -870,7 +870,7 @@ export class World {
     const from=entry.length?entry.at(-1):this.player;
     const grid=.3,key=(gx,gz)=>`${gx},${gz}`,start=[Math.round(from.x/grid),Math.round(from.z/grid)],goal=[Math.round(x/grid),Math.round(z/grid)];
     const frontier=[start],came=new Map([[key(...start),null]]);let found=null;
-    for(let cursor=0;cursor<frontier.length&&cursor<1300;cursor++){
+    for(let cursor=0;cursor<frontier.length&&cursor<5000;cursor++){
       const cell=frontier[cursor];if(Math.hypot(cell[0]-goal[0],cell[1]-goal[1])<=1){found=cell;break;}
       for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){const next=[cell[0]+dx,cell[1]+dz],k=key(...next);if(!came.has(k)&&valid(next[0]*grid,next[1]*grid)){came.set(k,cell);frontier.push(next);}}
     }
