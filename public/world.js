@@ -791,9 +791,17 @@ export class World {
     const furniture=this.visitedHome?.furniture||this.state.furniture;
     const valid=(px,pz)=>walkable(this.location,px,pz,furniture);
     if(!valid(x,z)){this.onObject({blocked:true});return;}
-    // If you're standing somewhere blocked (furniture placed on you, an old position), step to the nearest open ground first.
-    if(!valid(this.player.x,this.player.z)){let spot=null;for(let r=.3;r<=6&&!spot;r+=.3)for(let i=0;i<24&&!spot;i++){const px=this.player.x+Math.cos(i/24*Math.PI*2)*r,pz=this.player.z+Math.sin(i/24*Math.PI*2)*r;if(valid(px,pz))spot={x:px,z:pz};}if(!spot&&valid(0,1))spot={x:0,z:1};if(spot)this.player=spot;}
-    const grid=.3,key=(gx,gz)=>`${gx},${gz}`,start=[Math.round(this.player.x/grid),Math.round(this.player.z/grid)],goal=[Math.round(x/grid),Math.round(z/grid)];
+    // Standing outside the walls (just arrived at the doorstep): walk round to the door and come in through it.
+    // Standing on something inside (furniture placed on your spot): step to the nearest open ground.
+    let entry=[];
+    if(!valid(this.player.x,this.player.z)){
+      const p=this.player,outside=Math.abs(p.x)>4.8||Math.abs(p.z)>4.8;
+      if(outside&&this.interior()){const home=this.location==='home',inDoor=home?{x:-4.3,z:3.6}:{x:0,z:4.3},outDoor=home?{x:-6,z:3.6}:{x:0,z:6};
+        entry=home?[{x:outDoor.x,z:p.z},outDoor,inDoor]:[{x:p.x,z:outDoor.z},outDoor,inDoor];}
+      else{let spot=null;for(let r=.3;r<=6&&!spot;r+=.3)for(let i=0;i<24&&!spot;i++){const px=p.x+Math.cos(i/24*Math.PI*2)*r,pz=p.z+Math.sin(i/24*Math.PI*2)*r;if(valid(px,pz))spot={x:px,z:pz};}if(spot)this.player=spot;}
+    }
+    const from=entry.length?entry.at(-1):this.player;
+    const grid=.3,key=(gx,gz)=>`${gx},${gz}`,start=[Math.round(from.x/grid),Math.round(from.z/grid)],goal=[Math.round(x/grid),Math.round(z/grid)];
     const frontier=[start],came=new Map([[key(...start),null]]);let found=null;
     for(let cursor=0;cursor<frontier.length&&cursor<1300;cursor++){
       const cell=frontier[cursor];if(Math.hypot(cell[0]-goal[0],cell[1]-goal[1])<=1){found=cell;break;}
@@ -801,7 +809,7 @@ export class World {
     }
     if(!found){this.onObject({blocked:true});return;}
     const waypoints=[];for(let cell=found;cell;cell=came.get(key(...cell)))waypoints.unshift({x:cell[0]*grid,z:cell[1]*grid});
-    waypoints.shift();waypoints.push({x,z});this.waypoints=smoothPath(this.player,waypoints,valid);this.target=this.waypoints.shift();this.pending=callback;this.moving=true;
+    waypoints.shift();waypoints.push({x,z});this.waypoints=[...entry,...smoothPath(from,waypoints,valid)];this.target=this.waypoints.shift();this.pending=callback;this.moving=true;
     this.onMove({x,z}); // others see the walk begin immediately
     if(this.reduced){this.player={x,z};this.waypoints=[];this.arrived();}this.draw();
   }
