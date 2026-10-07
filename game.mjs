@@ -132,7 +132,8 @@ export function finishRecovery(s,now){
     if(act.groceries)s.groceries=(s.groceries||0)+act.groceries;
     if(act.interview&&now-(s.interviewAt||0)>=30*60_000){s.interviewAt=now;const good=Math.random()<.65,delta=good?Math.max(20,Math.round((s.fame||0)*.01)):-Math.max(10,Math.round((s.fame||0)*.005));addFame(s,delta,good?'TV interview':'Awkward TV interview',now);headline(s,good?`${s.name} charmed viewers on PCTV 📺`:`${s.name}'s awkward PCTV interview goes viral 😬`,now);log(s,good?`📺 The interview went great! +${delta} fame.`:`📺 That interview did not go well. ${delta} fame.`,now);}
   }
-  const train=r.item&&ITEMS[r.item]?.use?.learn;if(train&&CAREERS[s.career].family===train.family&&share>=.5)learn(s,s.career,CAREERS[s.career].focus,Math.round(train.points*share),`item:${r.id}`);
+  const used=r.item&&ITEMS[r.item]?.use;if(used?.fitness&&share>=.5)s.fitness=Math.min(FITNESS.max,(s.fitness||0)+FITNESS.perWorkout*used.fitness);
+  const train=used?.learn;if(train&&(CAREERS[s.career].family===train.family||CAREERS[s.career].family===used.learnAlso)&&share>=.5)learn(s,s.career,CAREERS[s.career].focus,Math.round(train.points*share),`item:${r.id}`);
   log(s,share>=1?`${r.label} completed.`:`${r.label}: stopped early, +${Math.round(amount*share)} ${r.need}.`,now);
 }
 // Insights land while you watch: due = 1 at 10s, +1 every 30s after, capped at WATCH_MAX.
@@ -440,6 +441,10 @@ export function act(s,input,now,rng=Math.random) {
       const def=ITEMS[input.item],use=def?.use;requireRule(use,'That item has no use.');
       requireRule(!s.active&&!s.recovery,'Finish or cancel your activity first.');
       if(def.gadget){requireRule(s.inventory[input.item],'Claim it first.');requireRule(!s.trip,'Wait until you arrive.');}
+      else if(def.extension){requireRule(s.inventory[input.item],'Claim it first.');requireRule(s.location==='home'&&!s.visiting,'Your extensions are at home.');}
+      else if(def.extension){requireRule(s.inventory[input.item],'Claim it first.');requireRule(s.location==='home'&&!s.visiting,'Your extensions are at home.');}
+      else if(def.extension){requireRule(s.inventory[input.item],'Claim it first.');requireRule(s.location==='home'&&!s.visiting,'Your extensions are at home.');}
+      else if(def.extension){requireRule(s.inventory[input.item],'Claim it first.');requireRule(s.location==='home'&&!s.visiting,'Your extensions are at home.');}
       else{requireRule(s.location==='home'&&!s.visiting,'Use your items at home.');
       requireRule(s.inventory[input.item]&&s.furniture.some(f=>f.item===input.item),'Place that item at home first.');}
       requireRule(!(POWERED.includes(input.item)&&noPower(s,now)),'NEPA took light. Wait for power, or get a generator.');

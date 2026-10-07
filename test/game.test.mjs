@@ -322,3 +322,13 @@ test('shops: barber, tailor, tattoos, bukka and fine dining',()=>{
   act(s,{type:'venueAct',act:'bukka'},T);assert.equal(s.recovery.amount,60);act(s,{type:'cancel'},T);
   s.location='lounge';assert.throws(()=>act(s,{type:'venueAct',act:'fineDining'},T),/500 fame/);
 });
+test('homes and extensions: claim a home, build extensions and use them at home',()=>{
+  const s=make('vlogger');s.fame=10_000;s.location='plaza';
+  act(s,{type:'claim',item:'duplex'},T);assert.equal(s.home,'duplex');
+  act(s,{type:'buy',item:'gymRoom'},T);act(s,{type:'buy',item:'studioRoom'},T);
+  assert.throws(()=>act(s,{type:'useItem',item:'gymRoom'},T),/at home/);
+  s.location='home';act(s,{type:'useItem',item:'gymRoom'},T);reconcile(s,s.recovery.endsAt+1);assert.equal(s.fitness,.25);
+  const before=s.careers.vlogger.skills[CAREERS.vlogger.focus].points;act(s,{type:'useItem',item:'studioRoom'},T+100_000);reconcile(s,s.recovery.endsAt+1);
+  assert.ok(s.careers.vlogger.skills[CAREERS.vlogger.focus].points>before||s.careers.vlogger.skills[CAREERS.vlogger.focus].level>1,'creators train in the home studio');
+  assert.ok(worldObjects('home',[],['pool','gymRoom']).some(o=>o.item==='gymRoom'&&o.remote));
+});

@@ -407,7 +407,7 @@ export class World3D extends World {
     const ctx = this.ctx; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, r.width, r.height);
     this.paintRoutine(); this.paintLabels(); if (!inside) this.paintPins(); this.paintSpeech();
     if (this.moving) { const t = this.project(this.target.x, .03, this.target.z); ctx.strokeStyle = '#fff8'; ctx.lineWidth = 1.3; ctx.beginPath(); ctx.ellipse(t.x, t.y, 7, 3.5, 0, 0, Math.PI * 2); ctx.stroke(); }
-    this.hits = [...worldObjects(this.location, this.visitedHome?.furniture || this.state.furniture).map(object => ({ ...object, screen: this.project(object.vx ?? object.x, .6, object.vz ?? object.z) })), ...this.petHits()];
+    this.hits = [...worldObjects(this.location, this.visitedHome?.furniture || this.state.furniture, this.visitedHome ? [] : Object.keys(this.state.inventory || {})).map(object => ({ ...object, screen: this.project(object.vx ?? object.x, .6, object.vz ?? object.z) })), ...this.petHits()];
     this.hitRadius = Math.max(14, Math.min(30, this.scale * .42));
     ctx.font = '600 10px Segoe UI'; ctx.textAlign = 'center';
     for (const o of this.hits.filter(o => o.name === this.hover?.name)) { const p = o.screen, w = ctx.measureText(o.name).width + 14; ctx.fillStyle = '#fff9'; ctx.beginPath(); ctx.roundRect(p.x - w / 2, p.y + 13, w, 17, 8); ctx.fill(); ctx.fillStyle = '#49614f'; ctx.fillText(o.name, p.x, p.y + 25); }
