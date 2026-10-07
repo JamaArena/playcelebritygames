@@ -22,7 +22,7 @@ let pulse=0;
 const broadcast=()=>{pulse=Date.now();const line=`data: ${pulse}\n\n`;for(const res of listeners)res.write(line);};
 setInterval(()=>{for(const res of listeners)res.write(': keep-alive\n\n');},25000).unref();
 const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.woff2':'font/woff2'};
-const server=http.createServer(async(req,res)=>{
+const handler=async(req,res)=>{
   res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');
   res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'");
   try {
@@ -46,7 +46,10 @@ const server=http.createServer(async(req,res)=>{
     if(!file.startsWith(publicRoot+path.sep)||!existsSync(file)){res.writeHead(404);res.end('Not found');return;}
     const bytes=readFileSync(file);res.writeHead(200,{'Content-Type':mime[path.extname(file)]||'application/octet-stream','Cache-Control':'no-cache'});res.end(req.method==='HEAD'?undefined:bytes);
   }catch{res.writeHead(500,{'Content-Type':'application/json'});res.end(JSON.stringify({error:'The request could not be completed.'}));}
-});
+};
 const port=Number(process.env.PORT||3000),host=process.env.HOST||'127.0.0.1';
-server.listen(port,host,()=>console.log(`Celebrity Life is ready at http://${host}:${server.address().port}`));
-export default server;
+if(!cloud){
+  const server=http.createServer(handler);
+  server.listen(port,host,()=>console.log(`Celebrity Life is ready at http://${host}:${server.address().port}`));
+}
+export default handler;
