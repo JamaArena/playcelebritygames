@@ -8,6 +8,10 @@ Create a character, explore six locations, recover daily needs, train skills, pl
 
 The full game supports Netlify Functions and Netlify Database (Postgres). Connect this repository, deploy the implementation branch, and use the committed `netlify.toml` settings. Database provisioning and migrations run automatically. See [docs/netlify.md](docs/netlify.md) for deployment, verification and operating limits.
 
+## Live server
+
+For many players at once, run the Docker image on a long-running host (Fly.io, Render) with Postgres. Browsers then get changes pushed over WebSockets instead of polling. See [docs/live-server.md](docs/live-server.md).
+
 ## Run locally
 
 Install Node.js **24 or newer**, then run:

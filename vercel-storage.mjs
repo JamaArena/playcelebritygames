@@ -1,5 +1,6 @@
 import pg from 'pg';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { handlePersistentRequest, readPulse } from './storage.mjs';
 import { resendSender } from './email.mjs';
 
@@ -15,7 +16,7 @@ let pool, ready;
 async function database() {
   const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
   if (!connectionString) throw new Error('Database not configured');
-  pool ||= new pg.Pool({ connectionString, max: 3, connectionTimeoutMillis: 8000, idleTimeoutMillis: 10000 });
+  pool ||= new pg.Pool({ connectionString, max: Number(process.env.PG_POOL_MAX || 3), connectionTimeoutMillis: 8000, idleTimeoutMillis: 10000 });
   ready ||= initialize(pool).catch(error => { ready = null; throw error; });
   await ready;
   return pool;
@@ -36,6 +37,26 @@ export async function initialize(pool) {
     await client.query('ROLLBACK').catch(() => {});
     throw error;
   } finally { client.release(); }
+}
+// For long-running servers: who a cookie belongs to, and a LISTEN connection for live nudges.
+export async function playerForCookie(cookie) {
+  const token = String(cookie || '').match(/(?:^|;\s*)celebrity=([a-f0-9]{64})/)?.[1];
+  if (!token) return null;
+  const db = await database(), tokenHash = createHash('sha256').update(token).digest('hex');
+  const { rows } = await db.query('SELECT id FROM celebrity.players WHERE token_hash = $1 UNION ALL SELECT player_id FROM celebrity.sessions WHERE token_hash = $1 LIMIT 1', [tokenHash]);
+  return rows[0]?.id || null;
+}
+export async function listenPulses(onKeys) {
+  const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
+  await database();
+  const connect = async () => {
+    const client = new pg.Client({ connectionString });
+    client.on('notification', message => onKeys(String(message.payload || '').split(',').filter(Boolean)));
+    client.on('error', () => { client.end().catch(() => {}); setTimeout(() => connect().catch(() => {}), 3000); });
+    await client.connect();
+    await client.query('LISTEN celebrity_pulse');
+  };
+  await connect();
 }
 export async function cloudRequest(request) {
   const pathname = new URL(request.url).pathname;

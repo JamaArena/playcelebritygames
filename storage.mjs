@@ -68,7 +68,11 @@ export async function handlePersistentRequest(pool, request, options = {}) {
     if (changed && request.method === 'POST' && response.status < 400) {
       const at = Date.now();
       await client.query('UPDATE celebrity.pulse SET at = $1 WHERE id = 1', [at]);
-      if (pulses.size) await client.query('INSERT INTO celebrity.pulses (key, at) SELECT unnest($1::text[]), $2 ON CONFLICT (key) DO UPDATE SET at = EXCLUDED.at', [[...pulses], at]);
+      if (pulses.size) {
+        await client.query('INSERT INTO celebrity.pulses (key, at) SELECT unnest($1::text[]), $2 ON CONFLICT (key) DO UPDATE SET at = EXCLUDED.at', [[...pulses], at]);
+        // Long-running servers LISTEN for this and nudge their WebSocket subscribers (sent on commit).
+        await client.query('SELECT pg_notify($1, $2)', ['celebrity_pulse', [...pulses].join(',').slice(0, 7900)]);
+      }
     }
     await client.query('COMMIT');
     return response;
