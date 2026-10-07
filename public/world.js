@@ -95,12 +95,12 @@ export const worldObjects = (location,furniture=[]) => ({
       return {name:f.item==='trophyShelf'?'Display table':def.name||'Display table',icon:'◇',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Admire',pose:null};})
   ],
   nightclub:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.dance.name,icon:VENUE_ACTS.dance.icon,x:0,z:-0.4,act:'dance',face:0},{name:VENUE_ACTS.djSet.name,icon:VENUE_ACTS.djSet.icon,x:0,z:-2.9,act:'djSet',face:0},{name:VENUE_ACTS.bar.name,icon:VENUE_ACTS.bar.icon,x:-3.1,z:0.4,act:'bar',face:-1.5708}],
-  lounge:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.chill.name,icon:VENUE_ACTS.chill.icon,x:-3,z:2.3,act:'chill',face:3.1416},{name:VENUE_ACTS.karaoke.name,icon:VENUE_ACTS.karaoke.icon,x:0,z:-2.9,act:'karaoke',face:0},{name:VENUE_ACTS.network.name,icon:VENUE_ACTS.network.icon,x:2.4,z:-0.4,act:'network',face:0}],
+  lounge:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.fineDining.name,icon:VENUE_ACTS.fineDining.icon,x:2.3,z:1.2,act:'fineDining',face:0},{name:VENUE_ACTS.chill.name,icon:VENUE_ACTS.chill.icon,x:-3,z:2.3,act:'chill',face:3.1416},{name:VENUE_ACTS.karaoke.name,icon:VENUE_ACTS.karaoke.icon,x:0,z:-2.9,act:'karaoke',face:0},{name:VENUE_ACTS.network.name,icon:VENUE_ACTS.network.icon,x:2.4,z:-0.4,act:'network',face:0}],
   cinema:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.film.name,icon:VENUE_ACTS.film.icon,x:0,z:1.6,act:'film',face:3.1416}],
-  mall:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.shop.name,icon:VENUE_ACTS.shop.icon,x:-2.4,z:-2.6,act:'shop',face:3.1416},{name:VENUE_ACTS.foodCourt.name,icon:VENUE_ACTS.foodCourt.icon,x:2.4,z:2,act:'foodCourt',face:0}],
+  mall:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.barber.name,icon:VENUE_ACTS.barber.icon,x:-3.4,z:-3.6,act:'barber',face:3.1416},{name:VENUE_ACTS.tattoo.name,icon:VENUE_ACTS.tattoo.icon,x:0,z:-3.6,act:'tattoo',face:3.1416},{name:VENUE_ACTS.phoneShop.name,icon:VENUE_ACTS.phoneShop.icon,x:3.4,z:-3.6,act:'phoneShop',face:3.1416},{name:VENUE_ACTS.shop.name,icon:VENUE_ACTS.shop.icon,x:-2.4,z:-2.6,act:'shop',face:3.1416},{name:VENUE_ACTS.foodCourt.name,icon:VENUE_ACTS.foodCourt.icon,x:2.4,z:2,act:'foodCourt',face:0}],
   tvStation:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.interview.name,icon:VENUE_ACTS.interview.icon,x:0.9,z:-2.3,act:'interview',face:0},{name:VENUE_ACTS.talkShow.name,icon:VENUE_ACTS.talkShow.icon,x:0,z:3,act:'talkShow',face:3.1416}],
   radio:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.airplay.name,icon:VENUE_ACTS.airplay.icon,x:-1.2,z:-2.4,act:'airplay',face:3.1416},{name:VENUE_ACTS.callIn.name,icon:VENUE_ACTS.callIn.icon,x:1.8,z:-2.4,act:'callIn',face:3.1416}],
-  market:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.stalls.name,icon:VENUE_ACTS.stalls.icon,x:0,z:-0.6,act:'stalls',face:3.1416},{name:VENUE_ACTS.snack.name,icon:VENUE_ACTS.snack.icon,x:3,z:2.2,act:'snack',face:3.1416}],
+  market:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.tailor.name,icon:VENUE_ACTS.tailor.icon,x:-3.4,z:-1.9,act:'tailor',face:3.1416},{name:VENUE_ACTS.bukka.name,icon:VENUE_ACTS.bukka.icon,x:0,z:2.4,act:'bukka',face:3.1416},{name:VENUE_ACTS.stalls.name,icon:VENUE_ACTS.stalls.icon,x:0,z:-0.6,act:'stalls',face:3.1416},{name:VENUE_ACTS.snack.name,icon:VENUE_ACTS.snack.icon,x:3,z:2.2,act:'snack',face:3.1416}],
   gym:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.workout.name,icon:VENUE_ACTS.workout.icon,x:0,z:-1,act:'workout',face:3.1416}],
   hospital:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.checkup.name,icon:VENUE_ACTS.checkup.icon,x:2.6,z:-2.4,act:'checkup',face:0}],
   worship:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.reflect.name,icon:VENUE_ACTS.reflect.icon,x:0,z:1.2,act:'reflect',face:3.1416}],
@@ -302,7 +302,7 @@ export class World {
     segment([0,hip+.5*Y,0],[0,hip+.6*Y,0],.12,skin);
     this.meshes.push({head:true,x,z,y:hip+.57*Y,w:.4,d:.36,h:.45,color:skin,hair,style,smile,heading,depth:x*Math.sin(this.angle)+z*Math.cos(this.angle)+.25}); // heads (and hair falling over the back) paint after their own body
   }
-  body(who){return {style:who.hair||'curls',hair:HAIR_COLORS[who.hairColor]||HAIR_COLORS.black,build:who.build||'average',height:who.height||'average'};}
+  body(who){return {style:who.hair||'curls',hair:HAIR_COLORS[who.hairColor]||HAIR_COLORS.black,build:who.build||'average',height:who.height||'average',tattoos:who.tattoos||[]};}
   // Background people get varied looks from a fixed rotation so the city feels mixed.
   extra(n){const k=n+CROWD_SEED,styles=Object.keys(HAIRSTYLES),builds=Object.keys(BUILDS),heights=Object.keys(HEIGHTS),colors=Object.values(HAIR_COLORS);return {style:styles[(k*5+3)%styles.length],hair:colors[(k*7)%colors.length],build:builds[(k*3+1)%builds.length],height:heights[(k*2+1)%heights.length]};}
   // Clothing reads the career at a glance; an equipped jacket overrides it.
@@ -310,7 +310,7 @@ export class World {
   // What someone wears: their career's default look, with each wardrobe piece they've put on layered over it.
   look(career,clothes=null,wear=null){
     const base=this.careerLook(career,clothes);if(!wear)return base;const top=WEAR[wear.top],bottom=WEAR[wear.bottom],shoes=WEAR[wear.shoes];
-    if(top)Object.assign(base,{outfit:top.color,fit:top.fit,accent:top.accent||base.accent});if(bottom)Object.assign(base,{pants:bottom.color,cut:bottom.cut});if(shoes)base.shoes=shoes.color;
+    if(top)Object.assign(base,{outfit:wear.tint?.[wear.top]||top.color,fit:top.fit,accent:top.accent||base.accent});if(bottom)Object.assign(base,{pants:bottom.color,cut:bottom.cut});if(shoes)base.shoes=shoes.color;
     base.acc=['head','face','neck','ears','wrist','bag'].map(k=>wear[k]).filter(Boolean);return base;
   }
   careerLook(career,clothes=null){const family=CAREERS[career]?.family;if(clothes==='designer')return {outfit:'#1f1f24',pants:'#2a2a30',shoes:'#d4af37',fit:'suit',accent:'#d4af37'};const fit=clothes==='jacket'||family==='acting'||family==='tech'?'suit':family==='sport'?'kit':'tee';return {outfit:clothes==='jacket'?'#24634e':({sport:'#2f6fb3',music:'#7b4fa3',creator:'#e07a5f',acting:'#b23a48',tech:'#3d6a8a',risk:'#2b2d42'})[family]||'#8ea9a4',pants:family==='sport'?'#f2f2ee':family==='tech'||family==='acting'?'#23262e':'#34435e',shoes:family==='sport'?'#2b2d42':fit==='suit'?'#1d1b1a':'#f4f1ea',fit,accent:family==='acting'?'#1d1b1a':'#7a2433'};}

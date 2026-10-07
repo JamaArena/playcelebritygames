@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
+import { TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -396,9 +396,23 @@ export function act(s,input,now,rng=Math.random) {
     }
     // Phone apps.
     case 'venueAct': {
-      const a=VENUE_ACTS[input.act];requireRule(a,'Unknown activity.');requireRule(s.location===a.venue,`Go to ${LOCATIONS[a.venue].name} for that.`);
+      const a=VENUE_ACTS[input.act];requireRule(a&&!a.menu,'Unknown activity.');requireRule((s.fame||0)>=(a.minFame||0),`${a.name} is for players with ${(a.minFame||0).toLocaleString('en-US')} fame.`);requireRule(s.location===a.venue,`Go to ${LOCATIONS[a.venue].name} for that.`);
       requireRule(!s.active&&!s.recovery&&!s.trip,'Finish what you are doing first.');
       s.recovery={id:id(),need:a.need,label:a.name,startedAt:now,endsAt:now+a.ms,amount:a.amount,extra:a.extra||{},act:input.act};break;
+    }
+    // Shops: a new hairstyle, a tailored colour for a top, tattoos on and off.
+    case 'restyle': {
+      requireRule(s.location==='mall','Visit the barber & salon at Palm Mall.');requireRule(HAIRSTYLES[input.hair]&&HAIR_COLORS[input.hairColor],'Choose a hairstyle and colour.');
+      s.hair=input.hair;s.hairColor=input.hairColor;s.needs.fun=clamp(s.needs.fun+5);log(s,`💈 Fresh new look: ${HAIRSTYLES[input.hair].toLowerCase()}.`,now);break;
+    }
+    case 'tailor': {
+      requireRule(s.location==='market','Visit the tailor at the market.');const item=WEAR[input.item];requireRule(item?.slot==='top'&&(item.fame===0||s.closet?.[input.item]),'Choose a top you own.');
+      requireRule(TAILOR_COLORS.includes(input.color),'Choose a colour.');s.wear??={};s.wear.tint={...(s.wear.tint||{}),[input.item]:input.color};log(s,`🧵 The tailor re-dyed your ${item.name.toLowerCase()}.`,now);break;
+    }
+    case 'tattoo': {
+      requireRule(s.location==='mall','Visit Ink Palm at Palm Mall.');requireRule(TATTOOS[input.spot],'Choose where.');s.tattoos??=[];
+      if(s.tattoos.includes(input.spot)){s.tattoos=s.tattoos.filter(t=>t!==input.spot);log(s,`🖋️ Laser removal done: ${TATTOOS[input.spot].toLowerCase()}.`,now);}
+      else{s.tattoos.push(input.spot);log(s,`🖋️ New ink: ${TATTOOS[input.spot].toLowerCase()}.`,now);}break;
     }
     case 'post': {
       const body=text(input.body,POSTS.max);requireRule(body,'Write something to post.');

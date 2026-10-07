@@ -333,3 +333,6 @@ html,body,#app{height:100%;height:100dvh;overflow:hidden}.rail{background:#153d3
 .gallery figure{margin:0}.gallery img{width:100%;border-radius:10px;display:block}
 .gallery figcaption{font-size:10px;color:#7b897e;margin-top:3px}
 .city-tile small{display:block;font-size:9px;color:#6a7d6c}
+
+/* Shops. */
+.tailor-row{display:grid;gap:6px;padding:8px 0;border-bottom:1px solid #eef0e8}
