@@ -78,7 +78,7 @@ export const ITEMS = {
   plants: {name: 'Indoor plant pack', fame: 40, description: 'Monstera and snake plants to water.', furniture: true, use: {verb: 'Water plants', icon: '❀', need: 'fun', amount: 5, ms: 10_000, pose: 'water'}},
   mirror: {name: 'Full-length mirror', fame: 60, description: 'Check your look before you head out.', furniture: true, use: {verb: 'Check your look', icon: '🪞', need: 'fun', amount: 10, ms: 15_000, pose: 'gesture'}},
   beanBag: {name: 'Bean bag', fame: 80, description: 'A comfy seat for lazy afternoons.', furniture: true, use: {verb: 'Lounge', icon: '◒', need: 'fun', amount: 25, ms: 45_000, pose: 'sit', seat: .4, onItem: true}},
-  bookshelf: {name: 'Bookshelf', fame: 100, description: 'Read a good book to unwind.', furniture: true, use: {verb: 'Read a book', icon: '📖', need: 'fun', amount: 20, ms: 40_000, pose: 'chat'}},
+  bookshelf: {name: 'Bookshelf', fame: 100, description: 'Read a good book to unwind, and learn a little for your career.', furniture: true, use: {verb: 'Read a book', icon: '📖', need: 'fun', amount: 20, ms: 40_000, pose: 'chat', learn: {family: '*', points: 3}}},
   microwave: {name: 'Microwave', fame: 120, description: 'A fast, so-so meal when you are in a rush.', furniture: true, use: {verb: 'Quick meal', icon: '🍱', need: 'hunger', amount: 25, ms: 15_000, pose: 'chat'}},
   coffeeMachine: {name: 'Coffee machine', fame: 150, description: 'A quick energy boost.', furniture: true, use: {verb: 'Make coffee', icon: '☕', need: 'energy', amount: 20, ms: 20_000, pose: 'chat'}},
   washingMachine: {name: 'Washing machine', fame: 250, description: 'Fresh clothes keep you clean.', furniture: true, use: {verb: 'Do laundry', icon: '🧺', need: 'hygiene', amount: 20, ms: 30_000, pose: 'chat'}},
@@ -270,8 +270,29 @@ export const LIFE_EVENTS = {
   wrongName: {icon: '😬', title: 'You called someone the wrong name', text: 'They smiled, but it was awkward for everyone.', needs: {social: -12}, weight: 2},
   wardrobe: {icon: '👔', title: 'Wardrobe malfunction', text: 'A button popped at the worst moment. Fans had jokes.', fame: [-.01, -10], needs: {fun: -5}, weight: 1, where: 'out'},
   lyrics: {icon: '🎤', title: 'You forgot the lyrics', text: 'Mid-song and live. The crowd sang it for you, at least.', fame: [-.01, -10], weight: 2, family: 'music', where: 'out'},
+  fanSelfie: {icon: '🤳', title: 'A fan wants a selfie', text: 'They are shaking with excitement.', weight: 3, where: 'out', minFame: 500, prompt: 'fanSelfie', guarded: true},
+  journalist: {icon: '📰', title: 'A journalist wants a quote', text: 'About your rival, of course.', weight: 2, minFame: 1000, prompt: 'journalist'},
+  paparazzi: {icon: '📸', title: 'Paparazzi spotted you', text: 'Flashes everywhere. Careful: the next ten minutes are on camera.', weight: 2, where: 'out', minFame: 5000, fame: [.003, 10], guarded: true, paps: true},
+  rivalHit: {icon: '🥊', title: 'Your rival dropped a hit', text: 'Duke Adeyemi is all over the radio. Time to answer?', weight: 1, minFame: 2000},
+  mumCalls: {icon: '📞', title: 'Mum called', text: '"Have you eaten?" You feel loved.', needs: {social: 15}, weight: 2},
+  familyVisit: {icon: '👪', title: 'Family came to visit', text: 'Mum is on the sofa with jollof she brought.', needs: {social: 20, hunger: 15}, weight: 1, where: 'home', family: null, visit: true},
+  landlord: {icon: '🔑', title: 'The landlord dropped by', text: 'He fixed the leaking tap and told you an hour of gossip.', needs: {social: 5, fun: -5}, weight: 1, where: 'home'},
   powerCut: {icon: '💡', title: 'NEPA took light', text: 'Power cut! No TV, gaming or appliances until it comes back.', weight: 3, where: 'home'},
 };
+// Choices some life moments ask for. Fame is [share of your fame, minimum]; needs change too.
+export const PROMPTS = {
+  fanSelfie: {options: [{label: '📸 Smile for the selfie', fame: [.002, 5], needs: {social: 10}, emote: 'selfie', text: 'The fan posted it. Wholesome.'}, {label: '🙅 Not now', needs: {social: -5}, text: 'They walked off, a bit sad.'}]},
+  journalist: {options: [{label: '😇 Stay classy', fame: [.004, 10], text: '"We wish everyone well." The blogs called you mature.'}, {label: '🔥 Throw shade', fame: [.01, 25], risk: .45, riskFame: [-.012, -25], text: 'Spicy. The quote is everywhere.', riskText: 'It backfired. Fans called you petty.'}]},
+};
+// Your rival: a fictional celebrity who keeps you on your toes. Beef with them can win or lose fame.
+export const RIVAL = {name: 'Duke Adeyemi', cooldownMs: 30 * 60_000};
+// Your team: hire people (free with fame) for lasting help.
+export const TEAM = {
+  mentor: {name: 'Mentor', icon: '🧑‍🏫', fame: 500, note: 'Skills train 25% faster.'},
+  manager: {name: 'Personal manager', icon: '🧑‍💼', fame: 2000, note: 'Books gigs: do the booked activity in time for bonus fame.'},
+  bodyguard: {name: 'Bodyguard', icon: '🕶️', fame: 20_000, note: 'Keeps paparazzi and selfie-hunters away; mishaps cost 20% less fame.'},
+};
+export const GIG = {everyMs: 15 * 60_000, windowMs: 10 * 60_000};
 // Home items that need electricity during a power cut (unless you own a generator).
 export const POWERED = ['gamingConsole', 'soundSystem', 'coffeeMachine', 'microwave', 'washingMachine', 'ringLight', 'studioMic'];
 // Phone apps: deliveries take a minute; groceries make home cooking more filling.
@@ -299,6 +320,8 @@ export const VENUE_ACTS = {
   talkShow: {venue: 'tvStation', name: 'Sit in a talk-show audience', icon: '📺', need: 'fun', amount: 25, ms: 45_000, pose: 'sit', seat: .5},
   airplay: {venue: 'radio', name: 'Get radio airplay', icon: '📻', need: 'social', amount: 10, ms: 40_000, pose: 'perform', family: 'music', fame: 25},
   callIn: {venue: 'radio', name: 'Call-in show', icon: '☎️', need: 'social', amount: 20, ms: 30_000, pose: 'chat'},
+  ludo: {venue: 'park', name: 'Play Ludo & Ayo', icon: '🎲', need: 'fun', amount: 25, ms: 40_000, extra: {social: 15}, pose: 'sitFloor'},
+  volunteer: {venue: 'hospital', name: 'Volunteer', icon: '🤲', need: 'social', amount: 20, ms: 60_000, extra: {fun: 10, energy: -5}, pose: 'chat', fame: 10, charity: true},
   stalls: {venue: 'market', name: 'Browse the stalls', icon: '🧺', need: 'fun', amount: 15, ms: 30_000, extra: {social: 10}, pose: 'chat', groceries: 5},
   snack: {venue: 'market', name: 'Buy puff-puff', icon: '🍩', need: 'hunger', amount: 20, ms: 15_000, extra: {fun: 5}, pose: 'chat'},
   workout: {venue: 'gym', name: 'Work out', icon: '🏋️', need: 'fun', amount: 15, ms: 45_000, extra: {energy: -12, hygiene: -15}, pose: 'sport', fitness: 1},

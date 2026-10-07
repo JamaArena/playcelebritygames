@@ -332,3 +332,15 @@ test('homes and extensions: claim a home, build extensions and use them at home'
   assert.ok(s.careers.vlogger.skills[CAREERS.vlogger.focus].points>before||s.careers.vlogger.skills[CAREERS.vlogger.focus].level>1,'creators train in the home studio');
   assert.ok(worldObjects('home',[],['pool','gymRoom']).some(o=>o.item==='gymRoom'&&o.remote));
 });
+test('people: team hires, life-moment choices, beef with the rival, crews and manager gigs',()=>{
+  const s=make();s.fame=30_000;s.location='plaza';
+  assert.throws(()=>act(s,{type:'hire',who:'ceo'},T),/Unknown role/);
+  act(s,{type:'hire',who:'mentor'},T);act(s,{type:'hire',who:'bodyguard'},T);act(s,{type:'hire',who:'manager'},T);
+  // A bodyguard keeps paparazzi and selfie-hunters away.
+  for(let i=0;i<20;i++){s.prompt=null;s.nextEventAt=0;lifeEvents(s,T+i,()=>i/20);assert.ok(!['paparazzi','fanSelfie'].includes(s.lifeEvent.kind));}
+  s.prompt={id:'p1',kind:'journalist',at:T};act(s,{type:'answerPrompt',id:'p1',choice:0},T);assert.equal(s.prompt,null);assert.match(s.headlines[0].text,/Duke Adeyemi/);
+  act(s,{type:'beef'},T);assert.throws(()=>act(s,{type:'beef'},T+1000),/cool down/);assert.match(s.fameLog[0].reason,/beef/);
+  act(s,{type:'crewCreate',name:'Island Boys',badge:'🌴'},T);assert.deepEqual([s.crew.name,s.crew.badge],['Island Boys','🌴']);act(s,{type:'crewLeave'},T);assert.equal(s.crew,null);
+  s.nextGigAt=0;s.lastSeen=T+5000;reconcile(s,T+6000);assert.ok(s.gig&&VENUE_ACTS[s.gig.act],'the manager books a gig');
+  const gig=s.gig,fame=s.fame;s.location=VENUE_ACTS[gig.act].venue;s.recovery=null;s.active=null;s.nextEventAt=Infinity;act(s,{type:'venueAct',act:gig.act},T+7000);reconcile(s,s.recovery.endsAt+1);assert.ok(s.fame>=fame+gig.bonus,'gig bonus paid');
+});
