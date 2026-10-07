@@ -417,3 +417,5 @@ details.v2-more summary{cursor:pointer;font-weight:600;color:#21634e}
 .v2-row-actions{margin-left:auto;flex-wrap:wrap;justify-content:flex-end}
 @media(max-width:520px){.v2-row-actions{width:100%}}
 .task-queue{display:flex;align-items:center;gap:6px;margin-top:7px;overflow-x:auto;white-space:nowrap}.task-queue small{font-size:10px;color:#73906a;flex:none}.queue-chip{flex:none;font-size:10px;padding:5px 9px;border-radius:14px;background:#edf3e7;border:1px solid #d5e2cd}.queue-chip b{margin-left:3px;opacity:.6}#app .activity-card:has(.idle-actions) .task-queue{background:#fffef4ed;padding:5px 8px;border-radius:14px}
+/* Arranging the room: a slim bar at the bottom keeps the floor in view. */
+#app .object-tray:has(.placement-hint){top:auto;bottom:150px}.object-tray:has(.placement-hint) .tray-options{margin-top:7px}.object-tray:has(.placement-hint) .tray-options button{padding:7px 10px;font-size:11px}.city-column:has(#objectTray:not([hidden]) .placement-hint) #minimap,.city-column:has(#objectTray:not([hidden]) .placement-hint) .activity-card{display:none}@media(max-width:620px){#app .object-tray:has(.placement-hint){bottom:125px}}

@@ -575,7 +575,23 @@ export function walkable(location,x,z,furniture=[]){
   if(location==='street')return Number.isFinite(x)&&Number.isFinite(z)&&Math.abs(x)<=7&&z>=5.7&&z<=7.3;
   return Number.isFinite(x)&&Number.isFinite(z)&&Math.abs(x)<=4.8&&Math.abs(z)<=4.8&&!obstacles(location,furniture).some(([cx,cz,w,d])=>Math.abs(x-cx)<w/2+.16&&Math.abs(z-cz)<d/2+.16);
 }
+// Where you stand to use the built-in home objects (kitchen, bed, sofa, shower, toilet, chairs, table, TV, fridge, lamp, window, plants, desk).
+export const HOME_SPOTS = [[-3.6,-2.5],[2.6,-1.8],[-2.8,.3],[4,1.5],[4,2.35],[.1,1.4],[1.6,3.9],[-2.8,3.7],[-.7,-3],[4.1,-3.2],[-4.5,-1.8],[-3.8,-.8],[3.6,-1.2],[.5,-3.1]];
+const HOME_DOOR = [-4.3,3.6];
+// Furniture goes on half-tile spots anywhere in the apartment, as long as nothing overlaps and you can still
+// walk from the front door to every built-in object and to the front of every piece of furniture.
+const placeCache=new Map();
 export function canPlace(furniture,item,x,z){
-  // The bottom half of the apartment is permanently kept open for access.
-  return Number.isInteger(x)&&Number.isInteger(z)&&x>=-3&&x<=3&&z>=-3&&z<=0&&walkable('home',x,z,furniture.filter(f=>f.item!==item))&&![[-2.2,-4,4.3,1.3],[2.5,-3.5,2.5,3]].some(([cx,cz,w,d])=>Math.abs(x-cx)<w/2+.45&&Math.abs(z-cz)<d/2+.45);
+  const memo=JSON.stringify([furniture,item,x,z]);if(placeCache.has(memo))return placeCache.get(memo);
+  const fits=placeCheck(furniture,item,x,z);if(placeCache.size>500)placeCache.clear();placeCache.set(memo,fits);return fits;
+}
+function placeCheck(furniture,item,x,z){
+  if(!Number.isInteger(x*2)||!Number.isInteger(z*2)||Math.abs(x)>4||z<-4||z>3.5)return false;
+  const others=furniture.filter(f=>f.item!==item),next=[...others,{item,x,z}];
+  // The whole footprint must be clear (not just its centre), and you need room to stand in front of it.
+  if(![[0,0],[-.4,-.4],[.4,-.4],[-.4,.4],[.4,.4]].every(([dx,dz])=>walkable('home',x+dx,z+dz,others))||!walkable('home',x,z+.75,next))return false;
+  const grid=.3,key=(a,b)=>a+','+b,start=[Math.round(HOME_DOOR[0]/grid),Math.round(HOME_DOOR[1]/grid)],seen=new Set([key(...start)]),open=[start],reached=[];
+  for(let i=0;i<open.length;i++){const [a,b]=open[i];reached.push([a*grid,b*grid]);for(const [da,db] of [[1,0],[-1,0],[0,1],[0,-1]]){const c=[a+da,b+db],k=key(...c);if(!seen.has(k)&&walkable('home',c[0]*grid,c[1]*grid,next)){seen.add(k);open.push(c);}}}
+  const near=([px,pz])=>reached.some(([rx,rz])=>Math.hypot(rx-px,rz-pz)<=.6);
+  return HOME_SPOTS.every(p=>walkable('home',p[0],p[1],[{item,x,z}])&&near(p))&&next.every(f=>near([f.x,f.z+.75]));
 }
