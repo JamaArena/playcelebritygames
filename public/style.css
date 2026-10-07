@@ -664,3 +664,9 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 .switch.on{background:#34c759}.switch.on::after{left:23px}
 
 .notice-card p:first-of-type{font-style:italic}
+/* Messages sit at the top, centred under the header, clear of the trip card and needs bar */
+@keyframes toastIn{0%{transform:translate(-50%,-12px) scale(.9);opacity:0}100%{transform:translate(-50%,0) scale(1);opacity:1}}
+#toast{top:84px;bottom:auto;left:50%;right:auto;transform:translateX(-50%);width:max-content;max-width:min(440px,calc(100vw - 32px));text-align:center;animation:toastIn .25s ease-out both;z-index:45}
+@media(max-width:620px){#toast{top:76px;font-size:12.5px;padding:11px 16px}}
+/* The activity card shows its whole title (up to two lines) */
+.sim-status strong{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.2}
