@@ -919,7 +919,7 @@ export class World {
   paintSpeech(){
     if(!this.speech?.size)return;const ctx=this.ctx,here=TOWN[this.location]||TOWN.home,now=performance.now();
     for(const [id,bubble] of this.speech){if(now>bubble.until){this.speech.delete(id);continue;}
-      const npcSpot=id==='npc'&&worldObjects(this.location).find(o=>o.action==='phone'),who=id==='me'?{x:this.actor.x,z:this.actor.z}:id==='pet'?this.petPos&&{x:this.petPos.x,z:this.petPos.z}:npcSpot?{x:npcSpot.x,z:npcSpot.z}:this.people?.get(id)&&!(this.interior()&&!this.people.get(id).scene)&&{x:this.people.get(id).x-here.x,z:this.people.get(id).z-here.z};if(!who||!this.onScreen(who.x,who.z,1))continue;
+      const npcSpot=id==='npc'&&worldObjects(this.location).find(o=>o.action==='phone'),who=id==='me'?{x:this.actor.x,z:this.actor.z}:String(id).startsWith('crowd:')&&this.gymCrowd?.[+String(id).slice(6)]?{x:this.gymCrowd[+String(id).slice(6)].x,z:this.gymCrowd[+String(id).slice(6)].z}:id==='pet'?this.petPos&&{x:this.petPos.x,z:this.petPos.z}:npcSpot?{x:npcSpot.x,z:npcSpot.z}:this.people?.get(id)&&!(this.interior()&&!this.people.get(id).scene)&&{x:this.people.get(id).x-here.x,z:this.people.get(id).z-here.z};if(!who||!this.onScreen(who.x,who.z,1))continue;
       const p=this.project(who.x,2.2,who.z),y=p.y-(id==='me'?44:16);ctx.font='500 11px Segoe UI';const words=bubble.text.length>34?bubble.text.slice(0,33)+'…':bubble.text,w=Math.min(240,ctx.measureText(words).width+20),fade=Math.min(1,(bubble.until-now)/600);
       ctx.globalAlpha=fade;ctx.fillStyle='#ffffff';ctx.strokeStyle='#cfdccb';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(p.x-w/2,y-26,w,24,12);ctx.fill();ctx.stroke();
       ctx.beginPath();ctx.moveTo(p.x-6,y-3);ctx.lineTo(p.x,y+5);ctx.lineTo(p.x+6,y-3);ctx.closePath();ctx.fill();ctx.fillStyle='#22392d';ctx.textAlign='center';ctx.fillText(words,p.x,y-10);ctx.globalAlpha=1;}
@@ -927,7 +927,28 @@ export class World {
   // Ambient people walk loops inside venues so places feel alive. Purely visual and identical for everyone.
   // Venue regulars: each has a job and a spot (a drill, a desk, the stands) instead of jogging laps.
   // While you train, anyone on your training spot steps aside to watch, so the area is yours.
+  // The gym crowd: regulars spend a while on a machine, then walk the aisle to another free one.
+  // They never pick the machine you are using or heading to, and they step off when asked (or shoved).
+  gymCrowdStep(){
+    const now=performance.now()/1000,dt=Math.min(.1,Math.max(0,now-(this.gymAt??now)));this.gymAt=now;
+    const machines=worldObjects('gym').filter(o=>o.act),AISLE=-1.6,mine=this.state?.recovery?.act&&this.actAt?this.actAt:null;
+    const busy=(m,self)=>this.gymCrowd.some(c=>c!==self&&c.machine?.key===m.key)||(mine&&mine.key===m.key)||(this.reserved&&this.reserved.until>now&&this.reserved.key===m.key);
+    const pick=self=>{const free=machines.filter(m=>m.key!==self.machine?.key&&!busy(m,self));return free[Math.floor(Math.random()*free.length)]||null;};
+    if(!this.gymCrowd){this.gymCrowd=['football','tennis','wrestling','basketball'].map((career,n)=>({n,career,machine:null,x:0,z:AISLE,path:[],until:0,gait:0}));
+      for(const c of this.gymCrowd){const m=pick(c);if(m){c.machine=m;c.x=m.vx??m.x;c.z=m.vz??m.z;c.until=now+8+Math.random()*25;}}}
+    for(const c of this.gymCrowd){
+      if(c.path.length){const t=c.path[0],dx=t.x-c.x,dz=t.z-c.z,d=Math.hypot(dx,dz),step=Math.min(d,1.7*dt);c.heading=Math.atan2(dx,dz);c.x+=d?dx/d*step:0;c.z+=d?dz/d*step:0;c.gait+=step*8;if(d<.04)c.path.shift();if(!c.path.length)c.until=now+18+Math.random()*22;continue;}
+      if(now>=c.until||(mine&&c.machine&&mine.key===c.machine.key)){const m=pick(c);if(!m){c.until=now+3;continue;}
+        c.machine=m;c.path=[{x:c.x,z:AISLE},{x:m.x,z:AISLE},{x:m.x,z:m.z},{x:m.vx??m.x,z:m.vz??m.z}];}
+    }
+  }
+  // Who is on (or walking to) a machine.
+  occupant(object){return this.location==='gym'&&this.gymCrowd?.find(c=>c.machine?.key===object.key)||null;}
+  // Ask someone to step off a machine: it is kept free for you for a few seconds.
+  evict(n,line,angry){const c=this.gymCrowd?.[n];if(!c)return;const now=performance.now()/1000;this.reserved={key:c.machine?.key,until:now+12};c.until=0;c.path=[];c.machine=null;c.angryUntil=angry?now+4:0;this.say(`crowd:${n}`,line);}
   paintCrowd(l){
+    if(l==='gym'){this.gymCrowdStep();const now=performance.now()/1000;for(const c of this.gymCrowd){const walking=c.path.length>0,using=!walking&&c.machine,angry=c.angryUntil>now;
+      this.human(c.x,c.z,SKIN_TONES[(c.n*3+l.length+CROWD_SEED)%SKIN_TONES.length],{...this.look(c.career),...this.extra(c.n+l.length),walk:walking,gait:c.gait,pose:angry?'gesture':using?VENUE_ACTS[c.machine.act]?.pose||null:null,heading:walking||angry?(angry?Math.atan2((this.actor||this.player).x-c.x,(this.actor||this.player).z-c.z):c.heading):c.machine?.face??0});}return;}
     const list=REGULARS[l];if(!list)return;const training=this.training(),t=this.reduced?0:performance.now()/1000,a=this.actor||this.player;
     const stage=this.performer(l),looks=spot=>stage&&!spot.seat&&!['work','sleep','sport','perform','dance','shoki','victory'].includes(spot.pose)&&Math.hypot(stage.x-spot.x,stage.z-spot.z)>.6?Math.atan2(stage.x-spot.x,stage.z-spot.z):null;
     const talking=this.chatWith&&this.chatWith.until>performance.now()?this.chatWith.id:null;
@@ -971,7 +992,7 @@ export class World {
     const npc=NPCS.find(n=>n.location===this.location),spot=npc&&worldObjects(this.location).find(o=>o.action==='phone');if(npc&&this.zoom>=.55)tag(spot?.x??2.5,spot?.z??2,`${npc.role} ${npc.name}`);
     const here=TOWN[this.location]||TOWN.home;this.peopleHits=[];
     // Venue regulars can be tapped to socialise.
-    if(this.interior()&&this.location!=='home'){const training=this.training();for(const [n,r] of (REGULARS[this.location]||[]).entries()){const spot=training&&r.aside?r.aside:r;this.peopleHits.push({regular:{id:`${this.location}:${n}`,name:npcName(this.location,n),career:r.career,x:spot.x,z:spot.z},screen:this.project(spot.x,1.1,spot.z)});}}
+    if(this.interior()&&this.location!=='home'){const training=this.training();const crowd=this.location==='gym'&&this.gymCrowd?this.gymCrowd.map(c=>({career:c.career,x:c.x,z:c.z})):REGULARS[this.location]||[];for(const [n,r] of crowd.entries()){const spot=training&&r.aside?r.aside:r;this.peopleHits.push({regular:{id:`${this.location}:${n}`,name:npcName(this.location,n),career:r.career,x:spot.x,z:spot.z},screen:this.project(spot.x,1.1,spot.z)});}}
     for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1))continue;this.peopleHits.push({player:p,screen:this.project(x,1.1,z)});if((p.location===this.location&&this.zoom>=.45)||this.zoom>=.85||this.hover?.player?.id===p.id)tag(x,z,(this.friends?.includes(p.id)?'♥ ':'')+(p.crew?.badge?p.crew.badge+' ':'')+p.name);}
     this.houseHits=[];if(!this.interior())for(const [index,owner] of this.owners||[]){const h=CITY.houses[index],x=h.x-here.x,z=h.z-here.z;if(!this.onScreen(x,z,2))continue;const screen=this.project(x,h.h+.9,z);this.houseHits.push({house:owner,screen});if(this.zoom>=.5||this.hover?.house?.id===owner.id){ctx.font='600 9px Segoe UI';ctx.textAlign='center';const label=`🏠 ${owner.name}`,w=ctx.measureText(label).width+14;ctx.fillStyle='#153d32d9';ctx.beginPath();ctx.roundRect(screen.x-w/2,screen.y-8,w,16,8);ctx.fill();ctx.fillStyle='#fff';ctx.fillText(label,screen.x,screen.y+3);}}
     if(!this.interior())for(const b of this.billboards||[]){const here=TOWN[this.location]||TOWN.home,p=this.project(b.x,7.1,b.z);if(p.x<-60||p.x>this.width+60||p.y<-30||p.y>this.height+30)continue;ctx.font='700 11px Segoe UI';ctx.textAlign='center';const label=`★ ${b.name}`,w=ctx.measureText(label).width+16;ctx.fillStyle='#1d1f22e6';ctx.beginPath();ctx.roundRect(p.x-w/2,p.y-9,w,18,9);ctx.fill();ctx.fillStyle='#f2c230';ctx.fillText(label,p.x,p.y+4);}
