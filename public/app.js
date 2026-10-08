@@ -371,17 +371,22 @@ function renderActivity(){
 }
 async function chooseDecision(index){const a=state.active;if(!a)return;const chosen=a.choices[index];const data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});if(data&&motion)world.respond(chosen.action,data.state.active?.outcomes.at(-1)?.success);}
 // Character creation is two steps: your look, then your career. The starting story is drawn at random.
-// Accounts, like Lagos Life: create an account or log in with an emailed one-time code. No passwords.
-let welcomed=false,authStep={tab:'signup',email:''};
+let welcomed=false,authStep={tab:'signup',username:''};
 async function auth(input){const response=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Something went wrong. Try again.');return data;}
+// Accounts: a username and a password. Create account links this browser's character to the new account.
 function authScreen(tab=authStep.tab,error=''){
-  authStep.tab=tab;const signup=tab==='signup',codeStep=tab==='code';
+  authStep.tab=tab;const signup=tab==='signup';
   showModal('auth',`<div class="auth"><div class="auth-brand"><span>✦</span><strong>Celebrity Games</strong><i>18+</i></div><p class="auth-lede">Live your celebrity story with real people.</p>
-  ${codeStep?`<form id="codeForm" class="auth-form">${authStep.fallback?`<p class="auth-note">Email codes aren’t switched on yet, so use <strong>123456</strong>.</p>`:`<p>We sent a 6-digit code to <strong>${escape(authStep.email)}</strong>.</p>`}<div class="field"><label for="code">Code</label><input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="\\d{6}" maxlength="6" required placeholder="123456"></div>${error?`<p class="auth-error">${escape(error)}</p>`:''}<button class="primary wide" type="submit">Verify &amp; continue</button><div class="auth-links">${button('Resend code','authResend','','text-button')}${button('Use a different email','authTab',`data-tab="${authStep.from||'signup'}"`,'text-button')}</div></form>`
-  :`<div class="auth-tabs">${button('Create account','authTab','data-tab="signup"',signup?'on':'')}${button('Log in','authTab','data-tab="login"',signup?'':'on')}</div><form id="authForm" class="auth-form"><input type="hidden" name="purpose" value="${tab}">
-  ${signup?`<div class="field"><label for="authName">Your name</label><input id="authName" name="name" placeholder="e.g. Tolu Adebayo" minlength="2" maxlength="40" required autocomplete="name"></div><div class="field"><label for="authUser">Username</label><div class="at-input"><span>@</span><input id="authUser" name="username" placeholder="tolu_eko" pattern="[A-Za-z0-9_]{3,20}" maxlength="20" required autocomplete="username"></div><small>Your celebrity name in Naija City. 3–20 letters, numbers or underscores.</small></div>`:''}
-  <div class="field"><label for="authEmail">Email</label><input id="authEmail" name="email" type="email" required autocomplete="email" placeholder="you@example.com" value="${escape(authStep.email)}"></div>
-  ${signup?'<label class="check"><input type="checkbox" name="adult" required> I’m 18 or older.</label>':''}${error?`<p class="auth-error">${escape(error)}</p>`:''}<button class="primary wide" type="submit">Send code</button><p class="empty">${signup?'We’ll email you a code. No password needed.':'We’ll email a code to the address on your account.'}</p></form>`}</div>`,false);
+  <div class="auth-tabs">${button('Create account','authTab','data-tab="signup"',signup?'on':'')}${button('Log in','authTab','data-tab="login"',signup?'':'on')}</div><form id="authForm" class="auth-form"><input type="hidden" name="purpose" value="${tab}">
+  <div class="field"><label for="authUser">Username</label><div class="at-input"><span>@</span><input id="authUser" name="username" placeholder="tolu_eko" pattern="[A-Za-z0-9_@]{3,21}" maxlength="21" required autocomplete="username" value="${escape(authStep.username||'')}"></div>${signup?'<small>Your celebrity name in Naija City. 3–20 letters, numbers or underscores.</small>':''}</div>
+  <div class="field"><label for="authPass">Password</label><input id="authPass" name="password" type="password" minlength="${signup?8:1}" maxlength="128" required autocomplete="${signup?'new-password':'current-password'}" placeholder="${signup?'At least 8 characters':'Your password'}"></div>
+  ${signup?'<label class="check"><input type="checkbox" name="adult" required> I’m 18 or older.</label>':''}${error?`<p class="auth-error">${escape(error)}</p>`:''}<button class="primary wide" type="submit">${signup?'Create account':'Log in'}</button><p class="empty">${signup?'Keep your password safe: there’s no reset.':'Forgot it? There’s no reset, so keep your password safe.'}</p></form></div>`,false);
+}
+// Older accounts made with email codes set a password here while signed in, so they can log in elsewhere.
+function passwordScreen(error=''){
+  const has=snapshot.account?.hasPassword;
+  showModal('password',`<span class="eyebrow">ACCOUNT</span><h2>${has?'Change your password':'Set a password'}</h2><p class="modal-intro">${has?'Enter your current password, then a new one.':'Sign-in is now a username and password. Set one so you can log in on any device as <strong>@'+escape(snapshot.account?.username||'')+'</strong>.'}</p>
+  <form id="passwordForm" class="auth-form">${has?'<div class="field"><label for="curPass">Current password</label><input id="curPass" name="current" type="password" required autocomplete="current-password"></div>':''}<div class="field"><label for="newPass">New password</label><input id="newPass" name="password" type="password" minlength="8" maxlength="128" required autocomplete="new-password" placeholder="At least 8 characters"></div>${error?`<p class="auth-error">${escape(error)}</p>`:''}<button class="primary wide" type="submit">Save password</button></form>`);
 }
 function welcome(data){
   const a=data.account,s=data.state;if(!s||modalPage)return;
@@ -391,7 +396,7 @@ function welcome(data){
 function confirmLogout(){
   // Guests have no account to return to, so logging out deletes their character.
   if(!snapshot.account){showModal('logoutConfirm',`<span class="eyebrow">GUEST</span><h2>Log out and start afresh?</h2><p class="modal-intro">You’re playing as a guest. Logging out <strong>permanently deletes ${escape(state.name)}</strong>, with all fame, skills and possessions. Save your character to an account first if you want to keep it.</p><div class="actions">${button('Save my character','authTab','data-tab="signup"','primary')}${button('Delete and log out','logoutGuest','','quiet')}</div>`);return;}
-  showModal('logoutConfirm',`<span class="eyebrow">ACCOUNT</span><h2>Log out?</h2><p class="modal-intro">You’re signed in as <strong>@${escape(snapshot.account.username)}</strong>. Your character stays safe on your account; log in with your email to play again on any device.</p><div class="actions">${button('Log out','logout','','primary')}${button('Stay signed in','closeWelcome')}</div>`);}
+  showModal('logoutConfirm',`<span class="eyebrow">ACCOUNT</span><h2>Log out?</h2><p class="modal-intro">You’re signed in as <strong>@${escape(snapshot.account.username)}</strong>. Your character stays safe on your account; log in with your username and password to play again on any device.</p><div class="actions">${button('Log out','logout','','primary')}${button('Stay signed in','closeWelcome')}</div>`);}
 function newLife(){showModal('newLife',`<span class="eyebrow">NEW LIFE</span><h2>Start over?</h2><p class="modal-intro">Your character, skills, fame and possessions are erased for good. Your account and username stay.</p><form id="newLifeForm"><div class="field"><label for="confirmLife">Type NEW LIFE to confirm</label><input id="confirmLife" name="confirm" autocomplete="off" required></div><button class="primary wide" type="submit">Erase and start a new life</button></form>`);}
 function creation(account=snapshot?.account){
   showModal('create',`<div class="creation-hero"><span class="eyebrow">WELCOME TO NAIJA CITY</span><h2>A little life.<br>A lot of possibility.</h2><p>Find your craft, make your people, and turn everyday moments into a life worth remembering.</p></div><form id="createForm"><div class="steps"><span class="step on">1 · Your look</span><span class="step" id="stepTwoLabel">2 · Your career</span></div>
@@ -742,7 +747,7 @@ function profile(){const season=snapshot.season,c=state.careers[state.career],de
   <p class="app-label">Settings</p><div class="pcard settings">
   ${graphicsMode==='fallback'?prow(ico('🖥️'),'2D Lite','3D isn’t available on this device or browser. Turning on hardware acceleration may enable it.'):prow(ico('🖥️'),'Graphics',graphicsMode==='2d'?'2D Lite · lighter and faster':'3D · try 2D Lite if it feels slow',graphicsMode==='2d'?button('Use 3D','graphics','data-mode="3d"',tint('#2fa84f')):button('Use 2D Lite','graphics','data-mode="2d"',tint('#2f7de1')))}
   ${prow(ico('📲'),'Phone upgrades',escape((PHONES[state.phone]||PHONES.basic).name),button('Open','app','data-app="upgrade"',tint('#2f7de1')))}
-  ${snapshot.account?prow(ico('👤'),'@'+escape(snapshot.account.username),escape(snapshot.account.email),button('Log out','app','data-app="logout"',tint('#2f7de1'))):prow(ico('👤'),'Playing as a guest','Save your character to play on any device.',button('Save','authTab','data-tab="signup"','primary small')+button('Log out','app','data-app="logout"','quiet small'))}
+  ${snapshot.account?prow(ico('👤'),'@'+escape(snapshot.account.username),snapshot.account.hasPassword?'Username and password':'⚠ Set a password to log in elsewhere',button('Log out','app','data-app="logout"',tint('#2f7de1')))+prow(ico('🔑'),snapshot.account.hasPassword?'Change password':'Set a password','',button(snapshot.account.hasPassword?'Change':'Set','setPassword','',snapshot.account.hasPassword?tint('#2f7de1'):'primary small')):prow(ico('👤'),'Playing as a guest','Save your character to play on any device.',button('Save','authTab','data-tab="signup"','primary small')+button('Log out','app','data-app="logout"','quiet small'))}
   ${snapshot.account?prow(ico('🌱','#e5484d'),'New life','Erase this character and start over.',button('New life','newLife','','danger small')):''}</div>`);}
 function phone(tab='people'){
   if(tab==='local')tab='people';if(tab==='battles'){battlesFrom='social';battlesApp();return;}
@@ -975,7 +980,7 @@ document.addEventListener('click',async event=>{
     case 'closeReel':lookWorld?.stop();lookWorld=null;modalPage=null;$('#modal').hidden=true;toast('Welcome to Naija City. Your next chapter starts at home.');break;
     case 'playHere':elsewhere=false;modalPage=null;$('#modal').hidden=true;await refresh(true);scheduleHeartbeat();break;
     case 'authTab':authStep.from=d.tab;authScreen(d.tab);break;
-    case 'authResend':try{await auth({type:'sendCode',purpose:authStep.purpose,email:authStep.email,...authStep.extra});authScreen('code','A new code is on its way.');}catch(e){authScreen('code',e.message);}break;
+    case 'setPassword':passwordScreen();break;
     case 'closeWelcome':closeModal();break;
     case 'newLife':newLife();break;
     case 'logout':try{await auth({type:'logout'});}catch(e){toast(e.message);break;}location.reload();break;
@@ -1044,9 +1049,9 @@ document.addEventListener('click',async event=>{
 });
 document.addEventListener('submit',async event=>{
   event.preventDefault();const form=event.target,values=Object.fromEntries(new FormData(form));
-  if(form.id==='authForm'){const purpose=values.purpose,extra=purpose==='signup'?{name:values.name,username:values.username,adult:values.adult==='on'}:{};authStep={...authStep,purpose,email:values.email.trim(),extra,from:purpose};
-    try{const sent=await auth({type:'sendCode',purpose,email:values.email,...extra});authStep.fallback=!!sent.fallback;authScreen('code');}catch(e){authScreen(purpose,e.message);}}
-  if(form.id==='codeForm'){try{await auth({type:'verifyCode',email:authStep.email,code:values.code});modalPage=null;$('#modal').hidden=true;welcomed=true;await refresh();toast('You’re signed in.');}catch(e){authScreen('code',e.message);}}
+  if(form.id==='authForm'){const purpose=values.purpose==='login'?'login':'signup';authStep={...authStep,username:values.username.trim()};
+    try{await auth(purpose==='signup'?{type:'signup',username:values.username,password:values.password,adult:values.adult==='on'}:{type:'login',username:values.username,password:values.password});modalPage=null;$('#modal').hidden=true;welcomed=true;await refresh(true);toast(purpose==='signup'?'Account created. Welcome to Naija City!':'You’re signed in.');}catch(e){authScreen(purpose,e.message);}}
+  if(form.id==='passwordForm'){try{const data=await auth({type:'setPassword',password:values.password,current:values.current});if(snapshot)snapshot.account=data.account;closeModal();toast('Password saved.');}catch(e){passwordScreen(e.message);}}
   if(form.id==='newLifeForm'){try{await auth({type:'newLife',confirm:values.confirm.trim()});}catch(e){toast(e.message);return;}location.reload();}
   if(form.id==='createForm'){values.adult=values.adult==='on';const data=await send({type:'create',...values});if(data){modalPage=null;storyReel(data.state);}}
   if(form.id==='prepareForm')await send({type:'start',...values});

@@ -8,7 +8,7 @@ import { resendSender } from './email.mjs';
 
 // Migrations sit beside this file locally and on Vercel; bundled Netlify functions find them
 // from the working directory instead (they are included via netlify.toml).
-const MIGRATIONS = ['0001_celebrity-city', '0002_live-pulse', '0003_battles', '0004_accounts', '0005_active-device', '0006_profiles-pulses', '0007_award-arena'];
+const MIGRATIONS = ['0001_celebrity-city', '0002_live-pulse', '0003_battles', '0004_accounts', '0005_active-device', '0006_profiles-pulses', '0007_award-arena', '0008_passwords'];
 const migrationSql = name => {
   const rel = `netlify/database/migrations/${name}/migration.sql`;
   let here = null;

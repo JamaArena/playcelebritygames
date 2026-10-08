@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { CLASH, CLASH_ACTIONS, CHEER } from './public/clashText.js';
 import { CLASH_MEDALS, medalTier, isBigger, clashStake, ARENA, arenaGroup } from './public/content.js';
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes, createHash, scryptSync, timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline, questProgress } from './game.mjs';
 import { CAREERS, BALANCE, clamp, perksFor, WEAR, SPOUSE_SHARE, SPOUSE_REASON } from './public/content.js';
-export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS profiles(id TEXT PRIMARY KEY, room TEXT, location TEXT, career TEXT, fame INTEGER, trend INTEGER, seen INTEGER, dating INTEGER, crew INTEGER, outside INTEGER, data TEXT NOT NULL);\n CREATE INDEX IF NOT EXISTS profiles_room ON profiles(room,seen);\n CREATE INDEX IF NOT EXISTS profiles_seen ON profiles(seen);\n CREATE INDEX IF NOT EXISTS profiles_fame ON profiles(fame);\n CREATE INDEX IF NOT EXISTS profiles_career ON profiles(career,seen);\n CREATE TABLE IF NOT EXISTS arena(day INTEGER PRIMARY KEY, results TEXT NOT NULL);";
+export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL, password_hash TEXT);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS profiles(id TEXT PRIMARY KEY, room TEXT, location TEXT, career TEXT, fame INTEGER, trend INTEGER, seen INTEGER, dating INTEGER, crew INTEGER, outside INTEGER, data TEXT NOT NULL);\n CREATE INDEX IF NOT EXISTS profiles_room ON profiles(room,seen);\n CREATE INDEX IF NOT EXISTS profiles_seen ON profiles(seen);\n CREATE INDEX IF NOT EXISTS profiles_fame ON profiles(fame);\n CREATE INDEX IF NOT EXISTS profiles_career ON profiles(career,seen);\n CREATE TABLE IF NOT EXISTS arena(day INTEGER PRIMARY KEY, results TEXT NOT NULL);";
 // Who counts as online, and the room a player is in (a home, or a public place).
 export const ONLINE_MS=100_000;
 export const roomOf=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
@@ -268,45 +268,37 @@ function battlesFor(playerId,s,now){
   return rows.filter(b=>b.teams.flat().includes(playerId)?(b.status!=='done'&&b.status!=='cancelled')||now-(b.endedAt||b.createdAt)<5*60_000:b.status==='open'&&b.location===s?.location)
     .map(({lucky,...b})=>({...b,teamNames:b.teams.map(names),stake:b.status==='done'?null:clashStake(Math.min(...b.teams.flat().map(id=>id===playerId?s.fame||0:Number(db.prepare('SELECT fame FROM profiles WHERE id=?').get(id)?.fame||0))))}));
 }
-// Accounts: email + one-time code, no passwords. A code proves the email; the account then owns this
-// browser's character (or the one already linked to that email when logging in on a new device).
-// Until an email provider is configured, every code is FALLBACK_CODE so the game stays playable. This is
-// weak (anyone who knows an email can sign in as it) and switches off automatically once email is set up.
-const CODE_TTL=10*60_000,CODE_RESEND=60_000,CODE_ATTEMPTS=5,FALLBACK_CODE='123456';
-const cleanEmail=v=>String(v||'').trim().toLowerCase(),validEmail=v=>/^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,24}$/.test(v);
-function accountOf(playerId){const a=db.prepare('SELECT email,username,name FROM accounts WHERE player_id=?').get(playerId);return a?{username:a.username,name:a.name,email:a.email.replace(/^(.).*(@.*)$/,'$1•••$2')}:null;}
+// Accounts: a username and a password (stored as a salted scrypt hash). Accounts made before passwords keep
+// working on their signed-in devices and set one in Profile.
+const cleanUsername=v=>String(v||'').trim().replace(/^@/,'').toLowerCase();
+const hashPassword=password=>{const salt=randomBytes(16).toString('hex');return `scrypt$${salt}$${scryptSync(password,salt,32,{N:16384}).toString('hex')}`;};
+const passwordMatches=(password,stored)=>{const [kind,salt,digest]=String(stored||'').split('$');if(kind!=='scrypt'||!salt||!digest)return false;const a=Buffer.from(digest,'hex'),b=scryptSync(password,salt,32,{N:16384});return a.length===b.length&&timingSafeEqual(a,b);};
+const validPassword=p=>typeof p==='string'&&p.length>=8&&p.length<=128;
+if(!db.prepare("SELECT 1 FROM pragma_table_info('accounts') WHERE name='password_hash'").get())db.exec('ALTER TABLE accounts ADD COLUMN password_hash TEXT');
+function accountOf(playerId){const a=db.prepare('SELECT email,username,name,password_hash FROM accounts WHERE player_id=?').get(playerId);return a?{username:a.username,name:a.name,email:a.email.includes('@')?a.email.replace(/^(.).*(@.*)$/,'$1•••$2'):null,hasPassword:Boolean(a.password_hash)}:null;}
 async function authAction(playerId,token,input,now,res){
-  if(input.type==='sendCode'){
-    const email=cleanEmail(input.email),purpose=input.purpose==='login'?'login':'signup';fail(validEmail(email),'Enter a valid email address.');
-    const previous=db.prepare('SELECT sent FROM codes WHERE email=?').get(email);fail(!previous||now-previous.sent>=CODE_RESEND,'A code was just sent. Wait a minute before asking for another.');
-    let payload={};
-    if(purpose==='signup'){
-      const username=String(input.username||'').trim().replace(/^@/,'').toLowerCase(),name=String(input.name||'').trim().slice(0,40);
-      fail(name.length>=2,'Enter your name.');fail(/^[a-z0-9_]{3,20}$/.test(username),'Usernames use 3–20 letters, numbers or underscores.');fail(input.adult===true,'Confirm that you are 18 or older.');
-      fail(!db.prepare('SELECT 1 FROM accounts WHERE email=?').get(email),'That email already has an account. Log in instead.');
-      fail(!db.prepare('SELECT 1 FROM accounts WHERE username=?').get(username),'That username is taken.');
-      fail(!db.prepare('SELECT 1 FROM accounts WHERE player_id=?').get(playerId),'This browser is already signed in. Log out first.');
-      payload={username,name};
-    }
-    const exists=purpose==='login'?db.prepare('SELECT 1 FROM accounts WHERE email=?').get(email):true;
-    const code=sendEmail?String(randomBytes(4).readUInt32BE(0)%1_000_000).padStart(6,'0'):FALLBACK_CODE;
-    db.prepare('INSERT INTO codes VALUES(?,?,?,?,?,?,?) ON CONFLICT(email) DO UPDATE SET code_hash=excluded.code_hash,purpose=excluded.purpose,payload=excluded.payload,expires=excluded.expires,attempts=0,sent=excluded.sent').run(email,hash(email+':'+code),purpose,JSON.stringify(payload),now+CODE_TTL,0,now);
-    // Login never reveals whether an email is registered; unknown emails simply receive nothing.
-    if(exists&&sendEmail){await sendEmail({to:email,subject:`Your Celebrity Games code: ${code}`,text:`Your Celebrity Games code is ${code}. It expires in 10 minutes. If you didn't ask for it, ignore this email.`,code});}
-    return [200,{sent:true,email,fallback:!sendEmail}];
+  if(input.type==='signup'){
+    const username=cleanUsername(input.username);
+    fail(/^[a-z0-9_]{3,20}$/.test(username),'Usernames use 3–20 letters, numbers or underscores.');fail(validPassword(input.password),'Passwords need at least 8 characters.');fail(input.adult===true,'Confirm that you are 18 or older.');
+    fail(!db.prepare('SELECT 1 FROM accounts WHERE username=?').get(username),'That username is taken.');
+    fail(!db.prepare('SELECT 1 FROM accounts WHERE player_id=?').get(playerId),'This browser is already signed in. Log out first.');
+    // The email column stays unique and required for older accounts; new accounts store a placeholder.
+    db.prepare('INSERT INTO accounts(player_id,email,username,name,created,password_hash) VALUES(?,?,?,?,?,?)').run(playerId,'user:'+username,username,username,now,hashPassword(input.password));
+    return [200,{account:accountOf(playerId)}];
   }
-  if(input.type==='verifyCode'){
-    const email=cleanEmail(input.email),row=db.prepare('SELECT * FROM codes WHERE email=?').get(email);
-    fail(row&&row.expires>now&&row.attempts<CODE_ATTEMPTS,'That code has expired. Ask for a new one.');
-    if(row.code_hash!==hash(email+':'+String(input.code||'').trim())){db.prepare('UPDATE codes SET attempts=attempts+1 WHERE email=?').run(email);throw new GameError('That code isn’t right. Check your email and try again.');}
-    db.prepare('DELETE FROM codes WHERE email=?').run(email);
-    if(row.purpose==='signup'){
-      const {username,name}=JSON.parse(row.payload);fail(!db.prepare('SELECT 1 FROM accounts WHERE username=? OR email=?').get(username,email),'That username or email was just taken.');
-      db.prepare('INSERT INTO accounts VALUES(?,?,?,?,?)').run(playerId,email,username,name,now);return [200,{account:accountOf(playerId)}];
-    }
-    const account=db.prepare('SELECT player_id FROM accounts WHERE email=?').get(email);fail(account,'That code has expired. Ask for a new one.');
+  if(input.type==='login'){
+    const username=cleanUsername(input.username);
+    const account=db.prepare('SELECT player_id,password_hash FROM accounts WHERE username=?').get(username);
+    if(account&&!account.password_hash)throw new GameError('This account was made before passwords. Open the game where you are signed in and set a password in Profile.');
+    fail(account&&passwordMatches(String(input.password||''),account.password_hash),'That username and password don’t match.');
     const session=randomBytes(32).toString('hex');db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(hash(session),account.player_id,now);
     res.setHeader('Set-Cookie',`celebrity=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000${secureCookies?'; Secure':''}`);return [200,{account:accountOf(account.player_id)}];
+  }
+  if(input.type==='setPassword'){
+    const row=db.prepare('SELECT password_hash FROM accounts WHERE player_id=?').get(playerId);fail(row,'Create an account first.');
+    if(row.password_hash)fail(passwordMatches(String(input.current||''),row.password_hash),'Your current password isn’t right.');
+    fail(validPassword(input.password),'Passwords need at least 8 characters.');
+    db.prepare('UPDATE accounts SET password_hash=? WHERE player_id=?').run(hashPassword(input.password),playerId);return [200,{account:accountOf(playerId)}];
   }
   if(input.type==='logout'){
     // Guests have nothing to come back to: logging out deletes the guest character for good.
