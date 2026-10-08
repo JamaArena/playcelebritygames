@@ -118,22 +118,17 @@ test('HTTP persistence, idempotency, social permissions, collaboration and seaso
   assert.equal(aEnd.battle,null);assert.equal(bEnd.battle,null);
   assert.equal((await a.call({type:'battleMove',battleId,move:'brag',target:bId})).status,400,'finished battles take no more moves');
   assert.equal((await a.call({type:'battleCreate',mode:3})).status,400,'only 1v1 Fame Clashes');
-  // Accounts: email + one-time code (the local server logs codes), multi-device sign-in, logout, new life.
-  // The test server has no email key, so every code is the fallback 123456.
+  // Accounts: username + password, multi-device sign-in, logout, new life.
   const tolu=client(),phone=client();
-  assert.equal((await tolu.auth({type:'sendCode',purpose:'signup',email:'Tolu@Example.com',name:'Tolu',username:'@Tolu_Eko',adult:false})).status,400,'18+ confirmation required');
-  assert.equal((await tolu.auth({type:'sendCode',purpose:'signup',email:'tolu@example.com',name:'Tolu',username:'tolu_eko',adult:true})).status,200);
-  const code='123456';
-  assert.equal((await tolu.auth({type:'verifyCode',email:'tolu@example.com',code:code==='000000'?'111111':'000000'})).status,400,'wrong codes are rejected');
-  const joined=await tolu.auth({type:'verifyCode',email:'tolu@example.com',code});assert.equal(joined.status,200);assert.equal(joined.data.account.username,'tolu_eko');
-  assert.equal((await tolu.auth({type:'verifyCode',email:'tolu@example.com',code})).status,400,'codes work once');
+  assert.equal((await tolu.auth({type:'signup',username:'@Tolu_Eko',password:'sunshine8',adult:false})).status,400,'18+ confirmation required');
+  assert.equal((await tolu.auth({type:'signup',username:'tolu_eko',password:'short',adult:true})).status,400,'passwords need 8 characters');
+  const joined=await tolu.auth({type:'signup',username:'@Tolu_Eko',password:'sunshine8',adult:true});assert.equal(joined.status,200);assert.equal(joined.data.account.username,'tolu_eko');assert.equal(joined.data.account.hasPassword,true);
   assert.equal((await tolu.call()).data.account.username,'tolu_eko');assert.equal((await tolu.call()).data.state,null);
   await tolu.call({type:'create',name:'Tolu',career:'vlogger'});
-  assert.equal((await phone.auth({type:'sendCode',purpose:'signup',email:'other@example.com',name:'Other',username:'tolu_eko',adult:true})).status,400,'usernames are unique');
-  assert.equal((await phone.auth({type:'sendCode',purpose:'login',email:'nobody@example.com'})).status,200,'unknown emails get the same answer');
-  assert.equal((await phone.auth({type:'verifyCode',email:'nobody@example.com',code:'123456'})).status,400,'and cannot sign in');
-  const login=await phone.auth({type:'sendCode',purpose:'login',email:'tolu@example.com'});assert.equal(login.data.fallback,true,'the client is told to use the fallback code');
-  assert.equal((await phone.auth({type:'verifyCode',email:'tolu@example.com',code:'123456'})).status,200);
+  assert.equal((await phone.auth({type:'signup',username:'tolu_eko',password:'another88',adult:true})).status,400,'usernames are unique');
+  assert.equal((await phone.auth({type:'login',username:'nobody',password:'whatever1'})).status,400,'unknown usernames cannot sign in');
+  assert.equal((await phone.auth({type:'login',username:'tolu_eko',password:'wrongpass'})).status,400,'wrong passwords are rejected');
+  assert.equal((await phone.auth({type:'login',username:'Tolu_Eko',password:'sunshine8'})).status,200,'the right username and password sign in');
   const blocked=await phone.call();assert.equal(blocked.status,409,'one device at a time');assert.equal(blocked.data.code,'other_device');
   assert.equal((await phone.call(null,{takeover:true})).data.state.name,'Tolu','Play here moves the game to the second device');
   assert.equal((await tolu.call()).status,409,'and the first device is now blocked');
