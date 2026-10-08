@@ -65,7 +65,7 @@ const REGULARS={
   nightclub:[{career:'musician',x:-.6,z:.1,heading:.4,pose:'dance'},{career:'actor',x:.7,z:-.9,heading:-.6,pose:'shoki'},{career:'vlogger',x:-3.4,z:-1,heading:-Math.PI/2,pose:'chat'}],
   lounge:[{career:'actor',x:3,z:2.3,heading:Math.PI,pose:'sit',seat:.5},{career:'founder',x:3.4,z:-1.3,heading:-Math.PI/2,pose:'gesture'}],
   cinema:[{career:'vlogger',x:-1.9,z:2.8,heading:Math.PI,pose:'sit',seat:.5},{career:'actor',x:1.9,z:.4,heading:Math.PI,pose:'sit',seat:.5},{career:'tennis',x:.95,z:4,heading:Math.PI,pose:'sit',seat:.5}],
-  mall:[{career:'streamer',x:-.6,z:-3.4,heading:Math.PI,pose:'scroll'},{career:'actor',x:3.2,z:3.5,heading:0,pose:'sit',seat:.45},{career:'musician',x:-3.6,z:2,heading:Math.PI},{career:'vlogger',x:1,z:0,heading:.8}],
+  mall:[{career:'developer',x:3.9,z:-4.28,heading:0,pose:'gesture',name:'Phone shop assistant'},{career:'streamer',x:-.6,z:-3.4,heading:Math.PI,pose:'scroll'},{career:'actor',x:3.2,z:3.5,heading:0,pose:'sit',seat:.45},{career:'musician',x:-3.6,z:2,heading:Math.PI},{career:'vlogger',x:1,z:0,heading:.8}],
   tvStation:[{career:'actor',x:-1,z:-2.8,heading:0,pose:'gesture'},{career:'developer',x:-3,z:-.1,heading:Math.PI,pose:'chat'},{career:'vlogger',x:-1.5,z:3.4,heading:Math.PI,pose:'sit',seat:.6}],
   radio:[{career:'musician',x:0,z:-3.6,heading:Math.PI,pose:'gesture'}],
   market:[{career:'musician',x:-3.4,z:-2.1,heading:Math.PI,pose:'chat'},{career:'actor',x:3.4,z:1.9,heading:0,pose:'gesture'},{career:'vlogger',x:-1,z:2.8,heading:2.6},{career:'football',x:1.6,z:-1.5,heading:-1.2}],
@@ -783,7 +783,14 @@ export class World {
     else if(l==='cinema'){F(0,0,11,11,'#2a2428');walls(3,'#3a2f35','#342a30');B(0,-5,8.5,.12,3.2,'#111',.4);B(0,-4.92,8,.04,2.9,night?'#c8d8f0':'#e8eef6',.55);
       for(const z of [.4,1.6,2.8,4])seatRow(z,7,'#a3263a');B(-4.6,3,.6,1,1.2,'#e0c85a');R(-4.6,3,.5,.5,.4,'#f2e6c4',1.2);}
     else if(l==='mall'){F(0,0,11,11,'#e9e6e0');walls(3,'#f3f1ec','#eeece6');
-      [['#2f6fb3','👗'],['#d23b4b','👟'],['#2fae6b','📱']].forEach(([c],i)=>{const x=-3.4+i*3.4;B(x,-4.6,2.8,.6,2.4,'#f7f6f3');B(x,-4.28,2.5,.04,1.6,'#bce4fa',.2);B(x,-4.3,2.8,.08,.5,c,2.1);R(x-.6,-3.9,.4,.4,1.3,'#c9c4bc');});
+      [['#2f6fb3','👗'],['#d23b4b','👟']].forEach(([c],i)=>{const x=-3.4+i*3.4;B(x,-4.6,2.8,.6,2.4,'#f7f6f3');B(x,-4.28,2.5,.04,1.6,'#bce4fa',.2);B(x,-4.3,2.8,.08,.5,c,2.1);R(x-.6,-3.9,.4,.4,1.3,'#c9c4bc');});
+      // The phone store: a dark sign with a glowing stripe, a giant hero phone, lit shelves of handsets and a demo counter.
+      {const x=3.4,glow=['#5b7cfa','#9b5de5','#f15bb5','#2fae6b'][Math.floor(t/2)%4],screens=['#5b7cfa','#2fae6b','#f2c230','#f15bb5','#9fd3ff'];
+        B(x,-4.6,2.8,.6,2.4,'#f4f5f7');B(x,-4.29,2.8,.1,.46,'#1d1f24',2.08);B(x+.15,-4.23,1.9,.03,.08,night||Math.sin(t*3)>-.6?'#39d98a':'#1f7a4f',2.27);B(x-1.05,-4.23,.16,.03,.3,'#9fd3ff',2.16);B(x-1.05,-4.215,.12,.02,.22,'#14161a',2.2);
+        B(x,-4.28,.62,.04,1.22,'#14161a',.62);B(x,-4.25,.54,.03,1.08,glow,.69);R(x,-4.24,.08,.02,.08,'#05060a',1.69);
+        for(const s of [-1,1])for(const [r,y] of [[0,.85],[1,1.35]]){B(x+s*.92,-4.27,.78,.2,.04,'#d9dce1',y);for(let k=0;k<3;k++){const px=x+s*.92+(k-1)*.24;B(px,-4.26,.13,.03,.24,'#16181c',y+.04);B(px,-4.245,.1,.02,.2,screens[(k+r*2+(s>0?1:0))%5],y+.06);}}
+        B(x,-4.02,1.9,.42,.92,'#fbfbfc');B(x,-4.02,1.96,.48,.05,'#2b2d33',.92);B(x,-3.79,1.9,.02,.5,'#39d98a',.3);
+        for(let k=-2;k<=2;k++){B(x+k*.34,-4.02,.06,.06,.08,'#c9ccd2',.97);B(x+k*.34,-4.0,.13,.03,.22,'#16181c',1.03);B(x+k*.34,-3.985,.1,.02,.18,screens[(k+2+Math.floor(t))%5],1.05);}}
       for(const [x,z] of [[1.6,2],[3.2,2],[1.6,3.5],[3.2,3.5]]){table(x,z);this.stool(x-.55,z,'#e07a5f',.45);this.stool(x+.55,z,'#e07a5f',.45);}B(-3.6,2.8,2.4,1.2,1,'#e8a23a');plant(-1,1,1.2);plant(1,-1.2,1);}
     else if(l==='tvStation'){F(0,0,11,11,'#1f2a33');walls(3,'#2b3a46','#26343f');F(0,-2.4,6,3.4,'#3d6a8a',.02);this.desk(-1,-3.4,1.4,.6,0,'#f2f2f0','#9aa0a8');this.monitor(-1.3,-3.55,0,.75,.42);this.sofa(.9,-2.95,0,1.6,'#c9a46a','#2f6fb3');B(0,-4.9,4.2,.08,2,night?'#5b8fd6':'#4a7fc0',.6);
       for(const s of [-1,1]){this.tripodCamera(s*3,-.6,Math.PI);D(s*4.3,-3.8,.08,.08,2.2,'#2b2b2b');B(s*4.3,-3.8,.5,.3,.3,'#fff3c4',2.2);}
