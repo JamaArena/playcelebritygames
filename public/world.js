@@ -166,7 +166,7 @@ const HOME_STYLES={
 };
 // Background people are reshuffled each visit so the crowd looks different every time.
 const CROWD_SEED=Math.floor(Math.random()*997);
-export const DISTRICTS=[['PALM HEIGHTS',-48,-24],['DOWNTOWN',48,-24],['CENTRAL PARK',0,-32],['NORTH HILLS',0,-48],['PALM LAGOON',-40,22],['LAGOON ISLAND',0,33]];
+export const DISTRICTS=[['MAITAMA HEIGHTS',-48,-24],['DOWNTOWN',48,-24],['JOS PLATEAU PARK',0,-32],['NORTH HILLS',0,-48],['ATLANTIC LAGOON',-40,22],['LAGOON ISLAND',0,33]];
 // Two angled views where the cutaway walls sit behind you, plus a flatter top view. Drag pans; no free spin.
 export const VIEWS=[{name:'Corner view',angle:Math.PI/4,pitch:.5,lift:1},{name:'Side view',angle:Math.PI*3/4,pitch:.5,lift:1},{name:'Top view',angle:Math.PI/4,pitch:.93,lift:.35}];
 export class World {
@@ -749,7 +749,7 @@ export class World {
     if(hasCanvas&&!island)this.stamp(this.layers.front);
     this.canvas.dataset.perf=`${this.meshes.length} meshes · scene ${(t1-t0).toFixed(1)}ms · paint ${(performance.now()-t1).toFixed(1)}ms`;
     if(light.dark){ctx.fillStyle=`rgba(24,34,72,${light.dark*.3})`;ctx.fillRect(0,0,r.width,r.height);}
-    if(weatherAt(Date.now())==='rain'){const t=this.reduced?0:performance.now()/400;ctx.strokeStyle='rgba(210,225,240,.45)';ctx.lineWidth=1;ctx.beginPath();for(let i=0;i<90;i++){const x=(i*97+t*40)%r.width,y=(i*53+t*160)%r.height;ctx.moveTo(x,y);ctx.lineTo(x-4,y+14);}ctx.stroke();}
+    if(!this.noWeather&&weatherAt(Date.now())==='rain'){const t=this.reduced?0:performance.now()/400;ctx.strokeStyle='rgba(210,225,240,.45)';ctx.lineWidth=1;ctx.beginPath();for(let i=0;i<90;i++){const x=(i*97+t*40)%r.width,y=(i*53+t*160)%r.height;ctx.moveTo(x,y);ctx.lineTo(x-4,y+14);}ctx.stroke();}
     this.paintRoutine();
     this.paintLabels();
     if(!island)this.paintPins();
