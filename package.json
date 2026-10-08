@@ -12,6 +12,7 @@
     "check": "node scripts/check.mjs"
   },
   "dependencies": {
+    "@netlify/database": "^2.0.1",
     "pg": "^8.23.1"
   },
   "devDependencies": {
