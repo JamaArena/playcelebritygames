@@ -69,6 +69,7 @@ function closeModal(){if(modalPage==='create')return;const device=$('#modal.as-p
 let elsewhere=false;
 function playingElsewhere(){if(elsewhere)return;elsewhere=true;clearTimeout(heartbeat);showModal('elsewhere',`<div class="welcome-card"><span class="eyebrow">ONE DEVICE AT A TIME</span><h2>You’re playing on another device</h2><p class="modal-intro">Celebrity Games is open somewhere else right now. Play here to move the game to this device; the other one will pause.</p>${button('Play here','playHere','','primary wide')}</div>`,false);}
 async function refresh(takeover=false){
+  if(!state&&$('#loadingText'))$('#loadingText').textContent='Connecting to the city…';
   if(busy||(elsewhere&&!takeover))return;
   try{const response=await fetch('/api/state'+(takeover?'?takeover=1':''));if(response.status===409){playingElsewhere();return;}if(!response.ok)throw new Error('City connection unavailable.');receive(await response.json());$('#connection').textContent='Saved to your city';}
   catch(error){$('#connection').textContent='Connection interrupted · retrying';if(!state)$('#loading').innerHTML='<div class="initial-error"><h1>Your city is unavailable</h1><p>We could not connect to your city. Please try again in a moment.</p><button class="primary" data-action="retry">Try again</button></div>';}
@@ -932,7 +933,7 @@ document.addEventListener('click',async event=>{
     case 'retirePicker':retirePicker();break;
     case 'retire':await send({type:'retire',career:d.career});break;
     case 'gift':await send({type:'gift',playerId:d.player,item:d.item},{keepModal:true});break;
-    case 'barberPick':if(d.hair)barberPick.hair=d.hair;if(d.color)barberPick.hairColor=d.color;barberShop();break;
+    case 'barberPick':barberPick??={hair:state.hair,hairColor:state.hairColor};if(d.hair)barberPick.hair=d.hair;if(d.color)barberPick.hairColor=d.color;barberShop();break;
     case 'restyle':{const data=await send({type:'restyle',...barberPick},{keepModal:true});if(data)barberPick=null;break;}
     case 'tattoo':await send({type:'tattoo',spot:d.spot},{keepModal:true});break;
     case 'tailor':await send({type:'tailor',item:d.item,color:d.color},{keepModal:true});break;
