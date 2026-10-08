@@ -39,6 +39,8 @@ const DRILLS={
 // Work (matches, gigs, shoots, projects) moves too: ball sports play a match with teammates; everyone else
 // alternates their main activity with moving around the room.
 // Match kits: your side always plays in blue, the other side always in red.
+// How long both teams stand for the anthem at kick-off.
+export const ANTHEM_MS=12000;
 const MATCH_KITS=[{outfit:'#2f6fd6',pants:'#f4f4f0',shoes:'#1d1f24',accent:'#ffffff'},{outfit:'#d23b3b',pants:'#1d1f24',shoes:'#f4f4f0',accent:'#ffffff'}];
 const WORK_DRILLS={football:'match',basketball:'match',tennis:'tennis',wrestling:'bout',musician:'gig',actor:'scene',adult:'scene',vlogger:'shoot',video:'shoot',skitmaker:'skit',streamer:'stream',founder:'office',developer:'office',web3:'office'};
 // What each career wears to work (football and basketball use MATCH_KITS). Fits and accessories as in WEAR.
@@ -1180,14 +1182,17 @@ export class World {
         const save=s.find(f=>/save|Saved|stop/i.test(f.text));dive=!!save&&e>=save.t-.25&&e<save.t+1.2;
         this.matchBanner=celebrate?{text:celebrate==='A'?'GOAL! ⚽':'Goal for Red',color:celebrate==='A'?'#ffd84a':'#ff8a7a',...toPitch(celebrate==='A'?100:0,32)}:dive?{text:'SAVED!',color:'#ffffff',...toPitch(sball[0],sball[1])}:sball[0]>100&&(sball[1]<24||sball[1]>40)?{text:'Wide!',color:'#ffffff',...toPitch(100,sball[1])}:null;}}
     if(!mv)this.matchBanner=null;
-    const waiting=active.beat<active.totalBeats&&clock>=active.readyAt,defending=active.possession==='opponent',full=active.beat>=active.totalBeats;
+    // While a move replays, open play keeps the shape from before the decision (who had the ball, how close you were).
+    const was=mv?.before||active,waiting=active.beat<active.totalBeats&&clock>=active.readyAt,defending=was.possession==='opponent',full=active.beat>=active.totalBeats;
     // Kick-off: both teams line up facing the camera for the anthem, then jog out to their positions.
-    const anthemEnd=active.startedAt+7000,anthem=active.beat===0&&clock<anthemEnd,out=active.beat===0?smooth((clock-anthemEnd)/2500):1;
+    const anthemEnd=active.startedAt+ANTHEM_MS,anthem=active.beat===0&&clock<anthemEnd,out=active.beat===0?smooth((clock-anthemEnd)/2500):1;
     // Open play: the ball moves between players of the side in possession; both shapes slide with it.
     const pb=this.matchBall2??={team:'A',holder:9,to:9,at:t,next:t+1};const side0=defending?'B':'A';
     if(pb.team!==side0){pb.team=side0;pb.holder=pb.to=9;pb.at=t;}
     if(waiting||anthem||this.reduced){pb.holder=pb.to=9;}else if(t>=pb.next){pb.holder=pb.to;pb.to=1+Math.floor(Math.random()*10);pb.at=t;pb.next=t+1.3+Math.random()*1.3;}
-    const formation=(side,n,shift)=>{const [fx,fy]=FORMATION[n],x=side==='A'?fx:100-fx,sway=Math.sin(t*.8+n*1.3+(side==='B'?2:0))*1.6;return [Math.min(97,Math.max(3,x+(n?shift:shift*.15)+sway*.5)),fy+Math.cos(t*.7+n)*1.2];};
+    // After a move that came off you stay where it left you, closer to goal (a.chance metres out).
+    const chanceX=!defending&&was.chance?100-was.chance-2:null;
+    const formation=(side,n,shift)=>{if(chanceX&&side==='A'&&n===9)return [chanceX+Math.sin(t*.9)*.8,30+Math.cos(t*.7)*1.2];const [fx,fy]=FORMATION[n],x=side==='A'?fx:100-fx,sway=Math.sin(t*.8+n*1.3+(side==='B'?2:0))*1.6;return [Math.min(97,Math.max(3,x+(n?shift:shift*.15)+sway*.5)),fy+Math.cos(t*.7+n)*1.2];};
     let shift=0;const own=()=>{const from=formation(pb.team,pb.holder,shift),to=formation(pb.team,pb.to,shift),k=Math.min(1,(t-pb.at)/.7),fwd=pb.team==='A'?1.4:-1.4;return [lerp(from[0],to[0],k)+fwd,lerp(from[1],to[1],k),pb.to!==pb.holder?Math.sin(Math.PI*k)*.12:0];};
     for(let pass=0;pass<2;pass++){const bx=own()[0];shift=((sball?lerp(bx,sball[0],w):bx)-50)*.3;}
     const ownBall=own(),ball=sball?[lerp(ownBall[0],sball[0],w),lerp(ownBall[1],sball[1],w),lerp(ownBall[2],sball[2],w)]:ownBall;
@@ -1198,7 +1203,7 @@ export class World {
     const dt=Math.min(.1,Math.max(.001,(now-(this.matchPrevAt||now))/1000))||.016;this.matchPrevAt=now;this.matchPrev??={};
     const place=(side,n)=>{const g=toPitch(...spot(side,n)),l=lineup(side,n),k=anthem?0:out,p={x:lerp(l.x,g.x,k),z:lerp(l.z,g.z,k)},key=side+n,o=this.matchPrev[key]||{...p,gait:0,h:0},d=Math.hypot(p.x-o.x,p.z-o.z),walk=!this.reduced&&d/dt>.12&&!anthem;
       const heading=anthem?ang:walk?Math.atan2(p.x-o.x,p.z-o.z):Math.atan2(B3.x-p.x,B3.z-p.z),gait=o.gait+d/S*11;this.matchPrev[key]={...p,gait,h:heading};
-      const pose=celebrate?(celebrate===side?'victory':n?'facepalm':null):full&&!mv?(active.playerScore>=active.opponentScore?(side==='A'?'victory':null):(side==='B'?'victory':null)):dive&&n===0&&side===(ball[0]<50?'A':'B')?'faint':null;
+      const pose=celebrate?(celebrate===side?'victory':n?'facepalm':null):full&&!mv?(active.playerScore!==active.opponentScore&&(active.playerScore>active.opponentScore)===(side==='A')?'victory':null):dive&&n===0&&side===(ball[0]<50?'A':'B')?'faint':null;
       return {...p,walk:walk&&!pose,gait,heading,pose};};
     const kit=(side,n)=>({...MATCH_KITS[side==='A'?0:1],fit:'kit',cut:'shorts',...(n===0?{outfit:side==='A'?'#f2c230':'#2b2d33',pants:'#1d1f24'}:{}),scale:S});
     const me=place('A',9),others=[];for(const side of ['A','B'])for(let n=0;n<11;n++)if(side!=='A'||n!==9)others.push([side,n,place(side,n)]);

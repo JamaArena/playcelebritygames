@@ -1,5 +1,5 @@
 import { bestMode, fanClubSize, PROMPTS, RIVAL, TEAM, TAILOR_COLORS, TATTOOS, VENUE_ACTS, TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace, homeRooms } from './content.js';
-import { World, worldObjects } from './world.js';
+import { World, worldObjects, ANTHEM_MS } from './world.js';
 import { replayScript } from './matchPlay.js';
 import { World3D, Figure } from './world3d.js';
 import * as T from './vendor/three.min.js';
@@ -347,7 +347,9 @@ async function startAtObject(input){
   closeTray();closeModal();const def=CAREERS[state.career];lastTaskAt=Date.now();
   if(state.location!==def.location&&!(input.kind==='practice'&&state.location==='home'&&state.inventory.gear)&&!(input.kind==='practice'&&def.family==='sport'&&state.location==='gym')){const data=await send({type:'travel',location:def.location});if(!data)return;if(data.state.trip){toast(`${tripVerb(data.state.trip.ride)} to ${LOCATIONS[def.location].name}. Start work when you arrive.`);return;}}
   const object=worldObjects(state.location,state.furniture,[],state.home).find(o=>o.action===(input.kind==='practice'?'practice':'career'));
-  if(object)world.approach(object,()=>whenIdle(()=>send({type:'start',...input})));else await send({type:'start',...input});
+  // Start once you reach the spot. If the walk is cut short (a mishap, a refresh) start anyway, and say so if it did not take.
+  let started=false;const begin=()=>{if(started)return;started=true;whenIdle(async()=>{const data=await send({type:'start',...input});if(data&&!data.state.active)toast('Work did not start. Check your energy and hunger, then try again.');});};
+  if(object){world.approach(object,begin);setTimeout(()=>{if(!started&&!state.active&&!state.trip)begin();},6000);}else begin();
 }
 let tripTimer;
 function render(){
@@ -407,7 +409,7 @@ function renderActivity(){
   $('#activityCard').innerHTML=html;
 }
 let pendingChoice=null;
-async function chooseDecision(index){const a=state.active;if(!a||pendingChoice)return;const chosen=a.choices[index],career=a.career,before={playerScore:a.playerScore,opponentScore:a.opponentScore,engagement:a.engagement,stability:a.stability,playerStamina:a.playerStamina};
+async function chooseDecision(index){const a=state.active;if(!a||pendingChoice)return;const chosen=a.choices[index],career=a.career,before={playerScore:a.playerScore,opponentScore:a.opponentScore,engagement:a.engagement,stability:a.stability,playerStamina:a.playerStamina,chance:a.possession!=='opponent'&&a.chance,possession:a.possession};
   // The tapped choice lights up at once; the others wait until the server has decided.
   pendingChoice={id:a.id,beat:a.beat,index};$('.sim-choice[data-index="'+index+'"]')?.classList.add('pending');let data;try{data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});}finally{pendingChoice=null;}if(!data){renderActivity();return;}
   const last=(data.state.active?.outcomes||data.state.outputs?.[0]?.outcomes||[]).at(-1),success=last?.success;if(motion)world.respond(chosen.action,success);
@@ -1215,8 +1217,8 @@ await refresh();
 // Football matches play on the 3D pitch (world.footballMatch). After each decision the move is acted out there from a
 // script (matchPlay.js); the scoreboard changes when the ball goes in. A slim scoreboard and commentary sit over the view.
 function matchReplay(id,choice,success,before,after,result){
-  const blueGoal=(after.playerScore||0)>(before.playerScore||0),redGoal=(after.opponentScore||0)>(before.opponentScore||0),script=replayScript(choice,success,blueGoal,redGoal,state.name.split(' ')[0],result);
-  const goal=script.find(f=>f.ball[0]>=100||f.ball[0]<=0),t0=performance.now();world.playMatchMove({id,script,blueGoal,redGoal});
+  const blueGoal=(after.playerScore||0)>(before.playerScore||0),redGoal=(after.opponentScore||0)>(before.opponentScore||0),script=replayScript(choice,success,blueGoal,redGoal,state.name.split(' ')[0],result,before.chance?100-before.chance-2:45);
+  const goal=script.find(f=>f.ball[0]>=100||f.ball[0]<=0),t0=performance.now();world.playMatchMove({id,script,blueGoal,redGoal,before:{possession:before.possession,chance:before.chance}});
   matchHud.hold={score:[before.playerScore||0,before.opponentScore||0],until:t0+(goal&&(blueGoal||redGoal)&&motion?goal.t*1000:0)};matchScreen();
 }
 // matchHud (the scoreboard) is declared with the top-level state: the first render can run before this point.
@@ -1227,6 +1229,6 @@ function matchScreen(){
     matchHud.el=el;matchHud.timer=setInterval(matchScreen,250);}
   const minute=Math.min(90,Math.round(((a.beat||0)/(a.totalBeats||6))*90)),held=matchHud.hold&&performance.now()<matchHud.hold.until?matchHud.hold.score:[a.playerScore||0,a.opponentScore||0];
   const score=`${held[0]} – ${held[1]}`,el=matchHud.el,set=(q,v)=>{const n=el.querySelector(q);if(n.textContent!==v)n.textContent=v;};
-  set('.mr-bar strong',score);set('.mr-bar em',a.beat===0&&now()<a.startedAt+7000?'Anthem':a.beat>=a.totalBeats?'FT':`${minute}'`);
-  set('.mr-text',world.matchLine||(a.beat===0&&now()<a.startedAt+7000?'The teams line up for the anthem…':a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?(a.possession==='opponent'?'Red have the ball…':'Blue keep the ball moving…'):`${a.scene?.text||'The ball comes to you.'}`));
+  set('.mr-bar strong',score);set('.mr-bar em',a.beat===0&&now()<a.startedAt+ANTHEM_MS?'Anthem':a.beat>=a.totalBeats?'FT':`${minute}'`);
+  set('.mr-text',world.matchLine||(a.beat===0&&now()<a.startedAt+ANTHEM_MS?'The teams line up for the anthem…':a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?(a.possession==='opponent'?'Red have the ball…':'Blue keep the ball moving…'):`${a.scene?.text||'The ball comes to you.'}`));
 }

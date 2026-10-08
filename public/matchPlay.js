@@ -8,7 +8,7 @@ export const REPLAY_NAMES={blue:['Emeka','Bayo'],red:['Duke','Musa']};
 // Pitch units to the 3D pitch: Blue attack the white board at z −4.1, Red the one at z +4.1.
 export const toPitch=(x,y)=>({x:(y-32)/32*2.9,z:4-x/100*8});
 
-export function replayScript(choice,success,blueGoal,redGoal,me,result=''){
+export function replayScript(choice,success,blueGoal,redGoal,me,result='',from=45){
   const mate=REPLAY_NAMES.blue[choice.target==='striker'?1:0],[r1]=REPLAY_NAMES.red;
   const start={A1:[45,32],A2:[56,14],AK:[5,32],B1:[63,30],B2:[70,46],BK:[95,32]};
   const f=(t,pos,ball,text)=>({t,pos,ball,text});const at=(o,p)=>({...start,...o,...p});
@@ -16,7 +16,8 @@ export function replayScript(choice,success,blueGoal,redGoal,me,result=''){
   const dist=+(/(\d+)m/.exec(choice.label)?.[1]||20),sx=Math.max(48,Math.min(90,100-dist));
   // The opposition counter: a goal for Red, or your keeper keeps it out.
   const counter=(t,text)=>redGoal?f(t,at({A1:[40,30],AK:[4,24],B1:[14,30]}),[0,34],text||`${r1} breaks away… and scores.`):f(t,at({A1:[44,30],B1:[18,30],AK:[6,31]}),[6,31],'Your keeper gathers it.');
-  const finish=(t,from,goalText,saveText)=>blueGoal?f(t,at({A1:from,BK:[96,40]}),[100,29],goalText):f(t,at({A1:from,BK:[94,from[1]]}),[94,from[1]],saveText);
+  // A move that starts higher up the pitch (after an earlier pass or dribble came off) is played that much closer to goal.
+  const dx=Math.max(0,Math.min(28,from-45)),lift=fr=>dx?fr.map((x,i)=>i>2&&!success?x:{...x,pos:Object.fromEntries(Object.entries(x.pos).map(([k,[px,py]])=>[k,k.endsWith('K')?[px,py]:[Math.min(93,px+dx),py]])),ball:x.ball[0]>=94||x.ball[0]<=6?x.ball:[Math.min(93,x.ball[0]+dx),x.ball[1]]}):fr;
   const kind=choice.event?choice.kind||'knock':choice.action;
   if(kind==='shoot')return [
     f(0,at({A1:[sx-8,32],B1:[sx+4,30]}),[sx-6,32],`${me} has it ${dist}m out…`),f(1,at({A1:[sx,31],B1:[sx+5,28]}),[sx+1,31],`${me} shapes to shoot…`),
@@ -31,14 +32,14 @@ export function replayScript(choice,success,blueGoal,redGoal,me,result=''){
     f(1.2,at({A1:[90,32],B1:[91,29],B2:[91,38],BK:[96,30]}),corner?[91,32]:[94,34],corner?`${me} attacks the ball…`:'The keeper spills it!'),
     f(2.3,at({A1:[92,33],B1:[91,29],B2:[92,38],BK:blueGoal?[97,38]:[95,33]}),blueGoal?[100,30]:[95,33],blueGoal?'GOAL! 🎉':corner?'Headed straight at the keeper.':'The keeper recovers just in time.'),
     f(3.6,at({A1:[90,34],B1:[88,30],BK:[95,32]}),blueGoal?[100,30]:[95,32],blueGoal?`${me} is mobbed by the team!`:'Goal kick.')];}
-  if(kind==='pass'){const wing=choice.target!=='striker',to=wing?[70,12]:[76,30];return [
+  if(kind==='pass'){const wing=choice.target!=='striker',to=wing?[70,12]:[76,30];return lift([
     f(0,at({}),[47,32],`${me} looks up…`),f(1.1,at({A2:to,B1:[62,24]}),success?to:[63,22],success?`${me} threads it to ${mate}`:`${me} tries to find ${mate}…`),
     success?f(2.5,at({A1:[62,34],A2:[84,wing?18:28],B1:[70,26],B2:[80,38]}),[85,wing?18:28],`${mate} drives at the defence…`):f(2.4,at({A1:[50,30],A2:[66,16],B1:[56,26],B2:[62,40]}),[54,28],`${r1} cuts it out!`),
-    blueGoal?f(3.8,at({A1:[78,34],A2:[86,24],BK:[96,40]}),[100,30],`${mate} finishes! GOAL! 🎉`):success?f(3.8,at({A1:[74,34],A2:[88,22],BK:[90,26]}),[78,30],`${mate} lays it back to ${me}.`):counter(3.8)];}
-  if(kind==='dribble'){const lane=choice.target==='wing'?14:32;return [
+    blueGoal?f(3.8,at({A1:[78,34],A2:[86,24],BK:[96,40]}),[100,30],`${mate} finishes! GOAL! 🎉`):success?f(3.8,at({A1:[74,34],A2:[88,22],BK:[90,26]}),[78,30],`${mate} lays it back to ${me}.`):counter(3.8)]);}
+  if(kind==='dribble'){const lane=choice.target==='wing'?14:32;return lift([
     f(0,at({}),[47,32],`${me} runs at ${r1}…`),f(1.2,at({A1:[60,lane],B1:[62,lane+2]}),[61,lane],success?`${me} skips past ${r1}!`:`${r1} stands firm…`),
     success?f(2.6,at({A1:[78,lane+4],B1:[64,lane+6],BK:[94,30]}),[79,lane+4],`${me} is clear and closing in!`):f(2.4,at({A1:[61,lane],B1:[58,lane+2]}),[55,lane+4],`Tackled by ${r1}!`),
-    success?f(3.8,at({A1:[82,lane+4],B1:[70,lane+6],BK:[94,30]}),[83,lane+4],'Now for the finish…'):counter(3.8,`${r1} goes all the way… GOAL.`)];}
+    success?f(3.8,at({A1:[82,lane+4],B1:[70,lane+6],BK:[94,30]}),[83,lane+4],'Now for the finish…'):counter(3.8,`${r1} goes all the way… GOAL.`)]);}
   // Red attack your goal: tackles, interceptions, marking, and the defensive match events.
   const verb={intercept:`${me} reads the pass…`,mark:`${me} tracks the run…`,tackle:`${me} goes to ground…`,var:`${me} slides in inside the box…`,card:`${me} flies into a tackle…`,knock:`${me} takes a heavy knock…`}[kind]||`${me} closes in…`;
   const red=at({B1:[58,32],B2:[66,44],A1:[44,30]}),stopped=kind==='var'?!redGoal:success||['card','knock'].includes(kind)&&!redGoal;
