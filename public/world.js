@@ -18,6 +18,22 @@ const OPEN_RIDES=['bicycle','motorbike','okada','scooter'];
 // Where the parrot's perch stands at home.
 const PERCH=[3.4,-1.6];
 // The 2D view approximates emotes with its existing poses.
+// Practice drills per career skill; anything unlisted falls back to its career family.
+const DRILLS={
+  'football:passing':'pass','football:dribbling':'dribble','football:shooting':'shoot','football:defending':'defend',
+  'basketball:shooting':'hoop','basketball:passing':'pass','basketball:handling':'bounce','basketball:defending':'defend',
+  'tennis:serve':'serve','tennis:forehand':'rally','tennis:backhand':'rally','tennis:footwork':'footwork',
+  'wrestling:technique':'grapple','wrestling:strength':'lift','wrestling:stamina':'run','wrestling:charisma':'flex',
+  'musician:technique':'perform','musician:songwriting':'work','musician:production':'work','musician:stage presence':'dance',
+  'vlogger:storytelling':'selfie','vlogger:filming':'film','vlogger:editing':'work','vlogger:charisma':'wave',
+  'video:research':'scroll','video:scripting':'work','video:editing':'work','video:presentation':'present',
+  'skitmaker:comedy':'comedy','skitmaker:acting':'present','skitmaker:writing':'work','skitmaker:timing':'emote',
+  'streamer:commentary':'present','streamer:engagement':'wave','streamer:production':'work','streamer:format skill':'vr',
+  'actor:acting':'present','actor:expression':'emote','actor:improvisation':'present','actor:charisma':'wave',
+  'adult:performance':'dance','adult:presentation':'selfie','adult:production':'work','adult:business':'scroll',
+  'founder:product judgement':'work','founder:leadership':'present','founder:sales':'sales','founder:finance':'scroll',
+  'developer:coding':'work','developer:debugging':'work','developer:architecture':'work','developer:communication':'present',
+},DRILL_FAMILY={sport:'run',music:'perform',creator:'work',acting:'present',tech:'work'};
 const EMOTE_2D={squat:'sport',press:'gesture',curl:'gesture',punch:'gesture',pedal:'sit',row:'sit',wave:'gesture',victory:'gesture',selfie:'gesture',facepalm:'gesture',dance:'perform',shoki:'perform',laugh:'chat',cry:'chat',scroll:'chat',sitFloor:'sit'};
 // What a character does when a need runs critically low (see MISHAPS in content.js).
 const MISHAP_POSES={bladder:'pee',hunger:'faint',energy:'doze',hygiene:'stink',fun:'chat',social:'gesture'};
@@ -699,10 +715,14 @@ export class World {
     const actDef=this.state.recovery?.act&&VENUE_ACTS[this.state.recovery.act],actSpot=actDef&&(this.actAt?.act===this.state.recovery.act?this.actAt:worldObjects(this.location).find(o=>o.act===this.state.recovery.act));if(actDef)pose=actDef.pose;
     const roomSpot=this.state.recovery?.spot&&this.location==='home'&&!this.visitedHome?homeRooms(this.state.home).find(r=>r.slot===this.state.recovery.spot)?.object:null;if(roomSpot)pose=roomSpot.pose;
     if(this.state.recovery?.yacht){pose='dance';}
-    const pos=roomSpot?{x:roomSpot.vx,z:roomSpot.vz}:actSpot?{x:actSpot.vx??actSpot.x,z:actSpot.vz??actSpot.z}:this.state.recovery?.yacht?{x:4,z:7.1}:usedSpot?.face!=null?{x:usedSpot.x,z:usedSpot.z}:usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
+    let pos=roomSpot?{x:roomSpot.vx,z:roomSpot.vz}:actSpot?{x:actSpot.vx??actSpot.x,z:actSpot.vz??actSpot.z}:this.state.recovery?.yacht?{x:4,z:7.1}:usedSpot?.face!=null?{x:usedSpot.x,z:usedSpot.z}:usedSpot?{x:usedSpot.x,z:usedSpot.z+(usedDef.onItem?0:usedDef.seat?.42:.62)}:need==='bladder'?{x:4.1,z:3.02}:pose==='sleep'?{x:2.5,z:-3.3}:pose==='tv'&&this.location==='home'?{x:-3.5,z:2.1}:pose==='shower'?{x:4.3,z:.4}:pose==='cook'?{x:-3.2,z:-3.25}:this.pose||this.player;
     if(this.state.trip){const t=Date.now()+this.serverOffset,p=this.tripPosition(this.state.trip,t);if(this.state.trip.ride&&!p.onFoot){this.ride(this.state.trip.ride,p.x,p.z,p.axis,this.state.trip.ride==='helicopter'?6:0);if(OPEN_RIDES.includes(this.state.trip.ride))this.human(p.x,p.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),pose:'sit',seat:.7,heading:p.heading});this.actor={x:p.x,z:p.z,pose:'drive'};}else{this.tripWalker(this.state.trip,p,t,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state)});this.actor={x:p.x,z:p.z,pose:null};}return;}
     if(this.state.ride){if(this.interior())this.ride(this.state.ride,-2.5,7.4,'x');else this.ride(this.state.ride,-7.1,2.6,'z');}
-    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),walk:this.moving,pose,seat:usedDef?.seat??actDef?.seat,heading:roomSpot?roomSpot.face:actSpot?actSpot.face:usedSpot?.face!=null?usedSpot.face:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
+    // Practising: each skill plays its own drill (passing to a teammate, dribbling a loop, serving...).
+    const drill=active?.kind==='practice'&&!this.moving&&!need&&!actDef&&!usedDef&&!roomSpot&&!emote&&!mishap?this.drill(active,pos):null;
+    if(drill){pose=drill.pose;pos={x:drill.x,z:drill.z};}
+    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),walk:this.moving||!!drill?.walk,...(drill?.walk?{gait:drill.gait}:{}),pose,seat:usedDef?.seat??actDef?.seat,heading:drill?drill.heading:roomSpot?roomSpot.face:actSpot?actSpot.face:usedSpot?.face!=null?usedSpot.face:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
+    drill?.draw?.();
     this.actor={...pos,pose};
     // Your entourage: a bodyguard at your shoulder in public, paparazzi when they're on you, Mum visiting at home.
     const clock=Date.now()+(this.serverOffset||0),h=this.heading||0,side=(f,sd)=>({x:pos.x+Math.sin(h)*f+Math.cos(h)*sd,z:pos.z+Math.cos(h)*f-Math.sin(h)*sd});
@@ -977,6 +997,58 @@ export class World {
   performer(l){
     const a=this.actor||this.player;if(this.location===l&&l!=='home'&&(this.state?.active||this.state?.recovery?.act))return {x:a.x,z:a.z};
     const on=(REGULARS[l]||[]).find(r=>['perform','dance','shoki','victory','gesture'].includes(r.pose)&&!(this.training()&&r.aside));return on?{x:on.x,z:on.z}:null;
+  }
+  // Practice drills: a short looping routine per skill, around where you started practising.
+  // Returns where you are, how you stand and move, and a draw() for teammates, balls and goals.
+  drill(active,base){
+    const kind=DRILLS[`${active.career}:${active.skill}`]||DRILL_FAMILY[CAREERS[active.career]?.family]||'work',t=this.reduced?0:performance.now()/1000;
+    const dir=base.x>0?-1:1,mate={x:base.x+dir*2.4,z:base.z},face=Math.atan2(mate.x-base.x,mate.z-base.z),back=face+Math.PI;
+    const hoops=active.career==='basketball',tennis=active.career==='tennis',ballTone=hoops?'#d9772e':tennis?'#d8ef4a':'#f8f9ee',ballSize=tennis?.12:hoops?.26:.22;
+    const ball=(x,z,y)=>this.round(x,z,ballSize,ballSize,ballSize,ballTone,y);
+    const partner=(x,z,pose,heading,walk=false,gait=0)=>this.human(x,z,'#7a4a32',{...this.look(active.career),style:'short',hair:'#1d1714',pose,heading,walk,gait});
+    const stand=(pose,draw)=>({x:base.x,z:base.z,pose,heading:face,draw});
+    const cycle=(period,list)=>list[Math.floor(t/period)%list.length];
+    // A ball travelling out to a partner and back: kicked low, or thrown or hit in an arc.
+    const exchange=(far,period,arc,height)=>{const p=(t%period)/period,out=p<.42,home=p>=.5&&p<.92,k=out?p/.42:home?(p-.5)/.42:0,atMate=p>=.42&&p<.5;
+      const from=out||atMate?base.x:base.x+dir*far,to=out||atMate?base.x+dir*far:base.x,f=atMate?1:k;
+      return {p,x:from+(to-from)*f,z:base.z,y:height+Math.sin(f*Math.PI)*arc};};
+    switch(kind){
+      case 'pass':{const m={x:base.x+dir*2.6,z:base.z},b=exchange(2.6,2.4,hoops?.25:.08,hoops?1:0),kick=b.p<.08,back2=b.p>=.5&&b.p<.58;
+        return {x:base.x,z:base.z,pose:hoops&&kick?'press':null,walk:!hoops&&kick,gait:t*12,heading:face,draw:()=>{partner(m.x,m.z,hoops&&back2?'press':null,back,!hoops&&back2,t*12);ball(b.x,b.z,b.y);}};}
+      case 'dribble':{const a=t*1.5,x=base.x+Math.cos(a)*.9,z=base.z+Math.sin(a)*.9,h=Math.atan2(-Math.sin(a),Math.cos(a));
+        return {x,z,pose:null,walk:true,gait:t*11,heading:h,draw:()=>ball(x+Math.sin(h)*.4,z+Math.cos(h)*.4,Math.abs(Math.sin(t*11))*.05)};}
+      case 'shoot':{const p=(t%2.8)/2.8,run=Math.min(1,p/.35),x=base.x-dir*.9+dir*.9*run,goal={x:base.x+dir*4.2,z:base.z},f=p<.35?0:Math.min(1,(p-.35)/.35);
+        return {x,z:base.z,pose:null,walk:p<.38,gait:t*12,heading:face,draw:()=>{for(const s of [-1,1])this.box(goal.x,goal.z+s,.08,.08,1.2,'#f4f4f0',0);this.box(goal.x,goal.z,.08,2.08,.08,'#f4f4f0',1.2);
+          if(p<.8)ball(x+dir*.4+(goal.x-x-dir*.4)*f,base.z+Math.sin(t*.7)*.5*f,Math.sin(f*Math.PI)*.9+f*.3);}};}
+      case 'hoop':{const p=(t%2.4)/2.4,hoop={x:base.x+dir*3,z:base.z},f=p<.3?0:Math.min(1,(p-.3)/.45),drop=f>=1?(p-.75)*6:0;
+        return {x:base.x,z:base.z,pose:p>=.3&&p<.45?'victory':null,heading:face,draw:()=>{this.box(hoop.x+dir*.5,hoop.z,.1,.1,2.9,'#5b5f66',0);this.box(hoop.x+dir*.45,hoop.z,.06,1,.7,'#f4f4f0',2.4);this.round(hoop.x,hoop.z,.5,.5,.05,'#e0662c',2.55);
+          ball(p<.3?base.x+dir*.25:base.x+(hoop.x-base.x)*f,base.z,p<.3?Math.abs(Math.sin(t*9))*.8:Math.max(0,1.6+Math.sin(f*Math.PI)*1.6-f*.6-drop));}};}
+      case 'defend':{const s=Math.sin(t*2.2)*.9,m={x:base.x+dir*1.5,z:base.z+Math.sin(t*2.2-.4)*.9};
+        return {x:base.x,z:base.z+s,pose:null,walk:true,gait:t*9,heading:face,draw:()=>{partner(m.x,m.z,null,back,true,t*10);ball(m.x-dir*.4,m.z,hoops?Math.abs(Math.sin(t*8))*.8:Math.abs(Math.sin(t*10))*.05);}};}
+      case 'bounce':{const side=Math.sin(t*1.3)>0?1:-1,px=Math.cos(face)*.35*side,pz=-Math.sin(face)*.35*side;
+        return stand(null,()=>ball(base.x+px+Math.sin(face)*.2,base.z+pz+Math.cos(face)*.2,Math.abs(Math.sin(t*5))*.85));}
+      case 'serve':{const p=(t%2.2)/2.2,f=p<.55?0:Math.min(1,(p-.55)/.3);
+        return {x:base.x,z:base.z,pose:p<.45?'victory':p<.62?'punch':null,heading:face,draw:()=>{if(p<.85)ball(base.x+dir*(.25+f*4.5),base.z,p<.55?1.7+Math.sin(p/.55*Math.PI):2.4-f*1.4);}};}
+      case 'rally':{const m={x:base.x+dir*3.6,z:base.z},b=exchange(3.6,2.2,1.1,.9),hit=b.p<.1,back2=b.p>=.5&&b.p<.6;
+        return {x:base.x,z:base.z,pose:hit?'punch':null,heading:face,draw:()=>{partner(m.x,m.z,back2?'punch':null,back);this.box(base.x+dir*1.8,base.z,.04,2.6,.9,'#f4f4f0',0);ball(b.x,b.z,b.y);}};}
+      case 'footwork':return {x:base.x+dir*Math.cos(t*1.3)*.4,z:base.z+Math.sin(t*2.6)*.8,pose:null,walk:true,gait:t*12,heading:face};
+      case 'grapple':{const sway=Math.sin(t*1.6)*.35;return {x:base.x,z:base.z+sway,pose:'squat',heading:face,draw:()=>partner(base.x+dir*.75,base.z+sway,'squat',back)};}
+      case 'lift':return stand('press');
+      case 'run':{const a=t*1.2,x=base.x+Math.cos(a)*1.2,z=base.z+Math.sin(a)*1.2;return {x,z,pose:null,walk:true,gait:t*10,heading:Math.atan2(-Math.sin(a),Math.cos(a))};}
+      case 'flex':return stand(cycle(1.5,['victory','wave','victory','dance']));
+      case 'perform':return stand('perform');
+      case 'dance':return stand(cycle(3,['dance','shoki']));
+      case 'selfie':return {x:base.x,z:base.z,pose:'selfie',heading:face+Math.sin(t*.5)*.8};
+      case 'film':return stand('photo',()=>partner(mate.x,mate.z,cycle(1.8,['wave','gesture','laugh']),back));
+      case 'wave':return stand(cycle(2,['wave','laugh','wave','selfie']));
+      case 'vr':return stand('vr');
+      case 'scroll':return stand('scroll');
+      case 'present':return stand('gesture',()=>partner(mate.x-dir*.6,mate.z,cycle(2.4,[null,'laugh',null]),back));
+      case 'comedy':return stand(cycle(1.6,['gesture','facepalm','gesture','laugh']),()=>partner(mate.x-dir*.6,mate.z,cycle(1.6,[null,'laugh','laugh',null]),back));
+      case 'emote':return stand(cycle(1.6,['laugh','cry','facepalm','gesture']));
+      case 'sales':return stand(cycle(2,['gesture','chat']),()=>partner(mate.x-dir*.8,mate.z,cycle(2,['chat','gesture']),back));
+      default:return stand('work');
+    }
   }
   // You are training (practice or a career activity) at a venue.
   training(){return !!this.state?.active&&this.location!=='home';}
