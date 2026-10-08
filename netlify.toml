@@ -11,6 +11,17 @@
   # The database migrations are read at runtime to create tables on first use.
   included_files = ["netlify/database/migrations/**"]
 
+# The 3D engine and fonts never change between releases: let browsers keep them.
+[[headers]]
+  for = "/vendor/*"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000, stale-while-revalidate=86400"
+
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=2592000, stale-while-revalidate=86400"
+
 [[headers]]
   for = "/*"
   [headers.values]
