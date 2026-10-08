@@ -1075,15 +1075,17 @@ export class World {
       case 'sales':return stand(cycle(2,['gesture','chat']),()=>partner(mate.x-dir*.8,mate.z,cycle(2,['chat','gesture']),back));
       // A match: four players (you, a teammate and two opponents) run to new spots around the pitch. The ball sits
       // at the holder's feet; every second or two they pass it to someone else, and it travels to where they really are.
-      case 'match':{const now=performance.now()/1000,pitch={x:base.x+dir*1.1,z:base.z},runners=[0,1,2,3,4,5].map(n=>this.roam('match:'+n,{x:pitch.x+(n<3?-1.1:1.1)*dir,z:pitch.z+((n%3)-1)*1.1},1.9,1.3,1.6+(n%3)*.15,[.1,.9]));
+      case 'match':{const now=performance.now()/1000,pitch={x:base.x+dir*1.1,z:base.z},keepers=!hoops,goalX=s=>pitch.x+s*2.9*dir,runners=[0,1,2,3,4,5].map(n=>keepers&&n%3===2?this.roam('match:'+n,{x:goalX(n<3?-1:1)-(n<3?-1:1)*.35*dir,z:pitch.z},.15,.7,.9,[.3,1.2]):this.roam('match:'+n,{x:pitch.x+(n<3?-.9:.9)*dir,z:pitch.z+(n%3?1:-1)*.8},1.7,1.2,1.6+(n%3)*.15,[.1,.9]));
         const m=this.matchBall??={holder:0,from:0,to:0,at:now,next:now+1.2};
-        if(this.reduced){m.holder=0;}else if(m.to===m.holder&&now>=m.next){m.from=m.holder;m.to=(m.holder+1+Math.floor(Math.random()*5))%6;m.at=now;}
+        if(this.reduced){m.holder=0;}else if(m.to===m.holder&&now>=m.next){m.from=m.holder;const pool=[0,1,2,3,4,5].filter(n=>n!==m.holder&&!(keepers&&n%3===2&&Math.random()<.85));m.to=pool[Math.floor(Math.random()*pool.length)];m.at=now;}
         if(m.to!==m.holder&&now-m.at>=.6){m.holder=m.to;m.next=now+1+Math.random()*1.4;}
         const feet=r=>({x:r.x+Math.sin(r.heading)*.38,z:r.z+Math.cos(r.heading)*.38}),k=Math.min(1,(now-m.at)/.6),a=feet(runners[m.from]),b=feet(runners[m.to]),inFlight=m.to!==m.holder;
         const bx=inFlight?a.x+(b.x-a.x)*k:feet(runners[m.holder]).x,bz=inFlight?a.z+(b.z-a.z)*k:feet(runners[m.holder]).z,me=runners[0];
         // Off the ball, players turn to watch it while they jog. Your team is always blue, the other team always red.
         const look=r=>r.moving?r.heading:Math.atan2(bx-r.x,bz-r.z),kit=n=>({...MATCH_KITS[n<3?0:1],fit:'kit',cut:'shorts'});
-        return {x:me.x,z:me.z,pose:null,walk:me.moving,gait:me.gait,heading:look(me),kit:kit(0),draw:()=>{runners.forEach((r,n)=>{if(!n)return;this.human(r.x,r.z,SKIN_TONES[(n*5+3)%SKIN_TONES.length],{...this.look(active.career),...kit(n),style:['curls','short','fade','braids','locs','buzz'][n],hair:'#1d1714',walk:r.moving,gait:r.gait,heading:look(r)});});ball(bx,bz,inFlight?(hoops?.9+Math.sin(k*Math.PI)*.6:Math.sin(k*Math.PI)*.3):(hoops?Math.abs(Math.sin(t*8))*.8:0));}};}
+        return {x:me.x,z:me.z,pose:null,walk:me.moving,gait:me.gait,heading:look(me),kit:kit(0),draw:()=>{runners.forEach((r,n)=>{if(!n)return;this.human(r.x,r.z,SKIN_TONES[(n*5+3)%SKIN_TONES.length],{...this.look(active.career),...kit(n),style:['curls','short','fade','braids','locs','buzz'][n],hair:'#1d1714',walk:r.moving,gait:r.gait,heading:look(r)});});ball(bx,bz,inFlight?(hoops?.9+Math.sin(k*Math.PI)*.6:Math.sin(k*Math.PI)*.3):(hoops?Math.abs(Math.sin(t*8))*.8:0));
+          // Goals at both ends for the keepers to guard.
+          if(keepers)for(const s of [-1,1]){const gx=goalX(s);for(const e of [-1,1])this.box(gx,pitch.z+e*.85,.07,.07,1,'#f4f4f0',0);this.box(gx,pitch.z,.07,1.77,.07,'#f4f4f0',1);}}};}
       // Everyone else: the main activity, then a short walk to a new spot and back, so nobody stands frozen.
       default:{const loop={gig:['perform','dance'],scene:['gesture','laugh'],shoot:['photo','gesture'],office:['work','gesture']}[kind]||['work','gesture'],me=this.roam('work:me',base,1.1,.8,.9,[3,6]),mateOn=kind==='scene'||kind==='gig'||kind==='office';
         const m=mateOn?this.roam('work:mate',mate,.8,.6,.8,[3,7]):null;

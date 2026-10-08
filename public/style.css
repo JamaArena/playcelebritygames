@@ -1178,3 +1178,11 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 @keyframes actionIn{from{opacity:0;transform:translate(-50%,12px) scale(.9)}}
 @keyframes actionKick{0%{transform:translateX(-14px) rotate(-8deg)}60%{transform:translateX(6px) rotate(4deg)}}
 @media(prefers-reduced-motion:reduce){.action-pop,.action-pop .action-art{animation:none}}
+
+/* Football match replay */
+.match-replay{position:fixed;z-index:61;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100% - 24px));padding:10px;border-radius:22px;background:#0f1a24;box-shadow:0 20px 50px -10px #000a;color:#fff;cursor:pointer;animation:actionIn .3s ease-out}
+.match-replay.out{opacity:0;transition:.3s}
+.mr-bar{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:12px;background:linear-gradient(90deg,#1d4fae,#2a2f3a 40%,#2a2f3a 60%,#a82a2a);font:700 13px system-ui,sans-serif}
+.mr-bar strong{flex:1;text-align:center;font:700 20px Fredoka,system-ui,sans-serif}.mr-bar em{font-style:normal;padding:2px 8px;border-radius:8px;background:#000a;font-variant-numeric:tabular-nums}
+.mr-text{margin:8px 2px;padding:7px 12px;border-radius:10px;background:#1d4fae;font:600 14px Fredoka,system-ui,sans-serif;min-height:20px}
+.match-replay canvas{display:block;width:100%;height:auto;border-radius:12px}.match-replay small{display:block;text-align:center;margin-top:6px;font-size:10.5px;opacity:.6}
