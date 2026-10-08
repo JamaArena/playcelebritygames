@@ -249,7 +249,7 @@ test('a critically low need causes one embarrassing mishap that costs fame',()=>
 });
 test('wardrobe: claim at the boutique, wear anywhere, and perks change the rules',()=>{
   const s=make();s.fame=200;
-  assert.throws(()=>act(s,{type:'claimWear',item:'comfyJoggers'},T),/Eko plaza/);
+  assert.throws(()=>act(s,{type:'claimWear',item:'comfyJoggers'},T),/Abeokuta plaza/);
   s.location='plaza';act(s,{type:'claimWear',item:'comfyJoggers'},T);act(s,{type:'claimWear',item:'sunglasses'},T);
   assert.throws(()=>act(s,{type:'claimWear',item:'agbada'},T),/1,500 fame/);
   assert.throws(()=>act(s,{type:'wear',item:'statementShirt'},T),/Claim it/);
@@ -315,7 +315,7 @@ test('phone apps: posts, deliveries, takeaway, groceries, dating, music and the 
 });
 test('new places: activities, fitness, market groceries, and the beach over the bridge',()=>{
   const s=make();s.location='nightclub';s.needs.fun=40;s.needs.social=40;
-  assert.throws(()=>act(s,{type:'venueAct',act:'workout'},T),/Eko Iron Gym/);
+  assert.throws(()=>act(s,{type:'venueAct',act:'workout'},T),/Benin Iron Gym/);
   act(s,{type:'venueAct',act:'dance'},T);reconcile(s,s.recovery.endsAt+1);assert.equal(Math.round(s.needs.fun),80);assert.equal(Math.round(s.needs.social),60);
   s.location='gym';for(let i=0;i<8;i++){act(s,{type:'venueAct',act:'workout'},T+i*100_000);s.needs.energy=100;reconcile(s,s.recovery.endsAt+1);}assert.equal(s.fitness,2);
   s.location='market';act(s,{type:'venueAct',act:'stalls'},T+2_000_000);reconcile(s,s.recovery.endsAt+1);assert.equal(s.groceries,5);
@@ -324,7 +324,7 @@ test('new places: activities, fitness, market groceries, and the beach over the 
 });
 test('shops: barber, tailor, tattoos, bukka and fine dining',()=>{
   const s=make();s.fame=100;
-  assert.throws(()=>act(s,{type:'restyle',hair:'afro',hairColor:'blonde'},T),/Ikeja Mega Mall/);
+  assert.throws(()=>act(s,{type:'restyle',hair:'afro',hairColor:'blonde'},T),/Owerri Mega Mall/);
   s.location='mall';act(s,{type:'restyle',hair:'afro',hairColor:'blonde'},T);assert.equal(s.hair,'afro');assert.equal(s.hairColor,'blonde');
   act(s,{type:'tattoo',spot:'arm'},T);assert.deepEqual(s.tattoos,['arm']);act(s,{type:'tattoo',spot:'arm'},T);assert.deepEqual(s.tattoos,[]);
   assert.throws(()=>act(s,{type:'venueAct',act:'barber'},T),/Unknown activity/);
