@@ -369,8 +369,10 @@ function renderActivity(){
   if(taskQueue.length)html+='<div class="task-queue"><small>Up next</small>'+taskQueue.map((t,i)=>button(`${escape(t.icon||'•')} ${escape(t.label)} <b aria-hidden="true">×</b>`,'unqueue',`data-index="${i}" aria-label="Remove ${escape(t.label)} from queue"`,'queue-chip')).join('')+'</div>';
   $('#activityCard').innerHTML=html;
 }
-async function chooseDecision(index){const a=state.active;if(!a)return;const chosen=a.choices[index],career=a.career;const data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});if(!data)return;
-  const success=(data.state.active?.outcomes||data.state.outputs?.[0]?.outcomes||[]).at(-1)?.success;if(motion)world.respond(chosen.action,success);actionPop(career,chosen,success);}
+async function chooseDecision(index){const a=state.active;if(!a)return;const chosen=a.choices[index],career=a.career,before={playerScore:a.playerScore,opponentScore:a.opponentScore};const data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});if(!data)return;
+  const success=(data.state.active?.outcomes||data.state.outputs?.[0]?.outcomes||[]).at(-1)?.success;if(motion)world.respond(chosen.action,success);
+  // Football plays a short top-down replay of the move; at full time the final score comes from the result.
+  if(career==='football'&&motion){const done=data.state.results?.[0],[ps,os]=String(done?.score||'').split('–').map(Number),after=data.state.active||{playerScore:ps,opponentScore:os,beat:6,totalBeats:6};matchReplay(chosen,success,before,after);}else actionPop(career,chosen,success);}
 // A quick picture of what you just did at work: the move, who it went to, and how it turned out.
 const ACTION_ART={pass:'🦶⚽💨',shoot:'🦶⚽💥',dribble:'🏃⚽💨',tackle:'🦵💥⚽',intercept:'✋⚽',mark:'👀🏃',shot:'🏀🏹',drive:'🏃🏀💨',grapple:'🤼',counter:'🔄🤼',signature:'💥🤼',crowd:'📣🙌'};
 const CAREER_ART={musician:'🎤🎶',actor:'🎬🎭',adult:'🌙🎥',vlogger:'🤳✨',video:'🎥✂️',skitmaker:'😂🎬',streamer:'🎮💬',founder:'🚀📈',developer:'💻⌨️',web3:'🔗💡',tennis:'🎾💨'};
@@ -1158,3 +1160,49 @@ function arenaApp(){
 }
 // Start last: every declaration above is ready before the first update can arrive and draw.
 await refresh();
+
+// Football match replays: after each decision a 4–5 s top-down replay of the move plays out (3 v 3 with keepers),
+// told by what really happened: goals only when the score changed, saves and near misses otherwise.
+const REPLAY_NAMES={blue:['Emeka','Bayo'],red:['Duke','Musa']};
+function replayScript(choice,success,blueGoal,redGoal,me){
+  const mate=REPLAY_NAMES.blue[choice.target==='striker'?1:0],[r1]=REPLAY_NAMES.red;
+  const start={A1:[45,32],A2:[56,14],AK:[5,32],B1:[63,30],B2:[70,46],BK:[95,32]};
+  const f=(t,pos,ball,text)=>({t,pos,ball,text});const at=(o,p)=>({...start,...o,...p});
+  const miss=Math.random()<.5?'wide':'save';
+  if(choice.action==='shoot'){const dist=/(\d+)m/.exec(choice.label)?.[1]||20;return [
+    f(0,at({}),[47,32],`${me} has it ${dist}m out…`),f(1,at({A1:[58,31],B1:[64,28]}),[60,31],`${me} shapes to shoot…`),
+    blueGoal?f(1.9,at({A1:[60,31],B1:[66,27],BK:[96,40]}),[100,27],'GOAL! Into the corner! 🎉'):miss==='save'?f(1.9,at({A1:[60,31],BK:[95,30]}),[94,30],'Saved by the keeper!'):f(1.9,at({A1:[60,31],BK:[95,36]}),[101,12],'It goes just wide…'),
+    f(3.6,at({A1:[62,30],A2:[70,18],B1:[68,28],BK:[95,32]}),blueGoal?[100,27]:miss==='save'?[95,32]:[101,12],blueGoal?`${me} scores!`:miss==='save'?'The keeper gathers it.':'Goal kick.')];}
+  if(choice.action==='pass'){const wing=choice.target!=='striker',to=wing?[70,12]:[76,30];return [
+    f(0,at({}),[47,32],`${me} looks up…`),f(1.1,at({A2:to,B1:[62,24]}),success?to:[63,22],success?`${me} threads it to the ${choice.target||'winger'}`:`${me} tries to find the ${choice.target||'winger'}…`),
+    success?f(2.5,at({A1:[62,34],A2:[84,wing?18:28],B1:[70,26],B2:[80,38]}),[85,wing?18:28],`${mate} drives at the defence…`):f(2.4,at({A1:[50,30],A2:[66,16],B1:[56,26],B2:[62,40]}),[54,28],`${r1} cuts it out!`),
+    blueGoal?f(3.8,at({A1:[78,34],A2:[86,24],BK:[96,40]}),[100,30],`${mate} finishes! GOAL! 🎉`):redGoal?f(3.8,at({A1:[40,30],AK:[4,24],B1:[14,30]}),[0,34],`${r1} breaks away… and scores.`):success?f(3.8,at({A1:[74,34],A2:[88,22],BK:[94,26]}),[94,26],`${mate}'s effort is saved.`):f(3.8,at({A1:[46,30],B1:[44,30],B2:[52,40]}),[36,36],'Cleared upfield.')];}
+  if(choice.action==='dribble'){const lane=choice.target==='wing'?14:32;return [
+    f(0,at({}),[47,32],`${me} runs at ${r1}…`),f(1.2,at({A1:[60,lane],B1:[62,lane+2]}),[61,lane],success?`${me} skips past ${r1}!`:`${r1} stands firm…`),
+    success?f(2.6,at({A1:[78,lane+4],B1:[64,lane+6],BK:[94,30]}),[79,lane+4],`${me} is one on one with the keeper!`):f(2.4,at({A1:[61,lane],B1:[58,lane+2]}),[55,lane+4],`Tackled by ${r1}!`),
+    success?(blueGoal?f(3.8,at({A1:[82,lane+4],BK:[96,40]}),[100,28],'GOAL! What a run! 🎉'):f(3.8,at({A1:[82,lane+4],BK:[93,lane+6]}),[93,lane+6],'The keeper smothers it.')):(redGoal?f(3.8,at({A1:[50,30],AK:[4,26],B1:[16,30]}),[0,35],`${r1} goes all the way… GOAL.`):f(3.8,at({A1:[56,30],B1:[48,32]}),[44,34],'Red break forward.'))];}
+  // Defending: red attack your goal.
+  const red=at({B1:[58,32],B2:[66,44],A1:[44,30]});return [
+    f(0,red,[57,32],`${r1} brings it forward…`),f(1.2,at({B1:[40,30],B2:[46,42],A1:[38,32]}),[39,30],choice.action==='intercept'?`${me} reads the pass…`:choice.action==='mark'?`${me} tracks the run…`:`${me} goes to ground…`),
+    success?f(2.5,at({B1:[38,30],A1:[40,32],A2:[56,16]}),[44,30],`${me} wins it back!`):f(2.5,at({B1:[22,30],A1:[34,32],AK:[6,30]}),[22,30],`${r1} is through on goal…`),
+    success?f(3.8,at({A1:[50,32],A2:[64,18]}),[64,18],`…and plays it out to ${REPLAY_NAMES.blue[0]}.`):redGoal?f(3.8,at({B1:[18,30],AK:[3,24]}),[0,34],'GOAL for Red.'):f(3.8,at({B1:[18,30],AK:[6,31]}),[6,31],'Great save by the keeper!')];
+}
+function matchReplay(choice,success,before,after){
+  const blueGoal=(after.playerScore||0)>(before.playerScore||0),redGoal=(after.opponentScore||0)>(before.opponentScore||0),script=replayScript(choice,success,blueGoal,redGoal,state.name.split(' ')[0]);
+  const minute=Math.min(90,Math.round(((after.beat||1)/(after.totalBeats||6))*90));
+  $('#matchReplay')?.remove();const box=document.createElement('div');box.id='matchReplay';box.className='match-replay';
+  box.innerHTML=`<div class="mr-bar"><b class="mr-blue">BLUE</b><strong>${after.playerScore||0} – ${after.opponentScore||0}</strong><b class="mr-red">RED</b><em>${minute}'</em></div><div class="mr-text"></div><canvas width="640" height="400"></canvas><small>Tap to close</small>`;
+  document.body.append(box);const c=box.querySelector('canvas'),g=c.getContext('2d'),text=box.querySelector('.mr-text'),X=x=>20+x*6,Y=y=>16+y*5.75,t0=performance.now();let raf=0;
+  const close=()=>{cancelAnimationFrame(raf);box.classList.add('out');setTimeout(()=>box.remove(),350);};box.onclick=close;
+  const lerp=(a,b,k)=>a+(b-a)*k,ease=k=>k<.5?2*k*k:1-(-2*k+2)**2/2;
+  const pitch=()=>{g.fillStyle='#2f8f3a';g.fillRect(0,0,640,400);for(let i=0;i<10;i++){if(i%2){g.fillStyle='#349a40';g.fillRect(20+i*60,16,60,368);}}
+    g.strokeStyle='#e8f5e0cc';g.lineWidth=2;g.strokeRect(20,16,600,368);g.beginPath();g.moveTo(320,16);g.lineTo(320,384);g.stroke();g.beginPath();g.arc(320,200,46,0,7);g.stroke();
+    for(const s of [0,1]){const x=s?620:20,d=s?-1:1;g.strokeRect(s?560:20,110,60,180);g.strokeRect(s?596:20,160,24,80);g.fillStyle='#ffffffcc';g.fillRect(s?620:12,170,8,60);}};
+  const dot=(x,y,fill,label,ring)=>{g.beginPath();g.arc(x,y,11,0,7);g.fillStyle=fill;g.fill();g.lineWidth=ring?4:2;g.strokeStyle=ring?'#ffd84a':'#fff';g.stroke();g.fillStyle='#fff';g.font='bold 11px system-ui';g.textAlign='center';g.textBaseline='middle';g.fillText(label,x,y+.5);};
+  const frame=()=>{const t=(performance.now()-t0)/1000,i=Math.max(0,script.findIndex((s,n)=>n===script.length-1||script[n+1].t>t)),a=script[i],b=script[Math.min(i+1,script.length-1)],k=b===a?1:ease(Math.min(1,(t-a.t)/(b.t-a.t)));
+    pitch();for(const key of ['AK','A2','A1','BK','B1','B2']){const p=[lerp(a.pos[key][0],b.pos[key][0],k),lerp(a.pos[key][1],b.pos[key][1],k)];dot(X(p[0]),Y(p[1]),key[0]==='A'?(key==='AK'?'#173f8a':'#2f6fd6'):(key==='BK'?'#7a1d1d':'#d23b3b'),key.endsWith('K')?'GK':key==='A1'?'★':'',key==='A1');}
+    const bx=X(lerp(a.ball[0],b.ball[0],k)),by=Y(lerp(a.ball[1],b.ball[1],k));g.beginPath();g.arc(bx+2,by+3,5,0,7);g.fillStyle='#0004';g.fill();g.beginPath();g.arc(bx,by,6,0,7);g.fillStyle='#fff';g.fill();g.strokeStyle='#222';g.lineWidth=1.5;g.stroke();
+    const line=(t>=b.t-.4&&b!==a?b:a).text;if(text.textContent!==line)text.textContent=line;
+    if(t<script.at(-1).t+1.2&&!box.classList.contains('out'))raf=requestAnimationFrame(frame);else close();};
+  frame();
+}
