@@ -381,11 +381,12 @@ export const WORK_EVENTS = {
   ],
 };
 
-// The two live meters on the activity card, named for each career: [engagement, stability].
+// The two live meters on the activity card, named for each career: [engagement, stability]. The first rises and falls with
+// how it goes; the second is how steady the work is, except in ball sports, where it is Fitness: full at kick-off, then draining.
 export const METERS = {
-  football: ['Crowd', 'Fitness'], basketball: ['Crowd', 'Fitness'], wrestling: ['Crowd heat', 'Stamina'], tennis: ['Crowd', 'Fitness'],
-  musician: ['Vibe', 'Mix'], vlogger: ['Hype', 'Footage'], video: ['Retention', 'Accuracy'], skitmaker: ['Laughs', 'Takes'],
-  streamer: ['Chat', 'Stream'], actor: ['Director', 'Takes'], adult: ['Fans', 'Set'], founder: ['Investors', 'Runway'],
+  football: ['Momentum', 'Fitness'], basketball: ['Momentum', 'Fitness'], wrestling: ['Crowd heat', 'Stamina'], tennis: ['Momentum', 'Fitness'],
+  musician: ['Vibe', 'Mix'], vlogger: ['Hype', 'Footage'], video: ['Retention', 'Accuracy'], skitmaker: ['Laughs', 'Timing'],
+  streamer: ['Chat hype', 'Stream health'], actor: ['Director', 'Performance'], adult: ['Fans', 'Set mood'], founder: ['Investors', 'Team'],
   developer: ['Client', 'Tests'], web3: ['Community', 'Security'],
 };
 

@@ -1219,3 +1219,4 @@ body.in-match #questChip,body.in-match #app .page-heading{display:none!important
 body.in-match #activityCard .work-scene{display:none}
 /* A choice you tapped shows at once while the server decides */
 .sim-choice.pending{background:linear-gradient(#fff6c9,#ffe98f)!important;border-color:#f2c230!important;animation:pulse .8s ease-in-out infinite alternate}.sim-choices:has(.pending) .sim-choice:not(.pending){opacity:.45;pointer-events:none}@keyframes pulse{to{transform:scale(1.03)}}
+@media(max-width:480px){.activity-card .sim-choice{grid-template-columns:1fr;justify-items:center;text-align:center;padding:4px 3px}.activity-card .sim-choice b{grid-row:auto;font-size:13px}.activity-card .sim-choice span{font-size:9px}}

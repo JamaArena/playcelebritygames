@@ -549,3 +549,13 @@ test('a musician on stage gets live-show scenes',()=>{
   const s=make('musician');go(s);act(s,{type:'start',kind:'live'},T,()=>.9);const text=view(s,s.active.readyAt).active.scene.text;
   assert.ok(!/studio/i.test(text));assert.ok(choices(s).length===3);
 });
+test('ball sports: Fitness starts full and only drains, and tired legs cost a little accuracy',()=>{
+  for(const career of ['football','basketball','tennis']){const s=make(career);go(s);act(s,{type:'start',kind:'produce'},T,()=>.9);const a=s.active;delete a.event;assert.equal(a.stability,100);
+    let last=100;while(a.beat<a.totalBeats&&!s.active?.tennis?.winner){act(s,{type:'decision',activityId:a.id,beat:a.beat,choice:0},a.readyAt,()=>0);assert.ok(a.stability<last,`${career} fitness drains`);last=a.stability;}}
+  const s=make();go(s);act(s,{type:'start',kind:'produce'},T,()=>.9);const fresh=view(s,s.active.readyAt).active.choices[1].probability;s.active.stability=20;assert.ok(view(s,s.active.readyAt).active.choices[1].probability<fresh);
+});
+test('each sport has its own person at the arena; everyone else meets Scout Kai',async()=>{
+  const {npcAt}=await import('../public/content.js');
+  assert.equal(npcAt('sports','football').name,'Kai');assert.equal(npcAt('sports','musician').name,'Kai');
+  const names=['basketball','tennis','wrestling'].map(c=>npcAt('sports',c).name);assert.equal(new Set([...names,'Kai']).size,4);
+});

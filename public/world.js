@@ -1,6 +1,6 @@
 // A dependency-free orthographic 3D renderer. Meshes use world coordinates,
 // camera rotation, depth sorting and three shaded faces; no remote assets.
-import { arrivalSpot, NPCS, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, VENUE_ACTS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt, homeRooms, extensionSpot, npcName, obstacles } from './content.js';
+import { arrivalSpot, NPCS, npcAt, CAREERS, ITEMS, WEAR, EMOTES, PETS, TRANSIT, VENUE_ACTS, upgradesFor, weatherAt, festivalAt, LOCATIONS, TOWN, SPONSORSHIPS, RIDES, HAIR_COLORS, HAIRSTYLES, BUILDS, HEIGHTS, route, along, LOT, BALANCE as B, walkable, canPlace, lotAt, homeRooms, extensionSpot, npcName, obstacles } from './content.js';
 import { clampZoom, projectPoint, groundPoint } from './camera.js';
 import { turnToward, smoothPath } from './movement.js';
 import { FORMATION, ACTOR_SLOT, toPitch } from './matchPlay.js';
@@ -41,6 +41,8 @@ const DRILLS={
 // Match kits: your side always plays in blue, the other side always in red.
 // How long both teams stand for the anthem at kick-off.
 export const ANTHEM_MS=12000;
+// Everyone at a football match is drawn at this size so 22 players fit the arena pitch.
+export const MATCH_SCALE=.5;
 const MATCH_KITS=[{outfit:'#2f6fd6',pants:'#f4f4f0',shoes:'#1d1f24',accent:'#ffffff'},{outfit:'#d23b3b',pants:'#1d1f24',shoes:'#f4f4f0',accent:'#ffffff'}];
 const WORK_DRILLS={football:'match',basketball:'match',tennis:'tennis',wrestling:'bout',musician:'gig',actor:'scene',adult:'scene',vlogger:'shoot',video:'shoot',skitmaker:'skit',streamer:'stream',founder:'office',developer:'office',web3:'office'};
 // What each career wears to work (football and basketball use MATCH_KITS). Fits and accessories as in WEAR.
@@ -771,7 +773,7 @@ export class World {
     }
     if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.id,p.x,p.z,this.homeKey());for(const [sx,sz] of p.spots||[])this.round(sx,sz,.16,.16,.02,'#3fbf6f',.02);this.floor(p.x,p.z,1.15,1.15,valid?'#3fbf6f':'#e0533f',.03);this.furnitureModel(p.item,p.x,p.z);}
     if(this.interior()&&l!=='home')this.paintCrowd(l);
-    const npc=NPCS.find(n=>n.location===l);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone'),nx=this.inMatch()?3.7:obj?.x||2.5,nz=obj?.z||2,talking=this.npcTalkUntil>performance.now();this.human(nx,nz,npc.look.skin,{...this.look(npc.career),...this.body({hair:npc.look.hair,hairColor:npc.look.hairColor,build:npc.look.build,height:npc.look.height}),pose:talking?'gesture':null,heading:talking?Math.atan2(this.player.x-nx,this.player.z-nz):(()=>{const st=this.performer(l);return st?Math.atan2(st.x-nx,st.z-nz):0;})()});}
+    const npc=npcAt(l,this.state?.career);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone'),nx=this.inMatch()?3.7:obj?.x||2.5,nz=obj?.z||2,talking=this.npcTalkUntil>performance.now();this.human(nx,nz,npc.look.skin,{...this.look(npc.career),...this.body({hair:npc.look.hair,hairColor:npc.look.hairColor,build:npc.look.build,height:npc.look.height}),pose:talking?'gesture':null,heading:talking?Math.atan2(this.player.x-nx,this.player.z-nz):(()=>{const st=this.performer(l);return st?Math.atan2(st.x-nx,st.z-nz):0;})()});}
     this.paintPeople();
     // Using a placed home item: stand in front of it (or sit on it) in that item's pose.
     const using=this.state.recovery?.item&&!this.visitedHome,usedDef=using&&ITEMS[this.state.recovery.item]?.use,usedSpot=using&&(ITEMS[this.state.recovery.item]?.extension||(this.state.furniture.find(f=>f.id===this.state.recovery.piece)||this.state.furniture.find(f=>f.item===this.state.recovery.item)));
@@ -1168,7 +1170,7 @@ export class World {
   inMatch(){const a=this.state?.active;return !!a&&a.career==='football'&&a.kind!=='practice'&&this.location==='sports'&&!this.state.trip;}
   playMatchMove(move){this.matchMove={...move,t0:performance.now()};}
   footballMatch(active){
-    const S=.5,now=performance.now(),t=this.reduced?0:now/1000,clock=Date.now()+(this.serverOffset||0),lerp=(a,b,k)=>a+(b-a)*k,ease=k=>k<.5?2*k*k:1-(-2*k+2)**2/2,smooth=k=>{k=Math.max(0,Math.min(1,k));return k*k*(3-2*k);};
+    const S=MATCH_SCALE,now=performance.now(),t=this.reduced?0:now/1000,clock=Date.now()+(this.serverOffset||0),lerp=(a,b,k)=>a+(b-a)*k,ease=k=>k<.5?2*k*k:1-(-2*k+2)**2/2,smooth=k=>{k=Math.max(0,Math.min(1,k));return k*k*(3-2*k);};
     const ang=this.matchAngle??0,cam={x:Math.sin(ang),z:Math.cos(ang)},axis={x:Math.cos(ang),z:-Math.sin(ang)};
     // The move being replayed, if any: six actors and the ball along the script, eased in and out of open play.
     let mv=this.matchMove&&this.matchMove.id===active.id?this.matchMove:null,actors={},sball=null,line=null,w=0,celebrate=null,dive=false;
@@ -1368,7 +1370,7 @@ export class World {
   }
   paintLabels(){
     const ctx=this.ctx,tag=(x,z,text)=>{const p=this.project(x,2.05,z);ctx.font='600 9px Segoe UI';ctx.textAlign='center';const w=ctx.measureText(text).width+14;ctx.fillStyle='#fffef5dd';ctx.beginPath();ctx.roundRect(p.x-w/2,p.y-8,w,16,8);ctx.fill();ctx.fillStyle='#49614f';ctx.fillText(text,p.x,p.y+3);};
-    const npc=NPCS.find(n=>n.location===this.location),spot=npc&&worldObjects(this.location).find(o=>o.action==='phone');if(npc&&this.zoom>=.55)tag(spot?.x??2.5,spot?.z??2,`${npc.role} ${npc.name}`);
+    const npc=npcAt(this.location,this.state?.career),spot=npc&&worldObjects(this.location).find(o=>o.action==='phone');if(npc&&this.zoom>=.55)tag(spot?.x??2.5,spot?.z??2,`${npc.role} ${npc.name}`);
     const here=TOWN[this.location]||TOWN.home;this.peopleHits=[];
     // Venue regulars can be tapped to socialise.
     if(this.interior()&&this.location!=='home'){const training=this.training();const crowd=this.location==='gym'&&this.gymCrowd?this.gymCrowd.map(c=>({career:c.career,x:c.x,z:c.z})):REGULARS[this.location]||[];for(const [n,r] of crowd.entries()){const spot=training&&r.aside?r.aside:r;this.peopleHits.push({regular:{id:`${this.location}:${n}`,name:npcName(this.location,n),career:r.career,x:spot.x,z:spot.z},screen:this.project(spot.x,1.1,spot.z)});}}

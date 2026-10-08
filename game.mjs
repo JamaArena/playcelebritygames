@@ -204,6 +204,8 @@ export function tennisScore(t){
   return `Sets ${t.sets.join('–')} · Games ${t.games.join('–')} · ${points}`;
 }
 const sport = key => CAREERS[key].family==='sport';
+// Ball sports track Fitness: it starts full and only drains, a little for safe play and more for bold play.
+const fitnessMeter = key => sport(key)&&key!=='wrestling';
 const RISKS=['safe','balanced','risky'],EVENT_CHANCE=.35;
 export const practiceXp=s=>clamp(Math.round(4+Object.values(s.needs).reduce((a,b)=>a+b,0)/Object.keys(s.needs).length/15),5,10);
 export const focusLabel=xp=>xp>=9?'Focused':xp<=6?'Distracted':'Steady';
@@ -252,8 +254,10 @@ function chance(s,a,choice,scene){
   const c=s.careers[a.career],fatigue=(100-s.needs.energy)/100;let level=c.skills[choice.skill].level;
   if(choice.action==='signature')level=(level+c.skills.stamina.level)/2;
   const difficulty=clamp(scene.difficulty+({safe:-2,balanced:0,risky:2}[choice.risk]),1,10);
-  if(choice.action==='shoot')return {level,difficulty,probability:(1-.15*scene.pressure)*shootingProbability(level,scene.distance,scene.pressure,fatigue,scene.angle)*(1-keeperSave(scene.goalkeeper))};
-  let p=clamp(generalProbability(level,difficulty,scene.pressure,fatigue)+(perksFor(s).success||0)/100,.1,.95);
+  // Tired legs late in a match cost a little accuracy.
+  const legs=fitnessMeter(a.career)?1-Math.max(0,60-(a.stability??100))/300:1;
+  if(choice.action==='shoot')return {level,difficulty,probability:legs*(1-.15*scene.pressure)*shootingProbability(level,scene.distance,scene.pressure,fatigue,scene.angle)*(1-keeperSave(scene.goalkeeper))};
+  let p=clamp(generalProbability(level,difficulty,scene.pressure,fatigue)+(perksFor(s).success||0)/100,.1,.95)*legs;
   if(a.booked&&scene.defensive)p*=.85;
   if(choice.action==='pin'&&a.opponentStamina>40)p=Math.max(.05,p*.35);
   return {level,difficulty,probability:p};
@@ -273,7 +277,7 @@ function playTennis(a,won,risk,rng,games=3,edge=0){
 // Event results: energy, meters, quality, reputation, fame, and sport scores.
 function applyEvent(s,a,ev,ok,now,rng){
   const e=ev?.[3]?.[ok?'hit':'miss'];if(!e)return;const c=s.careers[a.career];
-  if(e.energy)s.needs.energy=clamp(s.needs.energy+e.energy);
+  if(e.energy){s.needs.energy=clamp(s.needs.energy+e.energy);if(fitnessMeter(a.career)&&e.energy<0)a.stability=clamp(a.stability+e.energy/2);}
   if(e.stability)a.stability=clamp(a.stability+e.stability);if(e.engagement)a.engagement=clamp(a.engagement+e.engagement);
   if(e.quality)a.bonus=(a.bonus||0)+e.quality;if(e.reputation)c.reputation=clamp(c.reputation+e.reputation);
   if(e.opponent)a.opponentScore+=e.opponent;if(e.stamina)a.playerStamina=clamp(a.playerStamina+e.stamina);
@@ -299,6 +303,7 @@ function start(s,input,now,rng) {
   s.charges--;if(s.refillAnchor===null)s.refillAnchor=now;
   s.active={id:id(),kind,career:key,skill:input.skill,title:text(input.title)||`${def.output} ${s.outputs.filter(o=>o.career===key).length+1}`,genre:text(input.genre,30)||'Original',beat:0,totalBeats:beats,readyAt:now+(kind==='practice'?B.practiceMs:duration/(beats+1)),interval:duration/(beats+1),status:kind==='practice'?'practising':'commentary',outcomes:[],tier,startedAt:now,playerScore:0,opponentScore:0,playerStamina:100,opponentStamina:100,exposure:0,engagement:50,stability:50,productId:product?.id,collaborator:kind==='collab'?input.npc:null,audienceShare:kind==='collab'?.6:1,seed:rng()};
   if(kind==='practice')s.active.xp=practiceXp(s);
+  if(fitnessMeter(key))s.active.stability=100;
   const evs=WORK_EVENTS[key];if(evs&&kind!=='practice'&&kind!=='trial'&&rng()<EVENT_CHANCE)s.active.event={beat:(sport(key)?2:1)+Math.floor(rng()*(beats-(sport(key)?2:1))),n:Math.floor(rng()*evs.length)};
   if(key==='tennis')s.active.tennis={points:[0,0],games:[0,0],sets:[0,0],history:[],tiebreak:false,winner:null};
   if(key==='football')s.active.possession='player';
@@ -417,7 +422,7 @@ export function act(s,input,now,rng=Math.random) {
       }
       // Live meters: bold choices that land lift the room but put the work at risk; safe ones steady it.
       a.engagement=clamp(a.engagement+(ok?[6,12,20][R]:-[6,10,14][R]));
-      a.stability=clamp(a.stability+(ok?[10,4,-4][R]:-[4,10,18][R]));
+      a.stability=fitnessMeter(a.career)?clamp(a.stability-[3,5,8][R]-(ok?0:2)):clamp(a.stability+(ok?[10,4,-4][R]:-[4,10,18][R]));
       // What the option was about adds its own effect: steady, craft, fans, team or a gamble.
       a.lastNote=null;if(choice.tag&&SCENE_FX[choice.tag]){const fx=SCENE_FX[choice.tag],e=fx[ok?'hit':'miss'];
         if(e.stability)a.stability=clamp(a.stability+e.stability);if(e.engagement)a.engagement=clamp(a.engagement+e.engagement);if(e.quality)a.bonus=(a.bonus||0)+e.quality;if(e.reputation)c.reputation=clamp(c.reputation+e.reputation);
@@ -613,7 +618,7 @@ export function act(s,input,now,rng=Math.random) {
     case 'talk': {
       const npc=NPCS.find(n=>n.id===input.npc);requireRule(npc&&npc.location===s.location,'That person isn’t here.');
       s.talks??={};requireRule(!s.talks[npc.id]||now-s.talks[npc.id]>=NPC_TALK.cooldownMs,`${npc.name} needs a moment. Try again shortly.`);
-      const gain=NPC_TALK.social+(perksFor(s).chat||0);s.talks[npc.id]=now;s.needs.social=clamp(s.needs.social+gain);const line=NPC_TALK.lines[Math.floor(Math.random()*NPC_TALK.lines.length)];
+      const gain=NPC_TALK.social+(perksFor(s).chat||0);s.talks[npc.id]=now;s.needs.social=clamp(s.needs.social+gain);const pool=npc.lines?[...npc.lines,...NPC_TALK.lines.slice(0,2)]:NPC_TALK.lines,line=pool[Math.floor(Math.random()*pool.length)];
       s.lastTalk={npc:npc.id,line,at:now};log(s,`${npc.name}: “${line}” (+${gain} social)`,now);break;
     }
     case 'phoneUpgrade': {

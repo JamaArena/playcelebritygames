@@ -4,7 +4,7 @@ import { replayScript } from './matchPlay.js';
 import { World3D, Figure } from './world3d.js';
 import * as T from './vendor/three.min.js';
 import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS } from './sound.js';
-import { OPINIONS, npcOpinion, npcName, QUESTS, QUEST_GRADUATION, ARENA } from './content.js';
+import { OPINIONS, npcOpinion, npcName, npcAt, QUESTS, QUEST_GRADUATION, ARENA } from './content.js';
 import { CLASH_ACTIONS } from './clashText.js';
 import { skillName, learnLine, METERS, UNITS, tierTitle } from './careerText.js';
 const $=selector=>document.querySelector(selector);
@@ -292,7 +292,7 @@ document.addEventListener('click',event=>{const t=event.target;if(!(t instanceof
   if(t.id==='notice'){notices.shift();nextNotice();}else if(t.id==='choice'){closeChoice();wantedMachine=null;}else if(t.id==='reward'){t.hidden=true;floatReward('✨ Collected!');chime('coin');}
 });
 // Speech bubbles come with a gibberish voice, pitched per character.
-world.onSpeak=(id,text)=>babble(text,voiceFor(id==='me'?state?.name:id==='npc'?NPCS.find(n=>n.location===state?.location)?.name:id,id==='me'&&['curvy','petite'].includes(state?.build)?'high':undefined));
+world.onSpeak=(id,text)=>babble(text,voiceFor(id==='me'?state?.name:id==='npc'?npcAt(state?.location,state?.career)?.name:id,id==='me'&&['curvy','petite'].includes(state?.build)?'high':undefined));
 world.onPlacement=fits=>{const b=$('#placeHere');if(b){b.disabled=!fits;b.innerHTML=fits?'✓ Place here':'✕ Doesn’t fit here';}};
 // Task queue: tap more things while you're busy and they run one after another.
 // Timed tasks (eating, sleeping, work) finish first; untimed ones (sitting, posing) give way after a few seconds.
@@ -983,7 +983,7 @@ document.addEventListener('click',async event=>{
     case 'closeTray':closeTray();break;
     case 'toggleObjects':$('#objects').hidden=!$('#objects').hidden;break;
     case 'quickSocial':closeTray();await send({type:'recover',need:'social'});break;
-    case 'talkNpc':{const object=selectedObject,npc=NPCS.find(n=>n.location===state.location);closeTray();if(!object||!npc)break;
+    case 'talkNpc':{const object=selectedObject,npc=npcAt(state.location,state.career);closeTray();if(!object||!npc)break;
       world.approach(object,()=>whenIdle(async()=>{const data=await send({type:'talk',npc:npc.id});if(data?.state.lastTalk)world.talkTo(object,data.state.lastTalk.line);}));break;}
     case 'quickStart':await startAtObject({kind:d.kind});break;
     case 'prepareDetails':closeTray();prepareDetails(d.kind);break;

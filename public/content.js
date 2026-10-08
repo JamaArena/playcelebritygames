@@ -533,7 +533,13 @@ export const NPCS = [
   {id:'mika', name:'Mika', career:'vlogger', location:'plaza', role:'Creator', color:'#e0a28f', look:{skin:'#ecc3a2', hair:'bun', hairColor:'pink', build:'slim', height:'short'}},
   {id:'ari', name:'Ari', career:'founder', location:'tech', role:'Builder', color:'#85b9ca', look:{skin:'#6e442e', hair:'short', hairColor:'black', build:'heavy', height:'average'}},
   {id:'sola', name:'Sola', career:'actor', location:'creator', role:'Director', color:'#d4a373', look:{skin:'#ad7350', hair:'bald', hairColor:'black', build:'average', height:'tall'}},
+  // The arena changes with your sport, and so does the person watching you: one scout cannot cover every game.
+  {id:'ngozi', name:'Ngozi', career:'basketball', location:'sports', role:'Hoops scout', alt:true, color:'#e0a96d', look:{skin:'#6e442e', hair:'braids', hairColor:'black', build:'athletic', height:'tall'}, lines:['Your crossover is getting sharp. Keep it low.', 'Lagos Lions are asking about you.', 'Box out every time and coaches will notice.']},
+  {id:'funmi', name:'Funmi', career:'tennis', location:'sports', role:'Tennis coach', alt:true, color:'#9fd3c7', look:{skin:'#8d5b3d', hair:'ponytail', hairColor:'black', build:'slim', height:'average'}, lines:['Bend your knees on that backhand, abeg.', 'Your first serve is a weapon. Trust it.', 'The Abuja Open qualifiers are coming. Be ready.']},
+  {id:'danjuma', name:'Danjuma', career:'wrestling', location:'sports', role:'Promoter', alt:true, color:'#d98b8b', look:{skin:'#5a3a28', hair:'buzz', hairColor:'black', build:'heavy', height:'tall'}, lines:['The crowd wants a villain. Or a hero. Pick one.', 'Work the mic more and I will put you on the main card.', 'That slam last week? The fans still talk about it.']},
 ];
+// Who you meet at a place: at the arena, the person for your sport (Scout Kai for football and everyone else).
+export const npcAt = (location, career) => { const here = NPCS.filter(n => n.location === location); return here.find(n => n.career === career) || here.find(n => !n.alt) || null; };
 export const clamp = (value, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, value));
 export const effort = (level, base = 35) => level <= 4 ? base * level : 4 * base * 2 ** (level - 4);
 // Bigger homes add rooms east of the apartment, reached through a door in the bedroom wall.
