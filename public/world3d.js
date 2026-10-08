@@ -3,7 +3,7 @@
 // shadowed 3D meshes with physically based materials, image-based lighting and filmic tone mapping.
 // Meshes are pooled and re-placed each frame, so nothing is rebuilt while playing.
 import * as T from './vendor/three.min.js';
-import { World, worldObjects } from './world.js';
+import { World, worldObjects, MATCH_SCALE } from './world.js';
 import { BUILDS, HEIGHTS, WEAR, weatherAt, festivalAt, upgradesFor } from './content.js';
 
 const UNIT_BOX = new T.BoxGeometry(1, 1, 1), UNIT_BALL = new T.SphereGeometry(.5, 24, 16), UNIT_ROD = new T.CylinderGeometry(.5, .5, 1, 18);
@@ -174,7 +174,7 @@ export class Figure {
     // Standing still people breathe and shift their weight a little.
     const idle = !o.walk && !pose && !reduced, breath = idle ? Math.sin(time * 1.7 + x) : 0, sway = idle ? Math.sin(time * .6 + z) : 0;
     const hip = pose === 'toilet' ? .57 : pose === 'sitFloor' ? .16 : seated ? o.seat ?? .7 : .9 * tall + bob, top = o.outfit, skinMat = mat(skin, 'skin'), pants = mat(o.pants);
-    this.root.position.set(x, 0, z); this.root.rotation.set(0, o.heading || 0, 0);
+    this.root.position.set(x, 0, z); this.root.rotation.set(0, o.heading || 0, 0); this.root.scale.setScalar(o.scale || 1);
     this.torso.position.set(sway * .012, hip, 0); this.torso.scale.set(1, tall, 1); this.torso.rotation.set(o.walk ? .05 : 0, 0, sway * .015);
     this.pelvis.material = pants; this.pelvis.scale.set(.96 * H, 1, .58 * H);
     this.chest.material = mat(top); this.chest.scale.set(S, 1 + breath * .006, .62 * W);
@@ -379,6 +379,10 @@ export class World3D extends World {
   human(x, z, skin, o = {}) {
     if (o.pose === 'run') o = { ...o, pose: null, walk: true, gait: performance.now() / 1000 * 11 };
     if (o.pose === 'sit' || o.pose === 'work') { const f = this.seatAt(x, z); if (f != null) o = { ...o, heading: f }; }
+    // During a football match everyone at the venue is drawn at the match scale, as if the camera were further back.
+    // A seat keeps its real height: the hips sit on it whatever the scale.
+    if (this.matchScale && !o.scale) o = { ...o, scale: this.matchScale };
+    if (o.scale && o.scale !== 1 && o.seat != null) o = { ...o, seat: o.seat / o.scale };
     const f = this.figures.next(); o = { hair: '#2b211c', style: 'curls', outfit: '#8ea9a4', pants: '#34435e', shoes: '#f4f1ea', gait: this.gait, ...o };
     f.apply(x, z, skin, o, performance.now() / 1000, this.reduced);
   }
@@ -405,13 +409,39 @@ export class World3D extends World {
     this.raycaster.setFromCamera(new T.Vector2(x / this.width * 2 - 1, -(y / this.height) * 2 + 1), this.camera);
     const r = this.raycaster.ray, t = -r.origin.y / (r.direction.y || -1e-6); return { x: r.origin.x + r.direction.x * t, z: r.origin.z + r.direction.z * t };
   }
+  // The part of the view not covered by the HUD on top and the activity card below.
+  viewBand() {
+    const c = this.canvas.getBoundingClientRect(), card = document.querySelector('#activityCard')?.getBoundingClientRect(), hud = document.querySelector('.match-hud')?.getBoundingClientRect();
+    const bottom = card && card.height > 0 && card.top < c.bottom ? card.top - c.top - 8 : this.height, top = Math.max(58, hud && hud.height ? hud.bottom - c.top + 6 : 0);
+    return bottom - top > 90 ? { top, bottom } : { top: 0, bottom: this.height };
+  }
+  aim(f, angle, el, dist, shift) {
+    this.camera.position.set(f.x + Math.sin(angle) * Math.cos(el) * dist, Math.sin(el) * dist, f.z + Math.cos(angle) * Math.cos(el) * dist);
+    this.camera.lookAt(f.x, .6, f.z);
+    if (shift > .5) this.camera.setViewOffset(this.width, this.height, 0, shift, this.width, this.height); else if (this.camera.view?.enabled) this.camera.clearViewOffset();
+    this.camera.updateMatrixWorld();
+    this.scale = this.height / (2 * dist * Math.tan(T.MathUtils.degToRad(this.camera.fov / 2)));
+  }
   placeCamera() {
+    // A football match: a broadcast view of the whole pitch, framed between the scoreboard and the activity card.
+    if (this.inMatch()) {
+      const band = this.viewBand(), angle = this.width >= this.height * .9 ? Math.PI / 2 : 0, el = .95, key = [this.width, this.height, angle, Math.round(band.top / 8), Math.round(band.bottom / 8)].join();
+      this.matchAngle = angle;
+      if (this.fitKey !== key) {
+        this.fitKey = key; const shift = this.height / 2 - (band.top + band.bottom) / 2, pts = [[-4.2, 0, -4.4], [4.6, 0, -4.4], [-4.2, 0, 4.4], [4.6, 0, 4.4], [-4.2, .8, -3], [4.6, .8, -2.5], [-4.2, .8, 3], [4.6, .8, 2.5], [-.8, 1.1, -4.1], [.8, 1.1, 4.1]];
+        let d = 6; for (; d < 90; d *= 1.04) { this.aim({ x: 0, z: 0 }, angle, el, d, shift); if (pts.every(([x, y, z]) => { const p = this.project(x, y, z); return p.x > 6 && p.x < this.width - 6 && p.y > band.top && p.y < band.bottom; })) break; }
+        this.fit = { d, shift };
+      }
+      this.focusPoint = { x: 0, z: 0 }; this.aim(this.focusPoint, angle, el, this.fit.d, this.fit.shift); return;
+    }
     // Keep a pleasant overhead view: between ~30° and ~80° up, never closer than 7 units.
     // Outdoors the camera pulls further back so streets and buildings fit around you.
     const f = this.focusPoint, el = .52 + (this.pitch - .3) / .63 * .88, dist = Math.max(7, 19 / this.zoom) * (this.interior() ? 1 : 1.9);
-    this.camera.position.set(f.x + Math.sin(this.angle) * Math.cos(el) * dist, Math.sin(el) * dist, f.z + Math.cos(this.angle) * Math.cos(el) * dist);
-    this.camera.lookAt(f.x, .6, f.z); this.camera.updateMatrixWorld();
-    this.scale = this.height / (2 * dist * Math.tan(T.MathUtils.degToRad(this.camera.fov / 2)));
+    // At work or practice the view slides up so what you are doing sits above the activity card.
+    let goal = 0; const a = this.state?.active && !this.state.trip && this.actor;
+    if (a) { this.aim(f, this.angle, el, dist, 0); const band = this.viewBand(), p = this.project(a.x, 1, a.z); goal = Math.max(0, Math.min(this.height * .35, p.y - (band.top + band.bottom) / 2)); }
+    this.workShift = (this.workShift || 0) + (goal - (this.workShift || 0)) * (this.reduced ? 1 : .12);
+    this.aim(f, this.angle, el, dist, this.workShift);
   }
   light(day) {
     const k = 1 - day.dark * .78;
@@ -445,7 +475,7 @@ export class World3D extends World {
     this.island.visible = inside; this.city.visible = !inside; this.scene3.fog = inside ? null : this.fog;
     if (!inside) { const key = [this.location, day.night, this.ownersKey, this.state.home, !!this.state.trip, festivalAt(Date.now()), !!this.state.vip?.yacht, this.starsKey].join('|'); if (key !== this.cityKey) { this.cityKey = key; this.buildCity(day.night); } }
     for (const p of [this.boxes, this.balls, this.rods, this.figures, this.toilets]) p.begin();
-    this.meshes = []; this.seats = []; if (!inside) this.townLife(); this.scene();
+    this.matchScale = this.inMatch() ? MATCH_SCALE : 0; this.meshes = []; this.seats = []; if (!inside) this.townLife(); this.scene();
     for (const p of [this.boxes, this.balls, this.rods, this.figures, this.toilets]) p.end();
     this.paintRain();
     this.renderer.render(this.scene3, this.camera);

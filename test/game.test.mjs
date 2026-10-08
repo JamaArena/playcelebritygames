@@ -79,8 +79,8 @@ test('commentary pauses prevent early decisions and final settlement',()=>{
   assert.throws(()=>act(s,{type:'finish',activityId:a.id},T+1),/Complete every/);assert.equal(s.charges,9);
 });
 test('published output settles money, reach and fame once; retries cannot release again',()=>{
-  const s=make('musician');go(s);const activity=complete(s);assert.equal(s.outputs.length,1);assert.equal(s.outputs[0].released,true);assert.equal(s.outputs[0].quality,68,"safe hits plus a handled event lift the vibe and mix meters");assert.equal(s.careers.musician.audience,6800);assert.equal(s.fame,6);assert.equal(s.outputs[0].fame,6);assert.equal(s.outputs[0].payout,undefined);
-  assert.throws(()=>act(s,{type:'finish',activityId:activity},T+300_000),/No activity/);assert.equal(s.careers.musician.audience,6800);assert.equal(s.fame,6);
+  const s=make('musician');go(s);const activity=complete(s);assert.equal(s.outputs.length,1);assert.equal(s.outputs[0].released,true);assert.equal(s.outputs[0].quality,69,"safe hits plus a handled event lift the vibe and mix meters");assert.equal(s.careers.musician.audience,6900);assert.equal(s.fame,6);assert.equal(s.outputs[0].fame,6);assert.equal(s.outputs[0].payout,undefined);
+  assert.throws(()=>act(s,{type:'finish',activityId:activity},T+300_000),/No activity/);assert.equal(s.careers.musician.audience,6900);assert.equal(s.fame,6);
 });
 test('maximum football skill improves distance-sensitive accuracy without guaranteeing goals',()=>{
   assert.ok(Math.abs(shootingProbability(6,24,0,0,0)-.556)<1e-12);
@@ -91,7 +91,7 @@ test('maximum football skill improves distance-sensitive accuracy without guaran
 test('defensive football beats offer context-valid actions; passing trains passing',()=>{
   const s=make();go(s);act(s,{type:'start',kind:'produce'},T,()=>.9);const a=s.active;assert.equal(choices(s)[1].target,'left winger');
   act(s,{type:'decision',activityId:a.id,beat:0,choice:1},a.readyAt,()=>0);assert.equal(s.careers.football.skills.passing.points,5);assert.equal(s.careers.football.skills.shooting.points,0);
-  act(s,{type:'decision',activityId:a.id,beat:1,choice:1},a.readyAt,()=>0);assert.ok(choices(s).every(c=>c.skill==='defending'));
+  assert.equal(a.playerScore,1,'the winger finished the move');assert.ok(choices(s).every(c=>c.skill==='defending'),'Red kick off and attack');
 });
 test('upgrades need rising fame and time, finish offline once, preserve ownership and grant no learning',()=>{
   const s=make();s.location='plaza';assert.throws(()=>act(s,{type:'buy',item:'gear'},T),/50 fame/);s.fame=100;act(s,{type:'buy',item:'gear'},T);act(s,{type:'upgrade',item:'gear'},T);
@@ -506,4 +506,56 @@ test('work events bring their own decision and consequences',()=>{
 test('football shots are a real option and sport-only gyms host practice',()=>{
   const s=make();go(s);act(s,{type:'start',kind:'produce'},T+1,()=>.9);const shoot=view(s,s.active.readyAt).active.choices.find(c=>c.action==='shoot');assert.ok(shoot.probability>.12&&shoot.probability<.6,String(shoot.probability));
   const g=make('tennis');g.location='gym';act(g,{type:'start',kind:'practice',skill:'footwork'},T);assert.equal(g.active.kind,'practice');
+});
+// Football: Red score only after you lose the ball; a move you build gets you closer; balance stays fair.
+const seq=list=>{let i=0;return ()=>list[Math.min(i++,list.length-1)];};
+const footballer=(level=1,tier=0)=>{const s=make();go(s);s.careers.football.tier=tier;for(const k in s.careers.football.skills)s.careers.football.skills[k].level=level;return s;};
+test('football: keeping the ball never concedes, a completed pass sets up a closer shot',()=>{
+  const s=footballer(10);act(s,{type:'start',kind:'produce'},T,()=>.9);const a=s.active,pick=label=>choices(s).findIndex(c=>c.label.startsWith(label));
+  act(s,{type:'decision',activityId:a.id,beat:0,choice:pick('Pass to left'),},a.readyAt,seq([.1,.9,.9]));
+  assert.equal(a.opponentScore,0);assert.equal(a.possession,'player');assert.equal(a.chance,17);assert.ok(choices(s).some(c=>c.label==='Shoot · 17m'));
+  act(s,{type:'decision',activityId:a.id,beat:1,choice:pick('Dribble inside')},a.readyAt,seq([.99,.0]));
+  assert.equal(a.possession,'opponent','a lost ball hands them the attack');assert.equal(a.opponentScore,0,'but not a goal');assert.ok(choices(s).every(c=>c.skill==='defending'));
+  act(s,{type:'decision',activityId:a.id,beat:2,choice:0},a.readyAt,seq([0]));assert.equal(a.opponentScore,0,'a won tackle stops the attack');assert.equal(a.possession,'player');assert.equal(a.chance,16);
+});
+test('football: a beaten defender concedes less often the better you defend',()=>{
+  const conceded=level=>{let n=0;for(let i=0;i<200;i++){const s=footballer(level);act(s,{type:'start',kind:'produce'},T,()=>.9);const a=s.active;a.possession='opponent';act(s,{type:'decision',activityId:a.id,beat:0,choice:0},a.readyAt,seq([.999,i/200]));n+=a.opponentScore;}return n/200;};
+  const low=conceded(1),high=conceded(10);assert.ok(low>high,`${low} > ${high}`);assert.ok(low<=.4&&high>=.1);
+});
+test('football: match events include a penalty that can score and a booking that hurts your defending',()=>{
+  const s=footballer(5);act(s,{type:'start',kind:'produce'},T,()=>.9);const a=s.active;a.event={beat:0,n:2};
+  assert.equal(choices(s)[0].kind,'penalty');
+  act(s,{type:'decision',activityId:a.id,beat:0,choice:0},a.readyAt,()=>0);assert.equal(a.playerScore,1,'the penalty goes in');
+  const b=footballer(5);act(b,{type:'start',kind:'produce'},T,()=>.9);const x=b.active;x.event={beat:0,n:1};act(b,{type:'decision',activityId:x.id,beat:0,choice:2},x.readyAt,()=>.999);assert.equal(x.booked,true);
+  x.possession='opponent';const booked=view(b,x.readyAt).active.choices[0].probability;x.booked=false;assert.ok(booked<view(b,x.readyAt).active.choices[0].probability);
+});
+test('football balance: sensible play wins about 35–45% at level 1 and about 80% at level 10',()=>{
+  let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+  const rate=(level,tier,n=400)=>{let w=0;for(let i=0;i<n;i++){const s=footballer(level,tier);act(s,{type:'start',kind:'produce'},T,rnd);
+    while(s.active.beat<s.active.totalBeats){const at=s.active.readyAt;s.needs.energy=100;const ch=view(s,at).active.choices,sh=ch.findIndex(c=>c.action==='shoot'&&c.probability>=.3),i2=sh>=0?sh:ch.reduce((b,c,j)=>c.probability>ch[b].probability?j:b,0);act(s,{type:'decision',activityId:s.active.id,beat:s.active.beat,choice:i2},at,rnd);}
+    act(s,{type:'finish',activityId:s.active.id},s.active.readyAt,rnd);if(s.results[0].win==='Win')w++;}return w/n;};
+  const l1=rate(1,0),l10=rate(10,2);assert.ok(l1>=.28&&l1<=.5,`L1 ${l1}`);assert.ok(l10>=.7&&l10<=.92,`L10 ${l10}`);
+});
+// Work scenes: what an option is about has its own effect, a gamble gets a follow-up scene, and live shows are on stage.
+test('scene options carry their own effects and a risky pick gets a follow-up scene',()=>{
+  const s=make('developer');go(s);act(s,{type:'start',kind:'produce'},T,()=>.9);const a=s.active;delete a.event;
+  assert.ok(choices(s).every(c=>'scftg'.includes(c.tag)),'every option has a tag');const risky=choices(s)[2];
+  act(s,{type:'decision',activityId:a.id,beat:0,choice:2},a.readyAt,()=>.99);assert.equal(a.outcomes[0].tag,risky.tag);
+  assert.match(view(s,a.readyAt).active.scene.text,/client saw your last risky change/);assert.equal(view(s,a.readyAt).active.scene.follow,true);
+  if(risky.tag==='g')assert.match(a.lastNote,/backfired/);
+  act(s,{type:'decision',activityId:a.id,beat:1,choice:0},a.readyAt,()=>0);assert.equal(a.outcomes[1].follow,true);assert.equal(view(s,a.readyAt).active.scene.follow,false,'no follow-up of a follow-up');
+});
+test('a musician on stage gets live-show scenes',()=>{
+  const s=make('musician');go(s);act(s,{type:'start',kind:'live'},T,()=>.9);const text=view(s,s.active.readyAt).active.scene.text;
+  assert.ok(!/studio/i.test(text));assert.ok(choices(s).length===3);
+});
+test('ball sports: Fitness starts full and only drains, and tired legs cost a little accuracy',()=>{
+  for(const career of ['football','basketball','tennis']){const s=make(career);go(s);act(s,{type:'start',kind:'produce'},T,()=>.9);const a=s.active;delete a.event;assert.equal(a.stability,100);
+    let last=100;while(a.beat<a.totalBeats&&!s.active?.tennis?.winner){act(s,{type:'decision',activityId:a.id,beat:a.beat,choice:0},a.readyAt,()=>0);assert.ok(a.stability<last,`${career} fitness drains`);last=a.stability;}}
+  const s=make();go(s);act(s,{type:'start',kind:'produce'},T,()=>.9);const fresh=view(s,s.active.readyAt).active.choices[1].probability;s.active.stability=20;assert.ok(view(s,s.active.readyAt).active.choices[1].probability<fresh);
+});
+test('each sport has its own person at the arena; everyone else meets Scout Kai',async()=>{
+  const {npcAt}=await import('../public/content.js');
+  assert.equal(npcAt('sports','football').name,'Kai');assert.equal(npcAt('sports','musician').name,'Kai');
+  const names=['basketball','tennis','wrestling'].map(c=>npcAt('sports',c).name);assert.equal(new Set([...names,'Kai']).size,4);
 });
