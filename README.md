@@ -6,7 +6,7 @@ Create a character, explore six locations, recover daily needs, train skills, pl
 
 ## Deploy on Netlify
 
-The full game supports Netlify Functions and Netlify Database (Postgres). Connect this repository, deploy the implementation branch, and use the committed `netlify.toml` settings. Database provisioning and migrations run automatically. See [docs/netlify.md](docs/netlify.md) for deployment, verification and operating limits.
+The full game runs on Netlify Functions with any Postgres database (for example a free Neon project). Connect this repository, add the database's connection string as the `DATABASE_URL` environment variable, and deploy with the committed `netlify.toml` settings. Tables are created automatically on first use. See [docs/netlify.md](docs/netlify.md).
 
 ## Live server
 

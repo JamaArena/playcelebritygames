@@ -1,17 +1,22 @@
 import pg from 'pg';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { handlePersistentRequest, readPulse } from './storage.mjs';
 import { resendSender } from './email.mjs';
 
-const migrations = [
-  new URL('./netlify/database/migrations/0001_celebrity-city/migration.sql', import.meta.url),
-  new URL('./netlify/database/migrations/0002_live-pulse/migration.sql', import.meta.url),
-  new URL('./netlify/database/migrations/0003_battles/migration.sql', import.meta.url),
-  new URL('./netlify/database/migrations/0004_accounts/migration.sql', import.meta.url),
-  new URL('./netlify/database/migrations/0005_active-device/migration.sql', import.meta.url),
-  new URL('./netlify/database/migrations/0006_profiles-pulses/migration.sql', import.meta.url),
-];
+// Migrations sit beside this file locally and on Vercel; bundled Netlify functions find them
+// from the working directory instead (they are included via netlify.toml).
+const MIGRATIONS = ['0001_celebrity-city', '0002_live-pulse', '0003_battles', '0004_accounts', '0005_active-device', '0006_profiles-pulses'];
+const migrationSql = name => {
+  const rel = `netlify/database/migrations/${name}/migration.sql`;
+  let here = null;
+  try { here = fileURLToPath(new URL('./' + rel, import.meta.url)); } catch {}
+  for (const file of [here, path.join(process.cwd(), rel), path.join(process.env.LAMBDA_TASK_ROOT || '/var/task', rel)].filter(Boolean))
+    if (existsSync(file)) return readFileSync(file, 'utf8');
+  throw new Error('Missing migration ' + name);
+};
 let pool, ready;
 async function database() {
   const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
@@ -27,8 +32,8 @@ export async function initialize(pool) {
     await client.query('BEGIN');
     await client.query("SET LOCAL lock_timeout = '8s'");
     await client.query('SELECT pg_advisory_xact_lock(173204, 2)');
-    for (const file of migrations) {
-      const sql = readFileSync(file, 'utf8').replace(/CREATE TABLE /g, 'CREATE TABLE IF NOT EXISTS ')
+    for (const name of MIGRATIONS) {
+      const sql = migrationSql(name).replace(/CREATE TABLE /g, 'CREATE TABLE IF NOT EXISTS ')
         .replace('INSERT INTO celebrity.pulse VALUES(1,0);', 'INSERT INTO celebrity.pulse VALUES(1,0) ON CONFLICT (id) DO NOTHING;');
       await client.query(sql);
     }

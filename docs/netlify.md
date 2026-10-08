@@ -1,6 +1,9 @@
 # Netlify deployment
 
-The repository deploys the full game: `public/` is the website, `netlify/functions/game.mts` serves `/api/state`, `/api/action` and `/api/pulse`, and Netlify Database persists the city in Postgres. The Node 24 runtime is required. `netlify.toml` specifies the build and publish settings.
+
+> **Database:** set `DATABASE_URL` in Site configuration → Environment variables to a Postgres connection string (Neon's free plan works; use the pooled connection string with `sslmode=require`). The game creates its `celebrity` schema and tables on the first request. Netlify Database is no longer required.
+
+The repository deploys the full game: `public/` is the website, `netlify/functions/game.mts` serves `/api/state`, `/api/action` and `/api/pulse`, and a Postgres database given by the `DATABASE_URL` environment variable (for example Neon) persists the city in Postgres. The Node 24 runtime is required. `netlify.toml` specifies the build and publish settings.
 
 ## Deploy from GitHub
 
