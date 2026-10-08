@@ -1,6 +1,7 @@
 import { bestMode, fanClubSize, PROMPTS, RIVAL, TEAM, TAILOR_COLORS, TATTOOS, VENUE_ACTS, TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace, homeRooms } from './content.js';
 import { World, worldObjects } from './world.js';
-import { World3D } from './world3d.js';
+import { World3D, Figure } from './world3d.js';
+import * as T from './vendor/three.min.js';
 import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS } from './sound.js';
 import { OPINIONS, npcOpinion, npcName, QUESTS, QUEST_GRADUATION, ARENA } from './content.js';
 import { CLASH_ACTIONS } from './clashText.js';
@@ -337,7 +338,7 @@ function render(){
   $('#topStats').innerHTML=phoneWidget();
   $('#locationTitle').textContent=state.visiting?`${snapshot.players.find(p=>p.id===state.visiting)?.name||'Friend'}’s home`:state.location==='home'&&SPONSORSHIPS[state.home]?`Your ${SPONSORSHIPS[state.home].name.toLowerCase()}`:location.name;
   $('#locationSubtitle').textContent=location.subtitle;
-  $('#locationEyebrow').textContent=state.location==='home'?'YOUR NEIGHBOURHOOD':'OUT IN PALM CITY';
+  $('#locationEyebrow').textContent=state.location==='home'?'YOUR NEIGHBOURHOOD':'OUT IN NAIJA CITY';
   $('#objects').innerHTML=worldObjects(state.location,snapshot.visitedHome?.furniture||state.furniture,[],snapshot.visitedHome?snapshot.visitedHome.home:state.home).map(o=>button(`${o.icon} ${escape(o.label||o.name)}`,'object',`data-key="${escape(o.key||o.name)}"`,'object-button')).join('')+(state.location==='home'?button('💬 Socialise','recover','data-need="social"','object-button')+(snapshot.visitedHome?'':button('🛋 Arrange room','arrangeRoom','','object-button')):'');
   if(state.visiting)$('#objects').innerHTML=button('💬 Socialise','recover','data-need="social"','object-button')+button('📍 Leave visit','leaveVisit','','object-button');
   const moodValue=Object.values(state.needs).reduce((a,b)=>a+b,0)/6,moodLabel=moodValue>=75?'Very happy':moodValue>=55?'Content':moodValue>=30?'Uncomfortable':'Miserable';
@@ -393,7 +394,7 @@ function confirmLogout(){
   showModal('logoutConfirm',`<span class="eyebrow">ACCOUNT</span><h2>Log out?</h2><p class="modal-intro">You’re signed in as <strong>@${escape(snapshot.account.username)}</strong>. Your character stays safe on your account; log in with your email to play again on any device.</p><div class="actions">${button('Log out','logout','','primary')}${button('Stay signed in','closeWelcome')}</div>`);}
 function newLife(){showModal('newLife',`<span class="eyebrow">NEW LIFE</span><h2>Start over?</h2><p class="modal-intro">Your character, skills, fame and possessions are erased for good. Your account and username stay.</p><form id="newLifeForm"><div class="field"><label for="confirmLife">Type NEW LIFE to confirm</label><input id="confirmLife" name="confirm" autocomplete="off" required></div><button class="primary wide" type="submit">Erase and start a new life</button></form>`);}
 function creation(account=snapshot?.account){
-  showModal('create',`<div class="creation-hero"><span class="eyebrow">WELCOME TO PALM CITY</span><h2>A little life.<br>A lot of possibility.</h2><p>Find your craft, make your people, and turn everyday moments into a life worth remembering.</p></div><form id="createForm"><div class="steps"><span class="step on">1 · Your look</span><span class="step" id="stepTwoLabel">2 · Your career</span></div>
+  showModal('create',`<div class="creation-hero"><span class="eyebrow">WELCOME TO NAIJA CITY</span><h2>A little life.<br>A lot of possibility.</h2><p>Find your craft, make your people, and turn everyday moments into a life worth remembering.</p></div><form id="createForm"><div class="steps"><span class="step on">1 · Your look</span><span class="step" id="stepTwoLabel">2 · Your career</span></div>
   <section id="stepLook"><canvas class="look-canvas" id="lookCanvas" aria-label="Preview of your character. Drag to turn them around."></canvas><small class="look-hint">Drag to turn around</small><div class="field"><label for="name">What should we call you?</label><input id="name" name="name" placeholder="Your character’s name" minlength="2" maxlength="30" required autocomplete="nickname" value="${escape(account?.username||'')}"></div>
   <div class="field"><label>Skin tone</label><div class="swatches">${SKIN_TONES.map((c,i)=>`<button type="button" class="swatch ${i===3?'on':''}" style="--c:${c}" data-action="pick" data-field="color" data-value="${c}" aria-label="Skin tone ${i+1}"></button>`).join('')}</div><input type="hidden" id="color" name="color" value="${SKIN_TONES[3]}"></div>
   <div class="field"><label>Hairstyle</label><div class="choice-grid">${Object.entries(HAIRSTYLES).map(([key,name])=>`<button type="button" class="choice ${key==='curls'?'on':''}" data-action="pick" data-field="hair" data-value="${key}">${name}</button>`).join('')}</div><input type="hidden" id="hair" name="hair" value="curls"></div>
@@ -416,12 +417,33 @@ function storyReel(s){
 }
 // The look preview uses the real game renderer, so hair, colours and body shapes match the game exactly.
 let lookWorld=null;
+// The character designer's preview: the same 3D figure as the game on a little grass stage, whole body
+// in frame, drag to turn. 2D Lite (or no WebGL) keeps a flat preview, framed and without weather.
+function lookStage(canvas){
+  try{
+    const renderer=new T.WebGLRenderer({canvas,antialias:true,alpha:true});renderer.setPixelRatio(Math.min(2,devicePixelRatio||1));
+    const scene=new T.Scene(),sun=new T.DirectionalLight('#fff4e0',2.3),fig=new Figure();scene.add(new T.HemisphereLight('#ffffff','#6f8a5c',2.2));sun.position.set(2.5,4,3);scene.add(sun);
+    const stage=new T.Mesh(new T.CylinderGeometry(.78,.82,.08,48),new T.MeshStandardMaterial({color:'#9cc286',roughness:.95}));stage.position.y=-.04;scene.add(stage,fig.root);
+    const camera=new T.PerspectiveCamera(30,1,.1,50);camera.position.set(0,1.1,4.8);camera.lookAt(0,.9,0);
+    let heading=.45,dragX=null,raf=0,look=null,stopped=false;
+    canvas.addEventListener('pointerdown',e=>{dragX=e.clientX;canvas.setPointerCapture?.(e.pointerId);});
+    canvas.addEventListener('pointermove',e=>{if(dragX==null)return;heading+=(e.clientX-dragX)*.012;dragX=e.clientX;});
+    for(const ev of ['pointerup','pointercancel'])canvas.addEventListener(ev,()=>{dragX=null;});
+    const frame=time=>{if(stopped)return;const w=canvas.clientWidth||300,h=canvas.clientHeight||300;
+      if(canvas.width!==Math.round(w*renderer.getPixelRatio())||canvas.height!==Math.round(h*renderer.getPixelRatio())){renderer.setSize(w,h,false);camera.aspect=w/h;camera.updateProjectionMatrix();}
+      if(look)fig.apply(0,0,look.color,{...look,heading},time/1000,!motion);renderer.render(scene,camera);raf=requestAnimationFrame(frame);};
+    raf=requestAnimationFrame(frame);
+    return {canvas,set:l=>{look=l;},stop:()=>{stopped=true;cancelAnimationFrame(raf);renderer.dispose();}};
+  }catch(error){console.warn('3D preview unavailable; using 2D.',error);return null;}
+}
 function paintLook(){
   const canvas=$('#lookCanvas');if(!canvas)return;
-  if(!lookWorld||lookWorld.canvas!==canvas){lookWorld?.stop();lookWorld=new World(canvas,()=>{},()=>{});lookWorld.click=()=>{};lookWorld.location='home';lookWorld.zoom=6.5;const project=World.prototype.project;lookWorld.project=function(x,y,z){const p=project.call(this,x,y,z);return {x:p.x,y:p.y+this.height*.26};};lookWorld.forceHour=12;lookWorld.interior=()=>true;
+  const look={color:$('#color').value,style:$('#hair').value,hair:HAIR_COLORS[$('#hairColor').value],build:$('#build').value,height:$('#height').value,outfit:'#8ea9a4',pants:'#34435e',shoes:'#f4f1ea'};
+  if(graphicsMode==='3d'&&lookWorld?.canvas!==canvas){lookWorld?.stop();lookWorld=lookStage(canvas);}
+  if(lookWorld?.set&&lookWorld.canvas===canvas){lookWorld.set(look);return;}
+  if(!lookWorld||lookWorld.canvas!==canvas){lookWorld?.stop();lookWorld=new World(canvas,()=>{},()=>{});lookWorld.click=()=>{};lookWorld.location='home';lookWorld.zoom=4.5;lookWorld.noWeather=true;const project=World.prototype.project;lookWorld.project=function(x,y,z){const p=project.call(this,x,y,z);return {x:p.x,y:p.y+this.height*.34};};lookWorld.forceHour=12;lookWorld.interior=()=>true;
     for(const f of ['paintRoutine','paintLabels','paintSpeech','paintPins'])lookWorld[f]=()=>{};
     lookWorld.scene=function(){this.human(0,0,this.previewLook.color,{...this.previewLook,walk:false,heading:Math.PI/4});this.actor={x:0,z:0,pose:null};};}
-  const look={color:$('#color').value,style:$('#hair').value,hair:HAIR_COLORS[$('#hairColor').value],build:$('#build').value,height:$('#height').value,outfit:'#8ea9a4',pants:'#34435e',shoes:'#f4f1ea'};
   lookWorld.previewLook=look;lookWorld.state={location:'home',needs:{hunger:80,energy:80,fun:80,social:80,hygiene:80,bladder:80},equipped:{},career:'actor',color:look.color,furniture:[],serverNow:Date.now()};lookWorld.draw();
 }
 function updateCreationCareer(key){
