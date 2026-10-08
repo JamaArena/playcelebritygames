@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { WORK_SCENES } from './public/careerText.js';
+import { WORK_SCENES, SPORT_PLAYS, WORK_EVENTS, UNITS, reviewLine, tierTitle } from './public/careerText.js';
 import { bestMode, QUESTS, QUEST_GRADUATION, FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace, homeRooms, npcOpinion, OPINIONS, NPC_NAMES, CLASH_MEDALS, medalTier } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
@@ -48,7 +48,8 @@ export function learn(s, careerKey, skill, points, eventId) {
 export function evaluate(s, key=s.career) {
   const c=s.careers[key], def=CAREERS[key];
   const average=Object.values(c.skills).reduce((a,b)=>a+b.level,0)/def.skills.length;
-  B.tiers.forEach(([,fame,level],i)=>{if((s.fame||0)>=fame&&average>=level)c.tier=Math.max(c.tier,i);});
+  const before=c.tier;B.tiers.forEach(([,fame,level],i)=>{if((s.fame||0)>=fame&&average>=level)c.tier=Math.max(c.tier,i);});
+  if(c.tier>before){const title=tierTitle(key,c.tier),awardId=`promotion:${key}:${c.tier}`;if(!s.awards.some(a=>a.id===awardId))s.awards.push({id:awardId,name:`Promoted: ${title}`,career:key,at:s.lastSeen,promotion:c.tier});c.promotedAt=s.lastSeen;log(s,`🎉 Promoted! You are now ${title}.`,s.lastSeen);headline(s,`${s.name} steps up to ${title} ${def.icon}`,s.lastSeen);}
   for (const threshold of B.milestones) {
     const awardId=`milestone:fame:${threshold}`;
     if((s.fame||0)>=threshold&&!s.awards.some(a=>a.id===awardId))s.awards.push({id:awardId,name:`${threshold.toLocaleString()} fame`,career:key,at:s.lastSeen});
@@ -96,9 +97,9 @@ export function reconcile(s, now) {
   if(s.recovery && now>=s.recovery.endsAt)finishRecovery(s,s.recovery.endsAt);
   if(s.active?.kind==='practice' && now>=s.active.readyAt) {
     const a=s.active,c=s.careers[a.career];
-    learn(s,a.career,a.skill,7,a.id); s.needs.energy=clamp(s.needs.energy-5*(1-(perks.energy||0)/100)); c.practices++;c.exposure=0;
-    s.results.unshift({id:a.id,title:`${a.skill} practice`,quality:null,learning:7,at:now});
-    s.active=null;evaluate(s,a.career);log(s,`Practice complete: +7 ${a.skill} learning points.`,now);
+    const xp=a.xp??7;learn(s,a.career,a.skill,xp,a.id); s.needs.energy=clamp(s.needs.energy-5*(1-(perks.energy||0)/100)); c.practices++;c.exposure=0;
+    s.results.unshift({id:a.id,title:`${a.skill} practice`,quality:null,learning:xp,focus:focusLabel(xp),at:now});
+    s.active=null;evaluate(s,a.career);log(s,`Practice complete: ${focusLabel(xp)} +${xp} ${a.skill} learning points.`,now);
   }
 }
 // Needs fill up while you do something; you can stop any time and keep what you gained.
@@ -173,9 +174,10 @@ export function watchInsights(s,r,now){
   if(c)evaluate(s);
 }
 export function generalProbability(skill,difficulty,pressure,fatigue) { return clamp(.5+.05*(skill-difficulty)-.1*pressure-.1*fatigue,.1,.9); }
-export function shootingProbability(skill,distance,pressure,fatigue,angle) {return clamp(.15+.065*skill-.012*Math.max(0,distance-12)-.1*pressure-.05*fatigue-.1*angle,.02,.85);}
+export function shootingProbability(skill,distance,pressure,fatigue,angle) {return clamp(.4+.05*skill-.012*Math.max(0,distance-12)-.1*pressure-.05*fatigue-.1*angle,.05,.8);}
+export const keeperSave=goalkeeper=>clamp(.1+.02*goalkeeper,.1,.5);
 export function shot(skill,scene,fatigue,rng) {
-  const block=.15*scene.pressure, accuracy=shootingProbability(skill,scene.distance,scene.pressure,fatigue,scene.angle), save=clamp(.2+.04*scene.goalkeeper,.1,.7);
+  const block=.15*scene.pressure, accuracy=shootingProbability(skill,scene.distance,scene.pressure,fatigue,scene.angle), save=keeperSave(scene.goalkeeper);
   const draws=[rng(),rng(),rng()];
   const result=draws[0]<block?'Blocked':draws[1]>=accuracy?'Wide':draws[2]<save?'Saved':'Goal';
   return {success:result==='Goal', result, probability:(1-block)*accuracy*(1-save), accuracy, draws};
@@ -202,18 +204,24 @@ export function tennisScore(t){
   return `Sets ${t.sets.join('–')} · Games ${t.games.join('–')} · ${points}`;
 }
 const sport = key => CAREERS[key].family==='sport';
+const RISKS=['safe','balanced','risky'],EVENT_CHANCE=.25;
+export const practiceXp=s=>clamp(Math.round(4+Object.values(s.needs).reduce((a,b)=>a+b,0)/Object.keys(s.needs).length/15),5,10);
+export const focusLabel=xp=>xp>=9?'Focused':xp<=6?'Distracted':'Steady';
+// A work event (if this activity drew one) lands on its own beat with its own choices.
+const eventAt=(a,i)=>a.event&&a.event.beat===i?WORK_EVENTS[a.career]?.[a.event.n]||null:null;
 function beat(s,a) {
   const c=s.careers[a.career],def=CAREERS[a.career];
-  const i=a.beat;
+  const i=a.beat,ev=eventAt(a,i);
   // Careers with a scene list draw a random situation each step (seeded per activity, so it stays put on refresh).
   const scenes=WORK_SCENES[a.career],scene=scenes&&scenes[(Math.floor((a.seed||0)*997)+i*7)%scenes.length],line=scene?scene[0]:def.beats[i%def.beats.length];
-  const base={text:a.kind==='trial'?`Trial · ${line}`:line,difficulty:Math.min(10,3+c.tier*2),pressure:.3+c.tier*.1, distance:[24,18,30,12,22,16][i%6],angle:.1,goalkeeper:5,defensive:a.career==='football'&&(a.possession==='opponent'||[2,4].includes(i))};
+  const base={text:ev?ev[0]:a.kind==='trial'?`Trial · ${line}`:line,difficulty:Math.min(10,3+c.tier*2),pressure:.3+c.tier*.1, distance:[24,18,30,12,22,16][i%6],angle:.1,goalkeeper:5,defensive:!ev&&a.career==='football'&&(a.possession==='opponent'||[2,4].includes(i)),event:!!ev,defence:!!SPORT_PLAYS[a.career]?.[i%6]?.defence};
   if(base.defensive)base.text='The opposition has possession. Protect the passing lane and win the ball back.';
   return base;
 }
 export function choices(s) {
   const a=s.active;if(!a || a.kind==='practice')return [];
-  const scene=beat(s,a),def=CAREERS[a.career],i=a.beat;
+  const scene=beat(s,a),def=CAREERS[a.career],i=a.beat,ev=eventAt(a,i);
+  if(ev)return ev[1].map((label,j)=>({label,skill:def.skills[+ev[2][j]],risk:RISKS[j],action:a.career==='football'?['mark','pass','dribble'][j]:'event',...(a.career==='football'&&j===1?{target:'left winger'}:{}),event:true}));
   if(a.career==='football') return scene.defensive ? [
     {label:'Tackle',skill:'defending',risk:'balanced',action:'tackle'}, {label:'Intercept the lane',skill:'defending',risk:'safe',action:'intercept'}, {label:'Mark the runner',skill:'defending',risk:'safe',action:'mark'},
   ] : [
@@ -223,25 +231,45 @@ export function choices(s) {
     {label:'Dribble inside',skill:'dribbling',risk:'risky',action:'dribble',target:'inside'},
     {label:'Dribble down the wing',skill:'dribbling',risk:'balanced',action:'dribble',target:'wing'},
   ];
-  if(a.career==='basketball')return [{label:'Jump shot · 3 points',skill:'shooting',risk:'risky',action:'shot',points:3},{label:'Drive to the hoop',skill:'handling',risk:'balanced',action:'drive',points:2},{label:'Pass to the open teammate',skill:'passing',risk:'safe',action:'pass',points:2}];
-  if(a.career==='wrestling')return [{label:'Grapple',skill:'strength',risk:'balanced',action:'grapple'},{label:'Counter',skill:'technique',risk:'safe',action:'counter'},{label:a.opponentStamina<=30?'Signature move · pin attempt':'Signature move',skill:'technique',risk:'risky',action:'signature'},{label:'Work the crowd',skill:'charisma',risk:'safe',action:'crowd'}];
-  const skill=a.kind==='launch'?def.skills[[2,1,0][i%3]] : a.career==='tennis'?['serve','forehand','backhand','footwork','serve','forehand'][i%6] : a.career==='musician'?['songwriting','technique','production'][i%3] : a.career==='adult'?['business','presentation','production'][i%3] : a.career==='streamer'?['engagement','production','commentary'][i%3] : def.skills[i%def.skills.length];
+  // Ball sports, bouts and matches: the plays fit the moment (offence or defence, serve or return...).
+  const plays=SPORT_PLAYS[a.career]?.[i%6];
+  if(plays)return plays.plays.map(([label,k,risk,action,points])=>({label:action==='pin'&&a.opponentStamina>40?`${label} (they are still fresh)`:action==='signature'&&a.opponentStamina<=30?`${label} · pin attempt`:label,skill:def.skills[k],risk,action,...(points?{points}:{}),...(plays.defence?{defence:true}:{})}));
   const workScenes=WORK_SCENES[a.career],workScene=workScenes&&workScenes[(Math.floor((a.seed||0)*997)+i*7)%workScenes.length];
-  const labels = workScene ? workScene[1] : a.career==='musician' ? [
-    ['A familiar melody','An original chorus','A surprising key change'],['Simplify the passage','Record the planned take','Attempt a demanding run'],['Keep the mix simple','Balance the arrangement','Try a bold production idea']][i%3] : a.career==='developer'?[
-    ['Reproduce the bug first','Trace the failing path','Refactor the affected module'],['Apply a focused repair','Add regression coverage','Rebuild the component'],['Explain a smaller scope','Deliver with documented tests','Propose a broader release']][i%3] : a.career==='adult'?[
-    ['Sign the standard contract','Negotiate a bigger cut','Hold out for top billing'],['Keep it classy and teasing','Turn up the heat','Go bold and leave them breathless'],['Reschedule and keep it professional','Rework the scene with the crew','Improvise a sizzling solo set']][i%3] : ['Use a proven approach','Commit to your own approach','Try an ambitious approach'];
-  const list=labels.map((label,j)=>({label,skill,risk:['safe','balanced','risky'][j],action:'general'}));
-  return list;
+  if(workScene)return workScene[1].map((label,j)=>({label,skill:def.skills[+(workScene[2]?.[j]??i%def.skills.length)],risk:RISKS[j],action:'general'}));
+  return ['Use a proven approach','Commit to your own approach','Try an ambitious approach'].map((label,j)=>({label,skill:def.skills[i%def.skills.length],risk:RISKS[j],action:'general'}));
+}
+// The odds of a choice working: one rule for the card and for the result.
+function chance(s,a,choice,scene){
+  const c=s.careers[a.career],fatigue=(100-s.needs.energy)/100;let level=c.skills[choice.skill].level;
+  if(choice.action==='signature')level=(level+c.skills.stamina.level)/2;
+  const difficulty=clamp(scene.difficulty+({safe:-2,balanced:0,risky:2}[choice.risk]),1,10);
+  if(choice.action==='shoot')return {level,difficulty,probability:(1-.15*scene.pressure)*shootingProbability(level,scene.distance,scene.pressure,fatigue,scene.angle)*(1-keeperSave(scene.goalkeeper))};
+  let p=clamp(generalProbability(level,difficulty,scene.pressure,fatigue)+(perksFor(s).success||0)/100,.1,.95);
+  if(choice.action==='pin'&&a.opponentStamina>40)p=Math.max(.05,p*.35);
+  return {level,difficulty,probability:p};
 }
 export function view(s,now) {
   const result=structuredClone(s),a=result.active;
-  if(a&&a.kind!=='practice') {a.scene=beat(s,a);if(a.tennis)a.scoreLabel=tennisScore(a.tennis);a.choices=choices(s).map(choice=>{
-    const scene=a.scene, skill=choice.action==='signature'?(s.careers[a.career].skills[choice.skill].level+s.careers[a.career].skills.stamina.level)/2:s.careers[a.career].skills[choice.skill].level,fatigue=(100-s.needs.energy)/100;
-    const difficulty=clamp(scene.difficulty+({safe:-2,balanced:0,risky:2}[choice.risk]),1,10);
-    return {...choice,probability:choice.action==='shoot'?(1-.15*scene.pressure)*shootingProbability(skill,scene.distance,scene.pressure,fatigue,scene.angle)*(1-clamp(.2+.04*scene.goalkeeper,.1,.7)):clamp(generalProbability(skill,difficulty,scene.pressure,fatigue)+(perksFor(s).success||0)/100,.1,.95),difficulty,level:skill};
-  });}
+  if(a&&a.kind!=='practice') {a.scene=beat(s,a);if(a.tennis)a.scoreLabel=tennisScore(a.tennis);a.choices=choices(s).map(choice=>{const o=chance(s,s.active,choice,a.scene);return {...choice,probability:o.probability,difficulty:o.difficulty,level:o.level};});}
   result.opportunities=opportunities(s); result.serverNow=now;return result;
+}
+// A decision in a tennis match plays a stretch of about three games; how you played sets your odds on each point.
+function playTennis(a,won,risk,rng,games=3){
+  const t=a.tennis,R=RISKS.indexOf(risk),pw=won?[.62,.68,.76][R]:[.42,.36,.28][R],start=t.games[0]+t.games[1]+t.history.flat().reduce((x,y)=>x+y,0),mine=t.games[0]+t.history.reduce((x,h)=>x+h[0],0);
+  for(let n=0;n<400&&t.winner===null&&t.games[0]+t.games[1]+t.history.flat().reduce((x,y)=>x+y,0)<start+games;n++)tennisPoint(t,rng()<pw?0:1);
+  const played=t.games[0]+t.games[1]+t.history.flat().reduce((x,y)=>x+y,0)-start,gotMine=t.games[0]+t.history.reduce((x,h)=>x+h[0],0)-mine;
+  a.lastGames=[gotMine,played-gotMine];a.playerScore=t.sets[0];a.opponentScore=t.sets[1];
+}
+// Event results: energy, meters, quality, reputation, fame, and sport scores.
+function applyEvent(s,a,ev,ok,now,rng){
+  const e=ev?.[3]?.[ok?'hit':'miss'];if(!e)return;const c=s.careers[a.career];
+  if(e.energy)s.needs.energy=clamp(s.needs.energy+e.energy);
+  if(e.stability)a.stability=clamp(a.stability+e.stability);if(e.engagement)a.engagement=clamp(a.engagement+e.engagement);
+  if(e.quality)a.bonus=(a.bonus||0)+e.quality;if(e.reputation)c.reputation=clamp(c.reputation+e.reputation);
+  if(e.opponent)a.opponentScore+=e.opponent;if(e.stamina)a.playerStamina=clamp(a.playerStamina+e.stamina);
+  if(e.games&&a.tennis)playTennis(a,false,'risky',()=>.99,1);
+  if(e.fame)addFame(s,e.fame,'Work moment',now);
+  if(e.news){headline(s,`${s.name} ${e.news}`,now);log(s,`${ev[0]} ${s.name} ${e.news}.`,now);}
 }
 function start(s,input,now,rng) {
   requireRule(!s.active&&!s.recovery,'Finish or cancel your current activity first.');
@@ -249,7 +277,7 @@ function start(s,input,now,rng) {
   requireRule(s.needs.energy>=20&&s.needs.hunger>=20,'You need at least 20 energy and hunger.');
   const key=s.career,c=s.careers[key],def=CAREERS[key],kind=input.kind;
   requireRule(['practice','produce','live','trial','build','launch','collab'].includes(kind),'Unknown activity.');
-  requireRule(s.location===def.location || (kind==='practice'&&s.location==='home'&&s.inventory.gear) || (kind==='practice'&&!s.trip&&s.inventory.laptop&&def.family==='tech'),`Go to ${LOCATIONS[def.location].name} to start this activity.`);
+  requireRule(s.location===def.location || (kind==='practice'&&s.location==='home'&&s.inventory.gear) || (kind==='practice'&&!s.trip&&s.inventory.laptop&&def.family==='tech') || (kind==='practice'&&def.family==='sport'&&s.location==='gym'),`Go to ${LOCATIONS[def.location].name} to start this activity.`);
   if(kind==='practice')requireRule(def.skills.includes(input.skill),'Choose a career skill.');
   if(kind==='trial')requireRule(discovery(c,def),'Complete three local activities and reach level 2 in your focus skill, or practise after a failed trial.');
   if(['build','launch'].includes(kind))requireRule(['founder','web3'].includes(key),'Only founders and Web3 builders own launchable products.');
@@ -260,6 +288,8 @@ function start(s,input,now,rng) {
   const tier=Math.min(c.tier,3),beats=sport(key)?6:3,duration=sport(key)?B.sportMs:B.activityMs;
   s.charges--;if(s.refillAnchor===null)s.refillAnchor=now;
   s.active={id:id(),kind,career:key,skill:input.skill,title:text(input.title)||`${def.output} ${s.outputs.filter(o=>o.career===key).length+1}`,genre:text(input.genre,30)||'Original',beat:0,totalBeats:beats,readyAt:now+(kind==='practice'?B.practiceMs:duration/(beats+1)),interval:duration/(beats+1),status:kind==='practice'?'practising':'commentary',outcomes:[],tier,startedAt:now,playerScore:0,opponentScore:0,playerStamina:100,opponentStamina:100,exposure:0,engagement:50,stability:50,productId:product?.id,collaborator:kind==='collab'?input.npc:null,audienceShare:kind==='collab'?.6:1,seed:rng()};
+  if(kind==='practice')s.active.xp=practiceXp(s);
+  const evs=WORK_EVENTS[key];if(evs&&kind!=='practice'&&kind!=='trial'&&rng()<EVENT_CHANCE)s.active.event={beat:(sport(key)?2:1)+Math.floor(rng()*(beats-(sport(key)?2:1))),n:Math.floor(rng()*evs.length)};
   if(key==='tennis')s.active.tennis={points:[0,0],games:[0,0],sets:[0,0],history:[],tiebreak:false,winner:null};
   if(key==='football')s.active.possession='player';
   log(s,`Started ${kind==='practice'?`${input.skill} practice`:s.active.title}. One charge used.`,now);
@@ -268,10 +298,11 @@ function settle(s,a,now) {
   if(s.results.some(r=>r.id===a.id))return;
   const c=s.careers[a.career],def=CAREERS[a.career];
   let quality=Math.round(a.outcomes.reduce((sum,o)=>sum+o.score,0)/Math.max(1,a.outcomes.length));
-  if(a.career==='streamer')quality=Math.round((quality+a.engagement+a.stability)/3);
-  if(a.kind==='live'&&a.career==='musician')quality=Math.round((quality+a.engagement)/2);
+  quality=clamp(Math.round(sport(a.career)?quality*.8+a.engagement*.2:quality*.6+a.engagement*.25+a.stability*.15)+(a.bonus||0));
   if(a.kind==='launch'){const p=s.outputs.find(o=>o.id===a.productId);requireRule(p&&!p.released,'This product already launched.');quality=Math.round((quality+p.quality)/2);p.released=true;p.launchedAt=now;}
   if(!sport(a.career)&&s.inventory.gear)quality=clamp(quality+5*(s.inventory.gear.level-1));
+  // Basketball has no draws: a tied game goes to overtime, decided by how well you played.
+  if(a.career==='basketball'&&a.playerScore===a.opponentScore){a.overtime=true;if(((a.seed||0)*7919)%1<clamp(.5+(quality-50)/100,.2,.8))a.playerScore+=2;else a.opponentScore+=2;}
   let win=null;if(sport(a.career))win=a.playerScore>a.opponentScore?'Win':a.playerScore<a.opponentScore?'Loss':'Draw';
   if(a.career==='wrestling')win=a.pinned?'Win':a.playerStamina>a.opponentStamina?'Win':a.playerStamina<a.opponentStamina?'Loss':'Draw';
   if(a.career==='tennis'){
@@ -299,7 +330,9 @@ function settle(s,a,now) {
     else c.failedTrialAt=c.practices;
   }
   const output={id:a.id,career:a.career,kind:a.kind,title:a.title,genre:a.genre,quality,released:a.kind!=='build',at:now,credits:[s.name,...(a.collaborator?[NPCS.find(n=>n.id===a.collaborator).name]:[])],gain,fame,tier:a.tier};
-  s.outputs.unshift(output);s.results.unshift({...output,win,score:sport(a.career)?`${a.playerScore}–${a.opponentScore}`:null,learning:a.outcomes.length*5});
+  if(sport(a.career))output.win=win;
+  const story=a.outcomes.map(o=>({choice:o.choice,success:o.success,skill:o.skill,risk:o.risk,event:!!o.event,games:o.games})),score=a.career==='wrestling'?(a.pinned?'Pinfall':`${a.playerStamina}–${a.opponentStamina} stamina`):sport(a.career)?`${a.playerScore}–${a.opponentScore}${a.overtime?' (OT)':''}`:null;
+  s.outputs.unshift(output);s.results.unshift({...output,win,score,learning:a.outcomes.length*5,story,review:reviewLine(def.family,quality,story,win),units:UNITS[a.career],meters:[Math.round(a.engagement),Math.round(a.stability)],...(a.tennis?{sets:a.tennis.history.map(h=>h.join('–')).join(', ')}:{}),...(a.career==='wrestling'?{method:a.pinned?'Pinfall':'Decision',stamina:[a.playerStamina,a.opponentStamina]}:{})});
   if(contract&&qualifies)contract.delivered++;
   s.active=null;evaluate(s,a.career);log(s,`${a.title} completed · quality ${quality} · ${gain.toLocaleString('en-US')} ${def.audience} · +${fame} fame.`,now);
 }
@@ -332,36 +365,43 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(input.activityId===a.id&&input.beat===a.beat,'That decision has already been resolved.');
       requireRule(now>=a.readyAt,'Commentary is still running.');
       const choice=choices(s)[input.choice];requireRule(choice,'Choose a valid action.');
-      const scene=beat(s,a),c=s.careers[a.career],fatigue=(100-s.needs.energy)/100;
-      let skill=c.skills[choice.skill].level;
-      if(choice.action==='signature')skill=(skill+c.skills.stamina.level)/2;
-      const difficulty=clamp(scene.difficulty+({safe:-2,balanced:0,risky:2}[choice.risk]),1,10);
-      const p=clamp(generalProbability(skill,difficulty,scene.pressure,fatigue)+(perksFor(s).success||0)/100,.1,.95),draw=rng();
+      const scene=beat(s,a),c=s.careers[a.career],fatigue=(100-s.needs.energy)/100,ev=eventAt(a,a.beat),odds=chance(s,a,choice,scene),skill=odds.level,p=odds.probability,draw=rng();
       const outcome=choice.action==='shoot'?shot(skill,scene,fatigue,rng):{success:draw<p,probability:p,draws:[draw],result:draw<p?'Successful':'Missed opportunity'};
-      const score=outcome.success?{safe:60,balanced:80,risky:100}[choice.risk]:20;
-      a.outcomes.push({...outcome,score,choice:choice.label,action:choice.action,target:choice.target,scene,skill:choice.skill,at:now});
+      const ok=outcome.success,R=RISKS.indexOf(choice.risk),score=ok?{safe:60,balanced:80,risky:100}[choice.risk]:20;
+      a.outcomes.push({...outcome,score,choice:choice.label,action:choice.action,target:choice.target,scene,skill:choice.skill,risk:choice.risk,event:!!choice.event,at:now});
       learn(s,a.career,choice.skill,5,`${a.id}:${a.beat}`);s.needs.energy=clamp(s.needs.energy-2*(1-(perksFor(s).energy||0)/100));
+      if(ev)applyEvent(s,a,ev,ok,now,rng);
       if(sport(a.career)) {
-        if(a.career==='football'&&choice.action==='shoot'&&outcome.success)a.playerScore++;
         if(a.career==='football'){
-          a.possession=choice.action==='shoot'?'opponent':outcome.success?(choice.action==='pass'?'teammate':'player'):'opponent';
+          if(choice.action==='shoot'&&ok)a.playerScore++;
+          a.possession=choice.action==='shoot'?'opponent':ok?(choice.action==='pass'?'teammate':'player'):'opponent';
           a.ballTarget=choice.target||null;
+          if(rng()<.25&&choice.action!=='mark')a.opponentScore++;
         }
-        if(a.career==='basketball'&&outcome.success)a.playerScore+=choice.points;
-        if(a.career==='tennis'){
-          tennisPoint(a.tennis,outcome.success?0:1);
-          for(let n=0;n<16&&a.tennis.winner===null;n++)tennisPoint(a.tennis,rng()<.5?0:1);
-          a.playerScore=a.tennis.sets[0];a.opponentScore=a.tennis.sets[1];
+        // Basketball: your play scores (or stops them); their possession answers, harder against good defence.
+        if(a.career==='basketball'&&!ev){
+          if(choice.defence){if(ok){if(choice.action==='steal')a.playerScore+=2;}else a.opponentScore+=choice.action==='block'?3:2;}
+          else{if(ok)a.playerScore+=choice.points;if(rng()<clamp(.45-.04*(c.skills.defending.level-1),.12,.45))a.opponentScore+=rng()<.3?3:2;}
         }
-        if(a.career==='wrestling') {
-          if(choice.action==='signature'&&a.opponentStamina<=30&&outcome.success)a.pinned=true;
-          if(outcome.success&&choice.action!=='crowd')a.opponentStamina=clamp(a.opponentStamina-20);
-          if(!outcome.success)a.playerStamina=clamp(a.playerStamina-10);
+        if(a.career==='tennis')playTennis(a,ok,choice.risk,rng);
+        // Wrestling: moves cost the opponent stamina; misses and their offence cost yours. The pin needs them worn down.
+        if(a.career==='wrestling'&&!ev){
+          const act=choice.action,hit=[12,20,30][R],before=a.opponentStamina;let guarded=false;
+          if(ok){
+            if(act==='rest')a.playerStamina=clamp(a.playerStamina+15);
+            else if(act==='brace')guarded=true;
+            else if(act==='crowd')a.engagement=clamp(a.engagement+15);
+            else if(act==='pin'){if(before<=40)a.pinned=true;else a.opponentStamina=clamp(before-8);}
+            else if(act==='signature'){a.opponentStamina=clamp(before-30);if(before<=30)a.pinned=true;}
+            else{a.opponentStamina=clamp(before-hit);if(['counter','reversal'].includes(act))guarded=true;}
+          }else a.playerStamina=clamp(a.playerStamina-[4,8,12][R]);
+          if(!guarded&&!a.pinned)a.playerStamina=clamp(a.playerStamina-(2+Math.floor(rng()*6)));
         }
-        if(a.career!=='tennis'&&rng()<.25 && choice.action!=='mark')a.opponentScore+=a.career==='basketball'?2:1;
       }
-      a.engagement=clamp(a.engagement+(outcome.success?15:-10));
-      if(choice.skill==='production')a.stability=clamp(a.stability+(outcome.success?15:-15));
+      // Live meters: bold choices that land lift the room but put the work at risk; safe ones steady it.
+      a.engagement=clamp(a.engagement+(ok?[6,12,20][R]:-[6,10,14][R]));
+      a.stability=clamp(a.stability+(ok?[10,4,-4][R]:-[4,10,18][R]));
+      if(a.pinned||a.tennis?.winner!=null)a.beat=a.totalBeats-1;
       a.beat++;a.readyAt=now+a.interval;a.status=a.beat>=a.totalBeats?'finishing':'commentary';
       evaluate(s,a.career);break;
     }

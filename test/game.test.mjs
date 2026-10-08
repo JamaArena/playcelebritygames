@@ -12,7 +12,8 @@ const go=s=>{act(s,{type:'travel',location:CAREERS[s.career].location},T);arrive
 function complete(s,kind='produce',rng=()=>0){
   const start=T+1;act(s,{type:'start',kind,title:'First light'},start,rng);
   const activity=s.active.id;
-  for(let n=0;n<s.active.totalBeats;n++){const at=s.active.readyAt;act(s,{type:'decision',activityId:activity,beat:n,choice:0},at,rng);}
+  // Bouts and matches can end early (a pin, a straight-sets win), so play until no decision is left.
+  while(s.active.beat<s.active.totalBeats){const at=s.active.readyAt;act(s,{type:'decision',activityId:activity,beat:s.active.beat,choice:0},at,rng);}
   act(s,{type:'finish',activityId:activity},s.active.readyAt,rng);return activity;
 }
 test('all 14 career definitions have two valid starts and four skills',()=>{
@@ -62,15 +63,15 @@ test('need preconditions and overlapping starts spend nothing',()=>{
   s.needs.energy=80;act(s,{type:'start',kind:'produce'},T);assert.throws(()=>act(s,{type:'start',kind:'produce'},T),/Finish/);assert.equal(s.charges,9);
 });
 test('offline practice completes once and ordinary offline needs do not decay',()=>{
-  const s=make();go(s);act(s,{type:'start',kind:'practice',skill:'shooting'},T);reconcile(s,T+3*60_000);
-  assert.equal(s.careers.football.skills.shooting.points,7);assert.equal(s.needs.hunger,80);assert.equal(s.needs.energy,75);
-  reconcile(s,T+4*60_000);assert.equal(s.careers.football.skills.shooting.points,7);
+  const s=make();go(s);act(s,{type:'start',kind:'practice',skill:'shooting'},T);const xp=s.active.xp;assert.ok(xp>=5&&xp<=10,'practice XP follows mood');reconcile(s,T+3*60_000);
+  assert.equal(s.careers.football.skills.shooting.points,xp);assert.equal(s.needs.hunger,80);assert.equal(s.needs.energy,75);
+  reconcile(s,T+4*60_000);assert.equal(s.careers.football.skills.shooting.points,xp);
 });
 test('failed choices continue a saved activity, award eligible learning once and use no extra charge',()=>{
-  const s=make('musician');go(s);act(s,{type:'start',kind:'produce'},T);const a=s.active;
-  act(s,{type:'decision',activityId:a.id,beat:0,choice:0},a.readyAt,()=>.99);assert.equal(s.charges,9);assert.equal(s.active.beat,1);assert.equal(s.active.outcomes[0].success,false);assert.equal(s.careers.musician.skills.songwriting.points,5);
+  const s=make('musician');go(s);act(s,{type:'start',kind:'produce'},T);const a=s.active,sk=choices(s)[0].skill;
+  act(s,{type:'decision',activityId:a.id,beat:0,choice:0},a.readyAt,()=>.99);assert.equal(s.charges,9);assert.equal(s.active.beat,1);assert.equal(s.active.outcomes[0].success,false);assert.equal(s.careers.musician.skills[sk].points,5);
   const saved=JSON.parse(JSON.stringify(s));assert.equal(saved.active.id,a.id);assert.equal(view(saved,a.readyAt).active.beat,1);
-  assert.throws(()=>act(s,{type:'decision',activityId:a.id,beat:0,choice:0},a.readyAt,()=>0),/already been resolved/);assert.equal(s.careers.musician.skills.songwriting.points,5);
+  assert.throws(()=>act(s,{type:'decision',activityId:a.id,beat:0,choice:0},a.readyAt,()=>0),/already been resolved/);assert.equal(s.careers.musician.skills[sk].points,5);
 });
 test('commentary pauses prevent early decisions and final settlement',()=>{
   const s=make('musician');go(s);act(s,{type:'start',kind:'produce'},T);const a=s.active;
@@ -78,12 +79,12 @@ test('commentary pauses prevent early decisions and final settlement',()=>{
   assert.throws(()=>act(s,{type:'finish',activityId:a.id},T+1),/Complete every/);assert.equal(s.charges,9);
 });
 test('published output settles money, reach and fame once; retries cannot release again',()=>{
-  const s=make('musician');go(s);const activity=complete(s);assert.equal(s.outputs.length,1);assert.equal(s.outputs[0].released,true);assert.equal(s.outputs[0].quality,60);assert.equal(s.careers.musician.audience,6000);assert.equal(s.fame,6);assert.equal(s.outputs[0].fame,6);assert.equal(s.outputs[0].payout,undefined);
-  assert.throws(()=>act(s,{type:'finish',activityId:activity},T+300_000),/No activity/);assert.equal(s.careers.musician.audience,6000);assert.equal(s.fame,6);
+  const s=make('musician');go(s);const activity=complete(s);assert.equal(s.outputs.length,1);assert.equal(s.outputs[0].released,true);assert.equal(s.outputs[0].quality,68,"safe hits plus a handled event lift the vibe and mix meters");assert.equal(s.careers.musician.audience,6800);assert.equal(s.fame,6);assert.equal(s.outputs[0].fame,6);assert.equal(s.outputs[0].payout,undefined);
+  assert.throws(()=>act(s,{type:'finish',activityId:activity},T+300_000),/No activity/);assert.equal(s.careers.musician.audience,6800);assert.equal(s.fame,6);
 });
 test('maximum football skill improves distance-sensitive accuracy without guaranteeing goals',()=>{
-  assert.ok(Math.abs(shootingProbability(6,24,0,0,0)-.396)<1e-12);
-  assert.ok(Math.abs(shootingProbability(10,24,0,0,0)-.656)<1e-12);
+  assert.ok(Math.abs(shootingProbability(6,24,0,0,0)-.556)<1e-12);
+  assert.ok(Math.abs(shootingProbability(10,24,0,0,0)-.756)<1e-12);
   assert.ok(shootingProbability(6,12,0,0,0)>shootingProbability(6,24,0,0,0));
   const scene={distance:24,pressure:0,angle:0,goalkeeper:5};assert.equal(shot(10,scene,0,()=>.99).success,false);assert.equal(shot(10,scene,0,()=>.5).result,'Goal');
 });
@@ -475,4 +476,34 @@ test('life events wait until a match or work session is over', () => {
   assert.ok(!s.lifeEvent, 'no fan moments mid-match');
   s.active = null; lifeEvents(s, T + 2, () => 0);
   assert.ok(s.lifeEvent || s.prompt, 'the moment arrives once you are done');
+});
+test('work choices train the skill each option names; sport plays fit the beat',async()=>{
+  const {WORK_SCENES}=await import('../public/careerText.js');
+  const s=make('developer');go(s);act(s,{type:'start',kind:'produce'},T+1,()=>.5);const scene=WORK_SCENES.developer.find(([text])=>view(s,T+1).active.scene.text.endsWith(text));
+  assert.deepEqual(choices(s).map(c=>c.skill),[...scene[2]].map(k=>CAREERS.developer.skills[+k]));
+  const b=make('basketball');go(b);act(b,{type:'start',kind:'produce'},T+1,()=>.9);for(let n=0;n<2;n++)act(b,{type:'decision',activityId:b.active.id,beat:n,choice:0},b.active.readyAt,()=>.9);
+  assert.ok(choices(b).every(c=>c.defence&&c.skill==='defending'),'a defensive beat offers defensive plays');
+});
+test('wrestling results come from stamina or a pin, never the generic score',()=>{
+  for(const r of [()=>0,()=>.99]){const s=make('wrestling');go(s);complete(s,'produce',r);const res=s.results[0];
+    assert.ok(res.score==='Pinfall'||/stamina/.test(res.score),res.score);if(res.win==='Draw')assert.equal(res.stamina[0],res.stamina[1]);assert.ok(['Pinfall','Decision'].includes(res.method));}
+  const s=make('wrestling');go(s);complete(s,'produce',()=>0);assert.equal(s.results[0].win,'Win');
+});
+test('tennis decisions play whole games and the result shows set scores',()=>{
+  const s=make('tennis');go(s);act(s,{type:'start',kind:'produce'},T+1,()=>.9);act(s,{type:'decision',activityId:s.active.id,beat:0,choice:0},s.active.readyAt,()=>0);
+  assert.deepEqual(s.active.lastGames,[3,0]);
+  const w=make('tennis');go(w);complete(w,'produce',()=>0);assert.equal(w.results[0].win,'Win');assert.match(w.results[0].sets,/^\d+–\d+, \d+–\d+/);assert.ok(w.results[0].story.length>=1&&w.results[0].review.includes('★'));
+});
+test('a tier rise is a promotion with the career’s own title',()=>{
+  const s=make('developer');s.fame=150;for(const k of Object.values(s.careers.developer.skills))k.level=2;evaluate(s,'developer');
+  assert.equal(s.careers.developer.tier,1);assert.ok(s.awards.some(a=>a.name==='Promoted: Junior'));evaluate(s,'developer');assert.equal(s.awards.filter(a=>a.promotion).length,1);
+});
+test('work events bring their own decision and consequences',()=>{
+  const s=make('developer');go(s);act(s,{type:'start',kind:'produce'},T+1,()=>0);assert.deepEqual(s.active.event,{beat:1,n:0});
+  act(s,{type:'decision',activityId:s.active.id,beat:0,choice:0},s.active.readyAt,()=>0);const v=view(s,s.active.readyAt);assert.match(v.active.scene.text,/escalates/);assert.ok(v.active.choices.every(c=>c.event));
+  const rep=s.careers.developer.reputation;act(s,{type:'decision',activityId:s.active.id,beat:1,choice:2},s.active.readyAt,()=>.99);assert.equal(s.careers.developer.reputation,rep-3);
+});
+test('football shots are a real option and sport-only gyms host practice',()=>{
+  const s=make();go(s);act(s,{type:'start',kind:'produce'},T+1,()=>.9);const shoot=view(s,s.active.readyAt).active.choices.find(c=>c.action==='shoot');assert.ok(shoot.probability>.12&&shoot.probability<.6,String(shoot.probability));
+  const g=make('tennis');g.location='gym';act(g,{type:'start',kind:'practice',skill:'footwork'},T);assert.equal(g.active.kind,'practice');
 });
