@@ -33,10 +33,9 @@ export async function handlePersistentRequest(pool, request, options = {}) {
         continue;
       }
       await client.query('SELECT pg_advisory_xact_lock(173204, 1)');
-      for (const table of Object.keys(tables)) {
-        const { rows } = await client.query(`SELECT * FROM celebrity.${table}`);
-        for (const raw of rows) addRow(working, previous, table, raw);
-      }
+      // One round trip for the whole city: each table comes back as a JSON array.
+      const { rows: [all] } = await client.query(`SELECT ${Object.keys(tables).map(table => `(SELECT COALESCE(json_agg(t), '[]') FROM celebrity.${table} t) AS ${table}`).join(', ')}`);
+      for (const table of Object.keys(tables)) for (const raw of all[table]) addRow(working, previous, table, raw);
       break;
     }
     const response = await createGameService(working, { secureCookies: true, ...options, fast })(request);
