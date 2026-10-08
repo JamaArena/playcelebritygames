@@ -214,14 +214,17 @@ function beat(s,a) {
   const i=a.beat,ev=eventAt(a,i);
   // Careers with a scene list draw a random situation each step (seeded per activity, so it stays put on refresh).
   const scenes=WORK_SCENES[a.career],scene=scenes&&scenes[(Math.floor((a.seed||0)*997)+i*7)%scenes.length],line=scene?scene[0]:def.beats[i%def.beats.length];
-  const base={text:ev?ev[0]:a.kind==='trial'?`Trial · ${line}`:line,difficulty:Math.min(10,3+c.tier*2),pressure:.3+c.tier*.1, distance:[24,18,30,12,22,16][i%6],angle:.1,goalkeeper:5,defensive:!ev&&a.career==='football'&&(a.possession==='opponent'||[2,4].includes(i)),event:!!ev,defence:!!SPORT_PLAYS[a.career]?.[i%6]?.defence};
+  const base={text:ev?ev[0]:a.kind==='trial'?`Trial · ${line}`:line,difficulty:c.tier?Math.min(10,3+c.tier*2):2,pressure:.3+c.tier*.1, distance:a.chance||[24,18,30,12,22,16][i%6],angle:.1,goalkeeper:Math.min(9,3+2*c.tier),defensive:!ev&&a.career==='football'&&a.possession==='opponent',event:!!ev,defence:!!SPORT_PLAYS[a.career]?.[i%6]?.defence};
+  // A move you built (a pass or dribble that came off) leaves a cleaner look at goal.
+  if(a.career==='football'&&a.chance&&!ev)Object.assign(base,{pressure:Math.max(.1,base.pressure-.2),angle:0,goalkeeper:base.goalkeeper-2});
   if(base.defensive)base.text='The opposition has possession. Protect the passing lane and win the ball back.';
+  else if(a.career==='football'&&!ev&&a.chance)base.text=a.chance<=12?`You are through on goal, ${a.chance}m out!`:`The move is on: you have the ball ${a.chance}m from goal.`;
   return base;
 }
 export function choices(s) {
   const a=s.active;if(!a || a.kind==='practice')return [];
   const scene=beat(s,a),def=CAREERS[a.career],i=a.beat,ev=eventAt(a,i);
-  if(ev)return ev[1].map((label,j)=>({label,skill:def.skills[+ev[2][j]],risk:RISKS[j],action:a.career==='football'?['mark','pass','dribble'][j]:'event',...(a.career==='football'&&j===1?{target:'left winger'}:{}),event:true}));
+  if(ev)return ev[1].map((label,j)=>({label,skill:def.skills[+ev[2][j]],risk:RISKS[j],action:'event',...(ev[3]?.kind?{kind:ev[3].kind}:{}),event:true}));
   if(a.career==='football') return scene.defensive ? [
     {label:'Tackle',skill:'defending',risk:'balanced',action:'tackle'}, {label:'Intercept the lane',skill:'defending',risk:'safe',action:'intercept'}, {label:'Mark the runner',skill:'defending',risk:'safe',action:'mark'},
   ] : [
@@ -245,6 +248,7 @@ function chance(s,a,choice,scene){
   const difficulty=clamp(scene.difficulty+({safe:-2,balanced:0,risky:2}[choice.risk]),1,10);
   if(choice.action==='shoot')return {level,difficulty,probability:(1-.15*scene.pressure)*shootingProbability(level,scene.distance,scene.pressure,fatigue,scene.angle)*(1-keeperSave(scene.goalkeeper))};
   let p=clamp(generalProbability(level,difficulty,scene.pressure,fatigue)+(perksFor(s).success||0)/100,.1,.95);
+  if(a.booked&&scene.defensive)p*=.85;
   if(choice.action==='pin'&&a.opponentStamina>40)p=Math.max(.05,p*.35);
   return {level,difficulty,probability:p};
 }
@@ -254,8 +258,8 @@ export function view(s,now) {
   result.opportunities=opportunities(s); result.serverNow=now;return result;
 }
 // A decision in a tennis match plays a stretch of about three games; how you played sets your odds on each point.
-function playTennis(a,won,risk,rng,games=3){
-  const t=a.tennis,R=RISKS.indexOf(risk),pw=won?[.62,.68,.76][R]:[.42,.36,.28][R],start=t.games[0]+t.games[1]+t.history.flat().reduce((x,y)=>x+y,0),mine=t.games[0]+t.history.reduce((x,h)=>x+h[0],0);
+function playTennis(a,won,risk,rng,games=3,edge=0){
+  const t=a.tennis,R=RISKS.indexOf(risk),pw=(won?[.62,.68,.76][R]:[.42,.36,.28][R])+edge,start=t.games[0]+t.games[1]+t.history.flat().reduce((x,y)=>x+y,0),mine=t.games[0]+t.history.reduce((x,h)=>x+h[0],0);
   for(let n=0;n<400&&t.winner===null&&t.games[0]+t.games[1]+t.history.flat().reduce((x,y)=>x+y,0)<start+games;n++)tennisPoint(t,rng()<pw?0:1);
   const played=t.games[0]+t.games[1]+t.history.flat().reduce((x,y)=>x+y,0)-start,gotMine=t.games[0]+t.history.reduce((x,h)=>x+h[0],0)-mine;
   a.lastGames=[gotMine,played-gotMine];a.playerScore=t.sets[0];a.opponentScore=t.sets[1];
@@ -367,23 +371,30 @@ export function act(s,input,now,rng=Math.random) {
       const choice=choices(s)[input.choice];requireRule(choice,'Choose a valid action.');
       const scene=beat(s,a),c=s.careers[a.career],fatigue=(100-s.needs.energy)/100,ev=eventAt(a,a.beat),odds=chance(s,a,choice,scene),skill=odds.level,p=odds.probability,draw=rng();
       const outcome=choice.action==='shoot'?shot(skill,scene,fatigue,rng):{success:draw<p,probability:p,draws:[draw],result:draw<p?'Successful':'Missed opportunity'};
-      const ok=outcome.success,R=RISKS.indexOf(choice.risk),score=ok?{safe:60,balanced:80,risky:100}[choice.risk]:20;
+      const ok=outcome.success,R=RISKS.indexOf(choice.risk),score=ok?{safe:60,balanced:80,risky:100}[choice.risk]:sport(a.career)?20:35;
       a.outcomes.push({...outcome,score,choice:choice.label,action:choice.action,target:choice.target,scene,skill:choice.skill,risk:choice.risk,event:!!choice.event,at:now});
       learn(s,a.career,choice.skill,5,`${a.id}:${a.beat}`);s.needs.energy=clamp(s.needs.energy-2*(1-(perksFor(s).energy||0)/100));
       if(ev)applyEvent(s,a,ev,ok,now,rng);
       if(sport(a.career)) {
         if(a.career==='football'){
-          if(choice.action==='shoot'&&ok)a.playerScore++;
-          a.possession=choice.action==='shoot'?'opponent':ok?(choice.action==='pass'?'teammate':'player'):'opponent';
+          // Red only score after you lose the ball, less often the better you defend. A won ball starts a move;
+          // a pass or dribble that comes off carries it closer, so the next shot is easier.
+          const act=choice.action,last=a.beat>=a.totalBeats-1,d=c.skills.defending.level,beaten=clamp(.45-.035*(d-1)-(a.tier?0:.08),.15,.45);
           a.ballTarget=choice.target||null;
-          if(rng()<.25&&choice.action!=='mark')a.opponentScore++;
+          if(ev){const e=ev[3]?.[ok?'hit':'miss']||{};if(e.goal&&rng()<e.goal){a.playerScore++;a.possession='opponent';}else if(e.concede&&rng()<e.concede){a.opponentScore++;a.possession='player';}else a.possession=ok?'player':'opponent';if(e.booked)a.booked=true;a.chance=null;}
+          else if(scene.defensive){if(ok){a.possession='player';a.chance={tackle:16,intercept:20,mark:24}[act];}else{if(rng()<beaten)a.opponentScore++;a.possession='player';a.chance=null;}}
+          else if(act==='shoot'){if(ok)a.playerScore++;a.possession='opponent';a.chance=null;}
+          else if(ok){a.chance=Math.max(8,scene.distance-(act==='dribble'?10:7));a.possession='player';if(act==='pass'&&rng()<(choice.target==='striker'?.35:.25)){a.playerScore++;a.possession='opponent';a.chance=null;}}
+          else{a.possession='opponent';a.chance=null;}
+          // Losing it on the final beat leaves no time to defend: they break straight away.
+          if(last&&a.possession==='opponent'&&act!=='shoot'&&rng()<beaten*.6)a.opponentScore++;
         }
         // Basketball: your play scores (or stops them); their possession answers, harder against good defence.
         if(a.career==='basketball'&&!ev){
           if(choice.defence){if(ok){if(choice.action==='steal')a.playerScore+=2;}else a.opponentScore+=choice.action==='block'?3:2;}
-          else{if(ok)a.playerScore+=choice.points;if(rng()<clamp(.45-.04*(c.skills.defending.level-1),.12,.45))a.opponentScore+=rng()<.3?3:2;}
+          else{if(ok)a.playerScore+=choice.points;if(rng()<clamp((a.tier?.45:.28)-.04*(c.skills.defending.level-1),.12,.45))a.opponentScore+=rng()<.3?3:2;}
         }
-        if(a.career==='tennis')playTennis(a,ok,choice.risk,rng);
+        if(a.career==='tennis')playTennis(a,ok,choice.risk,rng,3,a.tier?0:.06);
         // Wrestling: moves cost the opponent stamina; misses and their offence cost yours. The pin needs them worn down.
         if(a.career==='wrestling'&&!ev){
           const act=choice.action,hit=[12,20,30][R],before=a.opponentStamina;let guarded=false;
@@ -395,7 +406,7 @@ export function act(s,input,now,rng=Math.random) {
             else if(act==='signature'){a.opponentStamina=clamp(before-30);if(before<=30)a.pinned=true;}
             else{a.opponentStamina=clamp(before-hit);if(['counter','reversal'].includes(act))guarded=true;}
           }else a.playerStamina=clamp(a.playerStamina-[4,8,12][R]);
-          if(!guarded&&!a.pinned)a.playerStamina=clamp(a.playerStamina-(2+Math.floor(rng()*6)));
+          if(!guarded&&!a.pinned)a.playerStamina=clamp(a.playerStamina-((a.tier?2:1)+Math.floor(rng()*(a.tier?6:4))));
         }
       }
       // Live meters: bold choices that land lift the room but put the work at risk; safe ones steady it.
