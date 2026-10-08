@@ -6,7 +6,7 @@ Create a character, explore six locations, recover daily needs, train skills, pl
 
 ## Deploy on Netlify
 
-The full game runs on Netlify Functions with any Postgres database (for example a free Neon project). Connect this repository, add the database's connection string as the `DATABASE_URL` environment variable, and deploy with the committed `netlify.toml` settings. Tables are created automatically on first use. See [docs/netlify.md](docs/netlify.md).
+The full game runs on Netlify Functions with Netlify Database (Postgres), which the build provisions automatically on credit-based plans, including Free. Teams without it can set `DATABASE_URL` to any Postgres database (for example a free Neon project) instead; tables are created on first use. See [docs/netlify.md](docs/netlify.md).
 
 ## Live server
 
