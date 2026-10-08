@@ -116,7 +116,8 @@ export function mishaps(s,now){
 // Random life moments while you play: good luck, small embarrassments, fan gifts, and power cuts at home.
 export function lifeEvents(s,now,rng=Math.random){
   if(s.nextEventAt==null){s.nextEventAt=now+LIFE_EVENT.firstMs;return;}
-  if(now<s.nextEventAt||s.trip)return;
+  // Nothing interrupts a match, a work session or a Fame Clash: the moment waits until you're done.
+  if(now<s.nextEventAt||s.trip||(s.active&&s.active.kind!=='practice')||s.battle)return;
   const family=CAREERS[s.career]?.family,home=s.location==='home'&&!s.visiting;
   const options=Object.entries(LIFE_EVENTS).filter(([,e])=>(!e.family||e.family===family)&&(!e.where||(e.where==='home')===home)&&(s.fame||0)>=(e.minFame||0)&&!(e.guarded&&s.team?.bodyguard)&&!(e.prompt&&s.prompt));
   const total=options.reduce((n,[,e])=>n+e.weight,0);let pick=rng()*total,key=options[0][0];
