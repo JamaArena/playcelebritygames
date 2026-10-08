@@ -469,3 +469,10 @@ test('trips default to the fastest way you have', async () => {
   act(t, { type: 'travel', location: 'plaza' }, T);
   assert.equal(t.trip.ride, 'helicopter', 'travel uses the best mode unless you chose another');
 });
+test('life events wait until a match or work session is over', () => {
+  const s = make(); s.nextEventAt = T; s.active = { kind: 'produce', career: 'football' };
+  lifeEvents(s, T + 1, () => 0);
+  assert.ok(!s.lifeEvent, 'no fan moments mid-match');
+  s.active = null; lifeEvents(s, T + 2, () => 0);
+  assert.ok(s.lifeEvent || s.prompt, 'the moment arrives once you are done');
+});
