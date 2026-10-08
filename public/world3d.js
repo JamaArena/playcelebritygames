@@ -135,20 +135,33 @@ export class Figure {
   // Hairstyles are small groups of shapes in the hair colour, rebuilt only when the style changes.
   styleHair(style, color, skin) {
     const key = style + color + skin; if (key === this.hairKey) return; this.hairKey = key; this.hair.clear();
-    const add = (geo, c, sx, sy, sz, x, y, z, rx = 0) => { const m = new T.Mesh(geo, mat(c, 'hair')); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.rotation.x = rx; m.castShadow = true; this.hair.add(m); return m; };
-    const cap = (c = color, s = 1) => { const m = new T.Mesh(new T.SphereGeometry(.118 * s, 24, 14, 0, Math.PI * 2, 0, Math.PI * .55), mat(c, 'hair')); m.scale.set(1.04, 1.12, 1.1); m.rotation.x = -.38; m.position.y = .042; m.castShadow = true; this.hair.add(m); return m; };
+    const add = (geo, c, sx, sy, sz, x, y, z, rx = 0, rz = 0) => { const m = new T.Mesh(geo, mat(c, 'hair')); m.scale.set(sx, sy, sz); m.position.set(x, y, z); m.rotation.set(rx, 0, rz); m.castShadow = true; this.hair.add(m); return m; };
+    // The scalp cap, tilted back so the hairline sits above the brows instead of like a bowl.
+    const cap = (c = color, s = 1) => { const m = new T.Mesh(new T.SphereGeometry(.118 * s, 24, 14, 0, Math.PI * 2, 0, Math.PI * .55), mat(c, 'hair')); m.scale.set(1.04, 1.12, 1.1); m.rotation.x = -.55; m.position.y = .042; m.castShadow = true; this.hair.add(m); return m; };
+    // A patch over the crown only: the longer top of a fade or a short crop.
+    const crown = (c, s, reach) => { const m = new T.Mesh(new T.SphereGeometry(.118 * s, 24, 10, 0, Math.PI * 2, 0, Math.PI * reach), mat(c, 'hair')); m.scale.set(1.04, 1.12, 1.1); m.rotation.x = -.35; m.position.y = .045; m.castShadow = true; this.hair.add(m); return m; };
     const shell = (low, c = color) => { const m = new T.Mesh(new T.SphereGeometry(.128, 24, 14, Math.PI * .78, Math.PI * 1.44, 0, Math.PI * low), mat(c, 'hair')); m.scale.set(1.04, 1.12, 1.08); m.position.y = .02; m.castShadow = true; this.hair.add(m); return m; };
+    // A point on the scalp: az turns around the head (0 = front), el rises from the ear line to the crown.
+    const on = (az, el, lift = 1.03) => [Math.sin(az) * Math.cos(el) * .123 * lift, .042 + Math.sin(el) * .132 * lift, Math.cos(az) * Math.cos(el) * .13 * lift];
+    // Hanging strands (braids, locs) from the back and sides of the head, clear of the face.
+    const strands = (n, r, len, tone, tips) => { for (let i = 0; i < n; i++) { const az = Math.PI * (.42 + i / (n - 1) * 1.16), [x, y, z] = on(az, .2, 1), out = .18;
+      const m = add(capsule(r, len), tone(i), 1, 1, 1, x * 1.02, y - len / 2 - .01, z * 1.02, Math.cos(az) * out, -Math.sin(az) * out);
+      if (tips) add(UNIT_BALL, tips, r * 2.6, r * 2.6, r * 2.6, x * 1.02 + Math.sin(az) * Math.sin(out) * len, y - len - .03, z * 1.02 - Math.cos(az) * Math.sin(out) * len); } };
     if (style === 'bald') return;
-    if (style === 'curls') { cap(); for (const [x, y, z] of [[-.08, .1, .02], [.08, .1, .02], [0, .13, .04], [-.05, .12, -.06], [.05, .12, -.06], [0, .07, -.1], [-.1, .03, -.05], [.1, .03, -.05]]) add(UNIT_BALL, color, .075, .075, .075, x, y, z); return; }
-    if (style === 'afro') { add(UNIT_BALL, color, .36, .33, .36, 0, .07, -.02); return; }
     if (style === 'buzz') { cap(mix(color, skin, .45), .99); return; }
-    if (style === 'fade') { cap(mix(color, skin, .55), .99); add(UNIT_ROD, color, .17, .09, .19, 0, .115, -.005); return; }
-    if (style === 'cornrows') { cap(); for (const x of [-.06, -.02, .02, .06]) add(UNIT_BOX, mix(skin, color, .3), .006, .012, .2, x, .11, -.02, -.35); return; }
+    if (style === 'fade') { cap(mix(color, skin, .55), .99); crown(color, 1.06, .3); return; }
+    if (style === 'short') { cap(); crown(color, 1.05, .4); return; }
+    if (style === 'curls') { cap(); for (const [el, n, s] of [[.5, 11, .058], [.85, 8, .062], [1.25, 4, .06]]) for (let i = 0; i < n; i++) { const az = i / n * Math.PI * 2 + el; if (el < .6 && Math.cos(az) > .55) continue; const [x, y, z] = on(az, el, 1.06); add(UNIT_BALL, color, s, s, s, x, y, z); } return; }
+    // Afro: a big round crown set up and back, so it frames the face rather than covering it.
+    if (style === 'afro') { cap(); add(UNIT_BALL, color, .36, .32, .34, 0, .13, -.06); return; }
+    // Cornrows: neat rows braided from the hairline over the crown, a little scalp between, short braids at the nape.
+    if (style === 'cornrows') { cap(mix(color, skin, .5), .995); for (const x of [-.078, -.052, -.026, 0, .026, .052, .078]) { const k = Math.sqrt(1 - (x / .125) ** 2); for (let j = 0; j < 13; j++) { const a = -.95 + j / 12 * 2.55, y = .042 + Math.cos(a) * .132 * k * 1.015, z = -Math.sin(a) * .13 * k * 1.015; add(UNIT_BALL, color, .02, .017, .028, x, y, z, a); } } for (const x of [-.05, 0, .05]) add(capsule(.012, .08), color, 1, 1, 1, x, -.03, -.125, .25); return; }
     if (style === 'bob') { cap(); shell(.64); return; }
     if (style === 'long') { cap(); shell(.72); add(UNIT_BOX, color, .23, .36, .05, 0, -.17, -.09); return; }
-    if (style === 'bun') { cap(); add(UNIT_BALL, color, .1, .09, .1, 0, .14, -.06); return; }
+    if (style === 'bun') { cap(); add(UNIT_BALL, color, .1, .09, .1, 0, .15, -.07); return; }
     if (style === 'ponytail') { cap(); add(UNIT_BALL, color, .07, .07, .07, 0, .07, -.12); add(capsule(.03, .18), color, 1, 1, 1, 0, -.06, -.15, .32); return; }
-    if (style === 'braids' || style === 'locs') { cap(); const r = style === 'locs' ? .022 : .015, len = style === 'locs' ? .26 : .32; for (let i = 0; i < 14; i++) { const a = Math.PI * (.15 + i / 13 * 1.7), x = Math.cos(a) * .11, z = -Math.abs(Math.sin(a)) * .1 + (i % 2 ? -.01 : 0); add(capsule(r, len), color, 1, 1, 1, x, -.06 - len / 2 + .1, z); } return; }
+    if (style === 'braids') { cap(); strands(18, .017, .36, () => color, '#d4af37'); return; }
+    if (style === 'locs') { cap(); strands(14, .026, .28, i => i % 3 ? color : mix(color, '#7a5a3a', .25), null); return; }
     cap();
   }
   // Place, dress and pose the figure. Mirrors the 2D poses: walking, seated, sleeping, gesturing, working, sport.
