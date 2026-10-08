@@ -8,6 +8,8 @@
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+  # The database migrations are read at runtime to create tables on first use.
+  included_files = ["netlify/database/migrations/**"]
 
 [[headers]]
   for = "/*"
