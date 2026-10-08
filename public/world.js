@@ -1003,8 +1003,8 @@ export class World {
     const talking=this.chatWith&&this.chatWith.until>performance.now()?this.chatWith.id:null;
     list.forEach((r,n)=>{let spot=training&&r.aside?r.aside:r,face=talking===`${l}:${n}`||spot.watch&&training?Math.atan2(a.x-spot.x,a.z-spot.z):looks(spot)??spot.heading,walking=false;
       // Not seated, not mid-routine and not chatting with you: stroll a little loop now and then.
-      if(!this.reduced&&!spot.seat&&talking!==`${l}:${n}`&&!['sit','work','sport','sleep','scroll','sitFloor'].includes(spot.pose)){const p=(t*.07+n*.37)%1,k=p<.2?p/.2:p<.5?1:p<.7?1-(p-.5)/.2:0,ang=n*2.1,rad=training&&r.aside?.45:.8;walking=(p<.2||(p>=.5&&p<.7));spot={...spot,x:spot.x+Math.cos(ang)*rad*k,z:spot.z+Math.sin(ang)*rad*k*.6,pose:walking?null:spot.pose};if(walking)face=p<.2?Math.atan2(Math.cos(ang),Math.sin(ang)*.6):Math.atan2(-Math.cos(ang),-Math.sin(ang)*.6);}
-      this.human(spot.x,spot.z,SKIN_TONES[(n*3+l.length+CROWD_SEED)%SKIN_TONES.length],{...this.look(r.career),...this.extra(n+l.length),pose:spot.pose||null,heading:face,seat:spot.seat,walk:walking,gait:t*9+n});});
+      let gait=t*9+n;if(!spot.seat&&talking!==`${l}:${n}`&&!['sit','work','sport','sleep','scroll','sitFloor'].includes(spot.pose)){const w=this.roam(`regular:${l}:${n}:${training&&r.aside?'aside':'home'}`,spot,training&&r.aside?.5:1,training&&r.aside?.4:.8,.7,[4,10]);walking=w.moving;gait=w.gait;if(walking)face=w.heading;spot={...spot,x:w.x,z:w.z,pose:walking?null:spot.pose};}
+      this.human(spot.x,spot.z,SKIN_TONES[(n*3+l.length+CROWD_SEED)%SKIN_TONES.length],{...this.look(r.career),...this.extra(n+l.length),pose:spot.pose||null,heading:face,seat:spot.seat,walk:walking,gait});});
     // The passing drill: a ball rolls back and forth between the two players.
     if(l==='sports'&&!training){const k=.5-.5*Math.cos(t*1.6);this.round(-1+2*k,-2.4,.2,.2,.2,'#f8f5e8',Math.abs(Math.sin(t*1.6))*.15);}
   }
@@ -1015,6 +1015,19 @@ export class World {
   }
   // Someone who follows a goal at walking pace (bodyguard): position, facing, gait and whether they're moving.
   trail(key,goal,k=.08){this.trails??={};let p=this.trails[key];if(!p||p.loc!==this.location)p={x:goal.x,z:goal.z,loc:this.location,heading:0,gait:0};const dx=goal.x-p.x,dz=goal.z-p.z,d=Math.hypot(dx,dz),moving=d>.18;if(moving){p.x+=dx*k;p.z+=dz*k;p.heading=Math.atan2(dx,dz);p.gait+=d*k*12;}this.trails[key]=p;return {...p,moving};}
+  // Someone moving like a person, not on a loop: they pick a spot in their area, walk or run to it, stop for a
+  // moment (doing their thing), then pick another. Areas are rx by rz around c. State lives per key.
+  roam(key,c,rx,rz,speed,pause=[.4,1.6]){
+    this.roamers??={};const now=performance.now()/1000;let r=this.roamers[key];
+    if(this.reduced)return {x:c.x,z:c.z,heading:0,gait:0,moving:false};
+    if(!r||r.loc!==this.location||Math.hypot(r.cx-c.x,r.cz-c.z)>.5)r=this.roamers[key]={x:c.x,z:c.z,cx:c.x,cz:c.z,tx:c.x,tz:c.z,loc:this.location,last:now,wait:now+Math.random()*pause[1],heading:Math.random()*6.3,gait:0,stops:0};
+    const dt=Math.min(.1,now-r.last);r.last=now;r.cx=c.x;r.cz=c.z;
+    const dx=r.tx-r.x,dz=r.tz-r.z,d=Math.hypot(dx,dz);
+    if(d<.06){if(!r.arrived){r.arrived=true;r.stops++;r.wait=now+pause[0]+Math.random()*(pause[1]-pause[0]);}
+      if(now>=r.wait){const a=Math.random()*Math.PI*2,m=.35+.65*Math.sqrt(Math.random());r.tx=c.x+Math.cos(a)*rx*m;r.tz=c.z+Math.sin(a)*rz*m;r.arrived=false;}
+      return {...r,moving:false};}
+    const step=Math.min(d,speed*dt);r.x+=dx/d*step;r.z+=dz/d*step;r.heading=Math.atan2(dx,dz);r.gait+=step*7;return {...r,moving:true};
+  }
   // Practice drills: a short looping routine per skill, around where you started practising.
   // Returns where you are, how you stand and move, and a draw() for teammates, balls and goals.
   drill(active,base){
@@ -1032,26 +1045,20 @@ export class World {
     switch(kind){
       case 'pass':{const m={x:base.x+dir*2.6,z:base.z},b=exchange(2.6,2.4,hoops?.25:.08,hoops?1:0),kick=b.p<.08,back2=b.p>=.5&&b.p<.58;
         return {x:base.x,z:base.z,pose:hoops&&kick?'press':null,walk:!hoops&&kick,gait:t*12,heading:face,draw:()=>{partner(m.x,m.z,hoops&&back2?'press':null,back,!hoops&&back2,t*12);ball(b.x,b.z,b.y);}};}
-      case 'dribble':{const a=t*1.5,x=base.x+Math.cos(a)*.9,z=base.z+Math.sin(a)*.9,h=Math.atan2(-Math.sin(a),Math.cos(a));
-        return {x,z,pose:null,walk:true,gait:t*11,heading:h,draw:()=>ball(x+Math.sin(h)*.4,z+Math.cos(h)*.4,Math.abs(Math.sin(t*11))*.05)};}
-      case 'shoot':{const p=(t%2.8)/2.8,run=Math.min(1,p/.35),x=base.x-dir*.9+dir*.9*run,goal={x:base.x+dir*4.2,z:base.z},f=p<.35?0:Math.min(1,(p-.35)/.35);
-        return {x,z:base.z,pose:null,walk:p<.38,gait:t*12,heading:face,draw:()=>{for(const s of [-1,1])this.box(goal.x,goal.z+s,.08,.08,1.2,'#f4f4f0',0);this.box(goal.x,goal.z,.08,2.08,.08,'#f4f4f0',1.2);
-          if(p<.8)ball(x+dir*.4+(goal.x-x-dir*.4)*f,base.z+Math.sin(t*.7)*.5*f,Math.sin(f*Math.PI)*.9+f*.3);}};}
-      case 'hoop':{const p=(t%2.4)/2.4,hoop={x:base.x+dir*3,z:base.z},f=p<.3?0:Math.min(1,(p-.3)/.45),drop=f>=1?(p-.75)*6:0;
-        return {x:base.x,z:base.z,pose:p>=.3&&p<.45?'victory':null,heading:face,draw:()=>{this.box(hoop.x+dir*.5,hoop.z,.1,.1,2.9,'#5b5f66',0);this.box(hoop.x+dir*.45,hoop.z,.06,1,.7,'#f4f4f0',2.4);this.round(hoop.x,hoop.z,.5,.5,.05,'#e0662c',2.55);
-          ball(p<.3?base.x+dir*.25:base.x+(hoop.x-base.x)*f,base.z,p<.3?Math.abs(Math.sin(t*9))*.8:Math.max(0,1.6+Math.sin(f*Math.PI)*1.6-f*.6-drop));}};}
-      case 'defend':{const s=Math.sin(t*2.2)*.9,m={x:base.x+dir*1.5,z:base.z+Math.sin(t*2.2-.4)*.9};
-        return {x:base.x,z:base.z+s,pose:null,walk:true,gait:t*9,heading:face,draw:()=>{partner(m.x,m.z,null,back,true,t*10);ball(m.x-dir*.4,m.z,hoops?Math.abs(Math.sin(t*8))*.8:Math.abs(Math.sin(t*10))*.05);}};}
+      case 'dribble':{const me=this.roam('drill:me',base,1.5,1.1,1.7,[.05,.35]);
+        return {x:me.x,z:me.z,pose:null,walk:me.moving,gait:me.gait,heading:me.heading,draw:()=>ball(me.x+Math.sin(me.heading)*.4,me.z+Math.cos(me.heading)*.4,me.moving?Math.abs(Math.sin(me.gait))*.05:0)};}
+      case 'defend':{const m=this.roam('drill:attacker',{x:base.x+dir*1.4,z:base.z},.9,1.2,1.6,[.1,.6]),me=this.roam('drill:me',{x:m.x-dir*1,z:m.z},.15,.15,2.2,[0,.1]);
+        return {x:me.x,z:me.z,pose:null,walk:me.moving,gait:me.gait,heading:Math.atan2(m.x-me.x,m.z-me.z),draw:()=>{partner(m.x,m.z,null,m.moving?m.heading:back,m.moving,m.gait);ball(m.x+Math.sin(m.heading)*.35,m.z+Math.cos(m.heading)*.35,hoops?Math.abs(Math.sin(t*8))*.8:0);}};}
       case 'bounce':{const side=Math.sin(t*1.3)>0?1:-1,px=Math.cos(face)*.35*side,pz=-Math.sin(face)*.35*side;
         return stand(null,()=>ball(base.x+px+Math.sin(face)*.2,base.z+pz+Math.cos(face)*.2,Math.abs(Math.sin(t*5))*.85));}
       case 'serve':{const p=(t%2.2)/2.2,f=p<.55?0:Math.min(1,(p-.55)/.3);
         return {x:base.x,z:base.z,pose:p<.45?'victory':p<.62?'punch':null,heading:face,draw:()=>{if(p<.85)ball(base.x+dir*(.25+f*4.5),base.z,p<.55?1.7+Math.sin(p/.55*Math.PI):2.4-f*1.4);}};}
       case 'rally':{const m={x:base.x+dir*3.6,z:base.z},b=exchange(3.6,2.2,1.1,.9),hit=b.p<.1,back2=b.p>=.5&&b.p<.6;
         return {x:base.x,z:base.z,pose:hit?'punch':null,heading:face,draw:()=>{partner(m.x,m.z,back2?'punch':null,back);this.box(base.x+dir*1.8,base.z,.04,2.6,.9,'#f4f4f0',0);ball(b.x,b.z,b.y);}};}
-      case 'footwork':return {x:base.x+dir*Math.cos(t*1.3)*.4,z:base.z+Math.sin(t*2.6)*.8,pose:null,walk:true,gait:t*12,heading:face};
+      case 'footwork':{const me=this.roam('drill:me',base,.9,.9,2.3,[.05,.3]);return {x:me.x,z:me.z,pose:null,walk:me.moving,gait:me.gait,heading:face};}
       case 'grapple':{const sway=Math.sin(t*1.6)*.35;return {x:base.x,z:base.z+sway,pose:'squat',heading:face,draw:()=>partner(base.x+dir*.75,base.z+sway,'squat',back)};}
       case 'lift':return stand('press');
-      case 'run':{const a=t*1.2,x=base.x+Math.cos(a)*1.2,z=base.z+Math.sin(a)*1.2;return {x,z,pose:null,walk:true,gait:t*10,heading:Math.atan2(-Math.sin(a),Math.cos(a))};}
+      case 'run':{const me=this.roam('drill:me',base,1.7,1.3,2.4,[.05,.3]);return {x:me.x,z:me.z,pose:null,walk:me.moving,gait:me.gait,heading:me.heading};}
       case 'flex':return stand(cycle(1.5,['victory','wave','victory','dance']));
       case 'perform':return stand('perform');
       case 'dance':return stand(cycle(3,['dance','shoki']));
@@ -1064,14 +1071,21 @@ export class World {
       case 'comedy':return stand(cycle(1.6,['gesture','facepalm','gesture','laugh']),()=>partner(mate.x-dir*.6,mate.z,cycle(1.6,[null,'laugh','laugh',null]),back));
       case 'emote':return stand(cycle(1.6,['laugh','cry','facepalm','gesture']));
       case 'sales':return stand(cycle(2,['gesture','chat']),()=>partner(mate.x-dir*.8,mate.z,cycle(2,['chat','gesture']),back));
-      // A match: you and three others run their own loops over the pitch while the ball is passed between all four.
-      case 'match':{const runners=[0,1,2,3].map(n=>{const a=t*(.9+n*.12)+n*1.7,rx=1.5+n*.35,rz=1+n*.25,cx=base.x+dir*(n%2?1.6:.4),cz=base.z+(n<2?-.4:.5);return {x:cx+Math.cos(a)*rx,z:cz+Math.sin(a)*rz,h:Math.atan2(-Math.sin(a)*rx,Math.cos(a)*rz)};});
-        const seg=Math.floor(t/1.3),f=(t%1.3)/1.3,from=runners[seg%4],to=runners[(seg*3+1)%4===seg%4?(seg+1)%4:(seg*3+1)%4],bx=from.x+(to.x-from.x)*f,bz=from.z+(to.z-from.z)*f,me=runners[0];
-        return {x:me.x,z:me.z,pose:null,walk:true,gait:t*11,heading:me.h,draw:()=>{runners.slice(1).forEach((r,n)=>this.human(r.x,r.z,SKIN_TONES[(n*5+3)%SKIN_TONES.length],{...this.look(active.career),...(n===1?{outfit:'#c94b3b'}:{}),style:['short','fade','braids'][n],hair:'#1d1714',walk:true,gait:t*11+n,heading:r.h}));ball(bx,bz,hoops?.9+Math.sin(f*Math.PI)*.5:Math.sin(f*Math.PI)*.25);}};}
+      // A match: four players (you, a teammate and two opponents) run to new spots around the pitch. The ball sits
+      // at the holder's feet; every second or two they pass it to someone else, and it travels to where they really are.
+      case 'match':{const now=performance.now()/1000,pitch={x:base.x+dir*1.1,z:base.z},runners=[0,1,2,3].map(n=>this.roam('match:'+n,pitch,2.3,1.6,1.7+n*.15,[.1,.9]));
+        const m=this.matchBall??={holder:0,from:0,to:0,at:now,next:now+1.2};
+        if(this.reduced){m.holder=0;}else if(m.to===m.holder&&now>=m.next){m.from=m.holder;m.to=(m.holder+1+Math.floor(Math.random()*3))%4;m.at=now;}
+        if(m.to!==m.holder&&now-m.at>=.6){m.holder=m.to;m.next=now+1+Math.random()*1.4;}
+        const feet=r=>({x:r.x+Math.sin(r.heading)*.38,z:r.z+Math.cos(r.heading)*.38}),k=Math.min(1,(now-m.at)/.6),a=feet(runners[m.from]),b=feet(runners[m.to]),inFlight=m.to!==m.holder;
+        const bx=inFlight?a.x+(b.x-a.x)*k:feet(runners[m.holder]).x,bz=inFlight?a.z+(b.z-a.z)*k:feet(runners[m.holder]).z,me=runners[0];
+        // Off the ball, players turn to watch it while they jog.
+        const look=r=>r.moving?r.heading:Math.atan2(bx-r.x,bz-r.z);
+        return {x:me.x,z:me.z,pose:null,walk:me.moving,gait:me.gait,heading:look(me),draw:()=>{runners.slice(1).forEach((r,n)=>this.human(r.x,r.z,SKIN_TONES[(n*5+3)%SKIN_TONES.length],{...this.look(active.career),...(n?{outfit:'#c94b3b'}:{}),style:['short','fade','braids'][n],hair:'#1d1714',walk:r.moving,gait:r.gait,heading:look(r)}));ball(bx,bz,inFlight?(hoops?.9+Math.sin(k*Math.PI)*.6:Math.sin(k*Math.PI)*.3):(hoops?Math.abs(Math.sin(t*8))*.8:0));}};}
       // Everyone else: the main activity, then a short walk to a new spot and back, so nobody stands frozen.
-      default:{const loop={gig:['perform','dance'],scene:['gesture','laugh'],shoot:['photo','gesture'],office:['work','gesture']}[kind]||['work','gesture'],p=(t%10)/10,walking=p>.55&&p<.75||p>.9,
-        k=p<.55?0:p<.75?(p-.55)/.2:p<.9?1:1-(p-.9)/.1,spot={x:base.x+dir*.9*k,z:base.z+.7*Math.sin(k*Math.PI)},mateOn=kind==='scene'||kind==='gig'||kind==='office';
-        return {x:spot.x,z:spot.z,pose:walking?null:p<.55?loop[0]:loop[1],walk:walking,gait:t*9,heading:walking?(p<.75?face:back):face,draw:mateOn?()=>partner(mate.x,mate.z+Math.sin(t*.4)*.4,kind==='gig'?'perform':cycle(2.2,[null,'laugh','gesture']),Math.atan2(spot.x-mate.x,spot.z-mate.z)):null};}
+      default:{const loop={gig:['perform','dance'],scene:['gesture','laugh'],shoot:['photo','gesture'],office:['work','gesture']}[kind]||['work','gesture'],me=this.roam('work:me',base,1.1,.8,.9,[3,6]),mateOn=kind==='scene'||kind==='gig'||kind==='office';
+        const m=mateOn?this.roam('work:mate',mate,.8,.6,.8,[3,7]):null;
+        return {x:me.x,z:me.z,pose:me.moving?null:loop[me.stops%2],walk:me.moving,gait:me.gait,heading:me.moving?me.heading:m?Math.atan2(m.x-me.x,m.z-me.z):face,draw:m?()=>partner(m.x,m.z,m.moving?null:kind==='gig'?'perform':cycle(2.2,[null,'laugh','gesture']),m.moving?m.heading:Math.atan2(me.x-m.x,me.z-me.z),m.moving,m.gait):null};}
     }
   }
   // You are training (practice or a career activity) at a venue.
