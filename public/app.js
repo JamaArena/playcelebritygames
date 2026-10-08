@@ -369,7 +369,24 @@ function renderActivity(){
   if(taskQueue.length)html+='<div class="task-queue"><small>Up next</small>'+taskQueue.map((t,i)=>button(`${escape(t.icon||'•')} ${escape(t.label)} <b aria-hidden="true">×</b>`,'unqueue',`data-index="${i}" aria-label="Remove ${escape(t.label)} from queue"`,'queue-chip')).join('')+'</div>';
   $('#activityCard').innerHTML=html;
 }
-async function chooseDecision(index){const a=state.active;if(!a)return;const chosen=a.choices[index];const data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});if(data&&motion)world.respond(chosen.action,data.state.active?.outcomes.at(-1)?.success);}
+async function chooseDecision(index){const a=state.active;if(!a)return;const chosen=a.choices[index],career=a.career;const data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});if(!data)return;
+  const success=(data.state.active?.outcomes||data.state.outputs?.[0]?.outcomes||[]).at(-1)?.success;if(motion)world.respond(chosen.action,success);actionPop(career,chosen,success);}
+// A quick picture of what you just did at work: the move, who it went to, and how it turned out.
+const ACTION_ART={pass:'🦶⚽💨',shoot:'🦶⚽💥',dribble:'🏃⚽💨',tackle:'🦵💥⚽',intercept:'✋⚽',mark:'👀🏃',shot:'🏀🏹',drive:'🏃🏀💨',grapple:'🤼',counter:'🔄🤼',signature:'💥🤼',crowd:'📣🙌'};
+const CAREER_ART={musician:'🎤🎶',actor:'🎬🎭',adult:'🌙🎥',vlogger:'🤳✨',video:'🎥✂️',skitmaker:'😂🎬',streamer:'🎮💬',founder:'🚀📈',developer:'💻⌨️',web3:'🔗💡',tennis:'🎾💨'};
+function actionLine(career,c){
+  const t=c.target;
+  return ({pass:career==='basketball'?'You fired a pass to the open teammate':`You passed to the ${t||'winger'}`,shoot:`You struck it ${/(\d+)m/.exec(c.label)?.[1]?`from ${/(\d+)m/.exec(c.label)[1]}m`:'at goal'}`,dribble:t==='wing'?'You dribbled down the wing':'You cut inside past a defender',
+    tackle:'You went in for the tackle',intercept:'You read the pass and stepped in',mark:'You tracked the runner',shot:'You rose for the jump shot',drive:'You drove hard to the hoop',
+    grapple:'You locked up and grappled',counter:'You countered the move',signature:'You hit your signature move',crowd:'You worked the crowd'})[c.action]||`You went with: ${c.label}`;
+}
+function actionPop(career,c,success){
+  const art=ACTION_ART[c.action]||CAREER_ART[career]||CAREERS[career]?.icon||'⭐';
+  const end=success==null?'':success?({shoot:' GOAL! 🎉',shot:' It drops! 🎉',pass:' …and it finds them!',signature:' The crowd erupts!'}[c.action]||' It worked!'):({shoot:' …but it goes wide.',pass:' …but it’s cut out.',shot:' …off the rim.'}[c.action]||' It didn’t quite land.');
+  $('#actionPop')?.remove();const pop=document.createElement('button');pop.id='actionPop';pop.className=`action-pop ${success===false?'miss':'hit'}`;pop.setAttribute('aria-label','Close');
+  pop.innerHTML=`<span class="action-art">${art}</span><strong>${escape(actionLine(career,c))}</strong><em>${escape(end.trim())}</em>`;pop.onclick=()=>pop.remove();
+  document.body.append(pop);setTimeout(()=>pop.classList.add('out'),2300);setTimeout(()=>pop.remove(),2700);
+}
 // Character creation is two steps: your look, then your career. The starting story is drawn at random.
 let welcomed=false,authStep={tab:'signup',username:''};
 async function auth(input){const response=await fetch('/api/auth',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(input)});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Something went wrong. Try again.');return data;}
