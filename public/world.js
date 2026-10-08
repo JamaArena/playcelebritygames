@@ -1031,7 +1031,7 @@ export class World {
     if(!this.speech?.size)return;const ctx=this.ctx,here=TOWN[this.location]||TOWN.home,now=performance.now();
     for(const [id,bubble] of this.speech){if(now>bubble.until){this.speech.delete(id);continue;}
       const npcSpot=id==='npc'&&worldObjects(this.location).find(o=>o.action==='phone'),who=String(id).startsWith('cast:')?this.castSpots?.[id]:id==='me'?{x:this.actor.x,z:this.actor.z}:String(id).startsWith('crowd:')&&this.gymCrowd?.[+String(id).slice(6)]?{x:this.gymCrowd[+String(id).slice(6)].x,z:this.gymCrowd[+String(id).slice(6)].z}:id==='pet'?this.petPos&&{x:this.petPos.x,z:this.petPos.z}:npcSpot?{x:npcSpot.x,z:npcSpot.z}:this.people?.get(id)&&!(this.interior()&&!this.people.get(id).scene)&&{x:this.people.get(id).x-here.x,z:this.people.get(id).z-here.z};if(!who||!this.onScreen(who.x,who.z,1))continue;
-      const p=this.project(who.x,2.2,who.z),y=p.y-(id==='me'?44:16);ctx.font='500 11px Segoe UI';const cap=String(id).startsWith('cast:')?46:34,words=bubble.text.length>cap?bubble.text.slice(0,cap-1)+'…':bubble.text,w=Math.min(240,ctx.measureText(words).width+20),fade=Math.min(1,(bubble.until-now)/600);
+      const p=this.project(who.x,2.2,who.z),y=p.y-(id==='me'?44:16);ctx.font='500 11px Segoe UI';const cap=String(id).startsWith('cast:')?64:34,words=bubble.text.length>cap?bubble.text.slice(0,cap-1)+'…':bubble.text,w=Math.min(String(id).startsWith('cast:')?340:240,ctx.measureText(words).width+20),fade=Math.min(1,(bubble.until-now)/600);
       ctx.globalAlpha=fade;ctx.fillStyle='#ffffff';ctx.strokeStyle='#cfdccb';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(p.x-w/2,y-26,w,24,12);ctx.fill();ctx.stroke();
       ctx.beginPath();ctx.moveTo(p.x-6,y-3);ctx.lineTo(p.x,y+5);ctx.lineTo(p.x+6,y-3);ctx.closePath();ctx.fill();ctx.fillStyle='#22392d';ctx.textAlign='center';ctx.fillText(words,p.x,y-10);ctx.globalAlpha=1;}
   }
@@ -1153,8 +1153,8 @@ export class World {
     const kind=work?(career==='musician'?(active.kind==='live'?'gig':'session'):WORK_DRILLS[career]):DRILLS[`${career}:${active.skill}`];
     const spot=work&&this.location===CAREERS[career]?.location?(career==='musician'&&active.kind==='live'?set.live:set.spot):null;
     const tennisCourt=career==='tennis'&&this.location==='sports';
-    const b=spot?{x:spot.x,z:spot.z}:tennisCourt?{x:0,z:2.7}:base;
-    const r=this.drillMove(active,b,kind||DRILL_FAMILY[CAREERS[career]?.family]||'work',spot)||{x:b.x,z:b.z,pose:null,heading:0};
+    const b=spot?{x:spot.x,z:spot.z}:tennisCourt?{x:0,z:2.7}:base,move=tennisCourt&&kind==='rally'?'tennis':kind;
+    const r=this.drillMove(active,b,move||DRILL_FAMILY[CAREERS[career]?.family]||'work',spot)||{x:b.x,z:b.z,pose:null,heading:0};
     if(spot?.h!=null&&!r.walk&&r.heading==null)r.heading=spot.h;
     if(!r.kit&&(work||sport)&&WORK_KITS[career])r.kit=WORK_KITS[career];
     const me={x:r.x,z:r.z},cast=work&&this.location===CAREERS[career]?.location?(career==='musician'&&active.kind==='live'?set.liveCast:set.cast):null,draw=r.draw;
@@ -1185,7 +1185,8 @@ export class World {
       case 'bounce':{const side=Math.sin(t*1.3)>0?1:-1,px=Math.cos(face)*.35*side,pz=-Math.sin(face)*.35*side;
         return stand(null,()=>ball(base.x+px+Math.sin(face)*.2,base.z+pz+Math.cos(face)*.2,Math.abs(Math.sin(t*5))*.85));}
       case 'serve':{const p=(t%2.2)/2.2,f=p<.55?0:Math.min(1,(p-.55)/.3);
-        return {x:base.x,z:base.z,pose:p<.45?'victory':p<.62?'punch':null,heading:face,draw:()=>{if(p<.85)ball(base.x+dir*(.25+f*4.5),base.z,p<.55?1.7+Math.sin(p/.55*Math.PI):2.4-f*1.4);}};}
+        const court=active.career==='tennis'&&this.location==='sports',d=.25+f*4.5;
+        return {x:base.x,z:base.z,pose:p<.45?'victory':p<.62?'punch':null,heading:court?Math.PI:face,draw:()=>{if(p<.85)ball(court?base.x:base.x+dir*d,court?base.z-d:base.z,p<.55?1.7+Math.sin(p/.55*Math.PI):2.4-f*1.4);}};}
       case 'rally':{const m={x:base.x+dir*3.6,z:base.z},b=exchange(3.6,2.2,1.1,.9),hit=b.p<.1,back2=b.p>=.5&&b.p<.6;
         return {x:base.x,z:base.z,pose:hit?'punch':null,heading:face,draw:()=>{partner(m.x,m.z,back2?'punch':null,back);this.box(base.x+dir*1.8,base.z,.04,2.6,.9,'#f4f4f0',0);ball(b.x,b.z,b.y);}};}
       case 'footwork':{const me=this.roam('drill:me',base,.9,.9,2.3,[.05,.3]);return {x:me.x,z:me.z,pose:null,walk:me.moving,gait:me.gait,heading:face};}

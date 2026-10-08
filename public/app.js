@@ -124,7 +124,7 @@ function showResult(r,rewards){
   const def=CAREERS[r.career]||CAREERS[state.career],sport=def.family==='sport',promo=rewards.find(x=>x.value==='Promoted!');
   const title=promo?'🎖️ Promoted!':sport?(r.win==='Win'?'🏆 Victory!':r.win==='Loss'?'Defeat':'Draw'):r.kind==='build'?'🛠️ Prototype built':r.quality>=70?'🌟 Smash hit!':r.quality>=45?CHEERS[Math.floor(Math.random()*CHEERS.length)]:'Tough day';
   const sub=sport?`${escape(r.title)} · ${escape(r.score||'')}${r.sets?` · sets ${escape(r.sets)}`:''}`:r.kind==='build'?`Prototype quality ${r.quality} — ready to launch from the Career page`:`${escape(r.title)} is out!`;
-  const stats=[['⭐',r.quality,'Quality'],...(r.kind==='build'?[]:[['👥',fmt(r.gain),r.units||def.audience]]),...resultExtras(r,def),['✦',`+${fmt(r.fame||0)}`,'Fame']];
+  const stats=[['⭐',r.quality,'Quality'],...(r.kind==='build'?[]:[['👥',fmt(r.gain),r.units||def.audience]]),...resultExtras(r,def),['✦',`+${fmt(r.fame||0)}`,'Fame'],['💎',`+${r.learning||0}`,'Skill XP']];
   const trial=r.kind==='trial'?(r.quality>=60?' · 📝 Trial passed: a contract offer is waiting!':' · Trial missed: quality 60 earns an offer'):'';
   let el=$('#reward');if(!el){el=document.createElement('div');el.id='reward';el.className='reward-overlay';document.body.appendChild(el);}
   el.innerHTML=`<div class="reward-card result-card ${sport?(r.win||'').toLowerCase():''}" role="dialog" aria-modal="true" aria-labelledby="rewardTitle"><div class="reward-burst" aria-hidden="true"></div><h2 id="rewardTitle">${escape(title)}</h2><p>${sub}${escape(trial)}</p>
@@ -377,6 +377,9 @@ function clock(){const hour=world.daylight().hour,day=Math.max(1,Math.floor((now
 function progress(start,end){const value=Math.min(100,Math.max(0,(now()-start)/(end-start)*100));return '<div class="sim-progress"><i style="width:'+value+'%"></i></div>';}
 const CHOICE_ICONS={shoot:'⚽',shot:'🎯',pass:'➜',dribble:'↝',tackle:'↘',intercept:'✋',mark:'◎',drive:'↝',stop:'■',steal:'🫳',contain:'🧱',funnel:'↪',block:'🖐️',charge:'🛑',boxout:'📦',circle:'🔄',grapple:'🤼',slam:'💥',brace:'🛡️',counter:'🔁',reversal:'🌀',crowd:'📣',dive:'🦅',rest:'😮‍💨',submission:'🔒',signature:'⭐',pin:'📌',serve:'🎾',volley:'🏸',forehand:'➡️',backhand:'⬅️',lob:'🌈',drop:'🪶',event:'⚡'};
 // Live numbers on the card: the score (or stamina) for sport, and the two career meters.
+// A coworker says what is happening when a new decision comes up (once per beat).
+let voicedBeat=null;
+function voiceScene(a){const key=a.id+':'+a.beat;if(voicedBeat===key||!a.scene?.text||!world?.castSpots)return;const [id,c]=Object.entries(world.castSpots)[0]||[];if(!id)return;voicedBeat=key;world.say(id,`${c.name.split(' (')[0]}: ${a.scene.text.replace(/^Trial · /,'')}`);}
 function workBoard(a){
   const [m1,m2]=METERS[a.career]||['Mood','Focus'],bar=(label,v,tone)=>'<div class="meter"><span>'+escape(label)+'</span><i style="--v:'+Math.round(v??50)+'%;--tone:'+tone+'"></i><b>'+Math.round(v??50)+'</b></div>';
   let board='';
@@ -396,7 +399,7 @@ function renderActivity(){
     const last=a.outcomes?.at(-1);html+=workBoard(a);
     if(waiting)html+=(last?'<div class="work-last '+(last.success?'hit':'miss')+'">'+(last.success?'✓ ':'✗ ')+escape(last.choice)+(a.career==='tennis'&&a.lastGames?' · games '+a.lastGames.join('–'):'')+'</div>':'')+progress(a.readyAt-a.interval,a.readyAt);
     else if(complete)html+=button('🎁 Collect result','finish','data-id="'+a.id+'"','primary');
-    else html+=(a.scene?.text?'<div class="work-scene'+(a.scene.event?' event':'')+'">'+escape(a.scene.text)+'</div>':'')+'<div class="sim-choices">'+a.choices.map((choice,index)=>button('<b>'+(CHOICE_ICONS[choice.action]||(choice.action==='general'?['💡','✨','⚡'][index%3]:def.icon))+'</b><span>'+escape(choice.label)+'</span><em class="risk-'+choice.risk+'">'+escape(skillName(a.career,choice.skill))+'</em><small>'+Math.round(choice.probability*100)+'%</small>','decision','data-index="'+index+'" data-beat="'+a.beat+'" data-id="'+a.id+'" title="'+escape(skillName(a.career,choice.skill))+' · '+escape(choice.risk)+'"','sim-choice')).join('')+'</div>';
+    else{voiceScene(a);html+=(a.scene?.text?'<div class="work-scene'+(a.scene.event?' event':'')+'">'+escape(a.scene.text)+'</div>':'')+'<div class="sim-choices">'+a.choices.map((choice,index)=>button('<b>'+(CHOICE_ICONS[choice.action]||(choice.action==='general'?['💡','✨','⚡'][index%3]:def.icon))+'</b><span>'+escape(choice.label)+'</span><em class="risk-'+choice.risk+'">'+escape(skillName(a.career,choice.skill))+'</em><small>'+Math.round(choice.probability*100)+'%</small>','decision','data-index="'+index+'" data-beat="'+a.beat+'" data-id="'+a.id+'" title="'+escape(skillName(a.career,choice.skill))+' · '+escape(choice.risk)+'"','sim-choice')).join('')+'</div>';}
   }else html='<div class="idle-actions">'+button(def.icon+' '+(state.location===def.location?'Start work':'Go to work'),state.location===def.location?'prepare':'travel',state.location===def.location?'':'data-location="'+def.location+'"','primary')+button('🎯 Practise','practice')+'</div>';
   if(taskQueue.length)html+='<div class="task-queue"><small>Up next</small>'+taskQueue.map((t,i)=>button(`${escape(t.icon||'•')} ${escape(t.label)} <b aria-hidden="true">×</b>`,'unqueue',`data-index="${i}" aria-label="Remove ${escape(t.label)} from queue"`,'queue-chip')).join('')+'</div>';
   $('#activityCard').innerHTML=html;

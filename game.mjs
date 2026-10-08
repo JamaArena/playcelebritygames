@@ -204,7 +204,7 @@ export function tennisScore(t){
   return `Sets ${t.sets.join('–')} · Games ${t.games.join('–')} · ${points}`;
 }
 const sport = key => CAREERS[key].family==='sport';
-const RISKS=['safe','balanced','risky'],EVENT_CHANCE=.25;
+const RISKS=['safe','balanced','risky'],EVENT_CHANCE=.35;
 export const practiceXp=s=>clamp(Math.round(4+Object.values(s.needs).reduce((a,b)=>a+b,0)/Object.keys(s.needs).length/15),5,10);
 export const focusLabel=xp=>xp>=9?'Focused':xp<=6?'Distracted':'Steady';
 // A work event (if this activity drew one) lands on its own beat with its own choices.

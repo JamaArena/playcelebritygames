@@ -89,7 +89,7 @@ test('maximum football skill improves distance-sensitive accuracy without guaran
   const scene={distance:24,pressure:0,angle:0,goalkeeper:5};assert.equal(shot(10,scene,0,()=>.99).success,false);assert.equal(shot(10,scene,0,()=>.5).result,'Goal');
 });
 test('defensive football beats offer context-valid actions; passing trains passing',()=>{
-  const s=make();go(s);act(s,{type:'start',kind:'produce'},T);const a=s.active;assert.equal(choices(s)[1].target,'left winger');
+  const s=make();go(s);act(s,{type:'start',kind:'produce'},T,()=>.9);const a=s.active;assert.equal(choices(s)[1].target,'left winger');
   act(s,{type:'decision',activityId:a.id,beat:0,choice:1},a.readyAt,()=>0);assert.equal(s.careers.football.skills.passing.points,5);assert.equal(s.careers.football.skills.shooting.points,0);
   act(s,{type:'decision',activityId:a.id,beat:1,choice:1},a.readyAt,()=>0);assert.ok(choices(s).every(c=>c.skill==='defending'));
 });
