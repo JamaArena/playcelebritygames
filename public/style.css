@@ -1168,3 +1168,13 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 .arena-noms{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:6px}.arena-noms li{display:flex;gap:9px;align-items:center;padding:4px 6px}
 .arena-noms li>span{width:18px;font:700 12px Fredoka,system-ui,sans-serif;color:#9a8f72}.arena-noms strong{flex:1;font:600 13px Fredoka,system-ui,sans-serif;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.arena-noms em{font-style:normal;font-size:10.5px;color:#7a7462;white-space:nowrap}
 .arena-you{display:inline-block;margin-left:4px;padding:1px 6px;border-radius:8px;background:#2fae6b;color:#fff;font:800 8.5px system-ui,sans-serif;vertical-align:middle}
+
+/* Work action popup: what you just did, with a big picture */
+.action-pop{position:fixed;z-index:60;left:50%;top:22%;transform:translateX(-50%);display:grid;justify-items:center;gap:4px;min-width:220px;max-width:min(340px,calc(100% - 32px));padding:14px 18px 16px;border:0;border-radius:24px;background:linear-gradient(160deg,#fffdf4,#fff1c9);box-shadow:0 14px 36px -10px #0007,inset 0 -3px 0 #f0d27c;color:#22301f;text-align:center;cursor:pointer;animation:actionIn .35s cubic-bezier(.2,1.5,.4,1)}
+.action-pop.miss{background:linear-gradient(160deg,#fffdf8,#ffe1dc);box-shadow:0 14px 36px -10px #0007,inset 0 -3px 0 #f0a99c}
+.action-pop .action-art{font-size:44px;line-height:1.1;letter-spacing:2px;filter:drop-shadow(0 4px 6px #0003);animation:actionKick .6s ease-out}
+.action-pop strong{font:600 16px/1.25 Fredoka,system-ui,sans-serif}.action-pop em{font-style:normal;font-size:13px;font-weight:700;color:#2f9a4c}.action-pop.miss em{color:#c0392b}
+.action-pop.out{opacity:0;transform:translate(-50%,-8px);transition:.4s}
+@keyframes actionIn{from{opacity:0;transform:translate(-50%,12px) scale(.9)}}
+@keyframes actionKick{0%{transform:translateX(-14px) rotate(-8deg)}60%{transform:translateX(6px) rotate(4deg)}}
+@media(prefers-reduced-motion:reduce){.action-pop,.action-pop .action-art{animation:none}}

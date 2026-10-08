@@ -36,6 +36,8 @@ const DRILLS={
 },DRILL_FAMILY={sport:'run',music:'perform',creator:'work',acting:'present',tech:'work'};
 // Work (matches, gigs, shoots, projects) moves too: ball sports play a match with teammates; everyone else
 // alternates their main activity with moving around the room.
+// Match kits: your side always plays in blue, the other side always in red.
+const MATCH_KITS=[{outfit:'#2f6fd6',pants:'#f4f4f0',shoes:'#1d1f24',accent:'#ffffff'},{outfit:'#d23b3b',pants:'#1d1f24',shoes:'#f4f4f0',accent:'#ffffff'}];
 const WORK_DRILLS={football:'match',basketball:'match',tennis:'rally',wrestling:'grapple',musician:'gig',actor:'scene',adult:'scene',vlogger:'shoot',video:'shoot',skitmaker:'scene',streamer:'office',founder:'office',developer:'office',web3:'office'};
 const EMOTE_2D={squat:'sport',press:'gesture',curl:'gesture',punch:'gesture',pedal:'sit',row:'sit',wave:'gesture',victory:'gesture',selfie:'gesture',facepalm:'gesture',dance:'perform',shoki:'perform',laugh:'chat',cry:'chat',scroll:'chat',sitFloor:'sit'};
 // What a character does when a need runs critically low (see MISHAPS in content.js).
@@ -724,7 +726,7 @@ export class World {
     // Practising: each skill plays its own drill (passing to a teammate, dribbling a loop, serving...).
     const drill=active&&!this.moving&&!need&&!actDef&&!usedDef&&!roomSpot&&!emote&&!mishap?this.drill(active,pos):null;
     if(drill){pose=drill.pose;pos={x:drill.x,z:drill.z};}
-    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),walk:this.moving||!!drill?.walk,...(drill?.walk?{gait:drill.gait}:{}),pose,seat:usedDef?.seat??actDef?.seat,heading:drill?drill.heading:roomSpot?roomSpot.face:actSpot?actSpot.face:usedSpot?.face!=null?usedSpot.face:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
+    const mood=Object.values(this.state.needs).reduce((a,b)=>a+b,0)/6,actorStart=this.meshes.length;this.human(pos.x,pos.z,this.state.color,{...this.look(this.state.career,this.state.equipped.clothes,this.state.wear),...this.body(this.state),...(drill?.kit||{}),walk:this.moving||!!drill?.walk,...(drill?.walk?{gait:drill.gait}:{}),pose,seat:usedDef?.seat??actDef?.seat,heading:drill?drill.heading:roomSpot?roomSpot.face:actSpot?actSpot.face:usedSpot?.face!=null?usedSpot.face:usedDef?(usedDef.onItem&&usedDef.pose==='sit'?0:Math.PI):pose==='gesture'?this.pose.heading:pose==='toilet'?Math.PI:['pee','doze','stink','faint'].includes(pose)||!pose?this.heading:this.pose?.face??(pose==='tv'&&this.location==='home'?SOFA_TV_FACE:0),smile:mood>=55?1:mood>=30?0:-.8});for(const mesh of this.meshes.slice(actorStart))mesh.actor=true;
     drill?.draw?.();
     this.actor={...pos,pose};
     // Your entourage: a bodyguard at your shoulder in public, paparazzi when they're on you, Mum visiting at home.
@@ -1073,15 +1075,15 @@ export class World {
       case 'sales':return stand(cycle(2,['gesture','chat']),()=>partner(mate.x-dir*.8,mate.z,cycle(2,['chat','gesture']),back));
       // A match: four players (you, a teammate and two opponents) run to new spots around the pitch. The ball sits
       // at the holder's feet; every second or two they pass it to someone else, and it travels to where they really are.
-      case 'match':{const now=performance.now()/1000,pitch={x:base.x+dir*1.1,z:base.z},runners=[0,1,2,3].map(n=>this.roam('match:'+n,pitch,2.3,1.6,1.7+n*.15,[.1,.9]));
+      case 'match':{const now=performance.now()/1000,pitch={x:base.x+dir*1.1,z:base.z},runners=[0,1,2,3,4,5].map(n=>this.roam('match:'+n,{x:pitch.x+(n<3?-1.1:1.1)*dir,z:pitch.z+((n%3)-1)*1.1},1.9,1.3,1.6+(n%3)*.15,[.1,.9]));
         const m=this.matchBall??={holder:0,from:0,to:0,at:now,next:now+1.2};
-        if(this.reduced){m.holder=0;}else if(m.to===m.holder&&now>=m.next){m.from=m.holder;m.to=(m.holder+1+Math.floor(Math.random()*3))%4;m.at=now;}
+        if(this.reduced){m.holder=0;}else if(m.to===m.holder&&now>=m.next){m.from=m.holder;m.to=(m.holder+1+Math.floor(Math.random()*5))%6;m.at=now;}
         if(m.to!==m.holder&&now-m.at>=.6){m.holder=m.to;m.next=now+1+Math.random()*1.4;}
         const feet=r=>({x:r.x+Math.sin(r.heading)*.38,z:r.z+Math.cos(r.heading)*.38}),k=Math.min(1,(now-m.at)/.6),a=feet(runners[m.from]),b=feet(runners[m.to]),inFlight=m.to!==m.holder;
         const bx=inFlight?a.x+(b.x-a.x)*k:feet(runners[m.holder]).x,bz=inFlight?a.z+(b.z-a.z)*k:feet(runners[m.holder]).z,me=runners[0];
-        // Off the ball, players turn to watch it while they jog.
-        const look=r=>r.moving?r.heading:Math.atan2(bx-r.x,bz-r.z);
-        return {x:me.x,z:me.z,pose:null,walk:me.moving,gait:me.gait,heading:look(me),draw:()=>{runners.slice(1).forEach((r,n)=>this.human(r.x,r.z,SKIN_TONES[(n*5+3)%SKIN_TONES.length],{...this.look(active.career),...(n?{outfit:'#c94b3b'}:{}),style:['short','fade','braids'][n],hair:'#1d1714',walk:r.moving,gait:r.gait,heading:look(r)}));ball(bx,bz,inFlight?(hoops?.9+Math.sin(k*Math.PI)*.6:Math.sin(k*Math.PI)*.3):(hoops?Math.abs(Math.sin(t*8))*.8:0));}};}
+        // Off the ball, players turn to watch it while they jog. Your team is always blue, the other team always red.
+        const look=r=>r.moving?r.heading:Math.atan2(bx-r.x,bz-r.z),kit=n=>({...MATCH_KITS[n<3?0:1],fit:'kit',cut:'shorts'});
+        return {x:me.x,z:me.z,pose:null,walk:me.moving,gait:me.gait,heading:look(me),kit:kit(0),draw:()=>{runners.forEach((r,n)=>{if(!n)return;this.human(r.x,r.z,SKIN_TONES[(n*5+3)%SKIN_TONES.length],{...this.look(active.career),...kit(n),style:['curls','short','fade','braids','locs','buzz'][n],hair:'#1d1714',walk:r.moving,gait:r.gait,heading:look(r)});});ball(bx,bz,inFlight?(hoops?.9+Math.sin(k*Math.PI)*.6:Math.sin(k*Math.PI)*.3):(hoops?Math.abs(Math.sin(t*8))*.8:0));}};}
       // Everyone else: the main activity, then a short walk to a new spot and back, so nobody stands frozen.
       default:{const loop={gig:['perform','dance'],scene:['gesture','laugh'],shoot:['photo','gesture'],office:['work','gesture']}[kind]||['work','gesture'],me=this.roam('work:me',base,1.1,.8,.9,[3,6]),mateOn=kind==='scene'||kind==='gig'||kind==='office';
         const m=mateOn?this.roam('work:mate',mate,.8,.6,.8,[3,7]):null;
