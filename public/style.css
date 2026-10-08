@@ -1136,3 +1136,22 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 /* Friends: the message button reads as a solid button; short screens shrink the clock so row 1 clears the dock */
 #modal .phone-device .phone-app button.round.tint[data-action=directMessage]{background:var(--c);color:#fff;font-size:17px;box-shadow:0 4px 10px -4px var(--c)}
 @media(max-height:740px){#modal .phone-device.ios .phone-clock{padding-top:0;padding-bottom:0;margin-bottom:0}#modal .phone-device.ios .phone-clock small{display:none}#modal .phone-device.ios .phone-clock strong{font-size:34px}#modal .phone-device.ios .home-screen .phone-card{margin-top:4px;margin-bottom:4px;padding-top:9px;padding-bottom:9px}#modal .phone-device.ios .home-screen:has(.phone-dock) .app-grid{padding-bottom:150px}}
+
+/* Phone tiers look like their price. Glow smartphone: a budget handset with a plastic body, thick bezels,
+   an earpiece slot, a home button, a squarer screen and flatter icons. Pro edition: a titanium flagship with
+   thin bezels and a punch-hole camera. The Gold edition keeps its Dynamic Island look. */
+#modal .phone-device.ios.skin-smart{--frame1:#2f333b;--frame2:#1b1d22;--wall:linear-gradient(170deg,#3d6fb6,#26467a 70%,#1d355e);padding:40px 9px 56px;border-radius:30px;background:linear-gradient(160deg,#3a3e47,#1b1d22 60%,#2a2d34);box-shadow:0 0 0 1.5px #0008,inset 0 1px 0 #ffffff1f,0 22px 50px #0007}
+#modal .phone-device.ios.skin-smart .phone-screen{border-radius:6px}
+#modal .phone-device.ios.skin-smart .phone-notch{top:18px;width:58px;height:6px;border-radius:4px;background:#0b0c0e;box-shadow:46px 0 0 -0px #0b0c0e00,inset 0 1px 1px #000}
+#modal .phone-device.ios.skin-smart::before{left:-3px;top:120px;width:3px;height:44px;border-radius:2px;background:#15171b;box-shadow:none}
+#modal .phone-device.ios.skin-smart::after{left:50%;right:auto;top:auto;bottom:12px;width:30px;height:30px;margin-left:-15px;border-radius:50%;background:radial-gradient(circle,#24272d 55%,#3a3e47 60%,#1b1d22 70%);box-shadow:inset 0 1px 2px #000,0 1px 0 #ffffff14}
+#modal .phone-device.ios.skin-smart .ios-status{height:30px;padding:6px 14px 0;font-size:12px;font-weight:500}
+#modal .phone-device.ios.skin-smart .app span{border-radius:12px!important;box-shadow:0 1px 2px #0005!important;filter:saturate(.85)}
+#modal .phone-device.ios.skin-smart .phone-dock{border-radius:10px!important;background:#0000003d!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+#modal .phone-device.ios.skin-smart .ios-homebar{display:none}
+#modal .phone-device.ios.skin-pro{--frame1:#e4e0ea;--frame2:#6e6679;padding:6px;border-radius:52px;background:linear-gradient(135deg,#f1eef5,#8d8597 22%,#5a5264 48%,#c9c3d2 52%,#6e6679 78%,#e4e0ea);box-shadow:0 0 0 1px #000a,inset 0 0 0 1px #fffa,0 30px 70px #0009}
+#modal .phone-device.ios.skin-pro .phone-screen{border-radius:46px}
+#modal .phone-device.ios.skin-pro .phone-notch{top:16px;width:15px;height:15px;border-radius:50%;background:radial-gradient(circle at 40% 40%,#2a3550 0 2px,#05060a 3px);box-shadow:0 0 0 1.5px #000}
+#modal .phone-device.ios.skin-smart .home-screen .phone-dock{position:relative;bottom:auto;margin:4px 8px 6px}
+#modal .phone-device.ios.skin-smart .home-screen:has(.phone-dock) .app-grid{padding-bottom:12px}
+#modal .phone-device.ios.skin-smart .home-screen:has(.phone-dock)::after{display:none}
