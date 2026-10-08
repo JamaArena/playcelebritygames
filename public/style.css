@@ -1180,21 +1180,16 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 @media(prefers-reduced-motion:reduce){.action-pop,.action-pop .action-art{animation:none}}
 
 /* Football match replay */
-.match-replay{position:fixed;z-index:61;left:50%;top:50%;transform:translate(-50%,-50%);width:min(560px,calc(100% - 24px));padding:10px;border-radius:22px;background:#0f1a24;box-shadow:0 20px 50px -10px #000a;color:#fff;cursor:pointer;animation:actionIn .3s ease-out}
-.match-replay.out{opacity:0;transition:.3s}
 .mr-bar{display:flex;align-items:center;gap:10px;padding:6px 10px;border-radius:12px;background:linear-gradient(90deg,#1d4fae,#2a2f3a 40%,#2a2f3a 60%,#a82a2a);font:700 13px system-ui,sans-serif}
 .mr-bar strong{flex:1;text-align:center;font:700 20px Fredoka,system-ui,sans-serif}.mr-bar em{font-style:normal;padding:2px 8px;border-radius:8px;background:#000a;font-variant-numeric:tabular-nums}
 .mr-text{margin:8px 2px;padding:7px 12px;border-radius:10px;background:#1d4fae;font:600 14px Fredoka,system-ui,sans-serif;min-height:20px}
-.match-replay canvas{display:block;width:100%;height:auto;border-radius:12px}.match-replay small{display:block;text-align:center;margin-top:6px;font-size:10.5px;opacity:.6}
 
-/* Football: the 2D match screen over the world view; the HUD and match card stay on top */
-.match-2d{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:84px 16px 200px;background:radial-gradient(circle at 50% 30%,#163a2a,#0b1a14 75%);color:#fff}
-.match-2d .mr-bar,.match-2d .mr-text{width:min(660px,100%)}.match-2d .mr-text{margin:0}
-.match-2d canvas{width:min(660px,100%);height:auto;max-height:calc(100% - 96px);object-fit:contain;border-radius:14px;box-shadow:0 12px 30px -10px #000c}
-@media(max-width:700px){.match-2d{padding:72px 10px 190px}}
+/* Football: a slim scoreboard and commentary over the 3D match; taps pass through to the pitch */
+.match-hud{position:absolute;top:58px;left:50%;transform:translateX(-50%);z-index:3;width:min(460px,calc(100% - 24px));display:flex;flex-direction:column;gap:4px;color:#fff;pointer-events:none}
+.match-hud .mr-bar{padding:4px 10px;box-shadow:0 6px 16px -8px #000c}.match-hud .mr-bar strong{font-size:17px}
+.match-hud .mr-text{margin:0;padding:4px 10px;font-size:12.5px;background:#1d4faed9;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:620px){.match-hud{top:52px}}
 body.in-match #questChip,body.in-match #app .page-heading{display:none!important}
-.mr-view{border:0;border-radius:14px;padding:7px 14px;background:#ffffff1f;color:#fff;font:600 12px Fredoka,system-ui,sans-serif;cursor:pointer}
-.match-2d.peek{background:transparent;pointer-events:none}.match-2d.peek>*:not(.mr-view):not(.mr-bar){visibility:hidden}.match-2d.peek .mr-view{pointer-events:auto;margin-top:auto}
 /* Work: the situation, live score and meters, choices that name their skill, and the result card. */
 #app .activity-card:has(.work-scene),#app .activity-card:has(.meters){max-height:min(330px,52vh)}
 .work-scene{margin:2px 0 7px;padding:8px 11px;border-radius:12px;background:#fff7dc;border:1px solid #f1dc9a;font:600 12px/1.3 var(--fun,'Segoe UI');color:#4a3b12}
@@ -1218,3 +1213,9 @@ body.in-match #questChip,body.in-match #app .page-heading{display:none!important
 @media(max-width:620px){.work-board{flex-direction:column;align-items:stretch}}
 @media(max-width:620px){.work-board .meters{flex-direction:row;gap:8px}.activity-card .sim-choice{padding:5px}.activity-card .sim-choice b{font-size:14px}}
 .result-stats{flex-wrap:wrap}
+/* Narrow or short screens: a compact work card (one-line situation, a row of choice chips) so the work stays in view */
+@media(max-width:820px),(max-height:760px){#app .activity-card:has(.work-scene),#app .activity-card:has(.meters){max-height:34vh;padding:7px 9px}.sim-status{margin-bottom:3px}.sim-status>span{width:26px;height:26px;font-size:15px;border-radius:9px}.work-board{flex-direction:row!important;align-items:center;gap:6px;margin:0 0 3px}.work-board .meters{flex-direction:row!important;gap:6px}.meter{font-size:9px}.work-board .scoreboard{font-size:11px;padding:2px 6px}.activity-card .work-scene{margin:0 0 4px;padding:3px 8px;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.activity-card .sim-choices{flex-wrap:nowrap;gap:5px;padding-top:1px}.activity-card .sim-choice{grid-template-columns:auto 1fr;align-items:center;justify-items:start;text-align:left;min-width:0;padding:4px 7px 4px 6px;gap:1px 5px;border-radius:12px}.activity-card .sim-choice b{grid-row:span 2;font-size:14px}.activity-card .sim-choice span{-webkit-line-clamp:2;font-size:9.5px}.activity-card .sim-choice em{display:none}.activity-card .sim-choice small{position:static;font-size:9px;font-weight:700}}
+@media(min-width:821px) and (min-height:761px){.activity-card .sim-choice em{display:inline-block}}
+body.in-match #activityCard .work-scene{display:none}
+/* A choice you tapped shows at once while the server decides */
+.sim-choice.pending{background:linear-gradient(#fff6c9,#ffe98f)!important;border-color:#f2c230!important;animation:pulse .8s ease-in-out infinite alternate}.sim-choices:has(.pending) .sim-choice:not(.pending){opacity:.45;pointer-events:none}@keyframes pulse{to{transform:scale(1.03)}}

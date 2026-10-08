@@ -1,5 +1,6 @@
 import { bestMode, fanClubSize, PROMPTS, RIVAL, TEAM, TAILOR_COLORS, TATTOOS, VENUE_ACTS, TRANSIT, TUNING, DELIVERY_MS, GROCERY, tripMs, RIDE_SPEED, CAREERS, LOCATIONS, ITEMS, FOODS, WEAR, WEAR_SLOTS, PERKS, wearPerks, EMOTES, REACTIONS, PETS, PET_CARE, LIFE_EVENTS, weatherAt, festivalAt, NPCS, TOWN, SPONSORSHIPS, RIDES, PHONES, WATCH, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, BALANCE as B, effort, canPlace, homeRooms } from './content.js';
 import { World, worldObjects } from './world.js';
+import { replayScript } from './matchPlay.js';
 import { World3D, Figure } from './world3d.js';
 import * as T from './vendor/three.min.js';
 import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS } from './sound.js';
@@ -12,7 +13,7 @@ const fmt=value=>Math.floor(value).toLocaleString();
 const duration=ms=>{const seconds=Math.max(0,Math.ceil(ms/1000));return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;};
 const needs={hunger:['Hunger','🍗'],energy:['Energy','⚡'],fun:['Fun','🎉'],social:['Social','💬'],hygiene:['Hygiene','🧼'],bladder:['Bladder','🚽']};
 // liveFollow is set once the live socket opens; declared up here because the first update can arrive first.
-let pitch2d=null,drawFailures=0,liveFollow=null,lastUpdate=0,heartbeat,snapshot,state,busy=false,modalPage=null,previousFocus,toastTimer,offset=0,phoneTab='local',selectedObject;
+let matchHud={el:null,timer:0,hold:null},drawFailures=0,liveFollow=null,lastUpdate=0,heartbeat,snapshot,state,busy=false,modalPage=null,previousFocus,toastTimer,offset=0,phoneTab='local',selectedObject;
 let motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;
 const now=()=>Date.now()+offset;
 const button=(label,action,attrs='',style='secondary')=>`<button class="${style}" data-action="${action}" ${attrs}>${label}</button>`;
@@ -399,15 +400,18 @@ function renderActivity(){
     const last=a.outcomes?.at(-1);html+=workBoard(a);
     if(waiting)html+=(last?'<div class="work-last '+(last.success?'hit':'miss')+'">'+(last.success?'✓ ':'✗ ')+escape(last.choice)+(a.career==='tennis'&&a.lastGames?' · games '+a.lastGames.join('–'):'')+'</div>':'')+progress(a.readyAt-a.interval,a.readyAt);
     else if(complete)html+=button('🎁 Collect result','finish','data-id="'+a.id+'"','primary');
-    else{voiceScene(a);html+=(a.scene?.text?'<div class="work-scene'+(a.scene.event?' event':'')+'">'+escape(a.scene.text)+'</div>':'')+'<div class="sim-choices">'+a.choices.map((choice,index)=>button('<b>'+(CHOICE_ICONS[choice.action]||(choice.action==='general'?['💡','✨','⚡'][index%3]:def.icon))+'</b><span>'+escape(choice.label)+'</span><em class="risk-'+choice.risk+'">'+escape(skillName(a.career,choice.skill))+'</em><small>'+Math.round(choice.probability*100)+'%</small>','decision','data-index="'+index+'" data-beat="'+a.beat+'" data-id="'+a.id+'" title="'+escape(skillName(a.career,choice.skill))+' · '+escape(choice.risk)+'"','sim-choice')).join('')+'</div>';}
+    else{voiceScene(a);html+=(a.scene?.text?'<div class="work-scene'+(a.scene.event?' event':'')+'">'+escape(a.scene.text)+'</div>':'')+'<div class="sim-choices">'+a.choices.map((choice,index)=>button('<b>'+(CHOICE_ICONS[choice.action]||(choice.action==='general'?['💡','✨','⚡'][index%3]:def.icon))+'</b><span>'+escape(choice.label)+'</span><em class="risk-'+choice.risk+'">'+escape(skillName(a.career,choice.skill))+'</em><small>'+Math.round(choice.probability*100)+'%</small>','decision','data-index="'+index+'" data-beat="'+a.beat+'" data-id="'+a.id+'" title="'+escape(skillName(a.career,choice.skill))+' · '+escape(choice.risk)+'"','sim-choice'+(pendingChoice&&pendingChoice.id===a.id&&pendingChoice.beat===a.beat&&pendingChoice.index===index?' pending':''))).join('')+'</div>';}
   }else html='<div class="idle-actions">'+button(def.icon+' '+(state.location===def.location?'Start work':'Go to work'),state.location===def.location?'prepare':'travel',state.location===def.location?'':'data-location="'+def.location+'"','primary')+button('🎯 Practise','practice')+'</div>';
   if(taskQueue.length)html+='<div class="task-queue"><small>Up next</small>'+taskQueue.map((t,i)=>button(`${escape(t.icon||'•')} ${escape(t.label)} <b aria-hidden="true">×</b>`,'unqueue',`data-index="${i}" aria-label="Remove ${escape(t.label)} from queue"`,'queue-chip')).join('')+'</div>';
   $('#activityCard').innerHTML=html;
 }
-async function chooseDecision(index){const a=state.active;if(!a)return;const chosen=a.choices[index],career=a.career,before={playerScore:a.playerScore,opponentScore:a.opponentScore,engagement:a.engagement,playerStamina:a.playerStamina};const data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});if(!data)return;
-  const success=(data.state.active?.outcomes||data.state.outputs?.[0]?.outcomes||[]).at(-1)?.success;if(motion)world.respond(chosen.action,success);
-  // Football plays a short top-down replay of the move; at full time the final score comes from the result.
-  if(career==='football'&&motion){const done=data.state.results?.[0],[ps,os]=String(done?.score||'').split('–').map(Number),after=data.state.active||{playerScore:ps,opponentScore:os,beat:6,totalBeats:6};matchReplay(chosen,success,before,after);}else actionPop(career,chosen,success,consequence(career,before,data.state.active||data.state.results?.[0]||{}));}
+let pendingChoice=null;
+async function chooseDecision(index){const a=state.active;if(!a||pendingChoice)return;const chosen=a.choices[index],career=a.career,before={playerScore:a.playerScore,opponentScore:a.opponentScore,engagement:a.engagement,playerStamina:a.playerStamina};
+  // The tapped choice lights up at once; the others wait until the server has decided.
+  pendingChoice={id:a.id,beat:a.beat,index};$('.sim-choice[data-index="'+index+'"]')?.classList.add('pending');let data;try{data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});}finally{pendingChoice=null;}if(!data){renderActivity();return;}
+  const last=(data.state.active?.outcomes||data.state.outputs?.[0]?.outcomes||[]).at(-1),success=last?.success;if(motion)world.respond(chosen.action,success);
+  // Football acts the move out on the 3D pitch; at full time the final score comes from the result.
+  if(career==='football'){const done=data.state.results?.[0],[ps,os]=String(done?.score||'').split('–').map(Number),after=data.state.active||{playerScore:ps,opponentScore:os,beat:6,totalBeats:6};matchReplay(a.id,chosen,success,before,after,last?.result);}else actionPop(career,chosen,success,consequence(career,before,data.state.active||data.state.results?.[0]||{}));}
 // What a choice changed: points, games, stamina, or the room's mood.
 function consequence(career,b,a){
   if(career==='basketball'&&a.playerScore!=null){const us=a.playerScore-(b.playerScore||0),them=a.opponentScore-(b.opponentScore||0);return `${us?`+${us} for you`:'No points'}${them?` · they answer with ${them}`:' · stop at the other end'} (${a.playerScore}–${a.opponentScore})`;}
@@ -1207,85 +1211,21 @@ function arenaApp(){
 // Start last: every declaration above is ready before the first update can arrive and draw.
 await refresh();
 
-// Football match replays: after each decision a 4–5 s top-down replay of the move plays out (3 v 3 with keepers),
-// told by what really happened: goals only when the score changed, saves and near misses otherwise.
-const REPLAY_NAMES={blue:['Emeka','Bayo'],red:['Duke','Musa']};
-function replayScript(choice,success,blueGoal,redGoal,me){
-  const mate=REPLAY_NAMES.blue[choice.target==='striker'?1:0],[r1]=REPLAY_NAMES.red;
-  const start={A1:[45,32],A2:[56,14],AK:[5,32],B1:[63,30],B2:[70,46],BK:[95,32]};
-  const f=(t,pos,ball,text)=>({t,pos,ball,text});const at=(o,p)=>({...start,...o,...p});
-  const miss=Math.random()<.5?'wide':'save';
-  if(choice.action==='shoot'){const dist=/(\d+)m/.exec(choice.label)?.[1]||20;return [
-    f(0,at({}),[47,32],`${me} has it ${dist}m out…`),f(1,at({A1:[58,31],B1:[64,28]}),[60,31],`${me} shapes to shoot…`),
-    blueGoal?f(1.9,at({A1:[60,31],B1:[66,27],BK:[96,40]}),[100,27],'GOAL! Into the corner! 🎉'):miss==='save'?f(1.9,at({A1:[60,31],BK:[95,30]}),[94,30],'Saved by the keeper!'):f(1.9,at({A1:[60,31],BK:[95,36]}),[101,12],'It goes just wide…'),
-    f(3.6,at({A1:[62,30],A2:[70,18],B1:[68,28],BK:[95,32]}),blueGoal?[100,27]:miss==='save'?[95,32]:[101,12],blueGoal?`${me} scores!`:miss==='save'?'The keeper gathers it.':'Goal kick.')];}
-  if(choice.action==='pass'){const wing=choice.target!=='striker',to=wing?[70,12]:[76,30];return [
-    f(0,at({}),[47,32],`${me} looks up…`),f(1.1,at({A2:to,B1:[62,24]}),success?to:[63,22],success?`${me} threads it to the ${choice.target||'winger'}`:`${me} tries to find the ${choice.target||'winger'}…`),
-    success?f(2.5,at({A1:[62,34],A2:[84,wing?18:28],B1:[70,26],B2:[80,38]}),[85,wing?18:28],`${mate} drives at the defence…`):f(2.4,at({A1:[50,30],A2:[66,16],B1:[56,26],B2:[62,40]}),[54,28],`${r1} cuts it out!`),
-    blueGoal?f(3.8,at({A1:[78,34],A2:[86,24],BK:[96,40]}),[100,30],`${mate} finishes! GOAL! 🎉`):redGoal?f(3.8,at({A1:[40,30],AK:[4,24],B1:[14,30]}),[0,34],`${r1} breaks away… and scores.`):success?f(3.8,at({A1:[74,34],A2:[88,22],BK:[94,26]}),[94,26],`${mate}'s effort is saved.`):f(3.8,at({A1:[46,30],B1:[44,30],B2:[52,40]}),[36,36],'Cleared upfield.')];}
-  if(choice.action==='dribble'){const lane=choice.target==='wing'?14:32;return [
-    f(0,at({}),[47,32],`${me} runs at ${r1}…`),f(1.2,at({A1:[60,lane],B1:[62,lane+2]}),[61,lane],success?`${me} skips past ${r1}!`:`${r1} stands firm…`),
-    success?f(2.6,at({A1:[78,lane+4],B1:[64,lane+6],BK:[94,30]}),[79,lane+4],`${me} is one on one with the keeper!`):f(2.4,at({A1:[61,lane],B1:[58,lane+2]}),[55,lane+4],`Tackled by ${r1}!`),
-    success?(blueGoal?f(3.8,at({A1:[82,lane+4],BK:[96,40]}),[100,28],'GOAL! What a run! 🎉'):f(3.8,at({A1:[82,lane+4],BK:[93,lane+6]}),[93,lane+6],'The keeper smothers it.')):(redGoal?f(3.8,at({A1:[50,30],AK:[4,26],B1:[16,30]}),[0,35],`${r1} goes all the way… GOAL.`):f(3.8,at({A1:[56,30],B1:[48,32]}),[44,34],'Red break forward.'))];}
-  // Defending: red attack your goal.
-  const red=at({B1:[58,32],B2:[66,44],A1:[44,30]});return [
-    f(0,red,[57,32],`${r1} brings it forward…`),f(1.2,at({B1:[40,30],B2:[46,42],A1:[38,32]}),[39,30],choice.action==='intercept'?`${me} reads the pass…`:choice.action==='mark'?`${me} tracks the run…`:`${me} goes to ground…`),
-    success?f(2.5,at({B1:[38,30],A1:[40,32],A2:[56,16]}),[44,30],`${me} wins it back!`):f(2.5,at({B1:[22,30],A1:[34,32],AK:[6,30]}),[22,30],`${r1} is through on goal…`),
-    success?f(3.8,at({A1:[50,32],A2:[64,18]}),[64,18],`…and plays it out to ${REPLAY_NAMES.blue[0]}.`):redGoal?f(3.8,at({B1:[18,30],AK:[3,24]}),[0,34],'GOAL for Red.'):f(3.8,at({B1:[18,30],AK:[6,31]}),[6,31],'Great save by the keeper!')];
+// Football matches play on the 3D pitch (world.footballMatch). After each decision the move is acted out there from a
+// script (matchPlay.js); the scoreboard changes when the ball goes in. A slim scoreboard and commentary sit over the view.
+function matchReplay(id,choice,success,before,after,result){
+  const blueGoal=(after.playerScore||0)>(before.playerScore||0),redGoal=(after.opponentScore||0)>(before.opponentScore||0),script=replayScript(choice,success,blueGoal,redGoal,state.name.split(' ')[0],result);
+  const goal=script.find(f=>f.ball[0]>=100||f.ball[0]<=0),t0=performance.now();world.playMatchMove({id,script,blueGoal,redGoal});
+  matchHud.hold={score:[before.playerScore||0,before.opponentScore||0],until:t0+(goal&&(blueGoal||redGoal)&&motion?goal.t*1000:0)};matchScreen();
 }
-function matchReplay(choice,success,before,after){
-  const blueGoal=(after.playerScore||0)>(before.playerScore||0),redGoal=(after.opponentScore||0)>(before.opponentScore||0),script=replayScript(choice,success,blueGoal,redGoal,state.name.split(' ')[0]);
-  const minute=Math.min(90,Math.round(((after.beat||1)/(after.totalBeats||6))*90));
-  if(pitch2d){pitch2d.replay={script,t0:performance.now()};return;}
-  $('#matchReplay')?.remove();const box=document.createElement('div');box.id='matchReplay';box.className='match-replay';
-  box.innerHTML=`<div class="mr-bar"><b class="mr-blue">BLUE</b><strong>${after.playerScore||0} – ${after.opponentScore||0}</strong><b class="mr-red">RED</b><em>${minute}'</em></div><div class="mr-text"></div><canvas width="640" height="400"></canvas><small>Tap to close</small>`;
-  document.body.append(box);const c=box.querySelector('canvas'),g=c.getContext('2d'),text=box.querySelector('.mr-text'),X=x=>20+x*6,Y=y=>16+y*5.75,t0=performance.now();let raf=0;
-  const close=()=>{cancelAnimationFrame(raf);box.classList.add('out');setTimeout(()=>box.remove(),350);};box.onclick=close;
-  const lerp=(a,b,k)=>a+(b-a)*k,ease=k=>k<.5?2*k*k:1-(-2*k+2)**2/2;
-  const pitch=()=>{g.fillStyle='#2f8f3a';g.fillRect(0,0,640,400);for(let i=0;i<10;i++){if(i%2){g.fillStyle='#349a40';g.fillRect(20+i*60,16,60,368);}}
-    g.strokeStyle='#e8f5e0cc';g.lineWidth=2;g.strokeRect(20,16,600,368);g.beginPath();g.moveTo(320,16);g.lineTo(320,384);g.stroke();g.beginPath();g.arc(320,200,46,0,7);g.stroke();
-    for(const s of [0,1]){const x=s?620:20,d=s?-1:1;g.strokeRect(s?560:20,110,60,180);g.strokeRect(s?596:20,160,24,80);g.fillStyle='#ffffffcc';g.fillRect(s?620:12,170,8,60);}};
-  const dot=(x,y,fill,label,ring)=>{g.beginPath();g.arc(x,y,11,0,7);g.fillStyle=fill;g.fill();g.lineWidth=ring?4:2;g.strokeStyle=ring?'#ffd84a':'#fff';g.stroke();g.fillStyle='#fff';g.font='bold 11px system-ui';g.textAlign='center';g.textBaseline='middle';g.fillText(label,x,y+.5);};
-  const frame=()=>{const t=(performance.now()-t0)/1000,i=Math.max(0,script.findIndex((s,n)=>n===script.length-1||script[n+1].t>t)),a=script[i],b=script[Math.min(i+1,script.length-1)],k=b===a?1:ease(Math.min(1,(t-a.t)/(b.t-a.t)));
-    pitch();for(const key of ['AK','A2','A1','BK','B1','B2']){const p=[lerp(a.pos[key][0],b.pos[key][0],k),lerp(a.pos[key][1],b.pos[key][1],k)];dot(X(p[0]),Y(p[1]),key[0]==='A'?(key==='AK'?'#173f8a':'#2f6fd6'):(key==='BK'?'#7a1d1d':'#d23b3b'),key.endsWith('K')?'GK':key==='A1'?'★':'',key==='A1');}
-    const bx=X(lerp(a.ball[0],b.ball[0],k)),by=Y(lerp(a.ball[1],b.ball[1],k));g.beginPath();g.arc(bx+2,by+3,5,0,7);g.fillStyle='#0004';g.fill();g.beginPath();g.arc(bx,by,6,0,7);g.fillStyle='#fff';g.fill();g.strokeStyle='#222';g.lineWidth=1.5;g.stroke();
-    const line=(t>=b.t-.4&&b!==a?b:a).text;if(text.textContent!==line)text.textContent=line;
-    if(t<script.at(-1).t+1.2&&!box.classList.contains('out'))raf=requestAnimationFrame(frame);else close();};
-  frame();
-}
-
-// Football matches are played on a full 2D match screen: 11 v 11 in a 4-4-2 with keepers, a scoreboard,
-// the minute and commentary. Decisions stay on the match card below; each one replays on this pitch.
-const FORMATION=[[5,32],[20,9],[20,24],[20,40],[20,55],[38,9],[38,24],[38,40],[38,55],[52,25],[52,39]];
-// The replay's six actors (see replayScript) mapped onto formation slots: you up front, a winger, the keepers, two red centre-backs.
-const ACTOR_SLOT={A1:['A',9],A2:['A',5],AK:['A',0],BK:['B',0],B1:['B',2],B2:['B',3]};
-// pitch2d (the live match screen) is declared with the top-level state: the first render can run before this point.
+// matchHud (the scoreboard) is declared with the top-level state: the first render can run before this point.
 function matchScreen(){
-  const a=state?.active,on=Boolean(a&&a.kind!=='practice'&&a.career==='football'&&!state.trip&&motion);document.body.classList.toggle('in-match',on);
-  if(!on){if(pitch2d){cancelAnimationFrame(pitch2d.raf);pitch2d.el.remove();pitch2d=null;}return;}
-  if(!pitch2d){const el=document.createElement('div');el.className='match-2d';el.innerHTML='<div class="mr-bar"><b class="mr-blue">BLUE</b><strong></strong><b class="mr-red">RED</b><em></em></div><div class="mr-text"></div><canvas width="660" height="420"></canvas><button class="mr-view" type="button">👀 See the line-up in 3D</button>';el.querySelector('.mr-view').onclick=e=>{e.stopPropagation();el.classList.toggle('peek');e.target.textContent=el.classList.contains('peek')?'⚽ Back to the match':'👀 See the line-up in 3D';};$('.world-card').append(el);
-    pitch2d={el,g:el.querySelector('canvas').getContext('2d'),text:el.querySelector('.mr-text'),replay:null,ball:{holder:9,to:9,at:0,next:0},raf:0};pitch2d.raf=requestAnimationFrame(drawMatch2d);}
-  const minute=Math.min(90,Math.round(((a.beat||0)/(a.totalBeats||6))*90));
-  pitch2d.el.querySelector('.mr-bar strong').textContent=`${a.playerScore||0} – ${a.opponentScore||0}`;pitch2d.el.querySelector('.mr-bar em').textContent=`${minute}'`;
-  if(!pitch2d.replay)pitch2d.text.textContent=a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?`Blue keep the ball moving… your next touch in ${duration(a.readyAt-now())}`:`${a.scene?.text||'The ball comes to you.'} Pick your move below.`;
-}
-function drawMatch2d(){
-  const m=pitch2d;if(!m)return;const g=m.g,W=660,H=420,X=x=>22+x*6.16,Y=y=>18+y*6.03,t=performance.now()/1000,lerp=(a,b,k)=>a+(b-a)*k,ease=k=>k<.5?2*k*k:1-(-2*k+2)**2/2;
-  // The pitch.
-  g.fillStyle='#2f8f3a';g.fillRect(0,0,W,H);for(let i=1;i<10;i+=2){g.fillStyle='#349a40';g.fillRect(X(i*10),Y(0),X(10)-X(0),Y(64)-Y(0));}
-  g.strokeStyle='#e8f5e0cc';g.lineWidth=2;g.strokeRect(X(0),Y(0),X(100)-X(0),Y(64)-Y(0));g.beginPath();g.moveTo(X(50),Y(0));g.lineTo(X(50),Y(64));g.stroke();g.beginPath();g.arc(X(50),Y(32),48,0,7);g.stroke();
-  for(const s of [0,1]){g.strokeRect(X(s?84:0),Y(14),X(16)-X(0),Y(50)-Y(14));g.strokeRect(X(s?95:0),Y(24),X(5)-X(0),Y(40)-Y(24));g.fillStyle='#ffffffcc';g.fillRect(s?X(100):X(0)-8,Y(27),8,Y(37)-Y(27));}
-  // Where the ball is: a replay (scripted move) or, between plays, blue passing it around.
-  let actors={},ball;
-  if(m.replay){const s=m.replay.script,e=(performance.now()-m.replay.t0)/1000,i=Math.max(0,s.findIndex((f,n)=>n===s.length-1||s[n+1].t>e)),a=s[i],b=s[Math.min(i+1,s.length-1)],k=b===a?1:ease(Math.min(1,(e-a.t)/(b.t-a.t)));
-    for(const key in ACTOR_SLOT)actors[key]=[lerp(a.pos[key][0],b.pos[key][0],k),lerp(a.pos[key][1],b.pos[key][1],k)];ball=[lerp(a.ball[0],b.ball[0],k),lerp(a.ball[1],b.ball[1],k)];
-    const line=(e>=b.t-.4&&b!==a?b:a).text;if(m.text.textContent!==line)m.text.textContent=line;if(e>s.at(-1).t+1.4){m.replay=null;matchScreen();}}
-  const pb=m.ball;if(!m.replay&&t>=pb.next){pb.holder=pb.to;pb.to=1+Math.floor(Math.random()*10);pb.at=t;pb.next=t+1.2+Math.random()*1.2;}
-  const shift=ball?(ball[0]-50)*.3:0,spot=(team,n)=>{const [fx,fy]=FORMATION[n],x=team==='A'?fx:100-fx,sway=Math.sin(t*.8+n*1.3+(team==='B'?2:0))*1.6;return [Math.min(97,Math.max(3,x+(n?shift:shift*.15)+sway*.5)),fy+Math.cos(t*.7+n)*1.2];};
-  if(!ball){const from=spot('A',pb.holder),to=spot('A',pb.to),k=Math.min(1,(t-pb.at)/.7);ball=[lerp(from[0],to[0],k),lerp(from[1],to[1],k)];}
-  const at=(team,n)=>{const key=Object.keys(ACTOR_SLOT).find(k=>ACTOR_SLOT[k][0]===team&&ACTOR_SLOT[k][1]===n);return key&&actors[key]?actors[key]:spot(team,n);};
-  for(const team of ['B','A'])for(let n=0;n<11;n++){const [x,y]=at(team,n),you=team==='A'&&n===9;g.beginPath();g.arc(X(x),Y(y),you?10:8,0,7);g.fillStyle=team==='A'?(n?'#2f6fd6':'#173f8a'):(n?'#d23b3b':'#7a1d1d');g.fill();g.lineWidth=you?4:1.6;g.strokeStyle=you?'#ffd84a':'#fff';g.stroke();
-    if(!n||you){g.fillStyle='#fff';g.font='bold 9px system-ui';g.textAlign='center';g.textBaseline='middle';g.fillText(you?'★':'GK',X(x),Y(y)+.5);}}
-  g.beginPath();g.arc(X(ball[0])+2,Y(ball[1])+3,4.5,0,7);g.fillStyle='#0004';g.fill();g.beginPath();g.arc(X(ball[0]),Y(ball[1]),5.5,0,7);g.fillStyle='#fff';g.fill();g.strokeStyle='#222';g.lineWidth=1.4;g.stroke();
-  m.raf=requestAnimationFrame(drawMatch2d);
+  const a=state?.active,on=Boolean(a&&a.kind!=='practice'&&a.career==='football'&&!state.trip&&state.location==='sports');document.body.classList.toggle('in-match',on);
+  if(!on){if(matchHud.el){clearInterval(matchHud.timer);matchHud.el.remove();matchHud.el=null;}return;}
+  if(!matchHud.el){const el=document.createElement('div');el.className='match-hud';el.setAttribute('aria-live','polite');el.innerHTML='<div class="mr-bar"><b class="mr-blue">BLUE</b><strong></strong><b class="mr-red">RED</b><em></em></div><div class="mr-text"></div>';$('.world-card').append(el);
+    matchHud.el=el;matchHud.timer=setInterval(matchScreen,250);}
+  const minute=Math.min(90,Math.round(((a.beat||0)/(a.totalBeats||6))*90)),held=matchHud.hold&&performance.now()<matchHud.hold.until?matchHud.hold.score:[a.playerScore||0,a.opponentScore||0];
+  const score=`${held[0]} – ${held[1]}`,el=matchHud.el,set=(q,v)=>{const n=el.querySelector(q);if(n.textContent!==v)n.textContent=v;};
+  set('.mr-bar strong',score);set('.mr-bar em',a.beat===0&&now()<a.startedAt+7000?'Anthem':a.beat>=a.totalBeats?'FT':`${minute}'`);
+  set('.mr-text',world.matchLine||(a.beat===0&&now()<a.startedAt+7000?'The teams line up for the anthem…':a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?(a.possession==='opponent'?'Red have the ball…':'Blue keep the ball moving…'):`${a.scene?.text||'The ball comes to you.'}`));
 }
