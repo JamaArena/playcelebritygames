@@ -1,12 +1,13 @@
 import { DatabaseSync } from 'node:sqlite';
 import { createHash } from 'node:crypto';
 import { schema, createGameService, relatedQueries, roomOf } from './service.mjs';
+import { ARENA } from './public/content.js';
 
 const tables = {
   players: ['id'], requests: ['player_id', 'request_id'], messages: ['id'],
   reports: ['id'], seasons: ['id'], agreements: ['id'], battles: ['id'],
   accounts: ['player_id'], codes: ['email'], sessions: ['token_hash'], active_devices: ['player_id'],
-  profiles: ['id'],
+  profiles: ['id'], arena: ['day'],
 };
 const numeric = new Set(['created', 'at', 'starts', 'ends', 'settled', 'fame', 'trend', 'seen']);
 
@@ -118,6 +119,10 @@ async function loadPlayerScope(client, working, previous, request) {
   const now = Date.now(), [season] = await one('SELECT * FROM celebrity.seasons ORDER BY id DESC LIMIT 1', []);
   if (!season || now >= Number(season.ends)) return false;
   const add = (table, rows) => rows.forEach(row => addRow(working, previous, table, row));
+  // A ceremony is due: the full path holds it (it needs every player's card).
+  const [arena] = await one('SELECT * FROM celebrity.arena ORDER BY day DESC LIMIT 1', []);
+  if (!arena || Number(arena.day) < ARENA.day(now)) return false;
+  add('arena', [arena]);
   add('players', [player]);
   add('sessions', sessions);
   add('seasons', [season]);

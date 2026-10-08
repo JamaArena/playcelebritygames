@@ -729,3 +729,28 @@ export function bestMode(s, now = Date.now()) {
   const cost = m => (RIDE_SPEED[m] ?? 1) * (1 - (m === s.ride ? TUNING[(s.tune?.[m] || 0) - 1]?.cut || 0 : 0) / 100) * (jam && !NO_JAM.includes(m) ? 1.4 : 1);
   return options.reduce((best, m) => cost(m) < cost(best) ? m : best, 'walk');
 }
+
+// The Award Arena: a ceremony every midnight (Nigeria time). Each career has its own award for the
+// most fame gained that day; each field (sport, entertainment, tech) crowns its best; and the
+// Greatest Celebrity of All Time goes to the most famous star ever. Names are original to the game.
+export const ARENA = {
+  day: now => Math.floor((now + 3_600_000) / 86_400_000),
+  next: day => (day + 1) * 86_400_000 - 3_600_000,
+  career: {
+    football: {name: 'Naija Golden Ball', icon: '⚽'}, basketball: {name: 'Naija Hoops MVP', icon: '🏀'},
+    tennis: {name: 'Naija Grand Slam Star', icon: '🎾'}, wrestling: {name: 'Naija Championship Belt', icon: '🤼'},
+    musician: {name: 'Naija Golden Record', icon: '🎶'}, actor: {name: 'Naija Golden Statue', icon: '🎭'},
+    adult: {name: 'Naija After Dark Award', icon: '🌙'}, vlogger: {name: 'Naija Vlog Crown', icon: '🤳'},
+    video: {name: 'Naija Golden Play Button', icon: '▶️'}, skitmaker: {name: 'Naija Comedy Crown', icon: '😂'},
+    streamer: {name: 'Naija Streamer of the Year', icon: '🎮'}, founder: {name: 'Naija Founder of the Year', icon: '🚀'},
+    developer: {name: 'Naija Dev of the Year', icon: '💻'}, web3: {name: 'Naija Web3 Pioneer', icon: '🔗'},
+  },
+  family: {
+    sport: {name: 'Sports Star of the Year', icon: '🏅', families: ['sport'], label: 'all sports'},
+    entertainment: {name: 'Best Entertainer', icon: '🌟', families: ['music', 'acting', 'creator'], label: 'music, film and creators'},
+    tech: {name: 'Best in Tech', icon: '💡', families: ['tech'], label: 'all of tech'},
+  },
+  goat: {name: 'Greatest Celebrity of All Time', icon: '👑'},
+  prize: {career: 200, family: 400},
+};
+export const arenaGroup = family => Object.keys(ARENA.family).find(k => ARENA.family[k].families.includes(family)) || null;
