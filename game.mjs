@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { WORK_SCENES, SPORT_PLAYS, WORK_EVENTS, UNITS, reviewLine, tierTitle } from './public/careerText.js';
+import { WORK_SCENES, SPORT_PLAYS, WORK_EVENTS, UNITS, reviewLine, tierTitle, SCENE_TAGS, SCENE_FX, AUDIENCE_WHO, FOLLOW_UPS, LIVE_SCENES } from './public/careerText.js';
 import { bestMode, QUESTS, QUEST_GRADUATION, FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace, homeRooms, npcOpinion, OPINIONS, NPC_NAMES, CLASH_MEDALS, medalTier } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
@@ -209,12 +209,18 @@ export const practiceXp=s=>clamp(Math.round(4+Object.values(s.needs).reduce((a,b
 export const focusLabel=xp=>xp>=9?'Focused':xp<=6?'Distracted':'Steady';
 // A work event (if this activity drew one) lands on its own beat with its own choices.
 const eventAt=(a,i)=>a.event&&a.event.beat===i?WORK_EVENTS[a.career]?.[a.event.n]||null:null;
+// The scene for a step: a follow-up when your last pick was a gamble, the stage for a musician's live show, or one drawn
+// at random from the career's list (seeded per activity, so it stays put on refresh). Tags say what each option is about.
+function workScene(a,i){
+  const prev=a.outcomes?.[i-1],follow=prev&&prev.risk==='risky'&&!prev.event&&!prev.follow&&FOLLOW_UPS[a.career]?.[prev.success?'hit':'miss'];
+  if(follow)return {scene:follow,tags:follow[3],follow:true};
+  const list=a.career==='musician'&&a.kind==='live'?LIVE_SCENES.musician:WORK_SCENES[a.career];if(!list)return null;
+  const n=(Math.floor((a.seed||0)*997)+i*7)%list.length;return {scene:list[n],tags:list[n][3]||SCENE_TAGS[a.career]?.[n],follow:false};
+}
 function beat(s,a) {
   const c=s.careers[a.career],def=CAREERS[a.career];
-  const i=a.beat,ev=eventAt(a,i);
-  // Careers with a scene list draw a random situation each step (seeded per activity, so it stays put on refresh).
-  const scenes=WORK_SCENES[a.career],scene=scenes&&scenes[(Math.floor((a.seed||0)*997)+i*7)%scenes.length],line=scene?scene[0]:def.beats[i%def.beats.length];
-  const base={text:ev?ev[0]:a.kind==='trial'?`Trial · ${line}`:line,difficulty:c.tier?Math.min(10,3+c.tier*2):2,pressure:.3+c.tier*.1, distance:a.chance||[24,18,30,12,22,16][i%6],angle:.1,goalkeeper:Math.min(9,3+2*c.tier),defensive:!ev&&a.career==='football'&&a.possession==='opponent',event:!!ev,defence:!!SPORT_PLAYS[a.career]?.[i%6]?.defence};
+  const i=a.beat,ev=eventAt(a,i),ws=workScene(a,i),line=ws?ws.scene[0]:def.beats[i%def.beats.length];
+  const base={text:ev?ev[0]:a.kind==='trial'?`Trial · ${line}`:line,difficulty:c.tier?Math.min(10,3+c.tier*2):2,pressure:.3+c.tier*.1, distance:a.chance||[24,18,30,12,22,16][i%6],angle:.1,goalkeeper:Math.min(9,3+2*c.tier),defensive:!ev&&a.career==='football'&&a.possession==='opponent',event:!!ev,follow:!ev&&!!ws?.follow,defence:!!SPORT_PLAYS[a.career]?.[i%6]?.defence};
   // A move you built (a pass or dribble that came off) leaves a cleaner look at goal.
   if(a.career==='football'&&a.chance&&!ev)Object.assign(base,{pressure:Math.max(.1,base.pressure-.2),angle:0,goalkeeper:base.goalkeeper-2});
   if(base.defensive)base.text='The opposition has possession. Protect the passing lane and win the ball back.';
@@ -237,8 +243,8 @@ export function choices(s) {
   // Ball sports, bouts and matches: the plays fit the moment (offence or defence, serve or return...).
   const plays=SPORT_PLAYS[a.career]?.[i%6];
   if(plays)return plays.plays.map(([label,k,risk,action,points])=>({label:action==='pin'&&a.opponentStamina>40?`${label} (they are still fresh)`:action==='signature'&&a.opponentStamina<=30?`${label} · pin attempt`:label,skill:def.skills[k],risk,action,...(points?{points}:{}),...(plays.defence?{defence:true}:{})}));
-  const workScenes=WORK_SCENES[a.career],workScene=workScenes&&workScenes[(Math.floor((a.seed||0)*997)+i*7)%workScenes.length];
-  if(workScene)return workScene[1].map((label,j)=>({label,skill:def.skills[+(workScene[2]?.[j]??i%def.skills.length)],risk:RISKS[j],action:'general'}));
+  const ws=workScene(a,i);
+  if(ws)return ws.scene[1].map((label,j)=>({label,skill:def.skills[+(ws.scene[2]?.[j]??i%def.skills.length)],risk:RISKS[j],action:'general',...(ws.tags?.[j]?{tag:ws.tags[j]}:{})}));
   return ['Use a proven approach','Commit to your own approach','Try an ambitious approach'].map((label,j)=>({label,skill:def.skills[i%def.skills.length],risk:RISKS[j],action:'general'}));
 }
 // The odds of a choice working: one rule for the card and for the result.
@@ -372,7 +378,7 @@ export function act(s,input,now,rng=Math.random) {
       const scene=beat(s,a),c=s.careers[a.career],fatigue=(100-s.needs.energy)/100,ev=eventAt(a,a.beat),odds=chance(s,a,choice,scene),skill=odds.level,p=odds.probability,draw=rng();
       const outcome=choice.action==='shoot'?shot(skill,scene,fatigue,rng):{success:draw<p,probability:p,draws:[draw],result:draw<p?'Successful':'Missed opportunity'};
       const ok=outcome.success,R=RISKS.indexOf(choice.risk),score=ok?{safe:60,balanced:80,risky:100}[choice.risk]:sport(a.career)?20:35;
-      a.outcomes.push({...outcome,score,choice:choice.label,action:choice.action,target:choice.target,scene,skill:choice.skill,risk:choice.risk,event:!!choice.event,at:now});
+      a.outcomes.push({...outcome,score,choice:choice.label,action:choice.action,target:choice.target,scene,skill:choice.skill,risk:choice.risk,event:!!choice.event,follow:!!scene.follow,...(choice.tag?{tag:choice.tag}:{}),at:now});
       learn(s,a.career,choice.skill,5,`${a.id}:${a.beat}`);s.needs.energy=clamp(s.needs.energy-2*(1-(perksFor(s).energy||0)/100));
       if(ev)applyEvent(s,a,ev,ok,now,rng);
       if(sport(a.career)) {
@@ -412,6 +418,10 @@ export function act(s,input,now,rng=Math.random) {
       // Live meters: bold choices that land lift the room but put the work at risk; safe ones steady it.
       a.engagement=clamp(a.engagement+(ok?[6,12,20][R]:-[6,10,14][R]));
       a.stability=clamp(a.stability+(ok?[10,4,-4][R]:-[4,10,18][R]));
+      // What the option was about adds its own effect: steady, craft, fans, team or a gamble.
+      a.lastNote=null;if(choice.tag&&SCENE_FX[choice.tag]){const fx=SCENE_FX[choice.tag],e=fx[ok?'hit':'miss'];
+        if(e.stability)a.stability=clamp(a.stability+e.stability);if(e.engagement)a.engagement=clamp(a.engagement+e.engagement);if(e.quality)a.bonus=(a.bonus||0)+e.quality;if(e.reputation)c.reputation=clamp(c.reputation+e.reputation);
+        a.lastNote=fx.note[ok?0:1].replace('{who}',AUDIENCE_WHO[a.career]||'everyone');}
       if(a.pinned||a.tennis?.winner!=null)a.beat=a.totalBeats-1;
       a.beat++;a.readyAt=now+a.interval;a.status=a.beat>=a.totalBeats?'finishing':'commentary';
       evaluate(s,a.career);break;

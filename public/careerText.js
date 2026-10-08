@@ -144,6 +144,59 @@ export const WORK_SCENES = {
   ],
 };
 
+// What each option in a work scene is really about, one letter per option (same order as WORK_SCENES):
+// s steady (safe, keeps things stable), c craft (better work), f fans (the room or audience), t team (with the people around you),
+// g gamble (big win or a public mess). Each has its own effect on top of the risk tier (SCENE_FX).
+export const SCENE_TAGS = {
+  musician: ['sfg', 'scg', 'scf', 'stg', 'scg', 'sct', 'sfg', 'scg', 'stg', 'scg'],
+  vlogger: ['sfg', 'ctf', 'scg', 'sfg', 'cfg', 'sct', 'sfg', 'scg', 'cfg', 'scf'],
+  video: ['scg', 'scf', 'scg', 'scg', 'sfg', 'ctg', 'sfg', 'scf', 'sfg', 'scg'],
+  skitmaker: ['scg', 'stg', 'scg', 'stg', 'stf', 'sfg', 'cfg', 'scg', 'scg', 'scg'],
+  streamer: ['sfg', 'stg', 'sfg', 'sfg', 'stf', 'sfg', 'scg', 'stf', 'ffg', 'sfg'],
+  actor: ['scg', 'scg', 'stg', 'stg', 'scg', 'stg', 'stc', 'scg', 'scg', 'scf'],
+  adult: ['scg', 'stg', 'sfg', 'stg', 'sfg', 'scg', 'sfg', 'scg', 'sft', 'scg'],
+  founder: ['scg', 'stf', 'stg', 'scg', 'stg', 'stf', 'scg', 'ttg', 'stf', 'scg'],
+  developer: ['scg', 'scg', 'scg', 'scg', 'scg', 'stg', 'stg', 'scg', 'stt', 'scg'],
+  web3: ['sfg', 'scg', 'scg', 'sfg', 'stg', 'ttf', 'scg', 'sfg', 'scg', 'scg'],
+};
+// What each kind of option does when it lands (hit) or not (miss): meters, quality and reputation, and the line you see.
+export const SCENE_FX = {
+  s: {hit: {stability: 6, engagement: -2}, miss: {stability: 2}, note: ['steady hands', 'no harm done']},
+  c: {hit: {quality: 4, stability: 4}, miss: {stability: -4}, note: ['the craft shows', 'not quite there yet']},
+  f: {hit: {engagement: 8}, miss: {engagement: -6}, note: ['{who} loved it', '{who} shrugged']},
+  t: {hit: {stability: 5, engagement: 4, reputation: 1}, miss: {stability: -3}, note: ['the team rallied round', 'the team was out of sync']},
+  g: {hit: {engagement: 10, quality: 3}, miss: {stability: -10, reputation: -1}, note: ['the gamble paid off', 'the gamble backfired and {who} noticed']},
+};
+export const AUDIENCE_WHO = {musician: 'the room', vlogger: 'your viewers', video: 'your viewers', skitmaker: 'the crew', streamer: 'chat', actor: 'the director', adult: 'your fans', founder: 'investors', developer: 'the client', web3: 'the community'};
+// Follow-ups: after a risky pick, the next scene reacts to how it went. [scene, options, skills, tags].
+export const FOLLOW_UPS = {
+  musician: {miss: ['The producer is still wincing at that last risky take.', ['Apologise and play it straight', 'Talk through what went wrong', 'Prove them wrong with another wild idea'], '012', 'stg'], hit: ['That bold move has the room buzzing. Ride it?', ['Bank it and move on', 'Build the next part around it', 'Push it even further'], '120', 'scg']},
+  vlogger: {miss: ['The comments are roasting your last stunt.', ['Pin a calm reply', 'Make a funny response clip', 'Double down with a sequel stunt'], '032', 'sfg'], hit: ['Your last bit is blowing up in the comments.', ['Thank everyone', 'Reply with a follow-up clip', 'Start a challenge trend'], '302', 'sfg']},
+  video: {miss: ['Viewers spotted the shaky section from your last gamble.', ['Pin a correction', 'Re-cut that part properly', 'Turn the mistake into a segment'], '023', 'scg'], hit: ['Retention spiked on your bold section.', ['Keep the pace steady', 'Back it up with more research', 'Rebuild the whole video around it'], '201', 'scg']},
+  skitmaker: {miss: ['The last joke fell flat and the crew has gone quiet.', ['Reset with a classic bit', 'Rewrite the punchline together', 'Bet on an even wilder bit'], '021', 'stg'], hit: ['The crew is still laughing at the last take.', ['Lock it in', 'Plant a callback for later', 'Build a sequel skit from it'], '322', 'scg']},
+  streamer: {miss: ['Chat is spamming L after that last stunt.', ['Laugh at yourself', 'Run a quick poll to win them back', 'Try the stunt again'], '013', 'sfg'], hit: ['Clips of your last play are everywhere.', ['Say thanks', 'Start a clip contest', 'Go for the world record now'], '013', 'sfg']},
+  actor: {miss: ['The director is unhappy after that bold choice.', ['Play it exactly as written', 'Ask what they need from the scene', 'Defend your version with a new take'], '012', 'stg'], hit: ['The director wants more of what you just did.', ['Repeat it carefully', 'Build on it with your co-star', 'Go even bigger'], '132', 'stg']},
+  adult: {miss: ['The crew is uneasy after the last risky idea.', ['Go back to the plan', 'Talk it over with the producer', 'Push the idea anyway'], '230', 'stg'], hit: ['Fans are begging for more of that last look.', ['Keep it classy', 'Post a teaser now', 'Launch a special edition'], '133', 'sfg']},
+  founder: {miss: ['Investors heard about your last gamble.', ['Send a calm update', 'Call them with the numbers', 'Promise a bigger win next quarter'], '132', 'scg'], hit: ['Your bold bet is getting buzz across the ecosystem.', ['Stay focused', 'Use it to hire a star engineer', 'Announce a big raise'], '013', 'stg']},
+  developer: {miss: ['The client saw your last risky change break the site.', ['Roll back and apologise', 'Write tests and fix it properly', 'Hotfix it live again'], '310', 'scg'], hit: ['The client loved the bold change and wants more.', ['Document it', 'Plan the next step together', 'Promise a big new feature by Friday'], '230', 'stg']},
+  web3: {miss: ['The community is nervous after your last risky move.', ['Post a calm update', 'Host a quick voice chat', 'Ship another upgrade right away'], '113', 'stg'], hit: ['Holders are hyped about your last move.', ['Say thanks', 'Share the roadmap', 'Announce a surprise airdrop'], '120', 'sfg']},
+};
+// Musicians on stage (live shows) face the stage, not the studio.
+export const LIVE_SCENES = {
+  musician: [
+    ['The crowd is flat after the opening song.', ['Play your biggest hit early', 'Get them clapping along', 'Jump down into the crowd'], '033', 'sfg'],
+    ['The mic starts to feed back.', ['Step away from the speaker', 'Signal the sound engineer', 'Keep singing over it'], '020', 'stg'],
+    ['A fan climbs onto the stage!', ['Let security handle it', 'Sing a line with them', 'Bring them up for a dance'], '303', 'sfg'],
+    ['The crowd is chanting for an encore.', ['Thank them and leave', 'Play one more favourite', 'Debut an unreleased song'], '301', 'sfg'],
+    ['The DJ cuts in early with the wrong track.', ['Wait for the right cue', 'Freestyle over it', 'Remix it live with the DJ'], '012', 'scg'],
+    ['Rain starts falling on the open-air stage.', ['Keep the set tight', 'Sing a rain song a cappella', 'Dance in the rain with the crowd'], '303', 'sfg'],
+    ['Your in-ear monitor dies mid-verse.', ['Pull it out and sing by ear', 'Follow the drummer’s cues', 'Hit the high note anyway'], '020', 'stg'],
+    ['A big artist is watching from the side of the stage.', ['Stay focused on your set', 'Shout them out', 'Invite them on for a surprise duet'], '033', 'sfg'],
+    ['The crowd knows every word of your song.', ['Let them sing the chorus', 'Slow it down acoustic', 'Drop a surprise remix'], '302', 'fcg'],
+    ['The power flickers during the bridge.', ['Hold the note till it comes back', 'Get the crowd singing in the dark', 'Light up the phones for a candlelight moment'], '033', 'sfg'],
+  ],
+};
+
 // What you learn, one line per skill gain: ten for every skill of every career.
 export const LEARN_LINES = {
   football: {

@@ -119,7 +119,8 @@ function nextNotice(){
 }
 // After work: win or loss and the score, each decision with ✓/✗, quality, reach in the career's own units and a review.
 // The numbers each career cares about, from the result's reach and quality.
-function resultExtras(r,def){const g=r.gain||0,q=r.quality||0;if(r.kind==='build')return [['🧪',`${Math.round(q*.9)}%`,'Test coverage'],['🐞',Math.max(0,Math.round((100-q)/12)),'Known bugs']];
+function resultExtras(r,def){const g=r.gain||0,q=r.quality||0;
+  if(r.kind==='build')return r.career==='founder'?[['🧪',fmt(Math.round(q*4)),'Beta users'],['⏳',`${Math.max(3,Math.round(q/6))} mo`,'Runway']]:r.career==='web3'?[['🛡️',`${Math.min(99,Math.round(q*.9+8))}/100`,'Audit score'],['👛',fmt(Math.round(q*12)),'Testnet wallets']]:[['🧪',`${Math.round(q*.9)}%`,'Test coverage'],['🐞',Math.max(0,Math.round((100-q)/12)),'Known bugs']];
   return ({music:[['📊',`#${Math.max(1,51-Math.round(q/2))}`,'Naija Top 50']],creator:r.career==='streamer'?[['🔴',fmt(g*.05),'Peak viewers'],['💜',fmt(g*.004),'New subs']]:[['❤️',fmt(g*.09),'Likes'],['💬',fmt(g*.012),'Comments']],acting:r.career==='actor'?[['🍿',`${Math.min(99,q+8)}%`,'Audience score']]:[['🔔',fmt(g*.02),'New subscribers']],tech:r.career==='developer'?[['⭐',`${(1+q/25).toFixed(1)}/5`,'Client rating']]:[['📈',`${Math.round(q*.6)}%`,'Retention']],sport:r.win?[['🏅',r.win==='Win'?'+3':r.win==='Draw'?'+1':'0','League points']]:[]})[def.family]||[];}
 function showResult(r,rewards){
   const def=CAREERS[r.career]||CAREERS[state.career],sport=def.family==='sport',promo=rewards.find(x=>x.value==='Promoted!');
@@ -406,7 +407,7 @@ function renderActivity(){
   $('#activityCard').innerHTML=html;
 }
 let pendingChoice=null;
-async function chooseDecision(index){const a=state.active;if(!a||pendingChoice)return;const chosen=a.choices[index],career=a.career,before={playerScore:a.playerScore,opponentScore:a.opponentScore,engagement:a.engagement,playerStamina:a.playerStamina};
+async function chooseDecision(index){const a=state.active;if(!a||pendingChoice)return;const chosen=a.choices[index],career=a.career,before={playerScore:a.playerScore,opponentScore:a.opponentScore,engagement:a.engagement,stability:a.stability,playerStamina:a.playerStamina};
   // The tapped choice lights up at once; the others wait until the server has decided.
   pendingChoice={id:a.id,beat:a.beat,index};$('.sim-choice[data-index="'+index+'"]')?.classList.add('pending');let data;try{data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});}finally{pendingChoice=null;}if(!data){renderActivity();return;}
   const last=(data.state.active?.outcomes||data.state.outputs?.[0]?.outcomes||[]).at(-1),success=last?.success;if(motion)world.respond(chosen.action,success);
@@ -417,7 +418,7 @@ function consequence(career,b,a){
   if(career==='basketball'&&a.playerScore!=null){const us=a.playerScore-(b.playerScore||0),them=a.opponentScore-(b.opponentScore||0);return `${us?`+${us} for you`:'No points'}${them?` · they answer with ${them}`:' · stop at the other end'} (${a.playerScore}–${a.opponentScore})`;}
   if(career==='tennis'&&a.lastGames)return `Games won ${a.lastGames[0]} of ${a.lastGames[0]+a.lastGames[1]} · ${a.scoreLabel||a.sets||''}`;
   if(career==='wrestling'&&a.playerStamina!=null)return a.pinned?'1… 2… 3! Pinfall!':`Stamina: you ${a.playerStamina} · them ${a.opponentStamina}`;
-  if(a.engagement!=null&&b.engagement!=null){const d=Math.round(a.engagement-b.engagement),[m]=METERS[career]||['Mood'];return `${m} ${d>=0?'▲':'▼'} ${Math.abs(d)}`;}
+  if(a.engagement!=null&&b.engagement!=null){const d=Math.round(a.engagement-b.engagement),st=Math.round((a.stability??0)-(b.stability??a.stability??0)),[m,m2]=METERS[career]||['Mood','Focus'];return `${m} ${d>=0?'▲':'▼'} ${Math.abs(d)}${st?` · ${m2} ${st>0?'▲':'▼'} ${Math.abs(st)}`:''}${a.lastNote?` · ${a.lastNote}`:''}`;}
   return '';
 }
 // A quick picture of what you just did at work: the move, who it went to, and how it turned out.

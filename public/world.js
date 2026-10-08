@@ -1198,7 +1198,7 @@ export class World {
     const dt=Math.min(.1,Math.max(.001,(now-(this.matchPrevAt||now))/1000))||.016;this.matchPrevAt=now;this.matchPrev??={};
     const place=(side,n)=>{const g=toPitch(...spot(side,n)),l=lineup(side,n),k=anthem?0:out,p={x:lerp(l.x,g.x,k),z:lerp(l.z,g.z,k)},key=side+n,o=this.matchPrev[key]||{...p,gait:0,h:0},d=Math.hypot(p.x-o.x,p.z-o.z),walk=!this.reduced&&d/dt>.12&&!anthem;
       const heading=anthem?ang:walk?Math.atan2(p.x-o.x,p.z-o.z):Math.atan2(B3.x-p.x,B3.z-p.z),gait=o.gait+d/S*11;this.matchPrev[key]={...p,gait,h:heading};
-      const pose=celebrate?(celebrate===side?'victory':n?'facepalm':null):full&&!mv?(active.playerScore>=active.opponentScore?(side==='A'?'victory':null):(side==='B'?'victory':null)):dive&&n===0&&side==='B'?'faint':null;
+      const pose=celebrate?(celebrate===side?'victory':n?'facepalm':null):full&&!mv?(active.playerScore>=active.opponentScore?(side==='A'?'victory':null):(side==='B'?'victory':null)):dive&&n===0&&side===(ball[0]<50?'A':'B')?'faint':null;
       return {...p,walk:walk&&!pose,gait,heading,pose};};
     const kit=(side,n)=>({...MATCH_KITS[side==='A'?0:1],fit:'kit',cut:'shorts',...(n===0?{outfit:side==='A'?'#f2c230':'#2b2d33',pants:'#1d1f24'}:{}),scale:S});
     const me=place('A',9),others=[];for(const side of ['A','B'])for(let n=0;n<11;n++)if(side!=='A'||n!==9)others.push([side,n,place(side,n)]);

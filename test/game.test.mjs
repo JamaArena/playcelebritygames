@@ -79,8 +79,8 @@ test('commentary pauses prevent early decisions and final settlement',()=>{
   assert.throws(()=>act(s,{type:'finish',activityId:a.id},T+1),/Complete every/);assert.equal(s.charges,9);
 });
 test('published output settles money, reach and fame once; retries cannot release again',()=>{
-  const s=make('musician');go(s);const activity=complete(s);assert.equal(s.outputs.length,1);assert.equal(s.outputs[0].released,true);assert.equal(s.outputs[0].quality,68,"safe hits plus a handled event lift the vibe and mix meters");assert.equal(s.careers.musician.audience,6800);assert.equal(s.fame,6);assert.equal(s.outputs[0].fame,6);assert.equal(s.outputs[0].payout,undefined);
-  assert.throws(()=>act(s,{type:'finish',activityId:activity},T+300_000),/No activity/);assert.equal(s.careers.musician.audience,6800);assert.equal(s.fame,6);
+  const s=make('musician');go(s);const activity=complete(s);assert.equal(s.outputs.length,1);assert.equal(s.outputs[0].released,true);assert.equal(s.outputs[0].quality,69,"safe hits plus a handled event lift the vibe and mix meters");assert.equal(s.careers.musician.audience,6900);assert.equal(s.fame,6);assert.equal(s.outputs[0].fame,6);assert.equal(s.outputs[0].payout,undefined);
+  assert.throws(()=>act(s,{type:'finish',activityId:activity},T+300_000),/No activity/);assert.equal(s.careers.musician.audience,6900);assert.equal(s.fame,6);
 });
 test('maximum football skill improves distance-sensitive accuracy without guaranteeing goals',()=>{
   assert.ok(Math.abs(shootingProbability(6,24,0,0,0)-.556)<1e-12);
@@ -535,4 +535,17 @@ test('football balance: sensible play wins about 35–45% at level 1 and about 8
     while(s.active.beat<s.active.totalBeats){const at=s.active.readyAt;s.needs.energy=100;const ch=view(s,at).active.choices,sh=ch.findIndex(c=>c.action==='shoot'&&c.probability>=.3),i2=sh>=0?sh:ch.reduce((b,c,j)=>c.probability>ch[b].probability?j:b,0);act(s,{type:'decision',activityId:s.active.id,beat:s.active.beat,choice:i2},at,rnd);}
     act(s,{type:'finish',activityId:s.active.id},s.active.readyAt,rnd);if(s.results[0].win==='Win')w++;}return w/n;};
   const l1=rate(1,0),l10=rate(10,2);assert.ok(l1>=.28&&l1<=.5,`L1 ${l1}`);assert.ok(l10>=.7&&l10<=.92,`L10 ${l10}`);
+});
+// Work scenes: what an option is about has its own effect, a gamble gets a follow-up scene, and live shows are on stage.
+test('scene options carry their own effects and a risky pick gets a follow-up scene',()=>{
+  const s=make('developer');go(s);act(s,{type:'start',kind:'produce'},T,()=>.9);const a=s.active;delete a.event;
+  assert.ok(choices(s).every(c=>'scftg'.includes(c.tag)),'every option has a tag');const risky=choices(s)[2];
+  act(s,{type:'decision',activityId:a.id,beat:0,choice:2},a.readyAt,()=>.99);assert.equal(a.outcomes[0].tag,risky.tag);
+  assert.match(view(s,a.readyAt).active.scene.text,/client saw your last risky change/);assert.equal(view(s,a.readyAt).active.scene.follow,true);
+  if(risky.tag==='g')assert.match(a.lastNote,/backfired/);
+  act(s,{type:'decision',activityId:a.id,beat:1,choice:0},a.readyAt,()=>0);assert.equal(a.outcomes[1].follow,true);assert.equal(view(s,a.readyAt).active.scene.follow,false,'no follow-up of a follow-up');
+});
+test('a musician on stage gets live-show scenes',()=>{
+  const s=make('musician');go(s);act(s,{type:'start',kind:'live'},T,()=>.9);const text=view(s,s.active.readyAt).active.scene.text;
+  assert.ok(!/studio/i.test(text));assert.ok(choices(s).length===3);
 });
