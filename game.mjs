@@ -393,9 +393,9 @@ export function act(s,input,now,rng=Math.random) {
       const room=input.spot&&s.location==='home'&&!s.visiting?homeRooms(s.home).find(r=>r.slot===input.spot&&r.object.need===input.need):null;
       s.recovery={id:id(),need:input.need,label:room?room.object.verb:watching?WATCH[family].label:labels[input.need],...(room?{spot:room.slot}:{}),startedAt:now,endsAt:now+Math.round((watching?WATCH_SESSION:B.recovery[input.need][1])*rest*sleep),watch,...(sofa?{amount:B.recovery.fun[0]+sofa}:{})};break;
     }
-    // Wardrobe: claim clothes free at Ankara Boutique (Eko plaza), then wear or take them off anywhere.
+    // Wardrobe: claim clothes free at Ankara Boutique (Abeokuta plaza), then wear or take them off anywhere.
     case 'claimWear': {
-      const item=WEAR[input.item];requireRule(item,'Unknown item.');requireRule(s.location==='plaza','Visit Ankara Boutique at Eko plaza to claim clothes.');
+      const item=WEAR[input.item];requireRule(item,'Unknown item.');requireRule(s.location==='plaza','Visit Ankara Boutique at Abeokuta plaza to claim clothes.');
       s.closet??={};requireRule(!s.closet[input.item]&&item.fame>0,'You already have this.');
       requireRule((s.fame||0)>=item.fame,`${item.name} unlocks at ${item.fame.toLocaleString('en-US')} fame.`);
       s.closet[input.item]=true;log(s,`Claimed ${item.name} from Ankara Boutique.`,now);break;
@@ -406,9 +406,9 @@ export function act(s,input,now,rng=Math.random) {
     }
     // Emotes are shown to everyone nearby for a few seconds; they do nothing else.
     case 'emote': {requireRule(EMOTES[input.emote],'Unknown emote.');requireRule(!s.trip,'You can emote when you arrive.');s.emote={kind:input.emote,at:now};break;}
-    // Pets: adopt at Eko plaza, care for them at home, or find them a new home.
+    // Pets: adopt at Abeokuta plaza, care for them at home, or find them a new home.
     case 'adoptPet': {
-      const pet=PETS[input.kind];requireRule(pet,'Unknown pet.');requireRule(s.location==='plaza','Adopt pets at the Eko plaza pet stall.');requireRule(!s.pet,'You already have a pet.');
+      const pet=PETS[input.kind];requireRule(pet,'Unknown pet.');requireRule(s.location==='plaza','Adopt pets at the Abeokuta plaza pet stall.');requireRule(!s.pet,'You already have a pet.');
       requireRule((s.fame||0)>=pet.fame,`${pet.name}s are for players with ${pet.fame.toLocaleString('en-US')} fame.`);
       const name=text(input.name,20)||pet.name;s.pet={kind:input.kind,name,food:80,joy:80,since:now};log(s,`${pet.icon} You adopted ${name} the ${pet.name.toLowerCase()}!`,now);break;
     }
@@ -422,11 +422,11 @@ export function act(s,input,now,rng=Math.random) {
     case 'rehomePet': {requireRule(s.pet,'You have no pet.');log(s,`${s.pet.name} went to a loving new home.`,now);s.pet=null;break;}
     case 'travelMode': {requireRule(input.mode==='best'||input.mode==='own'||input.mode==='walk'||TRANSIT[input.mode],'Choose how to travel.');s.travelMode=input.mode;break;}
     case 'tune': {
-      requireRule(s.location==='plaza','Visit Naija Motors at Eko plaza.');requireRule(s.ride&&RIDE_SPEED[s.ride]&&s.ride!=='bicycle','Tune a ride you own.');
+      requireRule(s.location==='plaza','Visit Naija Motors at Abeokuta plaza.');requireRule(s.ride&&RIDE_SPEED[s.ride]&&s.ride!=='bicycle','Tune a ride you own.');
       s.tune??={};const level=s.tune[s.ride]||0,next=TUNING[level];requireRule(next,'Your ride is fully tuned.');requireRule((s.fame||0)>=next.fame,`Tuning level ${level+1} needs ${next.fame.toLocaleString('en-US')} fame.`);
       s.tune[s.ride]=level+1;log(s,`🔧 Tuned your ride to level ${level+1}: trips ${next.cut}% faster.`,now);break;
     }
-    case 'wash': {requireRule(s.location==='plaza','Visit Naija Motors at Eko plaza.');requireRule(s.ride,'You have no ride to wash.');requireRule(now-(s.washedAt||0)>=30*60_000,'Your ride is still sparkling.');s.washedAt=now;s.needs.fun=clamp(s.needs.fun+5);log(s,'🧽 Your ride is sparkling clean. (+5 fun)',now);break;}
+    case 'wash': {requireRule(s.location==='plaza','Visit Naija Motors at Abeokuta plaza.');requireRule(s.ride,'You have no ride to wash.');requireRule(now-(s.washedAt||0)>=30*60_000,'Your ride is still sparkling.');s.washedAt=now;s.needs.fun=clamp(s.needs.fun+5);log(s,'🧽 Your ride is sparkling clean. (+5 fun)',now);break;}
     case 'yachtParty': {
       requireRule(s.vip?.yacht,'Claim the yacht sponsorship first.');requireRule(s.location==='street'&&!s.trip,'Your yacht is moored by your street.');requireRule(!s.active&&!s.recovery,'Finish your activity first.');
       s.recovery={id:id(),need:'fun',label:'Yacht party on the lagoon',startedAt:now,endsAt:now+90_000,amount:50,extra:{social:30},yacht:true};break;
@@ -442,7 +442,7 @@ export function act(s,input,now,rng=Math.random) {
     }
     // Shops: a new hairstyle, a tailored colour for a top, tattoos on and off.
     case 'restyle': {
-      requireRule(s.location==='mall','Visit the barber & salon at Ikeja Mega Mall.');requireRule(HAIRSTYLES[input.hair]&&HAIR_COLORS[input.hairColor],'Choose a hairstyle and colour.');
+      requireRule(s.location==='mall','Visit the barber & salon at Owerri Mega Mall.');requireRule(HAIRSTYLES[input.hair]&&HAIR_COLORS[input.hairColor],'Choose a hairstyle and colour.');
       s.hair=input.hair;s.hairColor=input.hairColor;s.needs.fun=clamp(s.needs.fun+5);log(s,`💈 Fresh new look: ${HAIRSTYLES[input.hair].toLowerCase()}.`,now);break;
     }
     case 'tailor': {
@@ -450,7 +450,7 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(TAILOR_COLORS.includes(input.color),'Choose a colour.');s.wear??={};s.wear.tint={...(s.wear.tint||{}),[input.item]:input.color};log(s,`🧵 The tailor re-dyed your ${item.name.toLowerCase()}.`,now);break;
     }
     case 'tattoo': {
-      requireRule(s.location==='mall','Visit Eko Ink at Ikeja Mega Mall.');requireRule(TATTOOS[input.spot],'Choose where.');s.tattoos??=[];
+      requireRule(s.location==='mall','Visit Uyo Ink at Owerri Mega Mall.');requireRule(TATTOOS[input.spot],'Choose where.');s.tattoos??=[];
       if(s.tattoos.includes(input.spot)){s.tattoos=s.tattoos.filter(t=>t!==input.spot);log(s,`🖋️ Laser removal done: ${TATTOOS[input.spot].toLowerCase()}.`,now);}
       else{s.tattoos.push(input.spot);log(s,`🖋️ New ink: ${TATTOOS[input.spot].toLowerCase()}.`,now);}break;
     }
@@ -486,7 +486,7 @@ export function act(s,input,now,rng=Math.random) {
       if(now-(s.lastPostFame||0)>=POSTS.cooldownMs){s.lastPostFame=now;addFame(s,Math.max(1,Math.round((s.fame||0)*.0005)),'Social post',now);}break;
     }
     case 'order': {
-      requireRule((s.phone&&s.phone!=='basic')||s.location==='mall','Shopping needs a smartphone, or a visit to Ikeja Mega Mall.');requireRule((s.deliveries||[]).length<5,'Wait for your deliveries to arrive.');
+      requireRule((s.phone&&s.phone!=='basic')||s.location==='mall','Shopping needs a smartphone, or a visit to Owerri Mega Mall.');requireRule((s.deliveries||[]).length<5,'Wait for your deliveries to arrive.');
       let entry;
       if(input.kind==='item'){const item=ITEMS[input.item];requireRule(item&&!s.inventory[input.item],'You already have that, or it does not exist.');requireRule((s.fame||0)>=item.fame,`${item.name} unlocks at ${item.fame.toLocaleString('en-US')} fame.`);entry={name:item.name};}
       else if(input.kind==='wear'){const item=WEAR[input.item];requireRule(item&&item.fame>0&&!s.closet?.[input.item],'You already have that, or it does not exist.');requireRule((s.fame||0)>=item.fame,`${item.name} unlocks at ${item.fame.toLocaleString('en-US')} fame.`);entry={name:item.name};}
@@ -513,7 +513,7 @@ export function act(s,input,now,rng=Math.random) {
       s.recovery={id:id(),need:use.need,label:use.verb,startedAt:now,endsAt:now+use.ms,amount:use.amount,extra:use.extra||{},item:input.item,...(input.id&&!def.gadget&&!def.extension?{piece:input.id}:{})};break;
     }
     case 'buy': {
-      const item=ITEMS[input.item];requireRule(item,'Unknown item.');requireRule(s.location==='plaza','Visit Eko plaza to shop.');
+      const item=ITEMS[input.item];requireRule(item,'Unknown item.');requireRule(s.location==='plaza','Visit Abeokuta plaza to shop.');
       requireRule(!s.inventory[input.item]||item.furniture,'You already have this item.');requireRule((s.fame||0)>=item.fame,`${item.name} unlocks at ${item.fame.toLocaleString('en-US')} fame.`);
       // Furniture: own as many as you like; each new one waits in storage until you place it.
       if(s.inventory[input.item])s.inventory[input.item].count=(s.inventory[input.item].count||1)+1;else s.inventory[input.item]={level:1,count:1};
@@ -528,7 +528,7 @@ export function act(s,input,now,rng=Math.random) {
     case 'place': {
       requireRule(s.location==='home'&&s.inventory[input.item]&&ITEMS[input.item]?.furniture,'Place your owned furniture at home.');
       const piece=input.id?s.furniture.find(f=>f.id===input.id):null;requireRule(!input.id||piece&&piece.item===input.item,'That piece is not in your home.');
-      requireRule(piece||s.furniture.filter(f=>f.item===input.item).length<(s.inventory[input.item].count||1),`Every ${ITEMS[input.item].name.toLowerCase()} you own is already placed. Claim another at Eko plaza.`);
+      requireRule(piece||s.furniture.filter(f=>f.item===input.item).length<(s.inventory[input.item].count||1),`Every ${ITEMS[input.item].name.toLowerCase()} you own is already placed. Claim another at Abeokuta plaza.`);
       requireRule(canPlace(s.furniture,input.id||null,input.x,input.z,s.home),'That spot overlaps something or blocks a path. Try another (green means it fits).');
       requireRule(!s.furniture.some(f=>f.id!==input.id&&f.x===input.x&&f.z===input.z),'That position is occupied.');
       requireRule(!piece||s.recovery?.piece!==piece.id,'Finish using it first.');
@@ -542,7 +542,7 @@ export function act(s,input,now,rng=Math.random) {
     case 'claim': {
       if(SPONSORSHIPS[input.item]?.kind==='brand'){const d=SPONSORSHIPS[input.item];requireRule(!s.vip?.[input.item],'You already signed this deal.');requireRule((s.fame||0)>=d.fame,`${d.sponsor} signs players with ${d.fame.toLocaleString('en-US')} fame.`);s.vip={...(s.vip||{}),[input.item]:{at:now}};if(d.grant.wear){s.closet??={};s.closet[d.grant.wear]=true;}if(d.grant.phone)s.phone=d.grant.phone;headline(s,`${s.name} signs with ${d.sponsor} ${d.icon}`,now);log(s,`${d.icon} Signed with ${d.sponsor}.`,now);break;}
       const deal=SPONSORSHIPS[input.item];requireRule(deal,'Unknown sponsorship.');
-      requireRule(s.location==='plaza','Visit Naija Motors at Eko plaza to claim sponsorships.');
+      requireRule(s.location==='plaza','Visit Naija Motors at Abeokuta plaza to claim sponsorships.');
       s.vip??={};requireRule(!s.vip[input.item],'You already claimed this sponsorship.');
       requireRule((s.fame||0)>=deal.fame,`${deal.sponsor} sponsors players with ${deal.fame.toLocaleString('en-US')} fame.`);
       s.vip[input.item]={at:now};if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')moveHome(s,input.item,now);else if(deal.kind==='style')s.equipped.clothes=input.item;

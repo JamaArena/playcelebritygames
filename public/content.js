@@ -30,33 +30,33 @@ export const CAREERS = {
 };
 export const LOCATIONS = {
   home: {name: 'Your flat', subtitle: 'A little room for big dreams', icon: '🏠', color: '#edc594'},
-  sports: {name: 'Surulere Sports Arena', subtitle: 'Leave it all on the pitch', icon: '⚽', color: '#88bda5'},
-  studio: {name: 'Nollywood Studios', subtitle: 'Where your next chapter gets made', icon: '🎙️', color: '#b4a7d9'},
-  creator: {name: 'Lekki Creators Quarter', subtitle: 'Make something worth sharing', icon: '🎬', color: '#e0a28f'},
-  tech: {name: 'Yabacon Valley Hub', subtitle: 'Start small. Build something lasting.', icon: '💻', color: '#85b9ca'},
-  nightclub: {name: 'Club Shayo', subtitle: 'Dance till the lights come on', icon: '🪩', color: '#7b4fa3'},
-  lounge: {name: 'Suya & Chill Lounge', subtitle: 'Chill, chat and karaoke', icon: '🍸', color: '#b23a48'},
-  cinema: {name: 'Eko Cinema', subtitle: 'Popcorn and premieres', icon: '🍿', color: '#d23b4b'},
-  mall: {name: 'Ikeja Mega Mall', subtitle: 'Shops, food court and fashion', icon: '🛒', color: '#2f6fb3'},
+  sports: {name: 'Kaduna Sports Arena', subtitle: 'Leave it all on the pitch', icon: '⚽', color: '#88bda5'},
+  studio: {name: 'Asaba Film Studios', subtitle: 'Where your next chapter gets made', icon: '🎙️', color: '#b4a7d9'},
+  creator: {name: 'Enugu Creators Quarter', subtitle: 'Make something worth sharing', icon: '🎬', color: '#e0a28f'},
+  tech: {name: 'Abuja Tech Hub', subtitle: 'Start small. Build something lasting.', icon: '💻', color: '#85b9ca'},
+  nightclub: {name: 'Club Garden City', subtitle: 'Dance till the lights come on', icon: '🪩', color: '#7b4fa3'},
+  lounge: {name: 'Zaria Suya Lounge', subtitle: 'Chill, chat and karaoke', icon: '🍸', color: '#b23a48'},
+  cinema: {name: 'Ibadan Premiere Cinema', subtitle: 'Popcorn and premieres', icon: '🍿', color: '#d23b4b'},
+  mall: {name: 'Owerri Mega Mall', subtitle: 'Shops, food court and fashion', icon: '🛒', color: '#2f6fb3'},
   tvStation: {name: 'NCTV Studios', subtitle: 'Interviews and talk shows', icon: '📺', color: '#3d6a8a'},
   radio: {name: 'Naija FM 98.9', subtitle: 'Airplay and call-ins', icon: '📻', color: '#e08a3d'},
-  market: {name: 'Balogun Market', subtitle: 'Busy stalls, fabrics and snacks', icon: '🧺', color: '#d9573f'},
-  gym: {name: 'Eko Iron Gym', subtitle: 'Get fit with the city', icon: '🏋️', color: '#2f3237'},
+  market: {name: 'Onitsha Main Market', subtitle: 'Busy stalls, fabrics and snacks', icon: '🧺', color: '#d9573f'},
+  gym: {name: 'Benin Iron Gym', subtitle: 'Get fit with the city', icon: '🏋️', color: '#2f3237'},
   hospital: {name: 'Naija General Hospital', subtitle: 'Check-ups and recovery', icon: '🏥', color: '#3d9a7a'},
   worship: {name: 'Unity Chapel & Mosque', subtitle: 'Quiet, calm and community', icon: '🕊️', color: '#c9a46a'},
-  eventHall: {name: 'Owambe Event Centre', subtitle: 'Owambe parties and launches', icon: '🎉', color: '#c9a227'},
+  eventHall: {name: 'Calabar Carnival Centre', subtitle: 'Owambe parties and launches', icon: '🎉', color: '#c9a227'},
   stadium: {name: 'Naija National Stadium', subtitle: 'Big matches and concerts', icon: '🏟', color: '#2f7a55'},
-  park: {name: 'Freedom Park', subtitle: 'Walk, jog, picnic and breathe', icon: '🌳', color: '#5aa36b'},
+  park: {name: 'Jos Plateau Park', subtitle: 'Walk, jog, picnic and breathe', icon: '🌳', color: '#5aa36b'},
   airport: {name: 'Naija International Airport', subtitle: 'Fly out for shows', icon: '✈️', color: '#5b6fa8'},
-  beach: {name: 'Lekki Beach', subtitle: 'Sun, sand and the lagoon', icon: '🏖️', color: '#e8c97a'},
-  plaza: {name: 'Eko plaza', subtitle: 'Meet the city. Find your people.', icon: '🛍️', color: '#c3c48c'},
+  beach: {name: 'Ibeno Beach', subtitle: 'Sun, sand and the lagoon', icon: '🏖️', color: '#e8c97a'},
+  plaza: {name: 'Abeokuta plaza', subtitle: 'Meet the city. Find your people.', icon: '🛍️', color: '#c3c48c'},
   street: {name: 'Your street', subtitle: 'Step out into Naija City', icon: '🚪', color: '#c9d6bf'},
 };
 // Every location is an 11×11 lot in one open neighbourhood; x/z are lot centres in world units.
 export const TOWN = {
   home: {x: -16, z: 0, pin: '🏠', height: 4.5}, plaza: {x: 0, z: 0, pin: '🛍️', height: 2.6}, studio: {x: 16, z: 0, pin: '🎙️', height: 3.9},
   sports: {x: -16, z: -16, pin: '🏟️', height: 2.4}, creator: {x: 0, z: -16, pin: '🎬', height: 3.3}, tech: {x: 16, z: -16, pin: '💡', height: 7.6},
-  // Places around the city: downtown nightlife and media, Lekki Heights services, and the island beach.
+  // Places around the city: downtown nightlife and media, Maitama Heights services, and the island beach.
   nightclub: {x: 32, z: 0, pin: '🪩', height: 3.4}, lounge: {x: 48, z: 0, pin: '🍸', height: 3}, cinema: {x: 64, z: 0, pin: '🍿', height: 4},
   mall: {x: 32, z: -16, pin: '🛒', height: 4.4}, tvStation: {x: 48, z: -16, pin: '📺', height: 6.5}, radio: {x: 64, z: -16, pin: '📻', height: 5.5},
   market: {x: -32, z: 0, pin: '🧺', height: 2.2}, gym: {x: -32, z: -16, pin: '🏋️', height: 3.2}, hospital: {x: -48, z: -16, pin: '🏥', height: 4.6},
@@ -118,7 +118,7 @@ export const ITEMS = {
   weights: {name: 'Weight bench', fame: 1000, description: 'Lift weights: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Lift weights', icon: '🏋️', need: 'fun', amount: 20, ms: 40_000, pose: 'press', extra: {energy: -10, hygiene: -15}}},
 };
 // The wardrobe: clothes and accessories by slot. Each unlocks with fame (claimed free at Ankara Boutique,
-// Eko plaza) and most carry one perk. Wearing changes how you look; perks change the rules a little.
+// Abeokuta plaza) and most carry one perk. Wearing changes how you look; perks change the rules a little.
 export const WEAR_SLOTS = {top: 'Tops', bottom: 'Bottoms', shoes: 'Shoes', head: 'Headwear', face: 'Eyewear', neck: 'Necklaces', ears: 'Earrings', wrist: 'Wrist', bag: 'Bags'};
 // Perks add up across everything you wear, up to the cap.
 export const PERKS = {
@@ -204,7 +204,7 @@ export const EMOTES = {
 };
 // Quick reactions in local chat.
 export const REACTIONS = ['👍', '😂', '🔥', '❤️', '👏', '😮'];
-// Pets: adopt one at Eko plaza. Keep them fed and happy and they give you a perk.
+// Pets: adopt one at Abeokuta plaza. Keep them fed and happy and they give you a perk.
 export const PETS = {
   cat: {name: 'Cat', fame: 200, icon: '🐈', perk: ['social', 10], note: 'Naps with you. Social drains slower.'},
   dog: {name: 'Dog', fame: 300, icon: '🐕', perk: ['fun', 15], note: 'Follows you everywhere. Fun drains slower.'},
@@ -303,7 +303,7 @@ export const VENUE_ACTS = {
   network: {venue: 'lounge', name: 'Network with VIPs', icon: '🤝', need: 'social', amount: 25, ms: 40_000, pose: 'gesture', fame: 5},
   film: {venue: 'cinema', name: 'Watch a film', icon: '🎬', need: 'fun', amount: 45, ms: 90_000, extra: {hunger: -5}, pose: 'sit', seat: .5, family: 'acting', learn: 3},
   barber: {venue: 'mall', name: 'Barber & salon', icon: '💈', menu: 'barber'},
-  tattoo: {venue: 'mall', name: 'Eko Ink tattoos', icon: '🖋️', menu: 'tattoo'},
+  tattoo: {venue: 'mall', name: 'Uyo Ink tattoos', icon: '🖋️', menu: 'tattoo'},
   phoneShop: {venue: 'mall', name: 'Phone shop', icon: '📱', menu: 'phones'},
   tailor: {venue: 'market', name: 'Tailor', icon: '🧵', menu: 'tailor'},
   bukka: {venue: 'market', name: 'Eat at the bukka', icon: '🍲', need: 'hunger', amount: 60, ms: 30_000, extra: {social: 5}, pose: 'sit', seat: .45},
@@ -323,7 +323,7 @@ export const VENUE_ACTS = {
   titleBelt: {venue: 'eventHall', name: 'Fight for the title belt', icon: '🥇', need: 'fun', amount: 30, ms: 60_000, extra: {energy: -25}, pose: 'sport', careers: ['wrestling'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Title belt', headline: ['is the new champion 🥇', 'lost the title fight']}},
   premiere: {venue: 'cinema', name: 'Walk your movie premiere', icon: '🎬', need: 'social', amount: 30, ms: 60_000, pose: 'gesture', careers: ['actor', 'adult'], minOutputs: 2, moment: {win: [.02, 100], lose: [.005, 20], headline: ['dazzled at a premiere 🎬', "'s premiere got mixed reviews"]}},
   pitch: {venue: 'tech', name: 'Pitch for a funding round', icon: '💼', need: 'social', amount: 15, ms: 60_000, pose: 'gesture', careers: ['founder'], moment: {win: [.025, 120], lose: [.005, 15], award: 'Funded founder', headline: ['closed a funding round 💼', "'s pitch didn't land"]}},
-  hackathon: {venue: 'tech', name: 'Enter the hackathon', icon: '⌨️', need: 'fun', amount: 25, ms: 75_000, extra: {energy: -15}, pose: 'work', careers: ['developer'], learn: 8, moment: {win: [.02, 100], lose: [.004, 10], award: 'Hackathon winner', headline: ['won the Yabacon hackathon ⌨️', 'shipped a bug at the hackathon']}},
+  hackathon: {venue: 'tech', name: 'Enter the hackathon', icon: '⌨️', need: 'fun', amount: 25, ms: 75_000, extra: {energy: -15}, pose: 'work', careers: ['developer'], learn: 8, moment: {win: [.02, 100], lose: [.004, 10], award: 'Hackathon winner', headline: ['won the Abuja hackathon ⌨️', 'shipped a bug at the hackathon']}},
   tokenLaunch: {venue: 'tech', name: 'Launch a token project', icon: '🪙', need: 'fun', amount: 20, ms: 60_000, pose: 'gesture', careers: ['web3'], moment: {win: [.04, 150], lose: [-.01, -30], headline: ["'s launch sold out in minutes 🪙", "'s launch flopped. Ouch."]}},
   albumRelease: {venue: 'radio', name: 'Release an album', icon: '💿', need: 'social', amount: 20, ms: 60_000, pose: 'perform', family: 'music', minOutputs: 3, album: true},
   tourNightclub: {venue: 'nightclub', name: 'Tour stop: Club Neon show', icon: '🎤', need: 'fun', amount: 20, ms: 60_000, extra: {energy: -10}, pose: 'perform', family: 'music', tour: true},
@@ -383,27 +383,27 @@ export const FOODS = {
   suya: {name: 'Suya', icon: '🍢', hunger: 35, ms: 25_000, extra: {fun: 8}, takeaway: true},
   shawarma: {name: 'Shawarma', icon: '🌯', hunger: 45, ms: 30_000, extra: {fun: 5}, takeaway: true},
 };
-// VIP sponsorship deals: free items unlocked by fame, claimed at Naija Motors in Eko plaza.
+// VIP sponsorship deals: free items unlocked by fame, claimed at Naija Motors in Abeokuta plaza.
 // Fame is not spent and claimed items stay yours. Brand names are fictional.
 export const SPONSORSHIPS = {
-  scooter: {name: 'Eko e-scooter', sponsor: 'Gidi Mobility', fame: 100, kind: 'ride', icon: '🛵', color: '#3d9a7a', description: 'Zip between lots in style. Your first sponsor believes in you.'},
+  scooter: {name: 'Ilorin e-scooter', sponsor: 'Arewa Mobility', fame: 100, kind: 'ride', icon: '🛵', color: '#3d9a7a', description: 'Zip between lots in style. Your first sponsor believes in you.'},
   designer: {name: 'Designer look', sponsor: 'Maison Ankara', fame: 500, kind: 'style', icon: '🕶️', color: '#1f1f24', description: 'A tailored black-and-gold outfit for red carpets.'},
   coupe: {name: 'Tear-rubber coupé', sponsor: 'Omo Motors', fame: 5_000, kind: 'ride', icon: '🏎️', color: '#c9302c', description: 'Low, loud and very red.'},
   suv: {name: 'Big Boy SUV', sponsor: 'Odogwu Autos', fame: 20_000, kind: 'ride', icon: '🚙', color: '#23262f', description: 'Tinted windows for when the paparazzi find you.'},
-  bicycle: {name: 'Eko bicycle', sponsor: 'Eko Cycles', fame: 20, kind: 'ride', icon: '🚲', color: '#e05a47', description: 'Free, healthy and never stuck in traffic.'},
-  motorbike: {name: 'Gidi power bike', sponsor: 'Okada Kings Moto', fame: 1_500, kind: 'ride', icon: '🏍️', color: '#2b2d42', description: 'Fast, nimble, and it slips through go-slow.'},
+  bicycle: {name: 'Sokoto bicycle', sponsor: 'Sokoto Cycles', fame: 20, kind: 'ride', icon: '🚲', color: '#e05a47', description: 'Free, healthy and never stuck in traffic.'},
+  motorbike: {name: 'Arewa power bike', sponsor: 'Okada Kings Moto', fame: 1_500, kind: 'ride', icon: '🏍️', color: '#2b2d42', description: 'Fast, nimble, and it slips through go-slow.'},
   limo: {name: 'Kabiyesi limousine', sponsor: 'Kabiyesi Limousines', fame: 50_000, kind: 'ride', icon: '🚘', color: '#111111', description: 'Arrive in style: fans notice, and you earn a little fame when you pull up.'},
-  yacht: {name: 'Eko lagoon yacht', sponsor: 'Eko Marine', fame: 75_000, kind: 'yacht', icon: '🛥️', color: '#f2f2f0', description: 'Moored by your street. Throw yacht parties on the lagoon.'},
+  yacht: {name: 'Calabar Marina yacht', sponsor: 'Calabar Marine', fame: 75_000, kind: 'yacht', icon: '🛥️', color: '#f2f2f0', description: 'Moored by your street. Throw yacht parties on the lagoon.'},
   helicopter: {name: 'Big Man helicopter', sponsor: 'Naija Sky Aviation', fame: 250_000, kind: 'ride', icon: '🚁', color: '#d4af37', description: 'Fly straight over the city. No roads, no traffic, no rain delays.'},
   palmCola: {name: 'Zobo Cola ambassador', sponsor: 'Zobo Cola', fame: 3_000, kind: 'brand', icon: '🥤', color: '#d23b4b', grant: {wear: 'palmColaTee'}, description: 'A fizzy deal: an exclusive Zobo Cola tee (+4% fame from your work).'},
   zoomPhones: {name: 'Zoom Mobile face', sponsor: 'Zoom Mobile', fame: 8_000, kind: 'brand', icon: '📱', color: '#7b4fa3', grant: {phone: 'pro'}, description: 'They hand you a Pro edition phone, free.'},
   maisonDeal: {name: 'Maison Ankara muse', sponsor: 'Maison Ankara', fame: 30_000, kind: 'brand', icon: '👗', color: '#1f1f24', grant: {wear: 'maisonGown'}, description: 'An exclusive runway look (+8% fame from your work).'},
   hypercar: {name: 'Odogwu hypercar', sponsor: 'Jaiye Motors', fame: 100_000, kind: 'ride', icon: '🏁', color: '#1d4fa8', description: 'A hand-built hypercar for Icons only. A sponsorship deal, free to claim.'},
-  studioFlat: {name: 'Cosy studio flat', sponsor: 'Lekki Realty', fame: 0, kind: 'home', icon: '🛏️', color: '#9aa7b3', rest: 1, description: 'A cheap and cheerful starter home with a fresh coat of paint.'},
-  duplex: {name: 'Lekki-style duplex', sponsor: 'Lekki Realty', fame: 8_000, kind: 'home', icon: '🏘️', color: '#7a5a43', rest: .85, description: 'Two storeys, wood floors and room to grow. Home recovery is 15% faster.'},
+  studioFlat: {name: 'Cosy studio flat', sponsor: 'Maitama Realty', fame: 0, kind: 'home', icon: '🛏️', color: '#9aa7b3', rest: 1, description: 'A cheap and cheerful starter home with a fresh coat of paint.'},
+  duplex: {name: 'Port Harcourt duplex', sponsor: 'Maitama Realty', fame: 8_000, kind: 'home', icon: '🏘️', color: '#7a5a43', rest: .85, description: 'Two storeys, wood floors and room to grow. Home recovery is 15% faster.'},
   beachHouse: {name: 'Lagoon beach house', sponsor: 'Coastline Estates', fame: 40_000, kind: 'home', icon: '🏖️', color: '#2bb3c0', rest: .75, description: 'Sandy floors and sea breeze. Home recovery is 25% faster.'},
-  penthouse: {name: 'Skyline penthouse', sponsor: 'Lekki Realty', fame: 60_000, kind: 'home', icon: '🌆', color: '#2f3237', rest: .75, description: 'Dark marble and city views. Home recovery is 25% faster.'},
-  townhouse: {name: 'Lekki Heights townhouse', sponsor: 'Lekki Realty', fame: 2_000, kind: 'home', icon: '🏡', color: '#b86b52', rest: .9, description: 'Warm wood floors and art on the walls. Home recovery 10% faster.'},
+  penthouse: {name: 'Skyline penthouse', sponsor: 'Maitama Realty', fame: 60_000, kind: 'home', icon: '🌆', color: '#2f3237', rest: .75, description: 'Dark marble and city views. Home recovery is 25% faster.'},
+  townhouse: {name: 'Maitama Heights townhouse', sponsor: 'Maitama Realty', fame: 2_000, kind: 'home', icon: '🏡', color: '#b86b52', rest: .9, description: 'Warm wood floors and art on the walls. Home recovery 10% faster.'},
   villa: {name: 'Lagoon villa', sponsor: 'Coastline Estates', fame: 25_000, kind: 'home', icon: '🏝️', color: '#3a8fa8', rest: .8, description: 'Marble, sea light and a statement chandelier. Home recovery 20% faster.'},
   mansion: {name: 'Island mansion', sponsor: 'Isle Royale', fame: 150_000, kind: 'home', icon: '🏰', color: '#b8932f', rest: .7, description: 'Gold trim, a grand piano and room for the whole entourage. Home recovery 30% faster.'},
 };
@@ -711,7 +711,7 @@ export const QUESTS = [
   {key: 'travel', icon: '🗺️', title: 'Head into the city', how: 'Open the phone and the Map app, then pick a place to go.', reward: 20},
   {key: 'talk', icon: '🗣️', title: 'Meet a local', how: 'Tap a character in town and choose to talk to them.', reward: 20},
   {key: 'work', icon: '⭐', title: 'Do your first job', how: 'Tap Go to work, then Start work, and make your choices.', reward: 30},
-  {key: 'gym', icon: '🏋️', title: 'Hit the gym', how: 'Travel to Eko Iron Gym and use any machine.', reward: 25},
+  {key: 'gym', icon: '🏋️', title: 'Hit the gym', how: 'Travel to Benin Iron Gym and use any machine.', reward: 25},
   {key: 'shop', icon: '🛍️', title: 'Treat yourself', how: 'Buy something from the Market or Shopping app.', reward: 25},
   {key: 'dress', icon: '👗', title: 'Change your look', how: 'Open Wardrobe and wear something new.', reward: 20},
   {key: 'home', icon: '🛋️', title: 'Make it home', how: 'Open My stuff and place an item in your home.', reward: 25},
