@@ -2,7 +2,7 @@ import { bestMode, fanClubSize, PROMPTS, RIVAL, TEAM, TAILOR_COLORS, TATTOOS, VE
 import { World, worldObjects } from './world.js';
 import { World3D } from './world3d.js';
 import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS } from './sound.js';
-import { OPINIONS, npcOpinion, npcName, QUESTS, QUEST_GRADUATION } from './content.js';
+import { OPINIONS, npcOpinion, npcName, QUESTS, QUEST_GRADUATION, ARENA } from './content.js';
 import { CLASH_ACTIONS } from './clashText.js';
 import { skillName, learnLine } from './careerText.js';
 const $=selector=>document.querySelector(selector);
@@ -116,7 +116,7 @@ function showReward(title,subtitle,rewards){
 }
 function floatReward(text){const el=document.createElement('div');el.className='float-reward';el.textContent=text;document.body.appendChild(el);setTimeout(()=>el.remove(),1900);}
 // Glossy app icons: each app gets its own colour.
-const APP_COLORS={map:'#2bb3c0',career:'#f0a81c',phone:'#3fa52b',battles:'#e5484d',inventory:'#8a5a3c',wardrobe:'#e5408f',chat:'#2f86f2',friends:'#7b4fe0',feed:'#ff7a45',music:'#d23b8f',wallet:'#c9a227',team:'#3d6a8a',crews:'#f2b33d',news:'#5b6b7a',dating:'#ff4f81',calendar:'#e04f3f',camera:'#3b3f46',shopping:'#1fa37a',shop:'#ef8a1f',vip:'#1d4fa8',profile:'#6a5acd',life:'#e5408f',nearby:'#33a0d6',tips:'#f2c230',upgrade:'#5b7cfa',logout:'#7b897e'};
+const APP_COLORS={arena:'#c9852b',map:'#2bb3c0',career:'#f0a81c',phone:'#3fa52b',battles:'#e5484d',inventory:'#8a5a3c',wardrobe:'#e5408f',chat:'#2f86f2',friends:'#7b4fe0',feed:'#ff7a45',music:'#d23b8f',wallet:'#c9a227',team:'#3d6a8a',crews:'#f2b33d',news:'#5b6b7a',dating:'#ff4f81',calendar:'#e04f3f',camera:'#3b3f46',shopping:'#1fa37a',shop:'#ef8a1f',vip:'#1d4fa8',profile:'#6a5acd',life:'#e5408f',nearby:'#33a0d6',tips:'#f2c230',upgrade:'#5b7cfa',logout:'#7b897e'};
 const ITEM_ICONS={bed:'🛏️',shower:'🚿',toilet:'🚽',chair:'🪑',gear:'🎽',jacket:'🧥',trophyShelf:'🏆',wardrobe:'👗',ankaraRug:'🧶',floorLamp:'💡',laptop:'💻',drone:'🚁',curtains:'🪟',generator:'🔌',sectional:'🛋️',kingBed:'👑',ac:'❄️',smartTv:'📺',wallArt:'🖼️'};
 const itemIcon=key=>ITEMS[key]?.use?.icon||ITEM_ICONS[key]||'🎁';
 function notice(data,own){
@@ -815,7 +815,7 @@ function closeTip(){tipQueue.shift();showTip();}
 function alerts(){const me=snapshot.playerId;return state.invitations.filter(i=>i.expiresAt>now()).length+(snapshot.battles||[]).filter(b=>b.invited===me&&b.status==='open').length;}
 function phoneWidget(){const model=PHONES[state.phone]||PHONES.basic,count=alerts();
   return `<button class="phone-widget skin-${PHONES[state.phone]?state.phone:'basic'}" data-action="openPhone" style="--phone:${model.color}" aria-label="Open your phone${count?`, ${count} alerts`:''}"><span class="phone-mini">📱${count?`<i>${count}</i>`:''}</span><span class="phone-line"><strong>✦ ${fmt(state.fame||0)}</strong><small>fame · ${B.tiers[state.careers[state.career].tier][0]}</small></span><span class="phone-line"><strong>⚡ ${state.charges}/10</strong><small id="chargeRefill">${state.refillAnchor===null?'charged':`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></span></button>`;}
-const APPS=[['map','🗺️','Map'],['career','⭐','Career'],['phone','💬','Social'],['battles','⚔️','Battles'],['inventory','🏠','My stuff'],['wardrobe','👗','Wardrobe'],['chat','✉️','Chat'],['friends','👥','Friends'],['feed','📰','Feed'],['music','🎵','Music'],['wallet','💰','Fame wallet'],['team','🧑‍💼','My team'],['crews','🛡️','Crews'],['news','🗞️','News'],['dating','💘','Dating'],['calendar','📅','Calendar'],['camera','📷','Camera'],['shopping','🛒','Shopping'],['shop','🛍️','Market'],['vip','🏁','Naija Motors'],['quests','🎯','Quests'],['upgrade','📲','Upgrade'],['profile','🪪','Profile'],['life','❤️','My life'],['nearby','📍','Nearby'],['tips','💡','Tips']];
+const APPS=[['map','🗺️','Map'],['career','⭐','Career'],['phone','💬','Social'],['battles','⚔️','Battles'],['inventory','🏠','My stuff'],['wardrobe','👗','Wardrobe'],['chat','✉️','Chat'],['friends','👥','Friends'],['feed','📰','Feed'],['music','🎵','Music'],['wallet','💰','Fame wallet'],['team','🧑‍💼','My team'],['crews','🛡️','Crews'],['news','🗞️','News'],['dating','💘','Dating'],['calendar','📅','Calendar'],['camera','📷','Camera'],['shopping','🛒','Shopping'],['shop','🛍️','Market'],['vip','🏁','Naija Motors'],['arena','🏆','Award Arena'],['quests','🎯','Quests'],['upgrade','📲','Upgrade'],['profile','🪪','Profile'],['life','❤️','My life'],['nearby','📍','Nearby'],['tips','💡','Tips']];
 // Upgrade and Log out live in Profile's settings, not on the home grid.
 const HIDDEN_APPS=[['logout','🚪','Log out']];
 // Red badges on tiles: unread chats, quests finished since you last looked, and new Market unlocks.
@@ -841,7 +841,7 @@ function phoneHome(){
   showModal('phoneHome',`<div class="phone-device skin-${model.key}${model.key==='basic'?'':' ios'}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen home-screen">${model.key==='basic'?'':SKYLINE}${phoneStatus(model)}<div class="home-scroll"><i class="home-fade" aria-hidden="true"></i>${big?'':`<div class="phone-hello"><strong>${escape(state.name)}</strong><small>✦ ${fmt(state.fame||0)} fame · ${escape(LOCATIONS[state.location].name)}</small></div>`}${widgets}<div class="app-grid">${apps.map(icon).join('')}</div></div>${big?`<div class="phone-dock">${APPS.filter(([k])=>dock.includes(k)).map(icon).join('')}</div>`:''}${model.key==='basic'?'':'<div class="ios-homebar" aria-hidden="true"></div>'}<div class="phone-overlay" id="phoneOverlay" hidden></div></div></div>`);
 }
 const APP_NAMES=Object.fromEntries([...APPS,...HIDDEN_APPS].map(([key,,label])=>[key,label]));
-function launch(key){if(key==='logout'){confirmLogout();return;}({map:()=>{closeModal();map();},phone:()=>phone('people'),battles:()=>{battlesFrom=null;battlesApp();},career,inventory,wardrobe,chat:chatApp,friends:friendsApp,team:teamApp,crews:crewsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,quests:questsApp,upgrade:phoneStore}[key]||phoneHome)();}
+function launch(key){if(key==='logout'){confirmLogout();return;}({map:()=>{closeModal();map();},phone:()=>phone('people'),battles:()=>{battlesFrom=null;battlesApp();},career,inventory,wardrobe,chat:chatApp,friends:friendsApp,team:teamApp,crews:crewsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,quests:questsApp,arena:arenaApp,upgrade:phoneStore}[key]||phoneHome)();}
 // Budget phones make you wait, and now and then the app hangs. You can always wait or close it.
 function openApp(key){
   // Links between apps (not from the phone's home screen) open straight away, without the phone's loading lag.
@@ -1094,4 +1094,18 @@ function questsApp(){
   showModal('quests',`<div class="quest-hero"><div><small>Starter quests</small><strong>${next?'Learn the ropes':'All done, superstar!'}</strong></div><b class="quest-count">${count}/${QUESTS.length}</b><div class="quest-progress"><i style="width:${Math.round(count/QUESTS.length*100)}%"></i></div><p>Fifteen first steps, in any order. Each pays fame; finish them all for the <strong>${QUEST_GRADUATION.name}</strong> award (+${QUEST_GRADUATION.fame}).</p></div>
   <div class="quest-list">${QUESTS.map(x=>{const ok=done.includes(x.key);return `<div class="quest-row${ok?' done':''}${x===next?' current':''}"><span class="quest-icon">${ok?'✓':x.icon}</span><div><strong>${escape(x.title)}</strong><small>${escape(x.how)}</small></div><b>+${x.reward}</b></div>`;}).join('')}</div>
   ${next?button(questsHidden()?'Show the quest card':'Hide the quest card','questCard','','secondary wide'):''}`);
+}
+
+// The Award Arena: your career's award, your field's award and the all-time title, from the last ceremony.
+function arenaApp(){
+  const a=snapshot.arena;
+  if(!a){showModal('arena','<div class="arena-hero"><span>🏟️</span><div><strong>The Award Arena</strong><small>The first ceremony is being prepared. Check back soon.</small></div></div>');return;}
+  const left=Math.max(0,a.next-now()),h=Math.floor(left/3_600_000),m=Math.floor(left%3_600_000/60_000);
+  const you=p=>p.id===me()?' <b class="arena-you">YOU</b>':'';
+  const card=(award,sub,list,metric,cls)=>`<section class="arena-card ${cls}"><div class="arena-head"><span class="arena-trophy">${award.icon}</span><div><strong>${escape(award.name)}</strong><small>${escape(sub)}</small></div></div>${list.length?`<div class="arena-winner">${avatar(list[0],'lg')}<div><small>🏆 WINNER</small><strong>${escape(list[0].name)}${you(list[0])}</strong><em>${metric(list[0])}</em></div></div>${list.length>1?`<ol class="arena-noms">${list.slice(1).map((p,i)=>`<li><span>${i+2}</span>${avatar(p,'sm')}<strong>${escape(p.name)}${you(p)}</strong><em>${metric(p)}</em></li>`).join('')}</ol>`:''}`:'<p class="empty">No nominees this time. Earn fame today to be in the running.</p>'}</section>`;
+  const today=p=>`+${fmt(p.trend)} fame in a day`,ever=p=>`✦ ${fmt(p.fame)} fame`,c=ARENA.career[a.career.key],f=a.family&&ARENA.family[a.family.key];
+  showModal('arena',`<div class="arena-hero"><span>🏟️</span><div><strong>The Award Arena</strong><small>Winners are crowned every midnight. Next ceremony in ${h}h ${m}m.</small></div></div>
+  ${c?card(c,`Top ${CAREERS[a.career.key].name.toLowerCase()} by fame gained · winner gets +${ARENA.prize.career} fame`,a.career.list,today,'career'):''}
+  ${f?card(f,`Across ${f.label} · winner gets +${ARENA.prize.family} fame`,a.family.list,today,'field'):''}
+  ${card(ARENA.goat,'The most famous star in Naija City, ever',a.goat,ever,'goat')}`);
 }

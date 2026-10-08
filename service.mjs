@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { CLASH, CLASH_ACTIONS, CHEER } from './public/clashText.js';
-import { CLASH_MEDALS, medalTier, isBigger, clashStake } from './public/content.js';
+import { CLASH_MEDALS, medalTier, isBigger, clashStake, ARENA, arenaGroup } from './public/content.js';
 import { randomBytes, createHash } from 'node:crypto';
 import { Readable } from 'node:stream';
 import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline, questProgress } from './game.mjs';
 import { CAREERS, BALANCE, clamp, perksFor, WEAR, SPOUSE_SHARE, SPOUSE_REASON } from './public/content.js';
-export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS profiles(id TEXT PRIMARY KEY, room TEXT, location TEXT, career TEXT, fame INTEGER, trend INTEGER, seen INTEGER, dating INTEGER, crew INTEGER, outside INTEGER, data TEXT NOT NULL);\n CREATE INDEX IF NOT EXISTS profiles_room ON profiles(room,seen);\n CREATE INDEX IF NOT EXISTS profiles_seen ON profiles(seen);\n CREATE INDEX IF NOT EXISTS profiles_fame ON profiles(fame);\n CREATE INDEX IF NOT EXISTS profiles_career ON profiles(career,seen);";
+export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS profiles(id TEXT PRIMARY KEY, room TEXT, location TEXT, career TEXT, fame INTEGER, trend INTEGER, seen INTEGER, dating INTEGER, crew INTEGER, outside INTEGER, data TEXT NOT NULL);\n CREATE INDEX IF NOT EXISTS profiles_room ON profiles(room,seen);\n CREATE INDEX IF NOT EXISTS profiles_seen ON profiles(seen);\n CREATE INDEX IF NOT EXISTS profiles_fame ON profiles(fame);\n CREATE INDEX IF NOT EXISTS profiles_career ON profiles(career,seen);\n CREATE TABLE IF NOT EXISTS arena(day INTEGER PRIMARY KEY, results TEXT NOT NULL);";
 // Who counts as online, and the room a player is in (a home, or a public place).
 export const ONLINE_MS=100_000;
 export const roomOf=(playerId,s)=>s.location==='home'?`home:${s.visiting||playerId}`:s.location;
@@ -108,6 +108,30 @@ function saveProfile(playerId,s){
 }
 // One-off: players saved before profiles existed get their card now.
 if(!fast)for(const row of db.prepare("SELECT p.id,p.state FROM players p LEFT JOIN profiles f ON f.id=p.id WHERE f.id IS NULL AND p.state!='null'").all())saveProfile(row.id,JSON.parse(row.state));
+// The Award Arena: at the first request after midnight (Nigeria time) the day's ceremony is held from
+// the public player cards. Career and field awards go to the most fame gained in the last 24 hours
+// (players active in the last two days); the all-time award goes to the most famous star.
+function holdCeremony(now){
+  const day=ARENA.day(now),last=db.prepare('SELECT day FROM arena ORDER BY day DESC LIMIT 1').get();
+  if(last&&last.day>=day)return;
+  const cards=db.prepare('SELECT id,career,fame,trend,seen,data FROM profiles').all().map(r=>{const d=JSON.parse(r.data);return {id:r.id,name:d.name,color:d.color,hair:d.hair,hairColor:d.hairColor,wear:d.wear,career:r.career,fame:Number(r.fame)||0,trend:Number(r.trend)||0,seen:Number(r.seen)||0};});
+  const recent=cards.filter(c=>now-c.seen<2*86_400_000&&c.trend>0),top=(list,key)=>[...list].sort((a,b)=>b[key]-a[key]).slice(0,5).map(({seen,...c})=>c);
+  const results={career:{},family:{},goat:top(cards.filter(c=>c.fame>0),'fame')};
+  for(const key of Object.keys(ARENA.career))results.career[key]=top(recent.filter(c=>c.career===key),'trend');
+  for(const [key,group] of Object.entries(ARENA.family))results.family[key]=top(recent.filter(c=>group.families.includes(CAREERS[c.career]?.family)),'trend');
+  db.prepare('INSERT INTO arena(day,results) VALUES(?,?) ON CONFLICT(day) DO NOTHING').run(day,JSON.stringify(results));
+  // Winners get the award on their profile, a fame prize (none for the all-time title) and a headline.
+  const crown=(winner,award,prize)=>{const ps=winner&&load(winner.id);if(!ps)return;ps.awards.push({id:id(),name:`${award.icon} ${award.name}`,arena:true,career:ps.career,at:now});if(prize)addFame(ps,prize,award.name,now);log(ps,`${award.icon} You won ${award.name} at the Award Arena!${prize?` +${prize} fame.`:''}`,now);headline(ps,`${ps.name} wins ${award.name} ${award.icon}`,now);persist(winner.id,ps);};
+  for(const [key,list] of Object.entries(results.career))crown(list[0],ARENA.career[key],ARENA.prize.career);
+  for(const [key,list] of Object.entries(results.family))crown(list[0],ARENA.family[key],ARENA.prize.family);
+  crown(results.goat[0],ARENA.goat,0);
+}
+// Only the awards that matter to this player: their career's, their field's and the all-time title.
+function arenaFor(s){
+  const row=db.prepare('SELECT * FROM arena ORDER BY day DESC LIMIT 1').get();if(!row)return null;
+  const r=JSON.parse(row.results),group=arenaGroup(CAREERS[s.career]?.family);
+  return {day:row.day,next:ARENA.next(row.day),career:{key:s.career,list:r.career?.[s.career]||[]},family:group?{key:group,list:r.family?.[group]||[]}:null,goat:r.goat||[]};
+}
 function snapshot(playerId,s,now){
   const account=accountOf(playerId);
   if(!s)return {state:null,serverNow:now,account};
@@ -128,7 +152,7 @@ function snapshot(playerId,s,now){
   const agreements=db.prepare(q.agreements[0]).all(...q.agreements[1]).map(r=>JSON.parse(r.state)).filter(a=>a.participants.includes(playerId)&&['pending','running'].includes(a.status));
   const visiting=s.visiting?load(s.visiting):null;
   const battles=battlesFor(playerId,s,now);
-  return {state:view(s,now),account,playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture,home:visiting.home||null}:null,season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
+  return {state:view(s,now),account,playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture,home:visiting.home||null}:null,arena:arenaFor(s),season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
 }
 // Turn-based team battles between real players. Stats come from career skills, energy and fame.
 // Winners gain fame; losers lose the same stake (never below zero). Each fighter spends one charge.
@@ -423,7 +447,7 @@ try {
       let row=token?db.prepare('SELECT * FROM players WHERE token_hash=?').get(hash(token))||db.prepare('SELECT players.* FROM sessions JOIN players ON players.id=sessions.player_id WHERE sessions.token_hash=?').get(hash(token)):null;
       let device=token?hash(token):null;
       if(!row){const session=randomBytes(32).toString('hex');device=hash(session);const playerId=id();db.prepare('INSERT INTO players VALUES(?,?,?,?)').run(playerId,'null',hash(session),clock());row=read.get(playerId);res.setHeader('Set-Cookie',`celebrity=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000${secureCookies?'; Secure':''}`);}
-      const playerId=row.id,now=clock();settleSeasons(now);
+      const playerId=row.id,now=clock();settleSeasons(now);if(!fast)holdCeremony(now);
       // One device at a time: another device that was active in the last 45s blocks this one until it
       // chooses "Play here" (?takeover=1). Sign-in requests are never blocked.
       if(url.pathname!=='/api/auth'){
