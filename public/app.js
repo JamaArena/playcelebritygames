@@ -5,14 +5,14 @@ import * as T from './vendor/three.min.js';
 import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS } from './sound.js';
 import { OPINIONS, npcOpinion, npcName, QUESTS, QUEST_GRADUATION, ARENA } from './content.js';
 import { CLASH_ACTIONS } from './clashText.js';
-import { skillName, learnLine } from './careerText.js';
+import { skillName, learnLine, METERS, UNITS, tierTitle } from './careerText.js';
 const $=selector=>document.querySelector(selector);
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=value=>Math.floor(value).toLocaleString();
 const duration=ms=>{const seconds=Math.max(0,Math.ceil(ms/1000));return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;};
 const needs={hunger:['Hunger','🍗'],energy:['Energy','⚡'],fun:['Fun','🎉'],social:['Social','💬'],hygiene:['Hygiene','🧼'],bladder:['Bladder','🚽']};
 // liveFollow is set once the live socket opens; declared up here because the first update can arrive first.
-let drawFailures=0,liveFollow=null,lastUpdate=0,heartbeat,snapshot,state,busy=false,modalPage=null,previousFocus,toastTimer,offset=0,phoneTab='local',selectedObject;
+let pitch2d=null,drawFailures=0,liveFollow=null,lastUpdate=0,heartbeat,snapshot,state,busy=false,modalPage=null,previousFocus,toastTimer,offset=0,phoneTab='local',selectedObject;
 let motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;
 const now=()=>Date.now()+offset;
 const button=(label,action,attrs='',style='secondary')=>`<button class="${style}" data-action="${action}" ${attrs}>${label}</button>`;
@@ -90,15 +90,17 @@ function rewardsBetween(a,b){
   if(xp>0)out.push({gem:'blue',icon:'💎',value:`+${fmt(xp)}`,label:'Skill XP'});
   if(fans>0)out.push({gem:'pink',icon:'👥',value:`+${fmt(fans)}`,label:'Fans'});
   for(const [k,c] of Object.entries(b.careers||{}))for(const [skill,v] of Object.entries(c.skills))if(v.level>(a.careers?.[k]?.skills?.[skill]?.level??v.level))out.push({gem:'green',icon:'⬆️',value:`Level ${v.level}`,label:skillName(k,skill)});
-  for(const award of (b.awards||[]).slice((a.awards||[]).length))out.push({gem:'purple',icon:awardIcon(award.name),value:'Unlocked!',label:award.name});
+  for(const award of (b.awards||[]).slice((a.awards||[]).length))out.push(award.promotion?{gem:'gold',icon:'🎖️',value:'Promoted!',label:award.name.replace('Promoted: ','')}:{gem:'purple',icon:awardIcon(award.name),value:'Unlocked!',label:award.name});
   return out;
 }
 function celebrate(a,b){
   const made=(b.outputs||[]).find(o=>!(a.outputs||[]).some(p=>p.id===o.id)),practised=a.active?.kind==='practice'&&!b.active,moment=a.recovery?.act&&!b.recovery,award=(b.awards||[]).length>(a.awards||[]).length,rewards=rewardsBetween(a,b);
+  const result=made&&(b.results||[])[0]?.id===made.id?b.results[0]:null;
+  if(result&&result.story){showResult(result,rewards);return;}
   if((made||practised||moment||award)&&rewards.length){
     // Say what you learnt: a line for the skill that grew the most.
     let grew=null,most=0;for(const [k,c] of Object.entries(b.careers||{}))for(const [skill,v] of Object.entries(c.skills)){const before=a.careers?.[k]?.skills?.[skill],gain=xpOf({skills:{x:v}})-xpOf({skills:{x:before||v}});if(gain>most){most=gain;grew=[k,skill];}}
-    const learnt=grew?learnLine(grew[0],grew[1])+'!':null;
+    const done=practised?(b.results||[])[0]:null,learnt=(done?.focus?`${done.focus} session · +${done.learning} XP. `:'')+(grew?learnLine(grew[0],grew[1])+'!':'')||null;
     const why=learnt||(made?`${made.title||'Your work'} is out!`:practised?`${skillName(a.active.career,a.active.skill)} practice complete`:moment?`${VENUE_ACTS[a.recovery.act]?.name||'Done'}`:'A new achievement');
     showReward(CHEERS[Math.floor(Math.random()*CHEERS.length)],why,rewards);return;
   }
@@ -113,6 +115,24 @@ function nextNotice(){
   if(!el){el=document.createElement('div');el.id='notice';el.className='reward-overlay notice-overlay';document.body.appendChild(el);}
   el.innerHTML=`<div class="notice-card" role="alertdialog" aria-modal="true" aria-labelledby="noticeTitle" aria-describedby="noticeText"><div class="gem gem-${n.delta<0?'pink':'gold'} notice-gem" aria-hidden="true">${n.icon}</div><h2 id="noticeTitle">${escape(n.title)}</h2><p id="noticeText">${escape(n.text)}</p>${n.delta?`<div class="notice-delta ${n.delta>0?'up':'down'}">${n.delta>0?'+':'−'}${fmt(Math.abs(n.delta))} fame</div>`:''}<button class="game-btn" data-action="noticeOkay">Okay</button></div>`;
   el.hidden=false;chime('ding');setTimeout(()=>el.querySelector('button')?.focus(),50);
+}
+// After work: win or loss and the score, each decision with ✓/✗, quality, reach in the career's own units and a review.
+// The numbers each career cares about, from the result's reach and quality.
+function resultExtras(r,def){const g=r.gain||0,q=r.quality||0;if(r.kind==='build')return [['🧪',`${Math.round(q*.9)}%`,'Test coverage'],['🐞',Math.max(0,Math.round((100-q)/12)),'Known bugs']];
+  return ({music:[['📊',`#${Math.max(1,51-Math.round(q/2))}`,'Naija Top 50']],creator:r.career==='streamer'?[['🔴',fmt(g*.05),'Peak viewers'],['💜',fmt(g*.004),'New subs']]:[['❤️',fmt(g*.09),'Likes'],['💬',fmt(g*.012),'Comments']],acting:r.career==='actor'?[['🍿',`${Math.min(99,q+8)}%`,'Audience score']]:[['🔔',fmt(g*.02),'New subscribers']],tech:r.career==='developer'?[['⭐',`${(1+q/25).toFixed(1)}/5`,'Client rating']]:[['📈',`${Math.round(q*.6)}%`,'Retention']],sport:r.win?[['🏅',r.win==='Win'?'+3':r.win==='Draw'?'+1':'0','League points']]:[]})[def.family]||[];}
+function showResult(r,rewards){
+  const def=CAREERS[r.career]||CAREERS[state.career],sport=def.family==='sport',promo=rewards.find(x=>x.value==='Promoted!');
+  const title=promo?'🎖️ Promoted!':sport?(r.win==='Win'?'🏆 Victory!':r.win==='Loss'?'Defeat':'Draw'):r.kind==='build'?'🛠️ Prototype built':r.quality>=70?'🌟 Smash hit!':r.quality>=45?CHEERS[Math.floor(Math.random()*CHEERS.length)]:'Tough day';
+  const sub=sport?`${escape(r.title)} · ${escape(r.score||'')}${r.sets?` · sets ${escape(r.sets)}`:''}`:r.kind==='build'?`Prototype quality ${r.quality} — ready to launch from the Career page`:`${escape(r.title)} is out!`;
+  const stats=[['⭐',r.quality,'Quality'],...(r.kind==='build'?[]:[['👥',fmt(r.gain),r.units||def.audience]]),...resultExtras(r,def),['✦',`+${fmt(r.fame||0)}`,'Fame']];
+  const trial=r.kind==='trial'?(r.quality>=60?' · 📝 Trial passed: a contract offer is waiting!':' · Trial missed: quality 60 earns an offer'):'';
+  let el=$('#reward');if(!el){el=document.createElement('div');el.id='reward';el.className='reward-overlay';document.body.appendChild(el);}
+  el.innerHTML=`<div class="reward-card result-card ${sport?(r.win||'').toLowerCase():''}" role="dialog" aria-modal="true" aria-labelledby="rewardTitle"><div class="reward-burst" aria-hidden="true"></div><h2 id="rewardTitle">${escape(title)}</h2><p>${sub}${escape(trial)}</p>
+    <ol class="result-story">${r.story.map(s=>`<li class="${s.success?'hit':'miss'}${s.event?' event':''}"><b>${s.success?'✓':'✗'}</b><span>${escape(s.choice)}</span><small>${escape(skillName(r.career,s.skill))}</small></li>`).join('')}</ol>
+    <div class="result-stats">${stats.map(([i,v,l])=>`<div><span>${i}</span><strong>${escape(String(v))}</strong><small>${escape(l)}</small></div>`).join('')}</div>
+    ${r.review?`<p class="result-review">${escape(r.review)}</p>`:''}
+    <div class="reward-tiles">${rewards.filter(x=>x.label!=='Fame').slice(0,3).map((x,i)=>`<div class="reward-tile" style="--i:${i}"><div class="gem gem-${x.gem}">${x.icon}</div><strong>${escape(x.value)}</strong><small>${escape(x.label)}</small></div>`).join('')}</div><button class="game-btn" data-action="collectReward">Collect Rewards</button></div>`;
+  el.hidden=false;chime(sport&&r.win==='Loss'?'ding':'reward');setTimeout(()=>el.querySelector('button')?.focus(),50);
 }
 function showReward(title,subtitle,rewards){
   let el=$('#reward');if(!el){el=document.createElement('div');el.id='reward';el.className='reward-overlay';document.body.appendChild(el);}
@@ -323,7 +343,7 @@ function whenIdle(perform){if(!busy){perform();return;}const timer=setInterval((
 async function startAtObject(input){
   if(isBusyWithTimer()){closeTray();closeModal();queueTask({icon:CAREERS[state.career].icon,label:input.kind==='practice'?`Practise ${input.skill}`:'Work',run:()=>startAtObject(input)});return;}
   closeTray();closeModal();const def=CAREERS[state.career];lastTaskAt=Date.now();
-  if(state.location!==def.location&&!(input.kind==='practice'&&state.location==='home'&&state.inventory.gear)){const data=await send({type:'travel',location:def.location});if(!data)return;if(data.state.trip){toast(`${tripVerb(data.state.trip.ride)} to ${LOCATIONS[def.location].name}. Start work when you arrive.`);return;}}
+  if(state.location!==def.location&&!(input.kind==='practice'&&state.location==='home'&&state.inventory.gear)&&!(input.kind==='practice'&&def.family==='sport'&&state.location==='gym')){const data=await send({type:'travel',location:def.location});if(!data)return;if(data.state.trip){toast(`${tripVerb(data.state.trip.ride)} to ${LOCATIONS[def.location].name}. Start work when you arrive.`);return;}}
   const object=worldObjects(state.location,state.furniture,[],state.home).find(o=>o.action===(input.kind==='practice'?'practice':'career'));
   if(object)world.approach(object,()=>whenIdle(()=>send({type:'start',...input})));else await send({type:'start',...input});
 }
@@ -345,7 +365,7 @@ function render(){
   const moodValue=Object.values(state.needs).reduce((a,b)=>a+b,0)/6,moodLabel=moodValue>=75?'Very happy':moodValue>=55?'Content':moodValue>=30?'Uncomfortable':'Miserable';
   $('#needsHud').innerHTML=`<div class="sim-portrait" style="--skin:${escape(state.color)};--mood:${Math.round(moodValue*1.2)}" title="Mood ${Math.round(moodValue)}%"><span>${escape(state.name.slice(0,1).toUpperCase())}</span></div><div class="sim-meta"><strong>${escape(state.name)}</strong><small style="--mood:${Math.round(moodValue*1.2)}">${moodLabel}</small></div><div class="sim-needs">${Object.entries(needs).map(([key,[label,icon]])=>button(`<b class="need-gem" aria-hidden="true">${icon}</b><label>${label}</label><i style="--need:${state.needs[key]}%;--hue:${Math.round(state.needs[key]*1.2)}"></i>`,'recover',`data-need="${key}" aria-label="${label} ${Math.round(state.needs[key])} percent. Recover ${label}." title="${label} · ${Math.round(state.needs[key])}%"`,'need-bar')).join('')}</div>`;
   clock();
-  $('#profileCard').innerHTML=`<div class="profile-cover"></div><div class="avatar" style="background:${state.color}">${escape(state.name.slice(0,1).toUpperCase())}</div><h2>${escape(state.name)}</h2><p class="profile-career">${def.icon} ${def.name} · ${c.origin===1?'Connected origin':'Independent origin'}</p><span class="tier-pill">✦ ${B.tiers[c.tier][0]}</span><div class="profile-numbers"><div><strong>${fmt(state.fame||0)}</strong><small>fame</small></div><div><strong>${state.awards.length}</strong><small>awards</small></div><div><strong>${Math.round(c.reputation)}</strong><small>reputation</small></div></div>`;
+  $('#profileCard').innerHTML=`<div class="profile-cover"></div><div class="avatar" style="background:${state.color}">${escape(state.name.slice(0,1).toUpperCase())}</div><h2>${escape(state.name)}</h2><p class="profile-career">${def.icon} ${def.name} · ${c.origin===1?'Connected origin':'Independent origin'}</p><span class="tier-pill">✦ ${escape(tierTitle(state.career,c.tier))}</span><div class="profile-numbers"><div><strong>${fmt(state.fame||0)}</strong><small>fame</small></div><div><strong>${state.awards.length}</strong><small>awards</small></div><div><strong>${Math.round(c.reputation)}</strong><small>reputation</small></div></div>`;
   const mood=Object.values(state.needs).reduce((a,b)=>a+b,0)/6;
   $('#needsCard').innerHTML=`<div class="section-label"><h3>A little self care</h3><span>${mood>=60?'FEELING GOOD':mood>=30?'TAKE A BREATHER':'TIME TO RECOVER'}</span></div>${Object.entries(needs).map(([key,[label,icon]])=>`<div class="need-row ${state.needs[key]<30?'low':''}"><span class="need-icon">${icon}</span><div><label>${label}<small>${Math.round(state.needs[key])}%</small></label><div class="progress-track"><div class="progress-fill" style="width:${state.needs[key]}%"></div></div></div><button data-action="recover" data-need="${key}" aria-label="Recover ${label}">+</button></div>`).join('')}`;
   $('#skillsCard').innerHTML=`<div class="section-label"><h3>Getting a little better</h3><span>YOUR SKILLS</span></div>${Object.entries(c.skills).map(([key,skill])=>`<div class="skill-row"><div class="skill-top"><span>${escape(key)}</span><strong>LVL ${skill.level}</strong></div><div class="progress-track"><div class="progress-fill" style="width:${skill.level===10?100:skill.points/effort(skill.level)*100}%"></div></div><div class="skill-detail">${skill.level===10?'Maxed':`${skill.points} / ${effort(skill.level)} learning points`}</div></div>`).join('')}`;
@@ -355,39 +375,60 @@ function render(){
 
 function clock(){const hour=world.daylight().hour,day=Math.max(1,Math.floor((now()-state.seasonStart)/86400000)+1);const weather={rain:'🌧',harmattan:'🌫'}[weatherAt(now())],season={independence:'🇳🇬 Independence week',detty:'🎉 Detty December',christmas:'🎄 Christmas',newyear:'🎆 New Year'}[festivalAt(now())];$('#worldClock').innerHTML=`${weather||(hour>=6&&hour<19?'☀️':'🌙')} <strong>${new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</strong><span>Day ${day}${season?` · ${season}`:''}${weather?` · ${weatherAt(now())==='rain'?'Rain':'Harmattan haze'}`:''}</span>`;}
 function progress(start,end){const value=Math.min(100,Math.max(0,(now()-start)/(end-start)*100));return '<div class="sim-progress"><i style="width:'+value+'%"></i></div>';}
+const CHOICE_ICONS={shoot:'⚽',shot:'🎯',pass:'➜',dribble:'↝',tackle:'↘',intercept:'✋',mark:'◎',drive:'↝',stop:'■',steal:'🫳',contain:'🧱',funnel:'↪',block:'🖐️',charge:'🛑',boxout:'📦',circle:'🔄',grapple:'🤼',slam:'💥',brace:'🛡️',counter:'🔁',reversal:'🌀',crowd:'📣',dive:'🦅',rest:'😮‍💨',submission:'🔒',signature:'⭐',pin:'📌',serve:'🎾',volley:'🏸',forehand:'➡️',backhand:'⬅️',lob:'🌈',drop:'🪶',event:'⚡'};
+// Live numbers on the card: the score (or stamina) for sport, and the two career meters.
+function workBoard(a){
+  const [m1,m2]=METERS[a.career]||['Mood','Focus'],bar=(label,v,tone)=>'<div class="meter"><span>'+escape(label)+'</span><i style="--v:'+Math.round(v??50)+'%;--tone:'+tone+'"></i><b>'+Math.round(v??50)+'</b></div>';
+  let board='';
+  if(a.career==='tennis')board='<div class="scoreboard"><span class="sb-blue">YOU</span><strong>'+escape((a.scoreLabel||'Sets 0–0').replace(/ · /g,' · '))+'</strong><span class="sb-red">THEM</span></div>';
+  else if(a.career==='wrestling')board='<div class="scoreboard stamina">'+bar('🔵 You',a.playerStamina,'#2f7de1')+bar('🔴 Opponent',a.opponentStamina,'#d23b3b')+'</div>';
+  else if(a.career==='basketball')board='<div class="scoreboard"><span class="sb-blue">YOU</span><strong>'+(a.playerScore||0)+' – '+(a.opponentScore||0)+'</strong><span class="sb-red">THEM</span><em>Q'+Math.min(4,1+Math.floor((a.beat||0)*4/(a.totalBeats||6)))+'</em></div>';
+  return '<div class="work-board">'+board+'<div class="meters">'+bar(m1,a.engagement,'#f2a516')+(a.career==='wrestling'?'':bar(m2,a.stability,'#3a8b56'))+'</div></div>';
+}
 function renderActivity(){
   const a=state.active,r=state.recovery,def=CAREERS[state.career],t=state.trip;let html='';
   if(t)html='<div class="sim-status"><span>'+(RIDES[t.ride]?.icon||TRANSIT[t.ride]?.icon||'🚶')+'</span><strong>'+tripVerb(t.ride)+' to '+escape(LOCATIONS[t.to].name)+'</strong><time>'+duration(t.arrives-now())+'</time></div>'+progress(t.departs,t.arrives);
   else if(r){const start=r.startedAt??r.endsAt-B.recovery[r.need][1],gained=Math.round(B.recovery[r.need][0]*Math.min(1,Math.max(0,(now()-start)/(r.endsAt-start))));html='<div class="sim-status"><span>'+(r.watch?'📺':needs[r.need][1])+'</span><strong>'+escape(r.label)+'</strong><small>+'+gained+' '+escape(needs[r.need][0])+(r.watch?.learn?` · ${r.watch.given||0}/5 insights`:r.watch?' · just for fun (learning cooldown)':'')+'</small>'+button('Get up','getUp','','secondary')+'</div>'+progress(start,r.endsAt);}
-  else if(a?.kind==='practice')html='<div class="sim-status"><span>'+def.icon+'</span><strong>'+escape(skillName(a.career,a.skill))+'</strong><small>+7 XP</small><time>'+duration(a.readyAt-now())+'</time>'+button('×','cancel','aria-label="Cancel practice"','tray-close')+'</div>'+progress(a.startedAt,a.readyAt);
+  else if(a?.kind==='practice')html='<div class="sim-status"><span>'+def.icon+'</span><strong>'+escape(skillName(a.career,a.skill))+'</strong><small>'+((a.xp??7)>=9?'Focused':(a.xp??7)<=6?'Distracted':'Steady')+' · +'+(a.xp??7)+' XP</small><time>'+duration(a.readyAt-now())+'</time>'+button('×','cancel','aria-label="Cancel practice"','tray-close')+'</div>'+progress(a.startedAt,a.readyAt);
   else if(a){
     const waiting=now()<a.readyAt,complete=a.beat>=a.totalBeats;
     html='<div class="sim-status"><span>'+def.icon+'</span><strong>'+escape(a.title)+'</strong><small>'+Math.min(a.beat+1,a.totalBeats)+' / '+a.totalBeats+'</small>'+(waiting?'<time>'+duration(a.readyAt-now())+'</time>':'')+button('×','cancel','aria-label="Cancel activity"','tray-close')+'</div>';
-    if(waiting)html+=progress(a.readyAt-a.interval,a.readyAt);
+    const last=a.outcomes?.at(-1);html+=workBoard(a);
+    if(waiting)html+=(last?'<div class="work-last '+(last.success?'hit':'miss')+'">'+(last.success?'✓ ':'✗ ')+escape(last.choice)+(a.career==='tennis'&&a.lastGames?' · games '+a.lastGames.join('–'):'')+'</div>':'')+progress(a.readyAt-a.interval,a.readyAt);
     else if(complete)html+=button('🎁 Collect result','finish','data-id="'+a.id+'"','primary');
-    else html+='<div class="sim-choices">'+a.choices.map((choice,index)=>button('<b>'+(({shoot:'⚽',shot:'🎯',pass:'➜',dribble:'↝',tackle:'↘',intercept:'✋',mark:'◎',drive:'↝',general:['💡','✨','⚡'][index%3],stop:'■'})[choice.action]||def.icon)+'</b><span>'+escape(choice.label)+'</span><small>'+Math.round(choice.probability*100)+'%</small>','decision','data-index="'+index+'" data-beat="'+a.beat+'" data-id="'+a.id+'" title="'+escape(skillName(a.career,choice.skill))+' · '+escape(choice.risk)+'"','sim-choice')).join('')+'</div>';
+    else html+=(a.scene?.text?'<div class="work-scene'+(a.scene.event?' event':'')+'">'+escape(a.scene.text)+'</div>':'')+'<div class="sim-choices">'+a.choices.map((choice,index)=>button('<b>'+(CHOICE_ICONS[choice.action]||(choice.action==='general'?['💡','✨','⚡'][index%3]:def.icon))+'</b><span>'+escape(choice.label)+'</span><em class="risk-'+choice.risk+'">'+escape(skillName(a.career,choice.skill))+'</em><small>'+Math.round(choice.probability*100)+'%</small>','decision','data-index="'+index+'" data-beat="'+a.beat+'" data-id="'+a.id+'" title="'+escape(skillName(a.career,choice.skill))+' · '+escape(choice.risk)+'"','sim-choice')).join('')+'</div>';
   }else html='<div class="idle-actions">'+button(def.icon+' '+(state.location===def.location?'Start work':'Go to work'),state.location===def.location?'prepare':'travel',state.location===def.location?'':'data-location="'+def.location+'"','primary')+button('🎯 Practise','practice')+'</div>';
   if(taskQueue.length)html+='<div class="task-queue"><small>Up next</small>'+taskQueue.map((t,i)=>button(`${escape(t.icon||'•')} ${escape(t.label)} <b aria-hidden="true">×</b>`,'unqueue',`data-index="${i}" aria-label="Remove ${escape(t.label)} from queue"`,'queue-chip')).join('')+'</div>';
   $('#activityCard').innerHTML=html;
 }
-async function chooseDecision(index){const a=state.active;if(!a)return;const chosen=a.choices[index],career=a.career,before={playerScore:a.playerScore,opponentScore:a.opponentScore};const data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});if(!data)return;
+async function chooseDecision(index){const a=state.active;if(!a)return;const chosen=a.choices[index],career=a.career,before={playerScore:a.playerScore,opponentScore:a.opponentScore,engagement:a.engagement,playerStamina:a.playerStamina};const data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});if(!data)return;
   const success=(data.state.active?.outcomes||data.state.outputs?.[0]?.outcomes||[]).at(-1)?.success;if(motion)world.respond(chosen.action,success);
   // Football plays a short top-down replay of the move; at full time the final score comes from the result.
-  if(career==='football'&&motion){const done=data.state.results?.[0],[ps,os]=String(done?.score||'').split('–').map(Number),after=data.state.active||{playerScore:ps,opponentScore:os,beat:6,totalBeats:6};matchReplay(chosen,success,before,after);}else actionPop(career,chosen,success);}
+  if(career==='football'&&motion){const done=data.state.results?.[0],[ps,os]=String(done?.score||'').split('–').map(Number),after=data.state.active||{playerScore:ps,opponentScore:os,beat:6,totalBeats:6};matchReplay(chosen,success,before,after);}else actionPop(career,chosen,success,consequence(career,before,data.state.active||data.state.results?.[0]||{}));}
+// What a choice changed: points, games, stamina, or the room's mood.
+function consequence(career,b,a){
+  if(career==='basketball'&&a.playerScore!=null){const us=a.playerScore-(b.playerScore||0),them=a.opponentScore-(b.opponentScore||0);return `${us?`+${us} for you`:'No points'}${them?` · they answer with ${them}`:' · stop at the other end'} (${a.playerScore}–${a.opponentScore})`;}
+  if(career==='tennis'&&a.lastGames)return `Games won ${a.lastGames[0]} of ${a.lastGames[0]+a.lastGames[1]} · ${a.scoreLabel||a.sets||''}`;
+  if(career==='wrestling'&&a.playerStamina!=null)return a.pinned?'1… 2… 3! Pinfall!':`Stamina: you ${a.playerStamina} · them ${a.opponentStamina}`;
+  if(a.engagement!=null&&b.engagement!=null){const d=Math.round(a.engagement-b.engagement),[m]=METERS[career]||['Mood'];return `${m} ${d>=0?'▲':'▼'} ${Math.abs(d)}`;}
+  return '';
+}
 // A quick picture of what you just did at work: the move, who it went to, and how it turned out.
-const ACTION_ART={pass:'🦶⚽💨',shoot:'🦶⚽💥',dribble:'🏃⚽💨',tackle:'🦵💥⚽',intercept:'✋⚽',mark:'👀🏃',shot:'🏀🏹',drive:'🏃🏀💨',grapple:'🤼',counter:'🔄🤼',signature:'💥🤼',crowd:'📣🙌'};
+const ACTION_ART={steal:'🫳🏀',contain:'🧱🏀',funnel:'↪️🏀',block:'🖐️🏀',charge:'🛑🏀',boxout:'📦🏀',circle:'🔄🤼',slam:'💥🤼',brace:'🛡️🤼',reversal:'🌀🤼',dive:'🦅🤼',rest:'😮‍💨',submission:'🔒🤼',pin:'📌🤼',serve:'🎾💥',volley:'🎾🕸️',forehand:'🎾➡️',backhand:'🎾⬅️',lob:'🎾🌈',drop:'🎾🪶',event:'⚡',pass:'🦶⚽💨',shoot:'🦶⚽💥',dribble:'🏃⚽💨',tackle:'🦵💥⚽',intercept:'✋⚽',mark:'👀🏃',shot:'🏀🏹',drive:'🏃🏀💨',grapple:'🤼',counter:'🔄🤼',signature:'💥🤼',crowd:'📣🙌'};
 const CAREER_ART={musician:'🎤🎶',actor:'🎬🎭',adult:'🌙🎥',vlogger:'🤳✨',video:'🎥✂️',skitmaker:'😂🎬',streamer:'🎮💬',founder:'🚀📈',developer:'💻⌨️',web3:'🔗💡',tennis:'🎾💨'};
+const SUCCESS_LINES={musician:' The room is vibing! 🎶',actor:' “Cut! Print it!” 🎬',adult:' The fans love it.',vlogger:' Views are climbing! 📈',video:' Retention holds! 📈',skitmaker:' Everyone cracks up! 😂',streamer:' Chat goes wild! 💬',founder:' The numbers tick up! 📈',developer:' All tests green ✅',web3:' The community is buzzing 🔗'};
+const MISS_LINES={musician:' The producer winces.',actor:' “Cut! Again.”',adult:' The crew looks unsure.',vlogger:' Viewers drop off.',video:' Viewers click away.',skitmaker:' Crickets… 🦗',streamer:' Chat goes quiet.',founder:' An investor frowns.',developer:' Red build ❌',web3:' Someone posts FUD.'};
 function actionLine(career,c){
   const t=c.target;
   return ({pass:career==='basketball'?'You fired a pass to the open teammate':`You passed to the ${t||'winger'}`,shoot:`You struck it ${/(\d+)m/.exec(c.label)?.[1]?`from ${/(\d+)m/.exec(c.label)[1]}m`:'at goal'}`,dribble:t==='wing'?'You dribbled down the wing':'You cut inside past a defender',
     tackle:'You went in for the tackle',intercept:'You read the pass and stepped in',mark:'You tracked the runner',shot:'You rose for the jump shot',drive:'You drove hard to the hoop',
     grapple:'You locked up and grappled',counter:'You countered the move',signature:'You hit your signature move',crowd:'You worked the crowd'})[c.action]||`You went with: ${c.label}`;
 }
-function actionPop(career,c,success){
+function actionPop(career,c,success,detail=''){
   const art=ACTION_ART[c.action]||CAREER_ART[career]||CAREERS[career]?.icon||'⭐';
-  const end=success==null?'':success?({shoot:' GOAL! 🎉',shot:' It drops! 🎉',pass:' …and it finds them!',signature:' The crowd erupts!'}[c.action]||' It worked!'):({shoot:' …but it goes wide.',pass:' …but it’s cut out.',shot:' …off the rim.'}[c.action]||' It didn’t quite land.');
+  const end=success==null?'':success?({shoot:' GOAL! 🎉',shot:' It drops! 🎉',pass:' …and it finds them!',signature:' The crowd erupts!',slam:' The ring shakes!',pin:' 1… 2… 3!',steal:' Picked clean!',block:' Sent back! 🚫',serve:' Ace! 🎾',forehand:' Winner!',backhand:' Clean winner!',drop:' It dies on the line!',volley:' Put away at the net!'}[c.action]||SUCCESS_LINES[career]||' It worked!'):({shoot:' …but it goes wide.',pass:' …but it’s cut out.',shot:' …off the rim.',slam:' Countered!',pin:' Kick-out at two!',serve:' Double fault.',drop:' Into the net.'}[c.action]||MISS_LINES[career]||' It didn’t quite land.');
   $('#actionPop')?.remove();const pop=document.createElement('button');pop.id='actionPop';pop.className=`action-pop ${success===false?'miss':'hit'}`;pop.setAttribute('aria-label','Close');
-  pop.innerHTML=`<span class="action-art">${art}</span><strong>${escape(actionLine(career,c))}</strong><em>${escape(end.trim())}</em>`;pop.onclick=()=>pop.remove();
+  pop.innerHTML=`<span class="action-art">${art}</span><strong>${escape(actionLine(career,c))}</strong><em>${escape(end.trim())}</em>${detail?`<small>${escape(detail)}</small>`:''}`;pop.onclick=()=>pop.remove();
   document.body.append(pop);setTimeout(()=>pop.classList.add('out'),2300);setTimeout(()=>pop.remove(),2700);
 }
 // Character creation is two steps: your look, then your career. The starting story is drawn at random.
@@ -483,7 +524,7 @@ function eta(key){const pref=state.travelMode||'best',mode=pref==='best'?bestMod
 const tripVerb=ride=>!ride?'Walking':TRANSIT[ride]?`Taking a ${TRANSIT[ride].name.toLowerCase()}`:ride==='helicopter'?'Flying':ride==='bicycle'?'Cycling':'Driving';
 // How you travel: your own ride, walking, or public transport.
 function travelModes(){const mode=state.travelMode||'best',own=state.ride?`${RIDES[state.ride]?.icon||'🚗'} ${RIDES[state.ride]?.name||'Your ride'}`:'🚶 Walk',best=bestMode(state,now()),bestLabel=best==='walk'?'🚶 Walk':RIDES[best]?`${RIDES[best].icon||'🚗'} ${RIDES[best].name}`:TRANSIT[best]?`${TRANSIT[best].icon} ${TRANSIT[best].name}`:best;return '<div class="travel-modes"><strong>How you travel</strong><div>'+[['best',`⭐ Fastest: ${bestLabel}`],['own',own],...(state.ride?[['walk','🚶 Walk']]:[]),...Object.entries(TRANSIT).map(([k,t])=>[k,`${t.icon} ${t.name}`])].map(([k,label])=>`<button class="chip ${k===mode?'on':''}" data-action="travelMode" data-mode="${k}">${escape(label)}</button>`).join('')+'</div></div>';}
-function practice(){const def=CAREERS[state.career];if(state.location==='home'&&!state.inventory.gear){showTray('🎯 Practise','<div class="tray-options">'+button('📍 Go to venue','travel','data-location="'+def.location+'"','primary')+button('🛒 Buy home equipment','travel','data-location="plaza"')+'</div>');return;}showTray('🎯 Practise','<div class="tray-options skills-options">'+def.skills.map(skill=>button(escape(skillName(state.career,skill))+' <small>Lv '+state.careers[state.career].skills[skill].level+'</small>','startPractice','data-skill="'+escape(skill)+'"')).join('')+'</div><small>⚡ 1 · '+duration(B.practiceMs)+' · +7 XP</small>');}
+function practice(){const def=CAREERS[state.career];if(state.location==='home'&&!state.inventory.gear){showTray('🎯 Practise','<div class="tray-options">'+button('📍 Go to venue','travel','data-location="'+def.location+'"','primary')+button('🛒 Buy home equipment','travel','data-location="plaza"')+'</div>');return;}showTray('🎯 Practise','<div class="tray-options skills-options">'+def.skills.map(skill=>button(escape(skillName(state.career,skill))+' <small>Lv '+state.careers[state.career].skills[skill].level+'</small>','startPractice','data-skill="'+escape(skill)+'"')).join('')+'</div><small>⚡ 1 · '+duration(B.practiceMs)+' · +5–10 XP (more when you feel good)'+(def.family==='sport'&&state.location!=='gym'?' · or train at the gym':'')+'</small>');}
 function prepare(kind){const def=CAREERS[state.career];kind??=['founder','web3'].includes(state.career)?'build':'produce';if(kind==='launch'||kind==='collab'){prepareDetails(kind);return;}showTray(def.icon+' '+def.output,'<div class="tray-options">'+button('▶ Start · ⚡ 1','quickStart','data-kind="'+kind+'"','primary')+button('Options','prepareDetails','data-kind="'+kind+'"')+'</div><small>'+duration(def.family==='sport'?B.sportMs:B.activityMs)+' · '+(def.family==='sport'?6:3)+' choices</small>');}
 function prepareDetails(kind){
   const def=CAREERS[state.career],c=state.careers[state.career];kind??=['founder','web3'].includes(state.career)?'build':'produce';
@@ -498,8 +539,9 @@ function career(){
   // One big main action; the rest are coloured tiles; Retire sits quietly at the bottom.
   const actions=[['✨','Practise','practice','','#7c3aed'],...(def.family==='music'?[['🎤','Live show','prepare','data-kind="live"','#db2777']]:[]),...(o.launch?[['🚀','Launch','prepare','data-kind="launch"','#f97316']]:[]),...(!['founder','web3'].includes(state.career)?[['🤝','NPC collab','prepare','data-kind="collab"','#2f7de1']]:[]),...(o.trial?[['🎯','Trial','prepare','data-kind="trial"','#d97706']]:[])];
   const skills=Object.values(c.skills),xp=skills.length?Math.round(skills.reduce((n,sk)=>n+(sk.level===10?100:sk.level*10+sk.points/effort(sk.level)*10),0)/skills.length):0;
-  const tiers=B.tiers,tier=tiers[c.tier],nextTier=tiers[c.tier+1];
-  showModal('career',`${hero(def.icon,def.name,[tier[0],c.affiliation?escape(c.affiliation.name):'Independent',def.origins[c.origin]],'#ffffff33','hero-career',`<div class="xp"><div class="xp-label"><span>Skill level</span><b>${xp}%</b></div><div class="xp-bar"><i style="width:${xp}%"></i></div>${nextTier?`<small>Next: ${escape(nextTier[0])} at ✦ ${fmt(nextTier[1])} fame and skill Lv ${nextTier[2]}</small>`:''}</div>`)}
+  const tiers=B.tiers,tier=[tierTitle(state.career,c.tier)],nextTier=tiers[c.tier+1],avg=skills.reduce((n,sk)=>n+sk.level,0)/(skills.length||1),fameOk=nextTier&&(state.fame||0)>=nextTier[1],skillOk=nextTier&&avg>=nextTier[2];
+  const gate=nextTier?`<small class="tier-gate">Next: <b>${escape(tierTitle(state.career,c.tier+1))}</b> · <span class="${fameOk?'ok':'need'}">${fameOk?'✔':'✖'} ✦ ${fmt(nextTier[1])} fame</span> · <span class="${skillOk?'ok':'need'}">${skillOk?'✔':'✖'} average skill Lv ${nextTier[2]} (now ${avg.toFixed(1)})</span>${!skillOk&&fameOk?' — practise to get promoted!':''}</small>`:'';
+  showModal('career',`${hero(def.icon,def.name,[tier[0],c.affiliation?escape(c.affiliation.name):'Independent',def.origins[c.origin]],'#ffffff33','hero-career',`<div class="xp"><div class="xp-label"><span>Skill level</span><b>${xp}%</b></div><div class="xp-bar"><i style="width:${xp}%"></i></div>${gate}</div>`)}
   ${tiles([['✦',fmt(state.fame||0),'Fame'],['👥',fmt(c.audience),def.audience],['💬',Math.round(c.engagement)+'%','Engagement'],['⭐',Math.round(c.reputation),'Reputation']])}
   <button class="primary wide hero-cta" data-action="prepare"><span>${main[0]}</span> ${main[1]}</button>
   <div class="action-tiles">${actions.map(([icon,label,action,attrs,color])=>`<button class="action-tile" style="--c:${color}" data-action="${action}" ${attrs}><span>${icon}</span>${label}</button>`).join('')}</div>
@@ -509,7 +551,7 @@ function career(){
   <details class="v2-more"><summary>Discovery, deals & switching career</summary><p>${o.trial?'Your trial is available: quality 60+ unlocks an offer.':`Do three local activities and reach level 2 in ${escape(def.focus)} to attract a scout.`}</p>${c.affiliation?`<p>Reach boost +${Math.round((c.affiliation.boost??B.contractBoost)*100)}% · exit after ${c.affiliation.exitAfter} deliveries.</p>`:''}<form id="switchForm"><div class="field"><select name="career" aria-label="New primary career">${careerOptions(state.career)}</select></div><label class="check"><input type="checkbox" name="adult"> Adult character confirmation, if choosing adult entertainment</label><button class="secondary" type="submit">Switch career</button></form></details>
   ${button('👋 Retire from this career','retirePicker','','danger wide')}`);
 }
-function outputs(list){return list.length?`<div class="v2-list">${list.slice(0,20).map(o=>`<div class="v2-row"><span class="v2-badge">${o.quality}</span><div><strong>${escape(o.title)}</strong><small>${o.released?'Released':'Unreleased'} · ${new Date(o.at).toLocaleDateString()} · ${fmt(o.gain)} reach</small></div><span class="v2-gain">+${fmt(o.fame??Math.floor(o.gain*B.famePerReach))}</span></div>`).join('')}</div>`:'<p class="empty">Your first release is still ahead of you.</p>';}
+function outputs(list){return list.length?`<div class="v2-list">${list.slice(0,20).map(o=>`<div class="v2-row"><span class="v2-badge">${o.quality}</span><div><strong>${o.win?`<em class="wl wl-${o.win.toLowerCase()}">${o.win==='Win'?'W':o.win==='Loss'?'L':'D'}</em> `:''}${escape(o.title)}</strong><small>${o.released?'Released':o.kind==='build'?'Prototype · ready to launch':'Unreleased'} · ${new Date(o.at).toLocaleDateString()} · ${fmt(o.gain)} ${escape(UNITS[o.career]||'reach')}</small></div><span class="v2-gain">+${fmt(o.fame??Math.floor(o.gain*B.famePerReach))}</span></div>`).join('')}</div>`:'<p class="empty">Your first release is still ahead of you.</p>';}
 // Shared pieces of the modern screens: a gradient header, stat tiles, progress rings and award icons.
 function hero(avatar,title,chips=[],color='#ffffff33',cls='',extra=''){return `<div class="v2-hero ${cls}"><div class="v2-avatar" style="--c:${color}">${avatar}</div><div><h2>${title}</h2><div class="v2-chips">${chips.filter(Boolean).map(c=>`<span class="v2-chip">${c}</span>`).join('')}</div></div>${extra}</div>`;}
 function tiles(list){return `<div class="v2-tiles">${list.map(([icon,value,label])=>`<div class="v2-tile"><span>${icon}</span><strong>${value}</strong><small>${escape(String(label))}</small></div>`).join('')}</div>`;}
@@ -619,7 +661,7 @@ function walletApp(){
   const rank=snapshot.players.filter(p=>p.id!==me()&&(p.fame||0)>(state.fame||0)).length+1,today=new Date().toDateString();
   const entry=e=>{const [,icon,c]=LEDGER_KINDS.find(([re])=>re.test(e.reason))||[0,e.delta>0?'✦':'↘',e.delta>0?'#2fa84f':'#e5484d'];return prow(ico(icon,c).replace('prow-ico','prow-ico round'),escape(e.reason),ago(e.at),`<b class="amount ${e.delta>0?'up':'down'}">${e.delta>0?'+':'−'}${fmt(Math.abs(e.delta))}</b>`);};
   const shown=walletAll?log:log.slice(0,8),groups=[['Today',shown.filter(e=>new Date(e.at).toDateString()===today)],['Earlier',shown.filter(e=>new Date(e.at).toDateString()!==today)]].filter(([,l])=>l.length);
-  showModal('wallet',`<div class="kit-hero hero-wallet"><small>Fame balance</small><strong class="big-number">✦ ${fmt(state.fame||0)}</strong><span>${rank?`Rank #${rank} in Naija City`:'Naija City'} · ${B.tiers[state.careers[state.career].tier][0]}</span></div>
+  showModal('wallet',`<div class="kit-hero hero-wallet"><small>Fame balance</small><strong class="big-number">✦ ${fmt(state.fame||0)}</strong><span>${rank?`Rank #${rank} in Naija City`:'Naija City'} · ${escape(tierTitle(state.career,state.careers[state.career].tier))}</span></div>
   <div class="stat-pair"><div class="stat-tile"><span class="disc" style="--c:#2fa84f">↗</span><strong>+${fmt(gained)}</strong><small>Gained recently</small></div><div class="stat-tile"><span class="disc" style="--c:#e5484d">↘</span><strong>−${fmt(lost)}</strong><small>Lost recently</small></div></div>
   ${groups.map(([label,list])=>`<p class="app-label">${label}</p><div class="pcard">${list.map(entry).join('')}</div>`).join('')||'<p class="empty">Your fame history starts with your next win (or mishap).</p>'}${log.length>8?button(walletAll?'Show less':`Show all ${log.length}`,'walletAll','','secondary wide'):''}`);
 }
@@ -759,7 +801,7 @@ async function placement(item,id=null){closeModal();if(state.location!=='home'){
 function arrangeRoom(){inventory();}
 function profile(){const season=snapshot.season,c=state.careers[state.career],def=CAREERS[state.career],medals=state.awards.slice().reverse();
   const gem=(icon,value,label,c)=>`<div class="gem-tile"><span class="gem-ico" style="--c:${c}">${icon}</span><strong>${value}</strong><small>${label}</small></div>`;
-  showModal('profile',`${hero(avatar(myLook(),'xxl ring'),escape(state.name),[`${def.icon} ${def.name}`,B.tiers[c.tier][0],...((state.fame||0)>=50_000?['✔ Verified']:[]),...(state.spouse?[`💍 ${escape(state.spouse.name)}`]:[]),...(state.crew?[`${escape(state.crew.badge)} ${escape(state.crew.name)}`]:[])],'transparent','hero-profile')}
+  showModal('profile',`${hero(avatar(myLook(),'xxl ring'),escape(state.name),[`${def.icon} ${def.name}`,tierTitle(state.career,c.tier),...((state.fame||0)>=50_000?['✔ Verified']:[]),...(state.spouse?[`💍 ${escape(state.spouse.name)}`]:[]),...(state.crew?[`${escape(state.crew.badge)} ${escape(state.crew.name)}`]:[])],'transparent','hero-profile')}
   <div class="gem-grid">${gem('✦',fmt(state.fame||0),'Fame','#f5b942')}${gem('👥',fmt(fanClubSize(state.fame||0)),'Fan club','#db2777')}${gem('🎬',state.outputs.length,'Works','#2f7de1')}${gem('💪',Math.floor(state.fitness||0),'Fitness','#2fa84f')}</div>
   <section class="v2-section"><h3>Awards <small>${state.awards.length}</small></h3><div class="medals">${medals.map(a=>`<div class="medal"><span>${awardIcon(a.name)}</span><small>${escape(a.name)}</small></div>`).join('')}${Array.from({length:Math.max(1,4-medals.length)},()=>'<div class="medal locked"><span>🏆</span><small>Still to win</small></div>').join('')}</div></section>
   <section class="v2-section"><h3>Career history <small>latest</small></h3>${outputs(state.outputs)}</section>
@@ -1214,7 +1256,7 @@ function matchReplay(choice,success,before,after){
 const FORMATION=[[5,32],[20,9],[20,24],[20,40],[20,55],[38,9],[38,24],[38,40],[38,55],[52,25],[52,39]];
 // The replay's six actors (see replayScript) mapped onto formation slots: you up front, a winger, the keepers, two red centre-backs.
 const ACTOR_SLOT={A1:['A',9],A2:['A',5],AK:['A',0],BK:['B',0],B1:['B',2],B2:['B',3]};
-let pitch2d=null;
+// pitch2d (the live match screen) is declared with the top-level state: the first render can run before this point.
 function matchScreen(){
   const a=state?.active,on=Boolean(a&&a.kind!=='practice'&&a.career==='football'&&!state.trip&&motion);document.body.classList.toggle('in-match',on);
   if(!on){if(pitch2d){cancelAnimationFrame(pitch2d.raf);pitch2d.el.remove();pitch2d=null;}return;}
@@ -1222,7 +1264,7 @@ function matchScreen(){
     pitch2d={el,g:el.querySelector('canvas').getContext('2d'),text:el.querySelector('.mr-text'),replay:null,ball:{holder:9,to:9,at:0,next:0},raf:0};pitch2d.raf=requestAnimationFrame(drawMatch2d);}
   const minute=Math.min(90,Math.round(((a.beat||0)/(a.totalBeats||6))*90));
   pitch2d.el.querySelector('.mr-bar strong').textContent=`${a.playerScore||0} – ${a.opponentScore||0}`;pitch2d.el.querySelector('.mr-bar em').textContent=`${minute}'`;
-  if(!pitch2d.replay)pitch2d.text.textContent=a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?`Blue keep the ball moving… your next touch in ${duration(a.readyAt-now())}`:'The ball comes to you. Pick your move below.';
+  if(!pitch2d.replay)pitch2d.text.textContent=a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?`Blue keep the ball moving… your next touch in ${duration(a.readyAt-now())}`:`${a.scene?.text||'The ball comes to you.'} Pick your move below.`;
 }
 function drawMatch2d(){
   const m=pitch2d;if(!m)return;const g=m.g,W=660,H=420,X=x=>22+x*6.16,Y=y=>18+y*6.03,t=performance.now()/1000,lerp=(a,b,k)=>a+(b-a)*k,ease=k=>k<.5?2*k*k:1-(-2*k+2)**2/2;
