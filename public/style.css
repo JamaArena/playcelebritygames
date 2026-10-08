@@ -1195,3 +1195,26 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 body.in-match #questChip,body.in-match #app .page-heading{display:none!important}
 .mr-view{border:0;border-radius:14px;padding:7px 14px;background:#ffffff1f;color:#fff;font:600 12px Fredoka,system-ui,sans-serif;cursor:pointer}
 .match-2d.peek{background:transparent;pointer-events:none}.match-2d.peek>*:not(.mr-view):not(.mr-bar){visibility:hidden}.match-2d.peek .mr-view{pointer-events:auto;margin-top:auto}
+/* Work: the situation, live score and meters, choices that name their skill, and the result card. */
+#app .activity-card:has(.work-scene),#app .activity-card:has(.meters){max-height:min(330px,52vh)}
+.work-scene{margin:2px 0 7px;padding:8px 11px;border-radius:12px;background:#fff7dc;border:1px solid #f1dc9a;font:600 12px/1.3 var(--fun,'Segoe UI');color:#4a3b12}
+.work-scene.event{background:#ffe9e2;border-color:#f3a58c;color:#6b2412;animation:popIn .35s both}
+.meters{display:flex;gap:10px;margin:0 0 6px}.meter{flex:1;display:flex;align-items:center;gap:6px;font-size:10px;color:#4d6150}.meter span{white-space:nowrap}.meter i{flex:1;height:7px;border-radius:6px;background:linear-gradient(to right,var(--tone) var(--v),#e2eadb var(--v));transition:background .6s}.meter b{font-variant-numeric:tabular-nums;min-width:20px;text-align:right}
+.scoreboard{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 6px;padding:5px 10px;border-radius:12px;background:#1f2a37;color:#fff;font:700 13px var(--fun,'Segoe UI')}.scoreboard strong{font-variant-numeric:tabular-nums;text-align:center}.scoreboard em{font-style:normal;font-size:10px;padding:2px 6px;border-radius:6px;background:#ffffff22}.sb-blue,.sb-red{font-size:10px;padding:2px 7px;border-radius:6px;background:#2f6fd6}.sb-red{background:#d23b3b}
+.scoreboard.stamina{display:grid;gap:4px;background:#1f2a37}.scoreboard.stamina .meter{color:#fff}
+.work-last{margin:0 0 6px;font-size:11px;font-weight:600}.work-last.hit{color:#2f7a4a}.work-last.miss{color:#a0522d}
+.sim-choice em{font-style:normal;font-size:8px;padding:1px 6px;border-radius:8px;background:#e5efe0;color:#4b6a50}.sim-choice em.risk-balanced{background:#fff1cc;color:#7a5a12}.sim-choice em.risk-risky{background:#ffe0d6;color:#8a3416}
+.action-pop small{font-size:11px;color:#5b6b52;font-weight:600}
+.result-story{list-style:none;margin:0 auto 12px;padding:0;display:grid;gap:5px;max-width:420px;text-align:left}.result-story li{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:12px;background:#ffffffe6;color:#23352a;font:600 13px var(--fun,'Segoe UI')}.result-story li b{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:#3a8b56;color:#fff;flex:none}.result-story li.miss b{background:#c0583a}.result-story li span{flex:1}.result-story li small{font-size:10px;color:#6a7d6d}.result-story li.event{outline:2px solid #f3a58c}
+.result-stats{display:flex;justify-content:center;gap:10px;margin-bottom:10px}.result-stats div{min-width:84px;padding:8px;border-radius:14px;background:#ffffffe6;color:#23352a;display:grid;gap:2px}.result-stats span{font-size:18px}.result-stats strong{font:700 18px var(--fun,'Segoe UI')}.result-stats small{font-size:10px;color:#5b6b5e;text-transform:capitalize}
+.result-review{font-style:italic}.result-card.loss h2{color:#ffd9cf}
+.wl{display:inline-block;font-style:normal;font-size:10px;width:17px;height:17px;line-height:17px;text-align:center;border-radius:5px;color:#fff;background:#888;margin-right:3px}.wl-win{background:#2f8f4e}.wl-loss{background:#c0583a}
+.tier-gate{display:block;margin-top:4px;font-size:11px}.tier-gate .ok{color:#2f8f4e}.tier-gate .need{color:#c0583a;font-weight:700}
+@media(max-width:620px){.result-story li{font-size:11px;padding:5px 8px}.result-stats div{min-width:70px}.meters{gap:6px}.work-scene{font-size:11px}}
+.result-card{max-height:calc(100vh - 16px);overflow:auto;padding-top:4px}.result-card h2{margin-top:4px}
+@media(max-height:780px){.result-card h2{font-size:30px}.result-card>p{margin-bottom:8px}.result-story{gap:3px}.result-story li{padding:4px 9px;font-size:12px}.result-stats div{padding:5px}.result-card .reward-tiles{margin-bottom:12px}.result-card .reward-tile{padding:8px 6px 6px;width:120px}.result-card .reward-tile .gem{width:44px;height:44px;font-size:22px}}
+.work-board{display:flex;gap:8px;align-items:center;margin:0 0 5px}.work-board .scoreboard{margin:0;flex:1.4;font-size:12px;padding:4px 8px;gap:6px}.work-board .meters{margin:0;flex:1;flex-direction:column;gap:2px}.work-board .scoreboard.stamina{flex:1.4}
+.activity-card .work-scene{margin:0 0 5px;padding:6px 10px}.activity-card .sim-choice b{font-size:16px}
+@media(max-width:620px){.work-board{flex-direction:column;align-items:stretch}}
+@media(max-width:620px){.work-board .meters{flex-direction:row;gap:8px}.activity-card .sim-choice{padding:5px}.activity-card .sim-choice b{font-size:14px}}
+.result-stats{flex-wrap:wrap}
