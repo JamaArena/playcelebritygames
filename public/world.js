@@ -1142,7 +1142,7 @@ export class World {
   // Fans in the stands: they cheer your hits and groan at your misses.
   fans(kind,target){const spots=FAN_SPOTS[kind];if(!spots)return;const fx=this.effect&&performance.now()<this.effect.ends&&this.state.active&&this.state.active.kind!=='practice'?this.effect:null,t=this.reduced?0:performance.now()/1000;
     spots.forEach(([x,z,h,seated],n)=>{const look=target?Math.atan2(target.x-x,target.z-z):h,pose=fx?(fx.success?'victory':'facepalm'):seated?'sit':['wave',null,'victory',null][Math.floor(t/1.7+n)%4];
-      this.human(x,z,SKIN_TONES[(n*3+CROWD_SEED)%SKIN_TONES.length],{...this.look(['football','musician','vlogger','actor','developer','tennis'][n%6]),...this.extra(n+3),...(kind==='pitch'?{scale:.6}:{}),pose:fx&&seated?'sit':pose,heading:seated?h:look,seat:seated?.62:undefined});});}
+      this.human(x,z,SKIN_TONES[(n*3+CROWD_SEED)%SKIN_TONES.length],{...this.look(['football','musician','vlogger','actor','developer','tennis'][n%6]),...this.extra(n+3),pose:fx&&seated?'sit':pose,heading:seated?h:look,seat:seated?.62:undefined});});}
   // A gig audience facing the stage.
   audience(stage){const fx=this.effect&&performance.now()<this.effect.ends?this.effect:null,t=this.reduced?0:performance.now()/1000;
     for(let n=0;n<9;n++){const x=1.5+(n%3)*1.05+(Math.floor(n/3)%2)*.4,z=-.7+Math.floor(n/3)*.85;this.human(x,z,SKIN_TONES[(n*3+1+CROWD_SEED)%SKIN_TONES.length],{...this.look(['musician','vlogger','actor','skitmaker'][n%4]),...this.extra(n+11),pose:fx?(fx.success?'victory':null):['dance','shoki','wave','dance'][Math.floor(t/1.4+n)%4],heading:Math.atan2(stage.x-x,stage.z-z)});}}

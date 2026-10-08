@@ -383,7 +383,7 @@ export const WORK_EVENTS = {
 
 // The two live meters on the activity card, named for each career: [engagement, stability].
 export const METERS = {
-  football: ['Crowd', 'Legs'], basketball: ['Crowd', 'Legs'], wrestling: ['Crowd heat', 'Stamina'], tennis: ['Crowd', 'Legs'],
+  football: ['Crowd', 'Fitness'], basketball: ['Crowd', 'Fitness'], wrestling: ['Crowd heat', 'Stamina'], tennis: ['Crowd', 'Fitness'],
   musician: ['Vibe', 'Mix'], vlogger: ['Hype', 'Footage'], video: ['Retention', 'Accuracy'], skitmaker: ['Laughs', 'Takes'],
   streamer: ['Chat', 'Stream'], actor: ['Director', 'Takes'], adult: ['Fans', 'Set'], founder: ['Investors', 'Runway'],
   developer: ['Client', 'Tests'], web3: ['Community', 'Security'],
