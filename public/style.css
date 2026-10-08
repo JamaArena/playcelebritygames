@@ -1186,3 +1186,12 @@ h1,h2,h3,.eyebrow,.v2-tile strong,.shop-price,.tier-pill,.sim-status strong,.pie
 .mr-bar strong{flex:1;text-align:center;font:700 20px Fredoka,system-ui,sans-serif}.mr-bar em{font-style:normal;padding:2px 8px;border-radius:8px;background:#000a;font-variant-numeric:tabular-nums}
 .mr-text{margin:8px 2px;padding:7px 12px;border-radius:10px;background:#1d4fae;font:600 14px Fredoka,system-ui,sans-serif;min-height:20px}
 .match-replay canvas{display:block;width:100%;height:auto;border-radius:12px}.match-replay small{display:block;text-align:center;margin-top:6px;font-size:10.5px;opacity:.6}
+
+/* Football: the 2D match screen over the world view; the HUD and match card stay on top */
+.match-2d{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:84px 16px 200px;background:radial-gradient(circle at 50% 30%,#163a2a,#0b1a14 75%);color:#fff}
+.match-2d .mr-bar,.match-2d .mr-text{width:min(660px,100%)}.match-2d .mr-text{margin:0}
+.match-2d canvas{width:min(660px,100%);height:auto;max-height:calc(100% - 96px);object-fit:contain;border-radius:14px;box-shadow:0 12px 30px -10px #000c}
+@media(max-width:700px){.match-2d{padding:72px 10px 190px}}
+body.in-match #questChip,body.in-match #app .page-heading{display:none!important}
+.mr-view{border:0;border-radius:14px;padding:7px 14px;background:#ffffff1f;color:#fff;font:600 12px Fredoka,system-ui,sans-serif;cursor:pointer}
+.match-2d.peek{background:transparent;pointer-events:none}.match-2d.peek>*:not(.mr-view):not(.mr-bar){visibility:hidden}.match-2d.peek .mr-view{pointer-events:auto;margin-top:auto}

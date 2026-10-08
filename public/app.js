@@ -329,6 +329,7 @@ async function startAtObject(input){
 }
 let tripTimer;
 function render(){
+  matchScreen();
   setMood(state?.trip?'road':state?.location);questHud();
   if(!modalPage||modalPage!=='create')tip(state.location==='home'?'home':state.location==='street'||state.trip?'city':'venue');
   // Refresh the moment a trip, practice or recovery finishes instead of waiting for the next heartbeat.
@@ -1190,6 +1191,7 @@ function replayScript(choice,success,blueGoal,redGoal,me){
 function matchReplay(choice,success,before,after){
   const blueGoal=(after.playerScore||0)>(before.playerScore||0),redGoal=(after.opponentScore||0)>(before.opponentScore||0),script=replayScript(choice,success,blueGoal,redGoal,state.name.split(' ')[0]);
   const minute=Math.min(90,Math.round(((after.beat||1)/(after.totalBeats||6))*90));
+  if(pitch2d){pitch2d.replay={script,t0:performance.now()};return;}
   $('#matchReplay')?.remove();const box=document.createElement('div');box.id='matchReplay';box.className='match-replay';
   box.innerHTML=`<div class="mr-bar"><b class="mr-blue">BLUE</b><strong>${after.playerScore||0} – ${after.opponentScore||0}</strong><b class="mr-red">RED</b><em>${minute}'</em></div><div class="mr-text"></div><canvas width="640" height="400"></canvas><small>Tap to close</small>`;
   document.body.append(box);const c=box.querySelector('canvas'),g=c.getContext('2d'),text=box.querySelector('.mr-text'),X=x=>20+x*6,Y=y=>16+y*5.75,t0=performance.now();let raf=0;
@@ -1205,4 +1207,40 @@ function matchReplay(choice,success,before,after){
     const line=(t>=b.t-.4&&b!==a?b:a).text;if(text.textContent!==line)text.textContent=line;
     if(t<script.at(-1).t+1.2&&!box.classList.contains('out'))raf=requestAnimationFrame(frame);else close();};
   frame();
+}
+
+// Football matches are played on a full 2D match screen: 11 v 11 in a 4-4-2 with keepers, a scoreboard,
+// the minute and commentary. Decisions stay on the match card below; each one replays on this pitch.
+const FORMATION=[[5,32],[20,9],[20,24],[20,40],[20,55],[38,9],[38,24],[38,40],[38,55],[52,25],[52,39]];
+// The replay's six actors (see replayScript) mapped onto formation slots: you up front, a winger, the keepers, two red centre-backs.
+const ACTOR_SLOT={A1:['A',9],A2:['A',5],AK:['A',0],BK:['B',0],B1:['B',2],B2:['B',3]};
+let pitch2d=null;
+function matchScreen(){
+  const a=state?.active,on=Boolean(a&&a.kind!=='practice'&&a.career==='football'&&!state.trip&&motion);document.body.classList.toggle('in-match',on);
+  if(!on){if(pitch2d){cancelAnimationFrame(pitch2d.raf);pitch2d.el.remove();pitch2d=null;}return;}
+  if(!pitch2d){const el=document.createElement('div');el.className='match-2d';el.innerHTML='<div class="mr-bar"><b class="mr-blue">BLUE</b><strong></strong><b class="mr-red">RED</b><em></em></div><div class="mr-text"></div><canvas width="660" height="420"></canvas><button class="mr-view" type="button">👀 See the line-up in 3D</button>';el.querySelector('.mr-view').onclick=e=>{e.stopPropagation();el.classList.toggle('peek');e.target.textContent=el.classList.contains('peek')?'⚽ Back to the match':'👀 See the line-up in 3D';};$('.world-card').append(el);
+    pitch2d={el,g:el.querySelector('canvas').getContext('2d'),text:el.querySelector('.mr-text'),replay:null,ball:{holder:9,to:9,at:0,next:0},raf:0};pitch2d.raf=requestAnimationFrame(drawMatch2d);}
+  const minute=Math.min(90,Math.round(((a.beat||0)/(a.totalBeats||6))*90));
+  pitch2d.el.querySelector('.mr-bar strong').textContent=`${a.playerScore||0} – ${a.opponentScore||0}`;pitch2d.el.querySelector('.mr-bar em').textContent=`${minute}'`;
+  if(!pitch2d.replay)pitch2d.text.textContent=a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?`Blue keep the ball moving… your next touch in ${duration(a.readyAt-now())}`:'The ball comes to you. Pick your move below.';
+}
+function drawMatch2d(){
+  const m=pitch2d;if(!m)return;const g=m.g,W=660,H=420,X=x=>22+x*6.16,Y=y=>18+y*6.03,t=performance.now()/1000,lerp=(a,b,k)=>a+(b-a)*k,ease=k=>k<.5?2*k*k:1-(-2*k+2)**2/2;
+  // The pitch.
+  g.fillStyle='#2f8f3a';g.fillRect(0,0,W,H);for(let i=1;i<10;i+=2){g.fillStyle='#349a40';g.fillRect(X(i*10),Y(0),X(10)-X(0),Y(64)-Y(0));}
+  g.strokeStyle='#e8f5e0cc';g.lineWidth=2;g.strokeRect(X(0),Y(0),X(100)-X(0),Y(64)-Y(0));g.beginPath();g.moveTo(X(50),Y(0));g.lineTo(X(50),Y(64));g.stroke();g.beginPath();g.arc(X(50),Y(32),48,0,7);g.stroke();
+  for(const s of [0,1]){g.strokeRect(X(s?84:0),Y(14),X(16)-X(0),Y(50)-Y(14));g.strokeRect(X(s?95:0),Y(24),X(5)-X(0),Y(40)-Y(24));g.fillStyle='#ffffffcc';g.fillRect(s?X(100):X(0)-8,Y(27),8,Y(37)-Y(27));}
+  // Where the ball is: a replay (scripted move) or, between plays, blue passing it around.
+  let actors={},ball;
+  if(m.replay){const s=m.replay.script,e=(performance.now()-m.replay.t0)/1000,i=Math.max(0,s.findIndex((f,n)=>n===s.length-1||s[n+1].t>e)),a=s[i],b=s[Math.min(i+1,s.length-1)],k=b===a?1:ease(Math.min(1,(e-a.t)/(b.t-a.t)));
+    for(const key in ACTOR_SLOT)actors[key]=[lerp(a.pos[key][0],b.pos[key][0],k),lerp(a.pos[key][1],b.pos[key][1],k)];ball=[lerp(a.ball[0],b.ball[0],k),lerp(a.ball[1],b.ball[1],k)];
+    const line=(e>=b.t-.4&&b!==a?b:a).text;if(m.text.textContent!==line)m.text.textContent=line;if(e>s.at(-1).t+1.4){m.replay=null;matchScreen();}}
+  const pb=m.ball;if(!m.replay&&t>=pb.next){pb.holder=pb.to;pb.to=1+Math.floor(Math.random()*10);pb.at=t;pb.next=t+1.2+Math.random()*1.2;}
+  const shift=ball?(ball[0]-50)*.3:0,spot=(team,n)=>{const [fx,fy]=FORMATION[n],x=team==='A'?fx:100-fx,sway=Math.sin(t*.8+n*1.3+(team==='B'?2:0))*1.6;return [Math.min(97,Math.max(3,x+(n?shift:shift*.15)+sway*.5)),fy+Math.cos(t*.7+n)*1.2];};
+  if(!ball){const from=spot('A',pb.holder),to=spot('A',pb.to),k=Math.min(1,(t-pb.at)/.7);ball=[lerp(from[0],to[0],k),lerp(from[1],to[1],k)];}
+  const at=(team,n)=>{const key=Object.keys(ACTOR_SLOT).find(k=>ACTOR_SLOT[k][0]===team&&ACTOR_SLOT[k][1]===n);return key&&actors[key]?actors[key]:spot(team,n);};
+  for(const team of ['B','A'])for(let n=0;n<11;n++){const [x,y]=at(team,n),you=team==='A'&&n===9;g.beginPath();g.arc(X(x),Y(y),you?10:8,0,7);g.fillStyle=team==='A'?(n?'#2f6fd6':'#173f8a'):(n?'#d23b3b':'#7a1d1d');g.fill();g.lineWidth=you?4:1.6;g.strokeStyle=you?'#ffd84a':'#fff';g.stroke();
+    if(!n||you){g.fillStyle='#fff';g.font='bold 9px system-ui';g.textAlign='center';g.textBaseline='middle';g.fillText(you?'★':'GK',X(x),Y(y)+.5);}}
+  g.beginPath();g.arc(X(ball[0])+2,Y(ball[1])+3,4.5,0,7);g.fillStyle='#0004';g.fill();g.beginPath();g.arc(X(ball[0]),Y(ball[1]),5.5,0,7);g.fillStyle='#fff';g.fill();g.strokeStyle='#222';g.lineWidth=1.4;g.stroke();
+  m.raf=requestAnimationFrame(drawMatch2d);
 }
