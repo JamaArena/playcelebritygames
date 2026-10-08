@@ -10,7 +10,8 @@ const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&
 const fmt=value=>Math.floor(value).toLocaleString();
 const duration=ms=>{const seconds=Math.max(0,Math.ceil(ms/1000));return `${Math.floor(seconds/60)}:${String(seconds%60).padStart(2,'0')}`;};
 const needs={hunger:['Hunger','🍗'],energy:['Energy','⚡'],fun:['Fun','🎉'],social:['Social','💬'],hygiene:['Hygiene','🧼'],bladder:['Bladder','🚽']};
-let lastUpdate=0,heartbeat,snapshot,state,busy=false,modalPage=null,previousFocus,toastTimer,offset=0,phoneTab='local',selectedObject;
+// liveFollow is set once the live socket opens; declared up here because the first update can arrive first.
+let drawFailures=0,liveFollow=null,lastUpdate=0,heartbeat,snapshot,state,busy=false,modalPage=null,previousFocus,toastTimer,offset=0,phoneTab='local',selectedObject;
 let motion=!matchMedia('(prefers-reduced-motion: reduce)').matches;
 const now=()=>Date.now()+offset;
 const button=(label,action,attrs='',style='secondary')=>`<button class="${style}" data-action="${action}" ${attrs}>${label}</button>`;
@@ -71,8 +72,11 @@ function playingElsewhere(){if(elsewhere)return;elsewhere=true;clearTimeout(hear
 async function refresh(takeover=false){
   if(!state&&$('#loadingText'))$('#loadingText').textContent='Connecting to the city…';
   if(busy||(elsewhere&&!takeover))return;
-  try{const response=await fetch('/api/state'+(takeover?'?takeover=1':''));if(response.status===409){playingElsewhere();return;}if(!response.ok)throw new Error('City connection unavailable.');receive(await response.json());$('#connection').textContent='Saved to your city';}
-  catch(error){$('#connection').textContent='Connection interrupted · retrying';if(!state)$('#loading').innerHTML='<div class="initial-error"><h1>Your city is unavailable</h1><p>We could not connect to your city. Please try again in a moment.</p><button class="primary" data-action="retry">Try again</button></div>';}
+  let data;
+  try{const response=await fetch('/api/state'+(takeover?'?takeover=1':''));if(response.status===409){playingElsewhere();return;}if(!response.ok)throw new Error('City connection unavailable.');data=await response.json();}
+  catch(error){$('#connection').textContent='Connection interrupted · retrying';if(!state)$('#loading').innerHTML='<div class="initial-error"><h1>Your city is unavailable</h1><p>We could not connect to your city. Please try again in a moment.</p><button class="primary" data-action="retry">Try again</button></div>';return;}
+  // A drawing error must never leave a blank screen until the next 45s check-in: log it and retry soon.
+  try{receive(data);$('#connection').textContent='Saved to your city';drawFailures=0;}catch(error){console.error('Showing the city failed',error);if(++drawFailures<=5)setTimeout(()=>refresh(),800*drawFailures);}
 }
 // Live notices: compare with the previous snapshot so things other players caused pop up immediately.
 let seen=null;
@@ -164,7 +168,7 @@ function receive(data,own=false){notice(data,own);const before=state;snapshot=da
   if(!$('#loading').hidden){if(state){$('#loadingText')&&($('#loadingText').textContent='Building your world…');requestAnimationFrame(()=>requestAnimationFrame(()=>{$('#loading').hidden=true;}));}else $('#loading').hidden=true;}lastUpdate=Date.now();scheduleHeartbeat();liveFollow?.(); // every update (an action or a refresh) restarts the 45s countdown
   if(!state){if(!data.account){if(modalPage!=='auth')authScreen('signup');}else if(modalPage!=='create')creation(data.account);return;}
   if(!welcomed){welcomed=true;setTimeout(()=>welcome(data),0);}
-  $('#app').hidden=false;render();if(modalPage==='thread'&&$('#threadLog')){const log=$('#threadLog'),atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<40;log.innerHTML=threadMessages(threadWith);if(atBottom)log.scrollTop=log.scrollHeight;}if(modalPage==='battle'&&!own)battleView();world.update(state,data.scenePlayers||[],data.visitedHome,data.townPlayers||[],data.players||[],state.friends);
+  $('#app').hidden=false;try{render();}catch(error){console.error('Drawing the HUD failed',error);}if(modalPage==='thread'&&$('#threadLog')){const log=$('#threadLog'),atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<40;log.innerHTML=threadMessages(threadWith);if(atBottom)log.scrollTop=log.scrollHeight;}if(modalPage==='battle'&&!own)battleView();world.update(state,data.scenePlayers||[],data.visitedHome,data.townPlayers||[],data.players||[],state.friends);
 }
 async function send(input,{keepModal=false,quiet=false}={}){
   if(busy)return;busy=true;$('#connection').textContent='Saving…';
@@ -1029,7 +1033,6 @@ document.addEventListener('submit',async event=>{
   if(form.id==='directForm'){await send({type:'chat',...values});toast('Message sent.');}
   if(form.id==='collabForm')await send({type:'collabInvite',...values},{keepModal:true});
 });
-await refresh();
 // Real-time: the local server pushes a ping after any player's action; polling remains the heartbeat and fallback.
 let liveTimer,pulseAt=null;const soon=()=>{clearTimeout(liveTimer);liveTimer=setTimeout(()=>{if(!busy)refresh();},150);};
 // Fallback for hosts without a push channel (Netlify): poll a one-row change counter, fetch state only when it moves.
@@ -1039,7 +1042,7 @@ let pulseFor='';
 const pollPulse=()=>setInterval(async()=>{if(document.hidden)return;try{const keys=pulseKeys(),r=await fetch('/api/pulse'+(keys?`?keys=${encodeURIComponent(keys)}`:''));if(!r.ok)return;const {at}=await r.json();if(pulseAt!==null&&pulseFor===keys&&at!==pulseAt)soon();pulseAt=at;pulseFor=keys;}catch{}},10000);
 // Live updates: a WebSocket that follows your room and you, and nudges a refresh when either changes.
 // Hosts without sockets (Netlify, Vercel) fall back to asking /api/pulse every 10s.
-let liveFollow=null,polling=false;
+let polling=false;
 const startPolling=()=>{if(!polling){polling=true;pollPulse();}};
 function connectLive(delay=1000){
   if(typeof WebSocket!=='function'){startPolling();return;}
@@ -1109,3 +1112,5 @@ function arenaApp(){
   ${f?card(f,`Across ${f.label} · winner gets +${ARENA.prize.family} fame`,a.family.list,today,'field'):''}
   ${card(ARENA.goat,'The most famous star in Naija City, ever',a.goat,ever,'goat')}`);
 }
+// Start last: every declaration above is ready before the first update can arrive and draw.
+await refresh();
