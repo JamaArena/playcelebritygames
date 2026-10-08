@@ -161,7 +161,7 @@ function showMishap(s){
   if(modalPage){toast(`${def.icon} ${def.title}! −${m.lost.toLocaleString('en-US')} fame.`);world.playMishap(m);}else showModal('mishap',card,false);
 }
 function receive(data,own=false){notice(data,own);const before=state;snapshot=data;state=data.state;if(before&&state&&before.name===state.name)celebrate(before,state);offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();showMishap(state);showLifeEvent(state);showPrompt(state);drawMinimap();
-  $('#loading').hidden=true;lastUpdate=Date.now();scheduleHeartbeat();liveFollow?.(); // every update (an action or a refresh) restarts the 45s countdown
+  if(!$('#loading').hidden){if(state){$('#loadingText')&&($('#loadingText').textContent='Building your world…');requestAnimationFrame(()=>requestAnimationFrame(()=>{$('#loading').hidden=true;}));}else $('#loading').hidden=true;}lastUpdate=Date.now();scheduleHeartbeat();liveFollow?.(); // every update (an action or a refresh) restarts the 45s countdown
   if(!state){if(!data.account){if(modalPage!=='auth')authScreen('signup');}else if(modalPage!=='create')creation(data.account);return;}
   if(!welcomed){welcomed=true;setTimeout(()=>welcome(data),0);}
   $('#app').hidden=false;render();if(modalPage==='thread'&&$('#threadLog')){const log=$('#threadLog'),atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<40;log.innerHTML=threadMessages(threadWith);if(atBottom)log.scrollTop=log.scrollHeight;}if(modalPage==='battle'&&!own)battleView();world.update(state,data.scenePlayers||[],data.visitedHome,data.townPlayers||[],data.players||[],state.friends);
