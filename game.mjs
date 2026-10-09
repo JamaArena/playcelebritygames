@@ -106,6 +106,8 @@ export function reconcile(s, now) {
 // A critically low need makes the character do something embarrassing: fame drops and it's in the news.
 // One mishap at a time, a couple of minutes apart, so several low needs don't pile on at once.
 export function mishaps(s,now){
+  // Like life events, a mishap waits until a match, a work session or a Fame Clash is over.
+  if((s.active&&s.active.kind!=='practice')||s.battle)return;
   s.mishapAt??={};if(now-(s.mishap?.at||0)<MISHAP.gapMs)return;
   for(const [need,m] of Object.entries(MISHAPS)){
     if(s.needs[need]>MISHAP.at||s.recovery?.need===need||now-(s.mishapAt[need]||0)<MISHAP.cooldownMs)continue;

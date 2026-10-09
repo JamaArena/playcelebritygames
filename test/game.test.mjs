@@ -572,3 +572,7 @@ test('tennis: a lost game from an event counts in the same stretch the card show
 test('tennis: the last pick shows the match result when its games are level',()=>{
   for(let i=1;i<200;i++){const t=make('tennis');go(t);let n=i;complete(t,'produce',()=>((n=n*48271%2147483647)/2147483647));const r=t.results[0],last=r.story.at(-1);if(last.games&&last.games[0]===last.games[1])assert.equal(last.success,r.win==='Win',r.sets);}
 });
+test('mishaps wait until a work session is over, like life events',async()=>{
+  const {mishaps}=await import('../game.mjs');const s=make();s.needs.hygiene=0;s.active={kind:'produce',career:'football'};mishaps(s,T+10*60_000);assert.equal(s.mishap,undefined);
+  s.active=null;mishaps(s,T+10*60_000);assert.equal(s.mishap.need,'hygiene');
+});

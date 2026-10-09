@@ -165,8 +165,10 @@ function notice(data,own){
 }
 // Random life moments (a lucky break, a fan gift, a power cut…) show once as a toast and a bubble.
 let seenLifeEvent=null;
+// Pop-ups hold while you are at work (not practice) or in a Fame Clash, and show once you are done.
+const holdPopups=s=>Boolean(s?.active&&s.active.kind!=='practice'||s?.battle);
 function showLifeEvent(s){
-  const e=s?.lifeEvent,def=e&&LIFE_EVENTS[e.kind];if(!def||seenLifeEvent===e.id)return;const first=seenLifeEvent===null;seenLifeEvent=e.id;
+  const e=s?.lifeEvent,def=e&&LIFE_EVENTS[e.kind];if(!def||seenLifeEvent===e.id||holdPopups(s))return;const first=seenLifeEvent===null;seenLifeEvent=e.id;
   // Remembered across reloads (such as a 2D/3D switch) so the same moment never pops up twice.
   let shown=null;try{shown=localStorage.getItem('cg.lifeEvent');localStorage.setItem('cg.lifeEvent',e.id);}catch{}
   if(first&&(shown===e.id||Date.now()+offset-e.at>60_000))return;
@@ -181,7 +183,7 @@ function showPrompt(s){
 // A mishap (a need hit rock bottom) pops up once: what happened, what it cost, and how to avoid it.
 let seenMishap=null;
 function showMishap(s){
-  const m=s?.mishap,def=m&&MISHAPS[m.need];if(!def||seenMishap===m.id)return;seenMishap=m.id;
+  const m=s?.mishap,def=m&&MISHAPS[m.need];if(!def||seenMishap===m.id||holdPopups(s))return;seenMishap=m.id;
   let stored=null;try{stored=localStorage.getItem('cg.mishap');localStorage.setItem('cg.mishap',m.id);}catch{}
   if(stored===m.id||Date.now()+offset-m.at>120_000)return;
   const card=`<div class="mishap-card"><div class="mishap-icon" aria-hidden="true">${def.icon}</div><span class="eyebrow">CAUGHT ON CAMERA</span><h2>${escape(def.title)}!</h2><p>${escape(def.text)}</p><strong class="mishap-fame">−${m.lost.toLocaleString('en-US')} fame</strong><small>Keep your ${escape(m.need)} above ${MISHAP.at}% to avoid moments like this.</small>${button('Ugh, fine','closeMishap','','primary wide')}</div>`;
