@@ -382,7 +382,7 @@ export function act(s,input,now,rng=Math.random) {
       let outcome=choice.action==='shoot'?shot(skill,scene,fatigue,rng):{success:draw<p,probability:p,draws:[draw],result:draw<p?'Successful':'Missed opportunity'};
       // Tennis: the shot sets your odds for a stretch of three games (odd, so there is no tie), and the stretch decides the call (won more games = it worked),
       // so the card, the umpire and the banner agree. The last decision plays on until the match is decided.
-      if(a.career==='tennis'){playTennis(a,outcome.success,choice.risk,rng,a.beat>=a.totalBeats-1?999:3,a.tier?0:.02);const [w,l]=a.lastGames,won=w>l||(w===l&&outcome.success);outcome={...outcome,success:won,result:won?'Successful':'Missed opportunity',games:[w,l]};}
+      if(a.career==='tennis'){playTennis(a,outcome.success,choice.risk,rng,a.beat>=a.totalBeats-1?999:3,a.tier?0:.02);const [w,l]=a.lastGames,won=w===l?a.tennis.winner===0:w>l;outcome={...outcome,success:won,result:won?'Successful':'Missed opportunity',games:[w,l]};}
       const ok=outcome.success,R=RISKS.indexOf(choice.risk),score=ok?{safe:60,balanced:80,risky:100}[choice.risk]:sport(a.career)?20:35;
       a.outcomes.push({...outcome,score,choice:choice.label,action:choice.action,target:choice.target,scene,skill:choice.skill,risk:choice.risk,event:!!choice.event,follow:!!scene.follow,...(choice.tag?{tag:choice.tag}:{}),at:now});
       learn(s,a.career,choice.skill,5,`${a.id}:${a.beat}`);s.needs.energy=clamp(s.needs.energy-2*(1-(perksFor(s).energy||0)/100));

@@ -569,3 +569,6 @@ test('tennis: a lost game from an event counts in the same stretch the card show
   const s=make('tennis');go(s);act(s,{type:'start',kind:'produce'},T+1,()=>.9);const a=s.active;a.event={beat:0,n:0};
   act(s,{type:'decision',activityId:a.id,beat:0,choice:2},a.readyAt,()=>.999);assert.deepEqual(a.outcomes[0].games,a.lastGames);assert.equal(a.outcomes[0].success,false);
 });
+test('tennis: the last pick shows the match result when its games are level',()=>{
+  for(let i=1;i<200;i++){const t=make('tennis');go(t);let n=i;complete(t,'produce',()=>((n=n*48271%2147483647)/2147483647));const r=t.results[0],last=r.story.at(-1);if(last.games&&last.games[0]===last.games[1])assert.equal(last.success,r.win==='Win',r.sets);}
+});
