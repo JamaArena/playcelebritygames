@@ -411,7 +411,9 @@ function renderActivity(){
 let pendingChoice=null;
 async function chooseDecision(index){const a=state.active;if(!a||pendingChoice)return;const chosen=a.choices[index],career=a.career,before={playerScore:a.playerScore,opponentScore:a.opponentScore,engagement:a.engagement,stability:a.stability,playerStamina:a.playerStamina,chance:a.possession!=='opponent'&&a.chance,possession:a.possession};
   // The tapped choice lights up at once; the others wait until the server has decided.
-  pendingChoice={id:a.id,beat:a.beat,index};$('.sim-choice[data-index="'+index+'"]')?.classList.add('pending');let data;try{data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});}finally{pendingChoice=null;}if(!data){renderActivity();return;}
+  pendingChoice={id:a.id,beat:a.beat,index};$('.sim-choice[data-index="'+index+'"]')?.classList.add('pending');let data;try{
+    // send() drops a request while another is in flight (a heartbeat or a walk), which used to lose the tap: wait for it first.
+    await new Promise(done=>whenIdle(done));data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});}finally{pendingChoice=null;}if(!data){renderActivity();return;}
   const last=(data.state.active?.outcomes||data.state.outputs?.[0]?.outcomes||[]).at(-1),success=last?.success;if(motion)world.respond(chosen.action,success);
   // Football acts the move out on the 3D pitch; at full time the final score comes from the result.
   if(career==='football'){const done=data.state.results?.[0],[ps,os]=String(done?.score||'').split('–').map(Number),after=data.state.active||{playerScore:ps,opponentScore:os,beat:6,totalBeats:6};matchReplay(a.id,chosen,success,before,after,last?.result);}else actionPop(career,chosen,success,consequence(career,before,data.state.active||data.state.results?.[0]||{}));}
