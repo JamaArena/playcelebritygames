@@ -528,7 +528,7 @@ export const MISHAPS = {
 export const NPC_TALK = {social: 10, cooldownMs: 45_000, lines: ['Big things are coming for you, I can feel it.', 'Saw your last post. You’re getting better!', 'This city never sleeps, eh?', 'Keep practising. People are starting to notice.', 'Have you been to Naija Motors? Those cars, ehn!', 'Don’t forget to rest. Burnout is real.', 'You know who you should meet? Everybody!', 'Fame is a marathon, not a sprint.']};
 // Key NPCs always look the same so players recognise them; background people get random looks.
 export const NPCS = [
-  {id:'nova', name:'Nova', career:'musician', location:'studio', role:'Producer', color:'#b4a7d9', look:{skin:'#8d5b3d', hair:'locs', hairColor:'black', build:'average', height:'tall'}},
+  {id:'nova', name:'Nova', career:'musician', location:'studio', role:'Producer', notFor:['actor', 'adult'], color:'#b4a7d9', look:{skin:'#8d5b3d', hair:'locs', hairColor:'black', build:'average', height:'tall'}},
   {id:'kai', name:'Kai', career:'football', location:'sports', role:'Scout', color:'#88bda5', look:{skin:'#c98d64', hair:'fade', hairColor:'black', build:'athletic', height:'average'}},
   {id:'mika', name:'Mika', career:'vlogger', location:'plaza', role:'Creator', color:'#e0a28f', look:{skin:'#ecc3a2', hair:'bun', hairColor:'pink', build:'slim', height:'short'}},
   {id:'ari', name:'Ari', career:'founder', location:'tech', role:'Builder', color:'#85b9ca', look:{skin:'#6e442e', hair:'short', hairColor:'black', build:'heavy', height:'average'}},
@@ -539,7 +539,8 @@ export const NPCS = [
   {id:'danjuma', name:'Danjuma', career:'wrestling', location:'sports', role:'Promoter', alt:true, color:'#d98b8b', look:{skin:'#5a3a28', hair:'buzz', hairColor:'black', build:'heavy', height:'tall'}, lines:['The crowd wants a villain. Or a hero. Pick one.', 'Work the mic more and I will put you on the main card.', 'That slam last week? The fans still talk about it.']},
 ];
 // Who you meet at a place: at the arena, the person for your sport (Scout Kai for football and everyone else).
-export const npcAt = (location, career) => { const here = NPCS.filter(n => n.location === location); return here.find(n => n.career === career) || here.find(n => !n.alt) || null; };
+// On a film set (actors, adult creators) the studio's music producer stays out of the shot.
+export const npcAt = (location, career) => { const here = NPCS.filter(n => n.location === location && !n.notFor?.includes(career)); return here.find(n => n.career === career) || here.find(n => !n.alt) || null; };
 export const clamp = (value, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, value));
 export const effort = (level, base = 35) => level <= 4 ? base * level : 4 * base * 2 ** (level - 4);
 // Bigger homes add rooms east of the apartment, reached through a door in the bedroom wall.

@@ -479,7 +479,11 @@ export class World {
   // Cutaway walls: the two walls on the far side stand full height; walls facing the camera drop to stubs.
   walls(h,toneZ,toneX,edge=5.35,t=.18){const c=Math.cos(this.angle),s=Math.sin(this.angle),stub=.18;
     this.box(0,-edge,11,t,c>0?h:stub,toneZ);this.box(0,edge,11,t,c<0?h:stub,toneZ);this.box(-edge,0,t,11,s>0?h:stub,toneX);this.box(edge,0,t,11,s<0?h:stub,toneX);}
-  human(x,z,skin,{hair='#2b211c',style='curls',outfit='#8ea9a4',pants='#34435e',shoes='#f4f1ea',walk=false,pose=null,heading=0,gait=this.gait,smile=1,build='average',height='average'}={}){
+  // 2D Lite: a scaled person (a football match draws everyone at MATCH_SCALE) is drawn full size, then shrunk towards their feet.
+  human(x,z,skin,o={}){const s=o.scale||(this.inMatch()?MATCH_SCALE:1),start=this.meshes?.length??0;this.humanBody(x,z,skin,o);if(s===1||!this.meshes)return;
+    const at=p=>[x+(p[0]-x)*s,p[1]*s,z+(p[2]-z)*s];
+    for(const m of this.meshes.slice(start)){const sn=Math.sin(this.angle),cs=Math.cos(this.angle);if(m.limb){m.a=at(m.a);m.b=at(m.b);m.width*=s;m.y*=s;m.depth=((m.a[0]+m.b[0])*sn+(m.a[2]+m.b[2])*cs)/2;}else{m.x=x+(m.x-x)*s;m.z=z+(m.z-z)*s;m.w*=s;m.d*=s;m.h*=s;m.y*=s;m.depth=m.x*sn+m.z*cs+Math.max(m.w,m.d)*.1;}}}
+  humanBody(x,z,skin,{hair='#2b211c',style='curls',outfit='#8ea9a4',pants='#34435e',shoes='#f4f1ea',walk=false,pose=null,heading=0,gait=this.gait,smile=1,build='average',height='average'}={}){
     // A person without a position is skipped; a missing direction means facing forward.
     if(!Number.isFinite(x)||!Number.isFinite(z)){if(!this.badHuman){this.badHuman=true;console.warn('Skipped a person with no position:',pose);}return;}if(!Number.isFinite(heading))heading=0;
     if(pose==='run'){pose=null;walk=true;gait=performance.now()/1000*11;}
