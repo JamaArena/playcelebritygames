@@ -324,7 +324,7 @@ export const WORK_EVENTS = {
     ['🟨 The referee reaches for a card after your sliding tackle.', ['Apologise and back off', 'Explain you got the ball', 'Argue with the referee'], '333', {kind: 'card', miss: {booked: true, reputation: -2, engagement: -8, news: 'was booked for a reckless tackle'}, hit: {engagement: 6}}],
     ['⚽ Penalty! You are brought down in the box.', ['Side-foot it into the corner', 'Smash it down the middle', 'Chip it Panenka-style'], '222', {kind: 'penalty', miss: {engagement: -10}, hit: {goal: 1, engagement: 20}}],
     ['📺 VAR checks your challenge in the box for a penalty.', ['Hands behind your back', 'Calmly show the replay angle', 'Protest to the referee'], '333', {kind: 'var', miss: {concede: .75, engagement: -10}, hit: {engagement: 12}}],
-    ['🚩 Injury time: a corner to Blue!', ['Play it short and keep the ball', 'Whip it to the near post', 'Go up for the header yourself'], '012', {kind: 'corner', miss: {engagement: -6}, hit: {goal: .5, engagement: 12}}],
+    ['🚩 Injury time: a corner to Blue!', ['Play it short and keep the ball', 'Whip it to the near post', 'Go up for the header yourself'], '002', {kind: 'corner', miss: {engagement: -6}, hit: {goal: .5, engagement: 12}}],
     ['🧤 Their keeper fumbles a cross at your feet!', ['Tap it into the empty net', 'Square it to Bayo', 'Chip the stranded keeper'], '202', {kind: 'fumble', miss: {engagement: -6}, hit: {goal: .85, engagement: 15}}],
   ],
   basketball: [

@@ -412,8 +412,11 @@ export class World3D extends World {
   // The part of the view not covered by the HUD on top and the activity card below.
   viewBand() {
     const c = this.canvas.getBoundingClientRect(), card = document.querySelector('#activityCard')?.getBoundingClientRect(), hud = document.querySelector('.match-hud')?.getBoundingClientRect();
-    const bottom = card && card.height > 0 && card.top < c.bottom ? card.top - c.top - 8 : this.height, top = Math.max(58, hud && hud.height ? hud.bottom - c.top + 6 : 0);
-    return bottom - top > 90 ? { top, bottom } : { top: 0, bottom: this.height };
+    // The quest card (top left) and the button rail (right) cover the view too.
+    const rect = q => { const r = document.querySelector(q)?.getBoundingClientRect(); return r && r.height > 0 && r.width > 0 ? r : null; }, quest = rect('#questChip'), rail = rect('.camera-controls');
+    const bottom = card && card.height > 0 && card.top < c.bottom ? card.top - c.top - 8 : this.height, top = Math.max(58, hud && hud.height ? hud.bottom - c.top + 6 : 0, quest ? quest.bottom - c.top + 6 : 0);
+    const right = rail && rail.left > c.left + c.width / 2 && rail.top < c.top + bottom ? rail.left - c.left - 6 : this.width;
+    return bottom - top > 90 ? { top, bottom, right } : { top: 0, bottom: this.height, right };
   }
   aim(f, angle, el, dist, shift) {
     this.camera.position.set(f.x + Math.sin(angle) * Math.cos(el) * dist, Math.sin(el) * dist, f.z + Math.cos(angle) * Math.cos(el) * dist);
@@ -425,11 +428,11 @@ export class World3D extends World {
   placeCamera() {
     // A football match: a broadcast view of the whole pitch, framed between the scoreboard and the activity card.
     if (this.inMatch()) {
-      const band = this.viewBand(), angle = this.width >= this.height * .9 ? Math.PI / 2 : 0, el = .95, key = [this.width, this.height, angle, Math.round(band.top / 8), Math.round(band.bottom / 8)].join();
+      const band = this.viewBand(), angle = this.width >= this.height * .9 ? Math.PI / 2 : 0, el = .95, key = [this.width, this.height, angle, Math.round(band.top / 8), Math.round(band.bottom / 8), Math.round(band.right / 8)].join();
       this.matchAngle = angle;
       if (this.fitKey !== key) {
         this.fitKey = key; const shift = this.height / 2 - (band.top + band.bottom) / 2, pts = [[-4.2, 0, -4.4], [4.6, 0, -4.4], [-4.2, 0, 4.4], [4.6, 0, 4.4], [-4.2, .8, -3], [4.6, .8, -2.5], [-4.2, .8, 3], [4.6, .8, 2.5], [-.8, 1.1, -4.1], [.8, 1.1, 4.1]];
-        let d = 6; for (; d < 90; d *= 1.04) { this.aim({ x: 0, z: 0 }, angle, el, d, shift); if (pts.every(([x, y, z]) => { const p = this.project(x, y, z); return p.x > 6 && p.x < this.width - 6 && p.y > band.top && p.y < band.bottom; })) break; }
+        let d = 6; for (; d < 90; d *= 1.04) { this.aim({ x: 0, z: 0 }, angle, el, d, shift); if (pts.every(([x, y, z]) => { const p = this.project(x, y, z); return p.x > 6 && p.x < band.right && p.y > band.top && p.y < band.bottom; })) break; }
         this.fit = { d, shift };
       }
       this.focusPoint = { x: 0, z: 0 }; this.aim(this.focusPoint, angle, el, this.fit.d, this.fit.shift); return;

@@ -248,7 +248,7 @@ const onWorldObject=object=>{
   if(object.action==='leave'){pie(object,[['🗺️ Open the map','app','data-app="map"'],['🏠 Go home','travel','data-location="home"']]);return;}
   if(object.action==='estate'){pie(object,[['🏡 Browse homes & extensions','page','data-page="estate"'],['🚶 Go here','goObject']]);return;}
   if(object.action==='vip'){pie(object,[['🏁 Sponsorship deals','page','data-page="vip"'],['🚶 Go here','goObject']]);return;}
-  if(object.action==='phone'){pie(object,[['💬 Chat <small>+10 Social</small>','talkNpc'],['📇 Contacts','page','data-page="phone"'],['🚶 Go here','goObject']]);return;}
+  if(object.action==='phone'){pie(object,[...(npcAt(state.location,state.career)?[['💬 Chat <small>+10 Social</small>','talkNpc']]:[]),['📇 Contacts','page','data-page="phone"'],['🚶 Go here','goObject']]);return;}
   // The kitchen menu: the everyday meal plus every dish, with locked dishes showing the fame they need.
   if(object.name==='Kitchen'&&!state.visiting){const fame=state.fame||0,effects=f=>Object.entries(f.extra||{}).map(([n,v])=>` · ${v>0?'+':''}${v} ${needs[n][0]}`).join('');
     showTray(`♨ Kitchen menu${state.groceries?` · 🥕 ${state.groceries} groceries`:''}`,'<div class="tray-options food-menu">'+button(`🍳 Cook & eat <small>+${B.recovery.hunger[0]} Hunger</small>`,'useObject')+Object.entries(FOODS).map(([key,f])=>f.takeaway&&!(state.takeaway?.[key]>0)?button(`${f.icon} ${escape(f.name)} <small>order on Shopping</small>`,'app','data-app="shopping"'):fame>=(f.fame||0)?button(`${f.icon} ${escape(f.name)} <small>+${f.hunger+(!f.takeaway&&state.groceries>0?GROCERY.bonus:0)} Hunger${effects(f)}${f.takeaway?` · you have ${state.takeaway[key]}`:''}</small>`,'cook',`data-food="${key}"`):button(`🔒 ${escape(f.name)} <small>${fmt(f.fame)} fame</small>`,'noop','disabled')).join('')+'</div>');return;}
@@ -418,7 +418,7 @@ async function chooseDecision(index){const a=state.active;if(!a||pendingChoice)r
 // What a choice changed: points, games, stamina, or the room's mood.
 function consequence(career,b,a){
   if(career==='basketball'&&a.playerScore!=null){const us=a.playerScore-(b.playerScore||0),them=a.opponentScore-(b.opponentScore||0);return `${us?`+${us} for you`:'No points'}${them?` · they answer with ${them}`:' · stop at the other end'} (${a.playerScore}–${a.opponentScore})`;}
-  if(career==='tennis'&&a.lastGames)return `Games won ${a.lastGames[0]} of ${a.lastGames[0]+a.lastGames[1]} · ${a.scoreLabel||a.sets||''}`;
+  if(career==='tennis'&&a.lastGames)return `${a.lastGames[0]>a.lastGames[1]?'You take the stretch':a.lastGames[0]<a.lastGames[1]?'They take the stretch':'Level stretch'}: games ${a.lastGames[0]}–${a.lastGames[1]} · ${a.scoreLabel||a.sets||''}`;
   if(career==='wrestling'&&a.playerStamina!=null)return a.pinned?'1… 2… 3! Pinfall!':`Stamina: you ${a.playerStamina} · them ${a.opponentStamina}`;
   if(a.engagement!=null&&b.engagement!=null){const d=Math.round(a.engagement-b.engagement),st=Math.round((a.stability??0)-(b.stability??a.stability??0)),[m,m2]=METERS[career]||['Mood','Focus'];return `${m} ${d>=0?'▲':'▼'} ${Math.abs(d)}${st?` · ${m2} ${st>0?'▲':'▼'} ${Math.abs(st)}`:''}${a.lastNote?` · ${a.lastNote}`:''}`;}
   return '';
@@ -439,7 +439,9 @@ function actionPop(career,c,success,detail=''){
   const end=success==null?'':success?({shoot:' GOAL! 🎉',shot:' It drops! 🎉',pass:' …and it finds them!',signature:' The crowd erupts!',slam:' The ring shakes!',pin:' 1… 2… 3!',steal:' Picked clean!',block:' Sent back! 🚫',serve:' Ace! 🎾',forehand:' Winner!',backhand:' Clean winner!',drop:' It dies on the line!',volley:' Put away at the net!'}[c.action]||SUCCESS_LINES[career]||' It worked!'):({shoot:' …but it goes wide.',pass:' …but it’s cut out.',shot:' …off the rim.',slam:' Countered!',pin:' Kick-out at two!',serve:' Double fault.',drop:' Into the net.'}[c.action]||MISS_LINES[career]||' It didn’t quite land.');
   $('#actionPop')?.remove();const pop=document.createElement('button');pop.id='actionPop';pop.className=`action-pop ${success===false?'miss':'hit'}`;pop.setAttribute('aria-label','Close');
   pop.innerHTML=`<span class="action-art">${art}</span><strong>${escape(actionLine(career,c))}</strong><em>${escape(end.trim())}</em>${detail?`<small>${escape(detail)}</small>`:''}`;pop.onclick=()=>pop.remove();
-  document.body.append(pop);setTimeout(()=>pop.classList.add('out'),2300);setTimeout(()=>pop.remove(),2700);
+  // A slim toast just above the activity card, so the 3D outcome on the work spot stays in view.
+  document.body.append(pop);const card=$('#activityCard')?.getBoundingClientRect();if(card&&card.height)pop.style.top=Math.max(64,card.top-pop.offsetHeight-8)+'px';
+  setTimeout(()=>pop.classList.add('out'),2600);setTimeout(()=>pop.remove(),3000);
 }
 // Character creation is two steps: your look, then your career. The starting story is drawn at random.
 let welcomed=false,authStep={tab:'signup',username:''};
@@ -531,7 +533,7 @@ function map(){world.overview=true;world.flyTo(.22);showTray('📍 Naija City','
 // About how long a trip takes with your chosen way of travelling.
 function eta(key){const pref=state.travelMode||'best',mode=pref==='best'?bestMode(state,now()):pref==='own'?(state.ride||'walk'):pref;if(!RIDE_SPEED[mode])return '';const ms=tripMs(state.location==='street'?'home':state.location,key,mode);return ms<60_000?`~${Math.round(ms/1000)}s`:`~${Math.round(ms/60000)} min`;}
 // How a trip reads: walking, cycling, flying, taking public transport, or driving.
-const tripVerb=ride=>!ride?'Walking':TRANSIT[ride]?`Taking a ${TRANSIT[ride].name.toLowerCase()}`:ride==='helicopter'?'Flying':ride==='bicycle'?'Cycling':'Driving';
+const tripVerb=ride=>!ride?'Walking':TRANSIT[ride]?`Taking ${/^[aeiou]/i.test(TRANSIT[ride].name)?'an':'a'} ${TRANSIT[ride].name.toLowerCase()}`:ride==='helicopter'?'Flying':ride==='bicycle'?'Cycling':'Driving';
 // How you travel: your own ride, walking, or public transport.
 function travelModes(){const mode=state.travelMode||'best',own=state.ride?`${RIDES[state.ride]?.icon||'🚗'} ${RIDES[state.ride]?.name||'Your ride'}`:'🚶 Walk',best=bestMode(state,now()),bestLabel=best==='walk'?'🚶 Walk':RIDES[best]?`${RIDES[best].icon||'🚗'} ${RIDES[best].name}`:TRANSIT[best]?`${TRANSIT[best].icon} ${TRANSIT[best].name}`:best;return '<div class="travel-modes"><strong>How you travel</strong><div>'+[['best',`⭐ Fastest: ${bestLabel}`],['own',own],...(state.ride?[['walk','🚶 Walk']]:[]),...Object.entries(TRANSIT).map(([k,t])=>[k,`${t.icon} ${t.name}`])].map(([k,label])=>`<button class="chip ${k===mode?'on':''}" data-action="travelMode" data-mode="${k}">${escape(label)}</button>`).join('')+'</div></div>';}
 function practice(){const def=CAREERS[state.career];if(state.location==='home'&&!state.inventory.gear){showTray('🎯 Practise','<div class="tray-options">'+button('📍 Go to venue','travel','data-location="'+def.location+'"','primary')+button('🛒 Buy home equipment','travel','data-location="plaza"')+'</div>');return;}showTray('🎯 Practise','<div class="tray-options skills-options">'+def.skills.map(skill=>button(escape(skillName(state.career,skill))+' <small>Lv '+state.careers[state.career].skills[skill].level+'</small>','startPractice','data-skill="'+escape(skill)+'"')).join('')+'</div><small>⚡ 1 · '+duration(B.practiceMs)+' · +5–10 XP (more when you feel good)'+(def.family==='sport'&&state.location!=='gym'?' · or train at the gym':'')+'</small>');}
@@ -1219,7 +1221,9 @@ await refresh();
 function matchReplay(id,choice,success,before,after,result){
   const blueGoal=(after.playerScore||0)>(before.playerScore||0),redGoal=(after.opponentScore||0)>(before.opponentScore||0),script=replayScript(choice,success,blueGoal,redGoal,state.name.split(' ')[0],result,before.chance?100-before.chance-2:45);
   const goal=script.find(f=>f.ball[0]>=100||f.ball[0]<=0),t0=performance.now();world.playMatchMove({id,script,blueGoal,redGoal,before:{possession:before.possession,chance:before.chance}});
-  matchHud.hold={score:[before.playerScore||0,before.opponentScore||0],until:t0+(goal&&(blueGoal||redGoal)&&motion?goal.t*1000:0)};matchScreen();
+  matchHud.hold={score:[before.playerScore||0,before.opponentScore||0],until:t0+(goal&&(blueGoal||redGoal)&&motion?goal.t*1000:0)};
+  // While the move plays, keep its minute and words (the final whistle waits for the last move); after a Red goal, Blue kick off.
+  matchHud.move={until:t0+(motion?(script.at(-1).t+2.6)*1000:0),minute:Math.min(90,Math.round(((after.beat||1)/(after.totalBeats||6))*90)),script,t0};matchHud.kickoff=redGoal?id+':'+(after.beat||0):null;matchScreen();
 }
 // matchHud (the scoreboard) is declared with the top-level state: the first render can run before this point.
 function matchScreen(){
@@ -1229,6 +1233,9 @@ function matchScreen(){
     matchHud.el=el;matchHud.timer=setInterval(matchScreen,250);}
   const minute=Math.min(90,Math.round(((a.beat||0)/(a.totalBeats||6))*90)),held=matchHud.hold&&performance.now()<matchHud.hold.until?matchHud.hold.score:[a.playerScore||0,a.opponentScore||0];
   const score=`${held[0]} – ${held[1]}`,el=matchHud.el,set=(q,v)=>{const n=el.querySelector(q);if(n.textContent!==v)n.textContent=v;};
-  set('.mr-bar strong',score);set('.mr-bar em',a.beat===0&&now()<a.startedAt+ANTHEM_MS?'Anthem':a.beat>=a.totalBeats?'FT':`${minute}'`);
-  set('.mr-text',world.matchLine||(a.beat===0&&now()<a.startedAt+ANTHEM_MS?'The teams line up for the anthem…':a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?(a.possession==='opponent'?'Red have the ball…':'Blue keep the ball moving…'):`${a.scene?.text||'The ball comes to you.'}`));
+  const mv=matchHud.move&&performance.now()<matchHud.move.until?matchHud.move:null,kickoff=matchHud.kickoff===a.id+':'+a.beat&&now()<a.readyAt;
+  set('.mr-bar strong',score);set('.mr-bar em',a.beat===0&&now()<a.startedAt+ANTHEM_MS?'Anthem':mv?`${mv.minute}'`:a.beat>=a.totalBeats?'FT':`${minute}'`);
+  // The commentary follows the replay clock, so it is right even when the 3D view is not drawing.
+  const e=mv&&(performance.now()-mv.t0)/1000,line=mv&&(motion?[...mv.script].reverse().find(f=>e>=f.t-.4)||mv.script[0]:mv.script.at(-1)).text;
+  set('.mr-text',line||world.matchLine||(kickoff?'Blue kick off after the goal…':a.beat===0&&now()<a.startedAt+ANTHEM_MS?'The teams line up for the anthem…':a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?(a.possession==='opponent'?'Red have the ball…':'Blue keep the ball moving…'):`${a.scene?.text||'The ball comes to you.'}`));
 }

@@ -269,8 +269,8 @@ export function view(s,now) {
 }
 // A decision in a tennis match plays a stretch of about three games; how you played sets your odds on each point.
 function playTennis(a,won,risk,rng,games=3,edge=0){
-  const t=a.tennis,R=RISKS.indexOf(risk),pw=(won?[.62,.68,.76][R]:[.42,.36,.28][R])+edge,start=t.games[0]+t.games[1]+t.history.flat().reduce((x,y)=>x+y,0),mine=t.games[0]+t.history.reduce((x,h)=>x+h[0],0);
-  for(let n=0;n<400&&t.winner===null&&t.games[0]+t.games[1]+t.history.flat().reduce((x,y)=>x+y,0)<start+games;n++)tennisPoint(t,rng()<pw?0:1);
+  const t=a.tennis,R=RISKS.indexOf(risk),pw=(won?[.56,.6,.65][R]:[.44,.4,.35][R])+edge,start=t.games[0]+t.games[1]+t.history.flat().reduce((x,y)=>x+y,0),mine=t.games[0]+t.history.reduce((x,h)=>x+h[0],0);
+  for(let n=0;n<8000&&t.winner===null&&t.games[0]+t.games[1]+t.history.flat().reduce((x,y)=>x+y,0)<start+games;n++)tennisPoint(t,rng()<pw?0:1);
   const played=t.games[0]+t.games[1]+t.history.flat().reduce((x,y)=>x+y,0)-start,gotMine=t.games[0]+t.history.reduce((x,h)=>x+h[0],0)-mine;
   a.lastGames=[gotMine,played-gotMine];a.playerScore=t.sets[0];a.opponentScore=t.sets[1];
 }
@@ -281,7 +281,8 @@ function applyEvent(s,a,ev,ok,now,rng){
   if(e.stability)a.stability=clamp(a.stability+e.stability);if(e.engagement)a.engagement=clamp(a.engagement+e.engagement);
   if(e.quality)a.bonus=(a.bonus||0)+e.quality;if(e.reputation)c.reputation=clamp(c.reputation+e.reputation);
   if(e.opponent)a.opponentScore+=e.opponent;if(e.stamina)a.playerStamina=clamp(a.playerStamina+e.stamina);
-  if(e.games&&a.tennis)playTennis(a,false,'risky',()=>.99,1);
+  // A lost game from an event adds to the stretch you just played, so the card and the call still agree.
+  if(e.games&&a.tennis){const prev=a.lastGames;playTennis(a,false,'risky',()=>.99,1);if(prev)a.lastGames=[prev[0]+a.lastGames[0],prev[1]+a.lastGames[1]];const o=a.outcomes.at(-1);if(o?.games)o.games=a.lastGames;}
   if(e.fame)addFame(s,e.fame,'Work moment',now);
   if(e.news){headline(s,`${s.name} ${e.news}`,now);log(s,`${ev[0]} ${s.name} ${e.news}.`,now);}
 }
@@ -321,12 +322,9 @@ function settle(s,a,now) {
   let win=null;if(sport(a.career))win=a.playerScore>a.opponentScore?'Win':a.playerScore<a.opponentScore?'Loss':'Draw';
   if(a.career==='wrestling')win=a.pinned?'Win':a.playerStamina>a.opponentStamina?'Win':a.playerStamina<a.opponentStamina?'Loss':'Draw';
   if(a.career==='tennis'){
-    // Background rallies preserve standard scoring. Decisions already affected
-    // their actual points; the remaining match uses the stored activity seed.
-    let seed=Math.floor(a.seed*2147483646)+1;
-    const background=()=>{seed=seed*16807%2147483647;return seed/2147483647;};
-    for(let n=0;n<20000&&a.tennis.winner===null;n++)tennisPoint(a.tennis,background()<clamp(.45+(quality-50)/250,.25,.75)?0:1);
-    win=a.tennis.winner===0?'Win':'Loss';a.playerScore=a.tennis.sets[0];a.opponentScore=a.tennis.sets[1];
+    // The decisions play the whole match; if it was cut short, sets and then games decide.
+    const t=a.tennis,g=i=>t.games[i]+t.history.reduce((x,h)=>x+h[i],0);
+    win=t.winner!=null?(t.winner===0?'Win':'Loss'):t.sets[0]!==t.sets[1]?(t.sets[0]>t.sets[1]?'Win':'Loss'):g(0)>=g(1)?'Win':'Loss';a.playerScore=a.tennis.sets[0];a.opponentScore=a.tennis.sets[1];
   }
   const qualifies=!['trial','build'].includes(a.kind);
   let gain=qualifies?Math.floor(B.reaches[a.tier]*quality/100*(win==='Win'?1.25:1)):0;
@@ -368,7 +366,7 @@ export function act(s,input,now,rng=Math.random) {
         const pref=input.mode||s.travelMode||'best',mode=pref==='best'?bestMode(s,now):pref==='own'?(s.ride||'walk'):pref;
         if(TRANSIT[mode])requireRule(mode!=='taxi'||(s.phone&&s.phone!=='basic'),'Ride-hailing needs a smartphone. Upgrade your phone.');
         let ms=Math.round(tripMs(s.location,input.location,mode)*(1-(mode===s.ride?TUNING[(s.tune?.[mode]||0)-1]?.cut||0:0)/100));
-        const rain=weatherAt(now)==='rain'&&!NO_RAIN.includes(mode),jam=!NO_JAM.includes(mode)&&goSlowAt(now);if(rain)ms=Math.round(ms*1.2);if(jam)ms=Math.round(ms*1.4);s.trip={from:s.location,to:input.location,ride:mode==='walk'?null:mode,departs:now,arrives:now+ms,delays:[...(rain?['rain']:[]),...(jam?['go-slow']:[])]};log(s,`${mode==='walk'?'Walking':TRANSIT[mode]?`Taking a ${TRANSIT[mode].name.toLowerCase()}`:mode==='helicopter'?'Flying':mode==='bicycle'?'Cycling':'Driving'} to ${LOCATIONS[input.location].name} · ${Math.ceil(ms/60000)} min.${jam?' Go-slow on the road!':''}${rain?' Flooded streets slow you down.':''}`,now);break;}
+        const rain=weatherAt(now)==='rain'&&!NO_RAIN.includes(mode),jam=!NO_JAM.includes(mode)&&goSlowAt(now);if(rain)ms=Math.round(ms*1.2);if(jam)ms=Math.round(ms*1.4);s.trip={from:s.location,to:input.location,ride:mode==='walk'?null:mode,departs:now,arrives:now+ms,delays:[...(rain?['rain']:[]),...(jam?['go-slow']:[])]};log(s,`${mode==='walk'?'Walking':TRANSIT[mode]?`Taking ${/^[aeiou]/i.test(TRANSIT[mode].name)?'an':'a'} ${TRANSIT[mode].name.toLowerCase()}`:mode==='helicopter'?'Flying':mode==='bicycle'?'Cycling':'Driving'} to ${LOCATIONS[input.location].name} · ${Math.ceil(ms/60000)} min.${jam?' Go-slow on the road!':''}${rain?' Flooded streets slow you down.':''}`,now);break;}
       s.location=input.location;s.position3d=arrivalSpot(input.location);break;
     case 'move':
       requireRule(walkable(s.location,input.x,input.z,s.visiting?[]:s.furniture,s.visiting?'mansion':s.home),'That destination is blocked. Choose open ground.');
@@ -381,7 +379,10 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(now>=a.readyAt,'Commentary is still running.');
       const choice=choices(s)[input.choice];requireRule(choice,'Choose a valid action.');
       const scene=beat(s,a),c=s.careers[a.career],fatigue=(100-s.needs.energy)/100,ev=eventAt(a,a.beat),odds=chance(s,a,choice,scene),skill=odds.level,p=odds.probability,draw=rng();
-      const outcome=choice.action==='shoot'?shot(skill,scene,fatigue,rng):{success:draw<p,probability:p,draws:[draw],result:draw<p?'Successful':'Missed opportunity'};
+      let outcome=choice.action==='shoot'?shot(skill,scene,fatigue,rng):{success:draw<p,probability:p,draws:[draw],result:draw<p?'Successful':'Missed opportunity'};
+      // Tennis: the shot sets your odds for a stretch of three games (odd, so there is no tie), and the stretch decides the call (won more games = it worked),
+      // so the card, the umpire and the banner agree. The last decision plays on until the match is decided.
+      if(a.career==='tennis'){playTennis(a,outcome.success,choice.risk,rng,a.beat>=a.totalBeats-1?999:3,a.tier?0:.02);const [w,l]=a.lastGames,won=w>l||(w===l&&outcome.success);outcome={...outcome,success:won,result:won?'Successful':'Missed opportunity',games:[w,l]};}
       const ok=outcome.success,R=RISKS.indexOf(choice.risk),score=ok?{safe:60,balanced:80,risky:100}[choice.risk]:sport(a.career)?20:35;
       a.outcomes.push({...outcome,score,choice:choice.label,action:choice.action,target:choice.target,scene,skill:choice.skill,risk:choice.risk,event:!!choice.event,follow:!!scene.follow,...(choice.tag?{tag:choice.tag}:{}),at:now});
       learn(s,a.career,choice.skill,5,`${a.id}:${a.beat}`);s.needs.energy=clamp(s.needs.energy-2*(1-(perksFor(s).energy||0)/100));
@@ -405,7 +406,6 @@ export function act(s,input,now,rng=Math.random) {
           if(choice.defence){if(ok){if(choice.action==='steal')a.playerScore+=2;}else a.opponentScore+=choice.action==='block'?3:2;}
           else{if(ok)a.playerScore+=choice.points;if(rng()<clamp((a.tier?.45:.28)-.04*(c.skills.defending.level-1),.12,.45))a.opponentScore+=rng()<.3?3:2;}
         }
-        if(a.career==='tennis')playTennis(a,ok,choice.risk,rng,3,a.tier?0:.06);
         // Wrestling: moves cost the opponent stamina; misses and their offence cost yours. The pin needs them worn down.
         if(a.career==='wrestling'&&!ev){
           const act=choice.action,hit=[12,20,30][R],before=a.opponentStamina;let guarded=false;
