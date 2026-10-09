@@ -1180,6 +1180,7 @@ scheduleHeartbeat();
 // Coming back after a real absence refreshes at once; quick app switches don't.
 let hiddenAt=0;document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();return;}if(Date.now()-hiddenAt>=10_000&&Date.now()-lastUpdate>=5_000)refresh();});
 setInterval(()=>{if(state&&modalPage==='prompt'){const end=state.prompt?.endsAt,t=$('#promptTimer');if(!state.prompt||end&&now()>=end){closeModal();toast('⏳ The moment passed.');}else if(t&&end)t.textContent=`⏳ ${Math.ceil((end-now())/1000)}s to answer`;}
+  if(state){const st=$('#questChip .step-timer');if(st){const left=+st.dataset.until-now();if(left<=0)questHud();else{st.querySelector('b').textContent=duration(left);st.classList.toggle('hurry',left<60_000);}}}
   if(state&&!busy){renderActivity();clock();const bt=$('#battleTimer'),bb=(snapshot.battles||[]).find(x=>x.id===battleId);if(bt&&bb)bt.textContent=duration(bb.turnEndsAt-now());const next=$('#chargeRefill');if(next&&state.refillAnchor!==null)next.textContent=`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`;}},1000);
 
 // Tell players when 3D couldn't start, and offer 2D Lite once when 3D runs slowly on this device.
@@ -1209,8 +1210,8 @@ function questHud(){
     if(!first&&q.graduated===q.last.at)showNotice('🎓',QUEST_GRADUATION.name,'You finished every starter quest. Naija City is yours.',QUEST_GRADUATION.fame);}
   // One card says what to do next: a need running out, your manager's gig, going to work; otherwise the next quest.
   const step=nextStep(),quest=next&&!questsHidden()?{icon:next.icon,tag:`QUEST ${done.length+1}/${QUESTS.length}`,title:next.title,how:next.how,attrs:'data-action="app" data-app="quests"'}:null,show=step||quest;
-  const html=show?`<button id="questChip" class="quest-chip${step?' step '+(step.tone||''):''}" ${show.attrs||''}><span class="quest-icon">${show.icon}</span><span class="quest-text"><small>${escape(show.tag)}</small><strong>${escape(show.title)}</strong><em>${escape(show.how)}</em></span>${show.attrs&&step?'<b class="step-go">›</b>':''}</button>`:'';
-  if($('#questChip')?.outerHTML!==html){$('#questChip')?.remove();if(html)$('.world-card').insertAdjacentHTML('beforeend',html);}
+  const html=show?`<button id="questChip" class="quest-chip${step?' step '+(step.tone||''):''}" ${show.attrs||''}><span class="quest-icon">${show.icon}</span><span class="quest-text"><small>${escape(show.tag)}</small><strong>${escape(show.title)}</strong><em>${escape(show.how)}</em>${show.until?`<span class="step-timer" data-until="${show.until}">⏳ <b>${duration(show.until-now())}</b> left</span>`:''}</span>${show.attrs&&step?'<b class="step-go">›</b>':''}</button>`:'';
+  const bare=h=>h.replace(/<b>\d+:\d\d<\/b>/,'');if(bare($('#questChip')?.outerHTML||'')!==bare(html)){$('#questChip')?.remove();if(html)$('.world-card').insertAdjacentHTML('beforeend',html);}
 }
 function questsApp(){
   const done=state.quests?.done||[],count=QUESTS.filter(x=>done.includes(x.key)).length,next=QUESTS.find(x=>!done.includes(x.key));markSeen('quests',questsDone());
@@ -1281,7 +1282,7 @@ function nextStep(){
   const low=Object.entries(state.needs).filter(([,v])=>v<20).sort((x,y)=>x[1]-y[1])[0];
   if(low&&!state.recovery){const [key,v]=low;return {icon:needs[key][1],tag:'RUNNING LOW',title:`${needs[key][0]} is at ${Math.round(v)}%`,how:NEED_HINTS[key]||'Tap to recover.',attrs:`data-action="recover" data-need="${key}"`,tone:'urgent'};}
   const gig=state.gig,act=gig&&VENUE_ACTS[gig.act];
-  if(act&&now()<gig.until&&!a)return {icon:'🧑‍💼',tag:'GIG FROM YOUR MANAGER',title:act.name,how:`${LOCATIONS[act.venue].name} · +${fmt(gig.bonus)} fame${gig.pay?` · ${naira(gig.pay)}`:''} · ${duration(gig.until-now())} left`,attrs:state.location===act.venue?'':`data-action="travel" data-location="${act.venue}"`,tone:'gig'};
+  if(act&&now()<gig.until&&!a)return {icon:'🧑‍💼',tag:'GIG FROM YOUR MANAGER',title:act.name,how:`${LOCATIONS[act.venue].name} · +${fmt(gig.bonus)} fame${gig.pay?` · ${naira(gig.pay)}`:''}`,until:gig.until,attrs:state.location===act.venue?'':`data-action="travel" data-location="${act.venue}"`,tone:'gig'};
   if(!a&&!state.recovery&&state.charges>0){const def=CAREERS[state.career],here=state.location===def.location;return {icon:def.icon,tag:'NEXT STEP',title:here?'Start work':'Go to work',how:here?`Earn fame and naira as a ${def.name.toLowerCase()}.`:`Head to ${LOCATIONS[def.location].name} to earn fame and naira.`,attrs:here?'data-action="prepare"':`data-action="travel" data-location="${def.location}"`};}
   return null;
 }
