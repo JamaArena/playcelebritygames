@@ -165,8 +165,10 @@ function notice(data,own){
 }
 // Random life moments (a lucky break, a fan gift, a power cut…) show once as a toast and a bubble.
 let seenLifeEvent=null;
+// Pop-ups hold while you are at work (not practice) or in a Fame Clash, and show once you are done.
+const holdPopups=s=>Boolean(s?.active&&s.active.kind!=='practice'||s?.battle);
 function showLifeEvent(s){
-  const e=s?.lifeEvent,def=e&&LIFE_EVENTS[e.kind];if(!def||seenLifeEvent===e.id)return;const first=seenLifeEvent===null;seenLifeEvent=e.id;
+  const e=s?.lifeEvent,def=e&&LIFE_EVENTS[e.kind];if(!def||seenLifeEvent===e.id||holdPopups(s))return;const first=seenLifeEvent===null;seenLifeEvent=e.id;
   // Remembered across reloads (such as a 2D/3D switch) so the same moment never pops up twice.
   let shown=null;try{shown=localStorage.getItem('cg.lifeEvent');localStorage.setItem('cg.lifeEvent',e.id);}catch{}
   if(first&&(shown===e.id||Date.now()+offset-e.at>60_000))return;
@@ -181,7 +183,7 @@ function showPrompt(s){
 // A mishap (a need hit rock bottom) pops up once: what happened, what it cost, and how to avoid it.
 let seenMishap=null;
 function showMishap(s){
-  const m=s?.mishap,def=m&&MISHAPS[m.need];if(!def||seenMishap===m.id)return;seenMishap=m.id;
+  const m=s?.mishap,def=m&&MISHAPS[m.need];if(!def||seenMishap===m.id||holdPopups(s))return;seenMishap=m.id;
   let stored=null;try{stored=localStorage.getItem('cg.mishap');localStorage.setItem('cg.mishap',m.id);}catch{}
   if(stored===m.id||Date.now()+offset-m.at>120_000)return;
   const card=`<div class="mishap-card"><div class="mishap-icon" aria-hidden="true">${def.icon}</div><span class="eyebrow">CAUGHT ON CAMERA</span><h2>${escape(def.title)}!</h2><p>${escape(def.text)}</p><strong class="mishap-fame">−${m.lost.toLocaleString('en-US')} fame</strong><small>Keep your ${escape(m.need)} above ${MISHAP.at}% to avoid moments like this.</small>${button('Ugh, fine','closeMishap','','primary wide')}</div>`;
@@ -411,7 +413,9 @@ function renderActivity(){
 let pendingChoice=null;
 async function chooseDecision(index){const a=state.active;if(!a||pendingChoice)return;const chosen=a.choices[index],career=a.career,before={playerScore:a.playerScore,opponentScore:a.opponentScore,engagement:a.engagement,stability:a.stability,playerStamina:a.playerStamina,chance:a.possession!=='opponent'&&a.chance,possession:a.possession};
   // The tapped choice lights up at once; the others wait until the server has decided.
-  pendingChoice={id:a.id,beat:a.beat,index};$('.sim-choice[data-index="'+index+'"]')?.classList.add('pending');let data;try{data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});}finally{pendingChoice=null;}if(!data){renderActivity();return;}
+  pendingChoice={id:a.id,beat:a.beat,index};$('.sim-choice[data-index="'+index+'"]')?.classList.add('pending');let data;try{
+    // send() drops a request while another is in flight (a heartbeat or a walk), which used to lose the tap: wait for it first.
+    await new Promise(done=>whenIdle(done));data=await send({type:'decision',activityId:a.id,beat:a.beat,choice:index});}finally{pendingChoice=null;}if(!data){renderActivity();return;}
   const last=(data.state.active?.outcomes||data.state.outputs?.[0]?.outcomes||[]).at(-1),success=last?.success;if(motion)world.respond(chosen.action,success);
   // Football acts the move out on the 3D pitch; at full time the final score comes from the result.
   if(career==='football'){const done=data.state.results?.[0],[ps,os]=String(done?.score||'').split('–').map(Number),after=data.state.active||{playerScore:ps,opponentScore:os,beat:6,totalBeats:6};matchReplay(a.id,chosen,success,before,after,last?.result);}else actionPop(career,chosen,success,consequence(career,before,data.state.active||data.state.results?.[0]||{}));}
@@ -473,7 +477,7 @@ function confirmLogout(){
 function newLife(){showModal('newLife',`<span class="eyebrow">NEW LIFE</span><h2>Start over?</h2><p class="modal-intro">Your character, skills, fame and possessions are erased for good. Your account and username stay.</p><form id="newLifeForm"><div class="field"><label for="confirmLife">Type NEW LIFE to confirm</label><input id="confirmLife" name="confirm" autocomplete="off" required></div><button class="primary wide" type="submit">Erase and start a new life</button></form>`);}
 function creation(account=snapshot?.account){
   showModal('create',`<div class="creation-hero"><span class="eyebrow">WELCOME TO NAIJA CITY</span><h2>A little life.<br>A lot of possibility.</h2><p>Find your craft, make your people, and turn everyday moments into a life worth remembering.</p></div><form id="createForm"><div class="steps"><span class="step on">1 · Your look</span><span class="step" id="stepTwoLabel">2 · Your career</span></div>
-  <section id="stepLook"><canvas class="look-canvas" id="lookCanvas" aria-label="Preview of your character. Drag to turn them around."></canvas><small class="look-hint">Drag to turn around</small><div class="field"><label for="name">What should we call you?</label><input id="name" name="name" placeholder="Your character’s name" minlength="2" maxlength="30" required autocomplete="nickname" value="${escape(account?.username||'')}"></div>
+  <section id="stepLook"><canvas class="look-canvas" id="lookCanvas" aria-label="Preview of your character. Drag to turn them around."></canvas><small class="look-hint">Drag to turn around</small><div class="field"><label for="name">What should we call you?</label><input id="name" name="name" placeholder="${escape(account?.username||'Your character’s name')}" minlength="2" maxlength="30" autocomplete="nickname" value=""></div>
   <div class="field"><label>Skin tone</label><div class="swatches">${SKIN_TONES.map((c,i)=>`<button type="button" class="swatch ${i===3?'on':''}" style="--c:${c}" data-action="pick" data-field="color" data-value="${c}" aria-label="Skin tone ${i+1}"></button>`).join('')}</div><input type="hidden" id="color" name="color" value="${SKIN_TONES[3]}"></div>
   <div class="field"><label>Hairstyle</label><div class="choice-grid">${Object.entries(HAIRSTYLES).map(([key,name])=>`<button type="button" class="choice ${key==='curls'?'on':''}" data-action="pick" data-field="hair" data-value="${key}">${name}</button>`).join('')}</div><input type="hidden" id="hair" name="hair" value="curls"></div>
   <div class="field"><label>Hair colour</label><div class="swatches">${Object.entries(HAIR_COLORS).map(([key,c])=>`<button type="button" class="swatch ${key==='black'?'on':''}" style="--c:${c}" data-action="pick" data-field="hairColor" data-value="${key}" aria-label="${key} hair"></button>`).join('')}</div><input type="hidden" id="hairColor" name="hairColor" value="black"></div>
@@ -1127,7 +1131,8 @@ document.addEventListener('submit',async event=>{
     try{await auth(purpose==='signup'?{type:'signup',username:values.username,password:values.password,adult:values.adult==='on'}:{type:'login',username:values.username,password:values.password});modalPage=null;$('#modal').hidden=true;welcomed=true;await refresh(true);toast(purpose==='signup'?'Account created. Welcome to Naija City!':'You’re signed in.');}catch(e){authScreen(purpose,e.message);}}
   if(form.id==='passwordForm'){try{const data=await auth({type:'setPassword',password:values.password,current:values.current});if(snapshot)snapshot.account=data.account;closeModal();toast('Password saved.');}catch(e){passwordScreen(e.message);}}
   if(form.id==='newLifeForm'){try{await auth({type:'newLife',confirm:values.confirm.trim()});}catch(e){toast(e.message);return;}location.reload();}
-  if(form.id==='createForm'){values.adult=values.adult==='on';const data=await send({type:'create',...values});if(data){modalPage=null;storyReel(data.state);}}
+  // The name starts empty (your username shows as a hint) so typing never runs into the username; left empty, it is used.
+  if(form.id==='createForm'){values.adult=values.adult==='on';if(!String(values.name||'').trim())values.name=snapshot?.account?.username||'';const data=await send({type:'create',...values});if(data){modalPage=null;storyReel(data.state);}}
   if(form.id==='prepareForm')await send({type:'start',...values});
   if(form.id==='switchForm')await send({type:'switch',...values,adult:values.adult==='on'});
   if(form.id==='chatForm'){await send({type:'chat',...values},{keepModal:true});}else if(form.id==='dmForm'){const data=await send({type:'chat',recipient:values.recipient,body:values.body},{keepModal:true});if(data)chatThread(values.recipient);}else if(form.id==='postForm'){await send({type:'post',...values},{keepModal:true});}else if(form.id==='crewForm'){await send({type:'crewCreate',name:values.name,badge:crewBadge},{keepModal:true});}
@@ -1232,10 +1237,13 @@ function matchScreen(){
   if(!matchHud.el){const el=document.createElement('div');el.className='match-hud';el.setAttribute('aria-live','polite');el.innerHTML='<div class="mr-bar"><b class="mr-blue">BLUE</b><strong></strong><b class="mr-red">RED</b><em></em></div><div class="mr-text"></div>';$('.world-card').append(el);
     matchHud.el=el;matchHud.timer=setInterval(matchScreen,250);}
   const minute=Math.min(90,Math.round(((a.beat||0)/(a.totalBeats||6))*90)),held=matchHud.hold&&performance.now()<matchHud.hold.until?matchHud.hold.score:[a.playerScore||0,a.opponentScore||0];
+  // Always just below the top bar, whatever its height at this screen size.
+  const bar=$('.topbar')?.getBoundingClientRect(),card=$('.world-card')?.getBoundingClientRect();if(bar&&card&&bar.height){const top=Math.round(bar.bottom-card.top+6)+'px';if(matchHud.el.style.top!==top)matchHud.el.style.top=top;}
   const score=`${held[0]} – ${held[1]}`,el=matchHud.el,set=(q,v)=>{const n=el.querySelector(q);if(n.textContent!==v)n.textContent=v;};
   const mv=matchHud.move&&performance.now()<matchHud.move.until?matchHud.move:null,kickoff=matchHud.kickoff===a.id+':'+a.beat&&now()<a.readyAt;
   set('.mr-bar strong',score);set('.mr-bar em',a.beat===0&&now()<a.startedAt+ANTHEM_MS?'Anthem':mv?`${mv.minute}'`:a.beat>=a.totalBeats?'FT':`${minute}'`);
   // The commentary follows the replay clock, so it is right even when the 3D view is not drawing.
   const e=mv&&(performance.now()-mv.t0)/1000,line=mv&&(motion?[...mv.script].reverse().find(f=>e>=f.t-.4)||mv.script[0]:mv.script.at(-1)).text;
-  set('.mr-text',line||world.matchLine||(kickoff?'Blue kick off after the goal…':a.beat===0&&now()<a.startedAt+ANTHEM_MS?'The teams line up for the anthem…':a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?(a.possession==='opponent'?'Red have the ball…':'Blue keep the ball moving…'):`${a.scene?.text||'The ball comes to you.'}`));
+  // Once the move has played, its words are gone: the world's line can be stale if the 3D view was not drawing.
+  set('.mr-text',line||(kickoff?'Blue kick off after the goal…':a.beat===0&&now()<a.startedAt+ANTHEM_MS?'The teams line up for the anthem…':a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?(a.possession==='opponent'?'Red have the ball…':'Blue keep the ball moving…'):`${a.scene?.text||'The ball comes to you.'}`));
 }
