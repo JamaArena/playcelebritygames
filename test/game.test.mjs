@@ -565,3 +565,7 @@ test('tennis: the call follows the games won, and the decisions alone settle the
   for(let i=0;i<30;i++){const t=make('tennis');go(t);let n=i;complete(t,'produce',()=>((n=n*16807%2147483647)/2147483647));const r=t.results[0];const sets=r.sets.split(', ').map(x=>x.split('–').map(Number));
     const won=sets.filter(([a,b])=>a>b).length,lost=sets.filter(([a,b])=>b>a).length;assert.ok(Math.max(won,lost)===2,r.sets);assert.equal(r.win,won===2?'Win':'Loss');}
 });
+test('tennis: a lost game from an event counts in the same stretch the card shows',()=>{
+  const s=make('tennis');go(s);act(s,{type:'start',kind:'produce'},T+1,()=>.9);const a=s.active;a.event={beat:0,n:0};
+  act(s,{type:'decision',activityId:a.id,beat:0,choice:2},a.readyAt,()=>.999);assert.deepEqual(a.outcomes[0].games,a.lastGames);assert.equal(a.outcomes[0].success,false);
+});

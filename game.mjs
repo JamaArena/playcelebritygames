@@ -281,7 +281,8 @@ function applyEvent(s,a,ev,ok,now,rng){
   if(e.stability)a.stability=clamp(a.stability+e.stability);if(e.engagement)a.engagement=clamp(a.engagement+e.engagement);
   if(e.quality)a.bonus=(a.bonus||0)+e.quality;if(e.reputation)c.reputation=clamp(c.reputation+e.reputation);
   if(e.opponent)a.opponentScore+=e.opponent;if(e.stamina)a.playerStamina=clamp(a.playerStamina+e.stamina);
-  if(e.games&&a.tennis)playTennis(a,false,'risky',()=>.99,1);
+  // A lost game from an event adds to the stretch you just played, so the card and the call still agree.
+  if(e.games&&a.tennis){const prev=a.lastGames;playTennis(a,false,'risky',()=>.99,1);if(prev)a.lastGames=[prev[0]+a.lastGames[0],prev[1]+a.lastGames[1]];const o=a.outcomes.at(-1);if(o?.games)o.games=a.lastGames;}
   if(e.fame)addFame(s,e.fame,'Work moment',now);
   if(e.news){headline(s,`${s.name} ${e.news}`,now);log(s,`${ev[0]} ${s.name} ${e.news}.`,now);}
 }
