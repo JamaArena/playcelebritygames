@@ -1232,6 +1232,8 @@ function matchScreen(){
   if(!matchHud.el){const el=document.createElement('div');el.className='match-hud';el.setAttribute('aria-live','polite');el.innerHTML='<div class="mr-bar"><b class="mr-blue">BLUE</b><strong></strong><b class="mr-red">RED</b><em></em></div><div class="mr-text"></div>';$('.world-card').append(el);
     matchHud.el=el;matchHud.timer=setInterval(matchScreen,250);}
   const minute=Math.min(90,Math.round(((a.beat||0)/(a.totalBeats||6))*90)),held=matchHud.hold&&performance.now()<matchHud.hold.until?matchHud.hold.score:[a.playerScore||0,a.opponentScore||0];
+  // Always just below the top bar, whatever its height at this screen size.
+  const bar=$('.topbar')?.getBoundingClientRect(),card=$('.world-card')?.getBoundingClientRect();if(bar&&card&&bar.height){const top=Math.round(bar.bottom-card.top+6)+'px';if(matchHud.el.style.top!==top)matchHud.el.style.top=top;}
   const score=`${held[0]} – ${held[1]}`,el=matchHud.el,set=(q,v)=>{const n=el.querySelector(q);if(n.textContent!==v)n.textContent=v;};
   const mv=matchHud.move&&performance.now()<matchHud.move.until?matchHud.move:null,kickoff=matchHud.kickoff===a.id+':'+a.beat&&now()<a.readyAt;
   set('.mr-bar strong',score);set('.mr-bar em',a.beat===0&&now()<a.startedAt+ANTHEM_MS?'Anthem':mv?`${mv.minute}'`:a.beat>=a.totalBeats?'FT':`${minute}'`);
