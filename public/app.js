@@ -1242,6 +1242,7 @@ function arenaApp(){
   ${f?card(f,`Across ${f.label} · +${ARENA.prize.family} fame and ${naira(ARENA.cash.family)}`,a.family.list,today,'field'):''}
   ${card(ARENA.goat,'The most famous star in Naija City, ever (total fame)',a.goat,ever,'goat')}`);
 }
+const NEED_HINTS={hunger:'Eat: the fridge or kitchen at home, or food in town.',energy:'Rest: sleep in your bed at home.',fun:'Have fun: TV, games, or a night out.',social:'Socialise: chat to someone nearby or call a friend.',hygiene:'Freshen up: shower at home.',bladder:'Find a toilet.'};
 // Start last: every declaration above is ready before the first update can arrive and draw.
 await refresh();
 
@@ -1273,7 +1274,6 @@ function matchScreen(){
 }
 
 // The single most useful next step, so a player always knows what to do.
-const NEED_HINTS={hunger:'Eat: the fridge or kitchen at home, or food in town.',energy:'Rest: sleep in your bed at home.',fun:'Have fun: TV, games, or a night out.',social:'Socialise: chat to someone nearby or call a friend.',hygiene:'Freshen up: shower at home.',bladder:'Find a toilet.'};
 function nextStep(){
   const a=state.active;
   if(state.trip)return {icon:'🚗',tag:'TRAVELLING',title:`On the way to ${LOCATIONS[state.trip.to]?.name||'town'}`,how:'Sit back, you will arrive soon.'};

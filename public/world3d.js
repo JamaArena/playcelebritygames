@@ -174,7 +174,7 @@ export class Figure {
     // Standing still people breathe and shift their weight a little.
     const idle = !o.walk && !pose && !reduced, breath = idle ? Math.sin(time * 1.7 + x) : 0, sway = idle ? Math.sin(time * .6 + z) : 0;
     const hip = pose === 'toilet' ? .57 : pose === 'sitFloor' ? .16 : seated ? o.seat ?? .7 : .9 * tall + bob, top = o.outfit, skinMat = mat(skin, 'skin'), pants = mat(o.pants);
-    this.root.position.set(x, 0, z); this.root.rotation.set(0, o.heading || 0, 0); this.root.scale.setScalar(o.scale || 1);
+    this.root.position.set(x, o.y || 0, z); this.root.rotation.set(0, o.heading || 0, 0); this.root.scale.setScalar(o.scale || 1);
     this.torso.position.set(sway * .012, hip, 0); this.torso.scale.set(1, tall, 1); this.torso.rotation.set(o.walk ? .05 : 0, 0, sway * .015);
     this.pelvis.material = pants; this.pelvis.scale.set(.96 * H, 1, .58 * H);
     this.chest.material = mat(top); this.chest.scale.set(S, 1 + breath * .006, .62 * W);
@@ -379,7 +379,7 @@ export class World3D extends World {
   human(x, z, skin, o = {}) {
     if (o.pose === 'run') o = { ...o, pose: null, walk: true, gait: performance.now() / 1000 * 11 };
     if (o.pose === 'sit' || o.pose === 'work') { const f = this.seatAt(x, z); if (f != null) o = { ...o, heading: f }; }
-    // During a football match everyone at the venue is drawn at the match scale, as if the camera were further back.
+    // In the stadium (match or not) everyone is drawn at the match scale, as if the camera were further back.
     // A seat keeps its real height: the hips sit on it whatever the scale.
     if (this.matchScale && !o.scale) o = { ...o, scale: this.matchScale };
     if (o.scale && o.scale !== 1 && o.seat != null) o = { ...o, seat: o.seat / o.scale };
@@ -439,7 +439,8 @@ export class World3D extends World {
     }
     // Keep a pleasant overhead view: between ~30° and ~80° up, never closer than 7 units.
     // Outdoors the camera pulls further back so streets and buildings fit around you.
-    const f = this.focusPoint, el = .52 + (this.pitch - .3) / .63 * .88, dist = Math.max(7, 19 / this.zoom) * (this.interior() ? 1 : 1.9);
+    // The stadium is bigger than a room (people at match scale): the default view takes in the bowl.
+    const f = this.focusPoint, el = .52 + (this.pitch - .3) / .63 * .88, dist = Math.max(7, 19 / this.zoom) * (this.interior() ? this.atStadium() ? 1.3 : 1 : 1.9);
     // At work or practice the view slides up so what you are doing sits above the activity card.
     let goal = 0; const a = this.state?.active && !this.state.trip && this.actor;
     if (a) { this.aim(f, this.angle, el, dist, 0); const band = this.viewBand(), p = this.project(a.x, 1, a.z); goal = Math.max(0, Math.min(this.height * .35, p.y - (band.top + band.bottom) / 2)); }
@@ -478,7 +479,7 @@ export class World3D extends World {
     this.island.visible = inside; this.city.visible = !inside; this.scene3.fog = inside ? null : this.fog;
     if (!inside) { const key = [this.location, day.night, this.ownersKey, this.state.home, !!this.state.trip, festivalAt(Date.now()), !!this.state.vip?.yacht, this.starsKey].join('|'); if (key !== this.cityKey) { this.cityKey = key; this.buildCity(day.night); } }
     for (const p of [this.boxes, this.balls, this.rods, this.figures, this.toilets]) p.begin();
-    this.matchScale = this.inMatch() ? MATCH_SCALE : 0; this.meshes = []; this.seats = []; if (!inside) this.townLife(); this.scene();
+    this.matchScale = this.atStadium() ? MATCH_SCALE : 0; this.meshes = []; this.seats = []; if (!inside) this.townLife(); this.scene();
     for (const p of [this.boxes, this.balls, this.rods, this.figures, this.toilets]) p.end();
     this.paintRain();
     this.renderer.render(this.scene3, this.camera);
