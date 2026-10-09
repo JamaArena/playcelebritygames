@@ -1227,3 +1227,20 @@ body.in-match #activityCard .work-scene{display:none}
 /* Countdown on a work event or a question: answer in time or miss it */
 .event-timer{margin:4px 0;font:700 12px Fredoka,system-ui,sans-serif;color:#a26b07}.event-timer.hurry{color:#c0392b;animation:hurryPulse .8s ease-in-out infinite}
 @keyframes hurryPulse{50%{opacity:.55}}@media(prefers-reduced-motion:reduce){.event-timer.hurry{animation:none}}
+
+/* Top bar: who you are, your title, where and when */
+.hud-who{display:flex;align-items:center;gap:10px;min-width:0}.hud-who>div{display:grid;gap:1px;min-width:0}
+.hud-who strong{font:600 15px/1.2 Fredoka,system-ui,sans-serif;color:#1f3328;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hud-title{margin-left:4px;padding:1px 8px;border-radius:10px;background:linear-gradient(#ffe08a,#f2b733);color:#5a3b00;font:700 10.5px system-ui,sans-serif;vertical-align:2px}
+.hud-who small{font-size:11px;color:#4f6a5a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#app .page-heading>div:first-child{display:none}
+/* Next-step card tones, and a nudge arrow when it can be tapped */
+.quest-chip.step.urgent{background:linear-gradient(135deg,#fff3f0f0,#ffd9cff0);box-shadow:0 6px 18px #2a3b2a26,inset 0 -3px 0 #f0a99c}.quest-chip.step.urgent .quest-icon{background:linear-gradient(#ff9e8a,#e5484d);box-shadow:inset 0 -3px 0 #b8323a}.quest-chip.step.urgent small{color:#c0392b}
+.quest-chip.step.gig{background:linear-gradient(135deg,#f6f0fff0,#e6dbfff0);box-shadow:0 6px 18px #2a3b2a26,inset 0 -3px 0 #c7b2f0}.quest-chip.step.gig .quest-icon{background:linear-gradient(#c4a5ff,#7b4fe0);box-shadow:inset 0 -3px 0 #5b36b0}.quest-chip.step.gig small{color:#6a3fd1}
+.quest-chip.step.work{background:linear-gradient(135deg,#f0fbf2f0,#d4f2dbf0);box-shadow:0 6px 18px #2a3b2a26,inset 0 -3px 0 #9ad6a8}.quest-chip.step.work .quest-icon{background:linear-gradient(#8de09b,#2f9a4c);box-shadow:inset 0 -3px 0 #237a3b}.quest-chip.step.work small{color:#2f9a4c}
+.step-go{flex:none;margin-left:4px;font:700 24px Fredoka,system-ui,sans-serif;color:#7a8a74}
+/* A need about to run out */
+.need-gem{position:relative}.need-alert{position:absolute;top:-5px;right:-6px;width:15px;height:15px;border-radius:50%;background:#e5484d;color:#fff;font:800 10px/15px system-ui,sans-serif;font-style:normal;text-align:center;box-shadow:0 0 0 2px #fff;animation:hurryPulse 1s ease-in-out infinite}
+@media(prefers-reduced-motion:reduce){.need-alert{animation:none}}
+/* A touch more colour in the world */
+#world3dGL{filter:saturate(1.22) contrast(1.03)}#world{filter:saturate(1.18)}

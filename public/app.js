@@ -363,13 +363,16 @@ function render(){
   const c=state.careers[state.career],def=CAREERS[state.career],location=LOCATIONS[state.location];
   $('#navigation').innerHTML=[['city','🏠','Home'],['career','⭐','Career'],['phone','💬','Social'],['inventory','◇','My home'],['profile','🪪','Profile']].map(([page,icon,label])=>`<button class="nav-button ${page==='city'?'active':''}" data-action="${page==='city'?(state.visiting?'leaveVisit':'travel'):'page'}" data-location="home" data-page="${page}"><span>${icon}</span>${label}</button>`).join('');
   $('#topStats').innerHTML=phoneWidget();
+  // Top bar: who you are, how far along your career, and where and when you are.
+  {const def=CAREERS[state.career],c=state.careers[state.career],place=state.trip?`🚗 On the way to ${escape(LOCATIONS[state.trip.to]?.name||'town')}`:`📍 ${escape(LOCATIONS[state.location]?.name||'Naija City')}`,hour=world.daylight().hour;
+    $('#hudWho').innerHTML=`${avatar({...state,id:snapshot.playerId},'md')}<div><strong>${escape(state.name)} <span class="hud-title">${def.icon} ${escape(tierTitle(state.career,c.tier))}</span></strong><small>${place} · ${hour>=6&&hour<19?'☀️':'🌙'} ${new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}</small></div>`;}
   $('#locationTitle').textContent=state.visiting?`${snapshot.players.find(p=>p.id===state.visiting)?.name||'Friend'}’s home`:state.location==='home'&&SPONSORSHIPS[state.home]?`Your ${SPONSORSHIPS[state.home].name.toLowerCase()}`:location.name;
   $('#locationSubtitle').textContent=location.subtitle;
   $('#locationEyebrow').textContent=state.location==='home'?'YOUR NEIGHBOURHOOD':'OUT IN NAIJA CITY';
   $('#objects').innerHTML=worldObjects(state.location,snapshot.visitedHome?.furniture||state.furniture,[],snapshot.visitedHome?snapshot.visitedHome.home:state.home).map(o=>button(`${o.icon} ${escape(o.label||o.name)}`,'object',`data-key="${escape(o.key||o.name)}"`,'object-button')).join('')+(state.location==='home'?button('💬 Socialise','recover','data-need="social"','object-button')+(snapshot.visitedHome?'':button('🛋 Arrange room','arrangeRoom','','object-button')):'');
   if(state.visiting)$('#objects').innerHTML=button('💬 Socialise','recover','data-need="social"','object-button')+button('📍 Leave visit','leaveVisit','','object-button');
   const moodValue=Object.values(state.needs).reduce((a,b)=>a+b,0)/6,moodLabel=moodValue>=75?'Very happy':moodValue>=55?'Content':moodValue>=30?'Uncomfortable':'Miserable';
-  $('#needsHud').innerHTML=`<div class="sim-portrait" style="--skin:${escape(state.color)};--mood:${Math.round(moodValue*1.2)}" title="Mood ${Math.round(moodValue)}%"><span>${escape(state.name.slice(0,1).toUpperCase())}</span></div><div class="sim-meta"><strong>${escape(state.name)}</strong><small style="--mood:${Math.round(moodValue*1.2)}">${moodLabel}</small></div><div class="sim-needs">${Object.entries(needs).map(([key,[label,icon]])=>button(`<b class="need-gem" aria-hidden="true">${icon}</b><label>${label}</label><i style="--need:${state.needs[key]}%;--hue:${Math.round(state.needs[key]*1.2)}"></i>`,'recover',`data-need="${key}" aria-label="${label} ${Math.round(state.needs[key])} percent. Recover ${label}." title="${label} · ${Math.round(state.needs[key])}%"`,'need-bar')).join('')}</div>`;
+  $('#needsHud').innerHTML=`<div class="sim-portrait" style="--skin:${escape(state.color)};--mood:${Math.round(moodValue*1.2)}" title="Mood ${Math.round(moodValue)}%"><span>${escape(state.name.slice(0,1).toUpperCase())}</span></div><div class="sim-meta"><strong>${escape(state.name)}</strong><small style="--mood:${Math.round(moodValue*1.2)}">${moodLabel}</small></div><div class="sim-needs">${Object.entries(needs).map(([key,[label,icon]])=>button(`<b class="need-gem" aria-hidden="true">${icon}${state.needs[key]<20?'<em class="need-alert">!</em>':''}</b><label>${label}</label><i style="--need:${state.needs[key]}%;--hue:${Math.round(state.needs[key]*1.2)}"></i>`,'recover',`data-need="${key}" aria-label="${label} ${Math.round(state.needs[key])} percent. Recover ${label}." title="${label} · ${Math.round(state.needs[key])}%"`,'need-bar')).join('')}</div>`;
   clock();
   $('#profileCard').innerHTML=`<div class="profile-cover"></div><div class="avatar" style="background:${state.color}">${escape(state.name.slice(0,1).toUpperCase())}</div><h2>${escape(state.name)}</h2><p class="profile-career">${def.icon} ${def.name} · ${c.origin===1?'Connected origin':'Independent origin'}</p><span class="tier-pill">✦ ${escape(tierTitle(state.career,c.tier))}</span><div class="profile-numbers"><div><strong>${fmt(state.fame||0)}</strong><small>fame</small></div><div><strong>${state.awards.length}</strong><small>awards</small></div><div><strong>${Math.round(c.reputation)}</strong><small>reputation</small></div></div>`;
   const mood=Object.values(state.needs).reduce((a,b)=>a+b,0)/6;
@@ -1194,10 +1197,10 @@ function questHud(){
   if(q.last&&seenQuest!==q.last.key+q.last.at){const first=false;seenQuest=q.last.key+q.last.at;const quest=QUESTS.find(x=>x.key===q.last.key);
     if(!first&&quest)showNotice('✅','Quest complete!',`${quest.icon} ${quest.title}${next?` · Next: ${next.title}`:''}`,quest.reward);
     if(!first&&q.graduated===q.last.at)showNotice('🎓',QUEST_GRADUATION.name,'You finished every starter quest. Naija City is yours.',QUEST_GRADUATION.fame);}
-  let chip=$('#questChip');
-  if(!next||questsHidden()){chip?.remove();return;}
-  if(!chip){chip=document.createElement('button');chip.id='questChip';chip.className='quest-chip';chip.dataset.action='app';chip.dataset.app='quests';$('.world-card').append(chip);}
-  chip.innerHTML=`<span class="quest-icon">${next.icon}</span><span class="quest-text"><small>QUEST ${done.length+1}/${QUESTS.length}</small><strong>${escape(next.title)}</strong><em>${escape(next.how)}</em></span>`;
+  // One card says what to do next: a need running out, your manager's gig, going to work; otherwise the next quest.
+  const step=nextStep(),quest=next&&!questsHidden()?{icon:next.icon,tag:`QUEST ${done.length+1}/${QUESTS.length}`,title:next.title,how:next.how,attrs:'data-action="app" data-app="quests"'}:null,show=step||quest;
+  const html=show?`<button id="questChip" class="quest-chip${step?' step '+(step.tone||''):''}" ${show.attrs||''}><span class="quest-icon">${show.icon}</span><span class="quest-text"><small>${escape(show.tag)}</small><strong>${escape(show.title)}</strong><em>${escape(show.how)}</em></span>${show.attrs&&step?'<b class="step-go">›</b>':''}</button>`:'';
+  if($('#questChip')?.outerHTML!==html){$('#questChip')?.remove();if(html)$('.world-card').insertAdjacentHTML('beforeend',html);}
 }
 function questsApp(){
   const done=state.quests?.done||[],count=QUESTS.filter(x=>done.includes(x.key)).length,next=QUESTS.find(x=>!done.includes(x.key));markSeen('quests',questsDone());
@@ -1247,4 +1250,18 @@ function matchScreen(){
   const e=mv&&(performance.now()-mv.t0)/1000,line=mv&&(motion?[...mv.script].reverse().find(f=>e>=f.t-.4)||mv.script[0]:mv.script.at(-1)).text;
   // Once the move has played, its words are gone: the world's line can be stale if the 3D view was not drawing.
   set('.mr-text',line||(kickoff?'Blue kick off after the goal…':a.beat===0&&now()<a.startedAt+ANTHEM_MS?'The teams line up for the anthem…':a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?(a.possession==='opponent'?'Red have the ball…':'Blue keep the ball moving…'):`${a.scene?.text||'The ball comes to you.'}`));
+}
+
+// The single most useful next step, so a player always knows what to do.
+const NEED_HINTS={hunger:'Eat: the fridge or kitchen at home, or food in town.',energy:'Rest: sleep in your bed at home.',fun:'Have fun: TV, games, or a night out.',social:'Socialise: chat to someone nearby or call a friend.',hygiene:'Freshen up: shower at home.',bladder:'Find a toilet.'};
+function nextStep(){
+  const a=state.active;
+  if(state.trip)return {icon:'🚗',tag:'TRAVELLING',title:`On the way to ${LOCATIONS[state.trip.to]?.name||'town'}`,how:'Sit back, you will arrive soon.'};
+  if(a&&a.kind!=='practice'&&a.beat<a.totalBeats)return {icon:CAREERS[a.career].icon,tag:'AT WORK',title:now()>=a.readyAt?'Your move!':`${a.title} in progress`,how:now()>=a.readyAt?'Pick an option on the card below.':`Next decision in ${duration(a.readyAt-now())}.`,tone:'work'};
+  const low=Object.entries(state.needs).filter(([,v])=>v<20).sort((x,y)=>x[1]-y[1])[0];
+  if(low&&!state.recovery){const [key,v]=low;return {icon:needs[key][1],tag:'RUNNING LOW',title:`${needs[key][0]} is at ${Math.round(v)}%`,how:NEED_HINTS[key]||'Tap to recover.',attrs:`data-action="recover" data-need="${key}"`,tone:'urgent'};}
+  const gig=state.gig,act=gig&&VENUE_ACTS[gig.act];
+  if(act&&now()<gig.until&&!a)return {icon:'🧑‍💼',tag:'GIG FROM YOUR MANAGER',title:act.name,how:`${LOCATIONS[act.venue].name} · +${fmt(gig.bonus)} fame · ${duration(gig.until-now())} left`,attrs:state.location===act.venue?'':`data-action="travel" data-location="${act.venue}"`,tone:'gig'};
+  if(!a&&!state.recovery&&state.charges>0){const def=CAREERS[state.career],here=state.location===def.location;return {icon:def.icon,tag:'NEXT STEP',title:here?'Start work':'Go to work',how:here?`Earn fame as a ${def.name.toLowerCase()}.`:`Head to ${LOCATIONS[def.location].name} to earn fame.`,attrs:here?'data-action="prepare"':`data-action="travel" data-location="${def.location}"`};}
+  return null;
 }
