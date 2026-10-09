@@ -439,7 +439,9 @@ function actionPop(career,c,success,detail=''){
   const end=success==null?'':success?({shoot:' GOAL! 🎉',shot:' It drops! 🎉',pass:' …and it finds them!',signature:' The crowd erupts!',slam:' The ring shakes!',pin:' 1… 2… 3!',steal:' Picked clean!',block:' Sent back! 🚫',serve:' Ace! 🎾',forehand:' Winner!',backhand:' Clean winner!',drop:' It dies on the line!',volley:' Put away at the net!'}[c.action]||SUCCESS_LINES[career]||' It worked!'):({shoot:' …but it goes wide.',pass:' …but it’s cut out.',shot:' …off the rim.',slam:' Countered!',pin:' Kick-out at two!',serve:' Double fault.',drop:' Into the net.'}[c.action]||MISS_LINES[career]||' It didn’t quite land.');
   $('#actionPop')?.remove();const pop=document.createElement('button');pop.id='actionPop';pop.className=`action-pop ${success===false?'miss':'hit'}`;pop.setAttribute('aria-label','Close');
   pop.innerHTML=`<span class="action-art">${art}</span><strong>${escape(actionLine(career,c))}</strong><em>${escape(end.trim())}</em>${detail?`<small>${escape(detail)}</small>`:''}`;pop.onclick=()=>pop.remove();
-  document.body.append(pop);setTimeout(()=>pop.classList.add('out'),2300);setTimeout(()=>pop.remove(),2700);
+  // A slim toast just above the activity card, so the 3D outcome on the work spot stays in view.
+  document.body.append(pop);const card=$('#activityCard')?.getBoundingClientRect();if(card&&card.height)pop.style.top=Math.max(64,card.top-pop.offsetHeight-8)+'px';
+  setTimeout(()=>pop.classList.add('out'),2600);setTimeout(()=>pop.remove(),3000);
 }
 // Character creation is two steps: your look, then your career. The starting story is drawn at random.
 let welcomed=false,authStep={tab:'signup',username:''};
