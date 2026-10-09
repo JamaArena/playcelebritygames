@@ -3,7 +3,7 @@ export const BALANCE = {
   capacity: 10, refillMs: 36 * 60_000, practiceMs: 10_000,
   recovery: { hunger: [40, 60_000], energy: [60, 300_000], fun: [30, 120_000], social: [30, 120_000], hygiene: [50, 60_000], bladder: [80, 30_000] },
   decay: { hunger: 12, energy: 8, fun: 6, social: 6, hygiene: 8, bladder: 15 },
-  activityMs: 120_000, sportMs: 300_000, upgradeMs: 30 * 60_000,
+  activityMs: 120_000, sportMs: 150_000, upgradeMs: 30 * 60_000,
   // Reach per output (views, streams, fans cheering, users) before quality; 1,000 reach = 1 fame point.
   reaches: [10_000, 100_000, 1_000_000, 10_000_000], famePerReach: 1 / 1000, seasonMinReach: 10_000, contractBoost: .25,
   tiers: [['Newcomer', 0, 1], ['Emerging', 100, 2], ['Established', 1000, 4], ['Star', 10000, 6], ['Icon', 100000, 8]],

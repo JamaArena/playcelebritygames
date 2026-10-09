@@ -82,6 +82,7 @@ export function reconcile(s, now) {
   if(s.pet&&dt<=ACTIVE_GAP_MS)for(const [k,rate] of Object.entries(PET_CARE.decay))s.pet[k]=clamp(s.pet[k]-rate*dt/3600_000);
   mishaps(s,now);
   if((s.fame||0)>=FAME_MARKS.hallOfFame&&!s.hallOfFame){s.hallOfFame=now;headline(s,`${s.name} is inducted into the Naija City Hall of Fame 🌟`,now);log(s,'🌟 You were inducted into the Hall of Fame!',now);}
+  expireMoments(s,now);
   if(dt<=ACTIVE_GAP_MS)lifeEvents(s,now);
   if(dt<=ACTIVE_GAP_MS&&s.team?.manager&&now>=(s.nextGigAt||0)){const fam=CAREERS[s.career]?.family,acts=Object.entries(VENUE_ACTS).filter(([,a])=>!a.menu&&!a.moment&&!a.album&&!a.tour&&!a.careers&&!a.minFame&&!a.minOutputs&&(!a.family||a.family===fam));const [key]=acts[Math.floor(Math.random()*acts.length)];s.gig={id:id(),act:key,until:now+GIG.windowMs,bonus:Math.max(20,Math.round((s.fame||0)*.005))};s.nextGigAt=now+GIG.everyMs;log(s,`🧑‍💼 Your manager booked you: ${VENUE_ACTS[key].name} at ${LOCATIONS[VENUE_ACTS[key].venue].name} within 10 minutes for +${s.gig.bonus} fame.`,now);}
   s.lastSeen=now;
@@ -212,7 +213,14 @@ const RISKS=['safe','balanced','risky'],EVENT_CHANCE=.35;
 export const practiceXp=s=>clamp(Math.round(4+Object.values(s.needs).reduce((a,b)=>a+b,0)/Object.keys(s.needs).length/15),5,10);
 export const focusLabel=xp=>xp>=9?'Focused':xp<=6?'Distracted':'Steady';
 // A work event (if this activity drew one) lands on its own beat with its own choices.
-const eventAt=(a,i)=>a.event&&a.event.beat===i?WORK_EVENTS[a.career]?.[a.event.n]||null:null;
+const eventAt=(a,i)=>a.event&&a.event.beat===i&&!a.event.missed?WORK_EVENTS[a.career]?.[a.event.n]||null:null;
+// Moments don't wait forever: a work event or a question left unanswered passes you by.
+export const EVENT_WINDOW=30_000,PROMPT_WINDOW=60_000;
+function expireMoments(s,now){
+  const a=s.active,ev=a&&eventAt(a,a.beat);
+  if(ev&&now>=a.readyAt+EVENT_WINDOW){a.event.missed=true;log(s,`⏳ You missed the moment: ${ev[0]}`,now);}
+  if(s.prompt&&now>=s.prompt.at+PROMPT_WINDOW){const kind=s.prompt.kind;s.prompt=null;log(s,`⏳ The moment passed (${kind}). Answer faster next time.`,now);}
+}
 // The scene for a step: a follow-up when your last pick was a gamble, the stage for a musician's live show, or one drawn
 // at random from the career's list (seeded per activity, so it stays put on refresh). Tags say what each option is about.
 function workScene(a,i){
@@ -266,6 +274,9 @@ function chance(s,a,choice,scene){
 }
 export function view(s,now) {
   const result=structuredClone(s),a=result.active;
+  // When an open moment runs out (shown as a countdown).
+  if(a&&eventAt(s.active,s.active.beat)&&now>=s.active.readyAt)a.eventEndsAt=s.active.readyAt+EVENT_WINDOW;
+  if(result.prompt)result.prompt.endsAt=s.prompt.at+PROMPT_WINDOW;
   if(a&&a.kind!=='practice') {a.scene=beat(s,a);if(a.tennis)a.scoreLabel=tennisScore(a.tennis);a.choices=choices(s).map(choice=>{const o=chance(s,s.active,choice,a.scene);return {...choice,probability:o.probability,difficulty:o.difficulty,level:o.level};});}
   result.opportunities=opportunities(s); result.serverNow=now;return result;
 }

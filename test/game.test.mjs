@@ -576,3 +576,17 @@ test('mishaps wait until a work session is over, like life events',async()=>{
   const {mishaps}=await import('../game.mjs');const s=make();s.needs.hygiene=0;s.active={kind:'produce',career:'football'};mishaps(s,T+10*60_000);assert.equal(s.mishap,undefined);
   s.active=null;mishaps(s,T+10*60_000);assert.equal(s.mishap.need,'hygiene');
 });
+test('work events and questions have a timer: leave them and you miss out; sport work runs quicker', async () => {
+  const { EVENT_WINDOW, PROMPT_WINDOW } = await import('../game.mjs');
+  const s = make(); go(s); act(s, { type: 'start', kind: 'produce' }, T);
+  const a = s.active;
+  assert.ok(a.interval <= B.sportMs / 7 + 1 && B.sportMs <= 150_000, 'a match with six decisions moves along quickly');
+  a.event = { beat: a.beat, n: 0 }; a.readyAt = T + 1000;
+  const seen = view(s, T + 2000).active;
+  assert.equal(seen.eventEndsAt, T + 1000 + EVENT_WINDOW, 'the open event shows its deadline');
+  reconcile(s, T + 1000 + EVENT_WINDOW + 10);
+  assert.equal(s.active.event.missed, true, 'an unanswered event is missed');
+  assert.ok(!choices(s).some(c => c.event), 'and the normal play carries on');
+  s.prompt = { id: 'p', kind: 'journalist', at: T }; reconcile(s, T + PROMPT_WINDOW + 10);
+  assert.equal(s.prompt, null, 'an unanswered question passes');
+});
