@@ -491,7 +491,7 @@ test('wrestling results come from stamina or a pin, never the generic score',()=
 });
 test('tennis decisions play whole games and the result shows set scores',()=>{
   const s=make('tennis');go(s);act(s,{type:'start',kind:'produce'},T+1,()=>.9);act(s,{type:'decision',activityId:s.active.id,beat:0,choice:0},s.active.readyAt,()=>0);
-  assert.deepEqual(s.active.lastGames,[3,0]);
+  assert.deepEqual(s.active.lastGames,[4,0]);assert.equal(s.active.outcomes[0].success,true);
   const w=make('tennis');go(w);complete(w,'produce',()=>0);assert.equal(w.results[0].win,'Win');assert.match(w.results[0].sets,/^\d+–\d+, \d+–\d+/);assert.ok(w.results[0].story.length>=1&&w.results[0].review.includes('★'));
 });
 test('a tier rise is a promotion with the career’s own title',()=>{
@@ -558,4 +558,10 @@ test('each sport has its own person at the arena; everyone else meets Scout Kai'
   const {npcAt}=await import('../public/content.js');
   assert.equal(npcAt('sports','football').name,'Kai');assert.equal(npcAt('sports','musician').name,'Kai');
   const names=['basketball','tennis','wrestling'].map(c=>npcAt('sports',c).name);assert.equal(new Set([...names,'Kai']).size,4);
+});
+test('tennis: the call follows the games won, and the decisions alone settle the match',()=>{
+  const s=make('tennis');go(s);act(s,{type:'start',kind:'produce'},T+1,()=>.9);delete s.active.event;
+  act(s,{type:'decision',activityId:s.active.id,beat:0,choice:0},s.active.readyAt,()=>.999);const [w,l]=s.active.lastGames;assert.ok(l>w);assert.equal(s.active.outcomes[0].success,false,'lost the stretch = a miss');
+  for(let i=0;i<30;i++){const t=make('tennis');go(t);let n=i;complete(t,'produce',()=>((n=n*16807%2147483647)/2147483647));const r=t.results[0];const sets=r.sets.split(', ').map(x=>x.split('–').map(Number));
+    const won=sets.filter(([a,b])=>a>b).length,lost=sets.filter(([a,b])=>b>a).length;assert.ok(Math.max(won,lost)===2,r.sets);assert.equal(r.win,won===2?'Win':'Loss');}
 });

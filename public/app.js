@@ -418,7 +418,7 @@ async function chooseDecision(index){const a=state.active;if(!a||pendingChoice)r
 // What a choice changed: points, games, stamina, or the room's mood.
 function consequence(career,b,a){
   if(career==='basketball'&&a.playerScore!=null){const us=a.playerScore-(b.playerScore||0),them=a.opponentScore-(b.opponentScore||0);return `${us?`+${us} for you`:'No points'}${them?` · they answer with ${them}`:' · stop at the other end'} (${a.playerScore}–${a.opponentScore})`;}
-  if(career==='tennis'&&a.lastGames)return `Games won ${a.lastGames[0]} of ${a.lastGames[0]+a.lastGames[1]} · ${a.scoreLabel||a.sets||''}`;
+  if(career==='tennis'&&a.lastGames)return `${a.lastGames[0]>a.lastGames[1]?'You take the stretch':a.lastGames[0]<a.lastGames[1]?'They take the stretch':'Level stretch'}: games ${a.lastGames[0]}–${a.lastGames[1]} · ${a.scoreLabel||a.sets||''}`;
   if(career==='wrestling'&&a.playerStamina!=null)return a.pinned?'1… 2… 3! Pinfall!':`Stamina: you ${a.playerStamina} · them ${a.opponentStamina}`;
   if(a.engagement!=null&&b.engagement!=null){const d=Math.round(a.engagement-b.engagement),st=Math.round((a.stability??0)-(b.stability??a.stability??0)),[m,m2]=METERS[career]||['Mood','Focus'];return `${m} ${d>=0?'▲':'▼'} ${Math.abs(d)}${st?` · ${m2} ${st>0?'▲':'▼'} ${Math.abs(st)}`:''}${a.lastNote?` · ${a.lastNote}`:''}`;}
   return '';
