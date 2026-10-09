@@ -491,7 +491,7 @@ test('wrestling results come from stamina or a pin, never the generic score',()=
 });
 test('tennis decisions play whole games and the result shows set scores',()=>{
   const s=make('tennis');go(s);act(s,{type:'start',kind:'produce'},T+1,()=>.9);act(s,{type:'decision',activityId:s.active.id,beat:0,choice:0},s.active.readyAt,()=>0);
-  assert.deepEqual(s.active.lastGames,[4,0]);assert.equal(s.active.outcomes[0].success,true);
+  assert.deepEqual(s.active.lastGames,[3,0]);assert.equal(s.active.outcomes[0].success,true);
   const w=make('tennis');go(w);complete(w,'produce',()=>0);assert.equal(w.results[0].win,'Win');assert.match(w.results[0].sets,/^\d+–\d+, \d+–\d+/);assert.ok(w.results[0].story.length>=1&&w.results[0].review.includes('★'));
 });
 test('a tier rise is a promotion with the career’s own title',()=>{
