@@ -616,7 +616,7 @@ export class World {
   // The open city: core venue lots plus homes, downtown, park, lagoon and island.
   town(){
     const here=TOWN[this.location]||TOWN.home,ox=-here.x,oz=-here.z,{night}=this.daylight(),far=this.zoom<.4,t=this.reduced?0:performance.now()/1000;
-    this.floor(ox,oz-26,160,72,'#c4d4ad');this.floor(ox,oz+27,200,36,night?'#58789a':'#93c9d8');this.floor(ox,oz+10.6,160,1.6,'#eadcb5');
+    this.floor(ox,oz-26,160,72,'#9fcd80');this.floor(ox,oz+27,200,36,night?'#3f6f93':'#4fbfd8');this.floor(ox,oz+10.6,160,1.6,'#f1d79a');
     for(const z of [8,-8,-24,-40,-56]){this.floor(ox,oz+z,148,4,'#dcd8cc');this.floor(ox,oz+z,148,3,'#9fa49a',.004);if(!far)for(let x=-72;x<72;x+=2.6)if(this.onScreen(ox+x,oz+z,1))this.floor(ox+x,oz+z,1.1,.12,'#eeeadb',.008);}
     for(const x of [-72,-56,-40,-24,-8,8,24,40,56,72]){this.floor(ox+x,oz-24.5,4,65,'#dcd8cc',.002);this.floor(ox+x,oz-24.5,3,65,'#9fa49a',.006);}
     // Bridge and island resort across the lagoon.
@@ -1355,9 +1355,9 @@ export class World {
     const clear=this.training();for(const p of this.people?.values()||[]){if(this.interior()&&!p.scene)continue;if(p.trip&&p.trip.arrives>Date.now()+this.serverOffset){const now=Date.now()+this.serverOffset,t=this.tripPosition(p.trip,now);if(this.onScreen(t.x,t.z,2)){if(p.trip.ride&&!t.onFoot){this.ride(p.trip.ride,t.x,t.z,t.axis,p.trip.ride==='helicopter'?6:0);if(OPEN_RIDES.includes(p.trip.ride))this.human(t.x,t.z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),pose:'sit',seat:.7,heading:t.heading});}else this.tripWalker(p.trip,t,now,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p)});}continue;}const x=p.x-here.x,z=p.z-here.z;if(!this.onScreen(x,z,1)||(clear&&this.inTrainingZone(x,z)))continue;const emoting=p.emote&&!p.moving&&Date.now()+this.serverOffset-p.emote.at<(EMOTES[p.emote.kind]?.ms||0)?(EMOTES[p.emote.kind]?.pose||p.emote.kind):null;this.human(x,z,p.color,{...this.look(p.career,p.clothes,p.wear),...this.body(p),walk:p.moving,heading:p.heading,gait:p.gait,pose:emoting});}
   }
   // The home screen: a soft sky and a round lawn under the house, like a dollhouse on a table.
-  paintIsland(light){const ctx=this.ctx,g=ctx.createLinearGradient(0,0,0,this.height);g.addColorStop(0,light.night?'#24324d':'#cfe3f4');g.addColorStop(1,light.night?'#3b4a66':'#eef5f9');ctx.fillStyle=g;ctx.fillRect(0,0,this.width,this.height);
+  paintIsland(light){const ctx=this.ctx,g=ctx.createLinearGradient(0,0,0,this.height);g.addColorStop(0,light.night?'#1f2d4d':'#8fcaf0');g.addColorStop(1,light.night?'#3b4a66':'#e3f3fb');ctx.fillStyle=g;ctx.fillRect(0,0,this.width,this.height);
     const ring=(r,color,y=0)=>{const pts=[];for(let i=0;i<48;i++){const a=i/48*Math.PI*2;pts.push([Math.cos(a)*r,y,Math.sin(a)*r]);}this.polygon(pts,color);};
-    const lawn={plaza:['#c9c29a','#ddd6b0'],sports:['#9fc08d','#b5d3a2'],studio:['#b9b3cf','#cfc9e2'],creator:['#d8b7a9','#ead0c4'],tech:['#a9c6cf','#c2dbe2']}[this.location]||['#b4c99c','#c6d8b0'];
+    const lawn={plaza:['#b9c97f','#cfdc95'],sports:['#7fbf62','#97d27a'],studio:['#a99ad6','#c2b6ea'],creator:['#e0a58f','#f0c0ac'],tech:['#86c2d6','#a6d8e8']}[this.location]||['#8cc46c','#a6d488'];
     ring(10.6,light.night?'#55705a':lawn[0]);ring(10,light.night?'#62806a':lawn[1],.01);
   }
   islandTrees(){for(const [x,z,s] of [[-7.6,4.6,1],[6.8,-6,1.2],[-6.6,-6.8,.9],[7.4,5.4,.8]])this.tree(x,z,s);}

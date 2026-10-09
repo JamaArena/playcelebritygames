@@ -317,12 +317,12 @@ export class World3D extends World {
     super(overlay, onMove, onObject);
     this.glCanvas = glCanvas;
     this.renderer = new T.WebGLRenderer({ canvas: glCanvas, antialias: true });
-    this.renderer.outputColorSpace = T.SRGBColorSpace; this.renderer.toneMapping = T.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.05;
+    this.renderer.outputColorSpace = T.SRGBColorSpace; this.renderer.toneMapping = T.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.1;
     this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = T.PCFSoftShadowMap;
     this.scene3 = new T.Scene(); this.camera = new T.PerspectiveCamera(32, 1, .1, 400);
     // Soft studio-style reflections and ambient light from a generated room environment.
     this.scene3.environment = new T.PMREMGenerator(this.renderer).fromScene(new T.RoomEnvironment(), .04).texture; this.scene3.environmentIntensity = .55;
-    this.hemi = new T.HemisphereLight('#f4f7ff', '#a8b896', .55); this.sun = new T.DirectionalLight('#fff1dc', 2.4); this.fill = new T.DirectionalLight('#dce8ff', .45);
+    this.hemi = new T.HemisphereLight('#f4f9ff', '#8fc46f', .6); this.sun = new T.DirectionalLight('#fff1dc', 2.4); this.fill = new T.DirectionalLight('#dce8ff', .45);
     this.sun.castShadow = true; this.sun.shadow.mapSize.set(2048, 2048); Object.assign(this.sun.shadow.camera, { left: -11, right: 11, top: 11, bottom: -11, near: 1, far: 60 });
     this.sun.shadow.bias = -.0004; this.sun.shadow.normalBias = .02;
     this.lamp = new T.PointLight('#ffcf85', 0, 10); this.lamp.position.set(-1.7, 2.2, 1.5);
@@ -453,7 +453,7 @@ export class World3D extends World {
     this.sun.position.set(this.focusPoint.x + 7, 13, this.focusPoint.z + 9); this.sun.target.position.set(this.focusPoint.x, 0, this.focusPoint.z); this.sun.target.updateMatrixWorld();
     // Weather: rain darkens the sky; harmattan brings a dusty haze. A power cut at home dims the room.
     const weather = weatherAt(Date.now()), outside = !this.interior();
-    const sky = weather === 'rain' ? (day.night ? '#1c2434' : '#9ba8b5') : weather === 'harmattan' ? (day.night ? '#2e2a2a' : '#e2d3b2') : day.night ? '#24324d' : '#d6e6f2';
+    const sky = weather === 'rain' ? (day.night ? '#1c2434' : '#9ba8b5') : weather === 'harmattan' ? (day.night ? '#2e2a2a' : '#e2d3b2') : day.night ? '#1f2d4d' : '#9fd2f3';
     this.scene3.background = new T.Color(sky); this.fog.color.set(sky);
     this.fog.near = weather === 'harmattan' ? 25 : weather === 'rain' ? 45 : 80; this.fog.far = weather === 'harmattan' ? 120 : weather === 'rain' ? 180 : 260;
     if (weather !== 'clear') { this.sun.intensity *= weather === 'rain' ? .45 : .75; this.hemi.intensity *= weather === 'rain' ? .85 : 1; }
