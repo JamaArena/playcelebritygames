@@ -1221,7 +1221,9 @@ await refresh();
 function matchReplay(id,choice,success,before,after,result){
   const blueGoal=(after.playerScore||0)>(before.playerScore||0),redGoal=(after.opponentScore||0)>(before.opponentScore||0),script=replayScript(choice,success,blueGoal,redGoal,state.name.split(' ')[0],result,before.chance?100-before.chance-2:45);
   const goal=script.find(f=>f.ball[0]>=100||f.ball[0]<=0),t0=performance.now();world.playMatchMove({id,script,blueGoal,redGoal,before:{possession:before.possession,chance:before.chance}});
-  matchHud.hold={score:[before.playerScore||0,before.opponentScore||0],until:t0+(goal&&(blueGoal||redGoal)&&motion?goal.t*1000:0)};matchScreen();
+  matchHud.hold={score:[before.playerScore||0,before.opponentScore||0],until:t0+(goal&&(blueGoal||redGoal)&&motion?goal.t*1000:0)};
+  // While the move plays, keep its minute and words (the final whistle waits for the last move); after a Red goal, Blue kick off.
+  matchHud.move={until:t0+(motion?(script.at(-1).t+2.6)*1000:0),minute:Math.min(90,Math.round(((after.beat||1)/(after.totalBeats||6))*90)),line:script[0].text};matchHud.kickoff=redGoal?id+':'+(after.beat||0):null;matchScreen();
 }
 // matchHud (the scoreboard) is declared with the top-level state: the first render can run before this point.
 function matchScreen(){
@@ -1231,6 +1233,7 @@ function matchScreen(){
     matchHud.el=el;matchHud.timer=setInterval(matchScreen,250);}
   const minute=Math.min(90,Math.round(((a.beat||0)/(a.totalBeats||6))*90)),held=matchHud.hold&&performance.now()<matchHud.hold.until?matchHud.hold.score:[a.playerScore||0,a.opponentScore||0];
   const score=`${held[0]} – ${held[1]}`,el=matchHud.el,set=(q,v)=>{const n=el.querySelector(q);if(n.textContent!==v)n.textContent=v;};
-  set('.mr-bar strong',score);set('.mr-bar em',a.beat===0&&now()<a.startedAt+ANTHEM_MS?'Anthem':a.beat>=a.totalBeats?'FT':`${minute}'`);
-  set('.mr-text',world.matchLine||(a.beat===0&&now()<a.startedAt+ANTHEM_MS?'The teams line up for the anthem…':a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?(a.possession==='opponent'?'Red have the ball…':'Blue keep the ball moving…'):`${a.scene?.text||'The ball comes to you.'}`));
+  const mv=matchHud.move&&performance.now()<matchHud.move.until?matchHud.move:null,kickoff=matchHud.kickoff===a.id+':'+a.beat&&now()<a.readyAt;
+  set('.mr-bar strong',score);set('.mr-bar em',a.beat===0&&now()<a.startedAt+ANTHEM_MS?'Anthem':mv?`${mv.minute}'`:a.beat>=a.totalBeats?'FT':`${minute}'`);
+  set('.mr-text',world.matchLine||mv?.line||(kickoff?'Blue kick off after the goal…':a.beat===0&&now()<a.startedAt+ANTHEM_MS?'The teams line up for the anthem…':a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?(a.possession==='opponent'?'Red have the ball…':'Blue keep the ball moving…'):`${a.scene?.text||'The ball comes to you.'}`));
 }
