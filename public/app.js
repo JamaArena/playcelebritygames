@@ -178,7 +178,7 @@ function showLifeEvent(s){
 let seenPrompt=null;
 function showPrompt(s){
   const p=s?.prompt;if(!p||seenPrompt===p.id||modalPage)return;seenPrompt=p.id;const e=Object.values(LIFE_EVENTS).find(e=>e.prompt===p.kind),def=PROMPTS[p.kind];if(!def)return;
-  showModal('prompt',`<div class="mishap-card"><div class="mishap-icon" aria-hidden="true">${e?.icon||'✨'}</div><h2>${escape(e?.title||'A moment')}</h2><p>${escape(e?.text||'')}</p><div class="actions">${def.options.map((o,i)=>button(escape(o.label),'answerPrompt',`data-choice="${i}" data-id="${p.id}"`,i?'':'primary')).join('')}</div></div>`,false);
+  showModal('prompt',`<div class="mishap-card"><div class="mishap-icon" aria-hidden="true">${e?.icon||'✨'}</div><h2>${escape(e?.title||'A moment')}</h2><p>${escape(e?.text||'')}</p><p class="event-timer" id="promptTimer"></p><div class="actions">${def.options.map((o,i)=>button(escape(o.label),'answerPrompt',`data-choice="${i}" data-id="${p.id}"`,i?'':'primary')).join('')}</div></div>`,false);
 }
 // A mishap (a need hit rock bottom) pops up once: what happened, what it cost, and how to avoid it.
 let seenMishap=null;
@@ -359,7 +359,7 @@ function render(){
   setMood(state?.trip?'road':state?.location);questHud();
   if(!modalPage||modalPage!=='create')tip(state.location==='home'?'home':state.location==='street'||state.trip?'city':'venue');
   // Refresh the moment a trip, practice or recovery finishes instead of waiting for the next heartbeat.
-  clearTimeout(tripTimer);const due=Math.min(...[state.trip?.arrives,state.active?.kind==='practice'?state.active.readyAt:null,state.recovery?.endsAt].filter(Boolean));if(Number.isFinite(due))tripTimer=setTimeout(()=>refresh(),Math.max(500,due-now()+400));
+  clearTimeout(tripTimer);const due=Math.min(...[state.trip?.arrives,state.active?.kind==='practice'?state.active.readyAt:null,state.recovery?.endsAt,state.active?.eventEndsAt,state.prompt?.endsAt].filter(Boolean));if(Number.isFinite(due))tripTimer=setTimeout(()=>refresh(),Math.max(500,due-now()+400));
   const c=state.careers[state.career],def=CAREERS[state.career],location=LOCATIONS[state.location];
   $('#navigation').innerHTML=[['city','🏠','Home'],['career','⭐','Career'],['phone','💬','Social'],['inventory','◇','My home'],['profile','🪪','Profile']].map(([page,icon,label])=>`<button class="nav-button ${page==='city'?'active':''}" data-action="${page==='city'?(state.visiting?'leaveVisit':'travel'):'page'}" data-location="home" data-page="${page}"><span>${icon}</span>${label}</button>`).join('');
   $('#topStats').innerHTML=phoneWidget();
@@ -405,7 +405,7 @@ function renderActivity(){
     const last=a.outcomes?.at(-1);html+=workBoard(a);
     if(waiting)html+=(last?'<div class="work-last '+(last.success?'hit':'miss')+'">'+(last.success?'✓ ':'✗ ')+escape(last.choice)+(a.career==='tennis'&&a.lastGames?' · games '+a.lastGames.join('–'):'')+'</div>':'')+progress(a.readyAt-a.interval,a.readyAt);
     else if(complete)html+=button('🎁 Collect result','finish','data-id="'+a.id+'"','primary');
-    else{voiceScene(a);html+=(a.scene?.text?'<div class="work-scene'+(a.scene.event?' event':'')+'">'+escape(a.scene.text)+'</div>':'')+'<div class="sim-choices">'+a.choices.map((choice,index)=>button('<b>'+(CHOICE_ICONS[choice.action]||(choice.action==='general'?['💡','✨','⚡'][index%3]:def.icon))+'</b><span>'+escape(choice.label)+'</span><em class="risk-'+choice.risk+'">'+escape(skillName(a.career,choice.skill))+'</em><small>'+Math.round(choice.probability*100)+'%</small>','decision','data-index="'+index+'" data-beat="'+a.beat+'" data-id="'+a.id+'" title="'+escape(skillName(a.career,choice.skill))+' · '+escape(choice.risk)+'"','sim-choice'+(pendingChoice&&pendingChoice.id===a.id&&pendingChoice.beat===a.beat&&pendingChoice.index===index?' pending':''))).join('')+'</div>';}
+    else{voiceScene(a);html+=(a.scene?.text?'<div class="work-scene'+(a.scene.event?' event':'')+'">'+escape(a.scene.text)+'</div>':'')+(a.eventEndsAt?`<p class="event-timer${a.eventEndsAt-now()<10_000?' hurry':''}">⏳ ${Math.max(0,Math.ceil((a.eventEndsAt-now())/1000))}s to react, or you miss it</p>`:'')+'<div class="sim-choices">'+a.choices.map((choice,index)=>button('<b>'+(CHOICE_ICONS[choice.action]||(choice.action==='general'?['💡','✨','⚡'][index%3]:def.icon))+'</b><span>'+escape(choice.label)+'</span><em class="risk-'+choice.risk+'">'+escape(skillName(a.career,choice.skill))+'</em><small>'+Math.round(choice.probability*100)+'%</small>','decision','data-index="'+index+'" data-beat="'+a.beat+'" data-id="'+a.id+'" title="'+escape(skillName(a.career,choice.skill))+' · '+escape(choice.risk)+'"','sim-choice'+(pendingChoice&&pendingChoice.id===a.id&&pendingChoice.beat===a.beat&&pendingChoice.index===index?' pending':''))).join('')+'</div>';}
   }else html='<div class="idle-actions">'+button(def.icon+' '+(state.location===def.location?'Start work':'Go to work'),state.location===def.location?'prepare':'travel',state.location===def.location?'':'data-location="'+def.location+'"','primary')+button('🎯 Practise','practice')+'</div>';
   if(taskQueue.length)html+='<div class="task-queue"><small>Up next</small>'+taskQueue.map((t,i)=>button(`${escape(t.icon||'•')} ${escape(t.label)} <b aria-hidden="true">×</b>`,'unqueue',`data-index="${i}" aria-label="Remove ${escape(t.label)} from queue"`,'queue-chip')).join('')+'</div>';
   $('#activityCard').innerHTML=html;
@@ -1166,7 +1166,8 @@ function scheduleHeartbeat(){clearTimeout(heartbeat);if(elsewhere)return;heartbe
 scheduleHeartbeat();
 // Coming back after a real absence refreshes at once; quick app switches don't.
 let hiddenAt=0;document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();return;}if(Date.now()-hiddenAt>=10_000&&Date.now()-lastUpdate>=5_000)refresh();});
-setInterval(()=>{if(state&&!busy){renderActivity();clock();const bt=$('#battleTimer'),bb=(snapshot.battles||[]).find(x=>x.id===battleId);if(bt&&bb)bt.textContent=duration(bb.turnEndsAt-now());const next=$('#chargeRefill');if(next&&state.refillAnchor!==null)next.textContent=`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`;}},1000);
+setInterval(()=>{if(state&&modalPage==='prompt'){const end=state.prompt?.endsAt,t=$('#promptTimer');if(!state.prompt||end&&now()>=end){closeModal();toast('⏳ The moment passed.');}else if(t&&end)t.textContent=`⏳ ${Math.ceil((end-now())/1000)}s to answer`;}
+  if(state&&!busy){renderActivity();clock();const bt=$('#battleTimer'),bb=(snapshot.battles||[]).find(x=>x.id===battleId);if(bt&&bb)bt.textContent=duration(bb.turnEndsAt-now());const next=$('#chargeRefill');if(next&&state.refillAnchor!==null)next.textContent=`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`;}},1000);
 
 // Tell players when 3D couldn't start, and offer 2D Lite once when 3D runs slowly on this device.
 {
