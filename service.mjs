@@ -3,8 +3,8 @@ import { CLASH, CLASH_ACTIONS, CHEER } from './public/clashText.js';
 import { CLASH_MEDALS, medalTier, isBigger, clashStake, ARENA, arenaGroup } from './public/content.js';
 import { randomBytes, createHash, scryptSync, timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline, questProgress } from './game.mjs';
-import { CAREERS, BALANCE, clamp, perksFor, WEAR, SPOUSE_SHARE, SPOUSE_REASON } from './public/content.js';
+import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline, questProgress, raceFame, addMoney, spend } from './game.mjs';
+import { CAREERS, BALANCE, clamp, perksFor, WEAR, SPOUSE_SHARE, SPOUSE_REASON, MONEY, FOODS, naira, jobPay } from './public/content.js';
 export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL, password_hash TEXT);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS profiles(id TEXT PRIMARY KEY, room TEXT, location TEXT, career TEXT, fame INTEGER, trend INTEGER, seen INTEGER, dating INTEGER, crew INTEGER, outside INTEGER, data TEXT NOT NULL);\n CREATE INDEX IF NOT EXISTS profiles_room ON profiles(room,seen);\n CREATE INDEX IF NOT EXISTS profiles_seen ON profiles(seen);\n CREATE INDEX IF NOT EXISTS profiles_fame ON profiles(fame);\n CREATE INDEX IF NOT EXISTS profiles_career ON profiles(career,seen);\n CREATE TABLE IF NOT EXISTS arena(day INTEGER PRIMARY KEY, results TEXT NOT NULL);";
 // Who counts as online, and the room a player is in (a home, or a public place).
 export const ONLINE_MS=100_000;
@@ -17,7 +17,8 @@ export function relatedQueries(playerId,s,now){
     profiles:[
       ['SELECT * FROM profiles WHERE room=? AND seen>? ORDER BY seen DESC LIMIT 100',[room,cut]],
       ['SELECT * FROM profiles ORDER BY fame DESC LIMIT 25',[]],
-      ['SELECT * FROM profiles WHERE seen>? ORDER BY trend DESC LIMIT 10',[now-86_400_000]],
+      ['SELECT * FROM profiles WHERE seen>? ORDER BY trend DESC LIMIT 10',[ARENA.start(ARENA.day(now))]],
+      ...raceQueries(s,now),
       ['SELECT * FROM profiles WHERE seen>? AND outside=1 ORDER BY seen DESC LIMIT 150',[cut]],
       ['SELECT * FROM profiles ORDER BY seen DESC LIMIT 40',[]],
       ['SELECT * FROM profiles WHERE career=? ORDER BY seen DESC LIMIT 20',[s.career]],
@@ -29,6 +30,12 @@ export function relatedQueries(playerId,s,now){
     battles:['SELECT * FROM battles WHERE state LIKE ? OR (state LIKE ? AND state LIKE ?)',[`%${playerId}%`,'%"status":"open"%',`%"location":"${s.location}"%`]],
     agreements:['SELECT * FROM agreements WHERE state LIKE ?',[`%${playerId}%`]],
   };
+}
+// Today's Award Arena race: the leaders in your career and in your field, by fame earned since the last ceremony.
+export function raceQueries(s,now){
+  const since=ARENA.start(ARENA.day(now)),group=arenaGroup(CAREERS[s.career]?.family),careers=group?Object.keys(CAREERS).filter(k=>ARENA.family[group].families.includes(CAREERS[k].family)):[];
+  return [['SELECT * FROM profiles WHERE career=? AND seen>=? AND trend>0 ORDER BY trend DESC LIMIT 5',[s.career,since]],
+    ...(careers.length?[[`SELECT * FROM profiles WHERE career IN (${careers.map(()=>'?').join(',')}) AND seen>=? AND trend>0 ORDER BY trend DESC LIMIT 5`,[...careers,since]]]:[])];
 }
 export function createGameService(db,{secureCookies=false,sendEmail=null,fast=false,onChange=null}={}) {
 // While an action runs, the rooms and players it touched (for live nudges).
@@ -74,7 +81,7 @@ function settleSeasons(now) {
         const entitlement=`season:${current.id}:${category}`,s=winner.player.state;
         if(s.awards.some(a=>a.id===entitlement))continue;
         s.awards.push({id:entitlement,name:`Season ${current.id} · ${CAREERS[winner.career].name} award`,career:winner.career,at:current.ends,score:winner.score});
-        addFame(s,100,'Season award',current.ends);log(s,`Season ${current.id} award: +100 fame.`,current.ends);
+        addFame(s,100,'Season award',current.ends);addMoney(s,MONEY.season,'Season award',current.ends);log(s,`Season ${current.id} award: +100 fame and ${naira(MONEY.season)}.`,current.ends);
       }
     }
     db.prepare('UPDATE seasons SET settled=1 WHERE id=?').run(current.id);
@@ -98,7 +105,7 @@ function captureEligibility(s,now){
 const TOWN_PLAYER_LIMIT=120,ACTIVE_DEVICE_MS=ONLINE_MS;
 class OtherDevice extends Error {}
 const roomFor=roomOf;
-function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,hairColor:s.hairColor||'black',tattoos:s.tattoos||[],build:s.build||'average',height:s.height||'average',career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,wear:s.wear||null,emote:s.emote||null,crew:s.crew||null,spouse:s.spouse?.name||null,verified:(s.fame||0)>=50_000,hallOfFame:s.hallOfFame||null,trend:(s.fameLog||[]).filter(e=>clock()-e.at<86_400_000).reduce((n,e)=>n+e.delta,0),bodyguard:!!s.team?.bodyguard,posts:(s.posts||[]).slice(0,3),headlines:(s.headlines||[]).slice(0,2),dating:!!s.dating?.open,datingLikes:s.dating?.open?s.dating.likes.slice(0,50):[],home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<ONLINE_MS};}
+function publicProfile(playerId,s){return {id:playerId,name:s.name,color:s.color,hair:s.hair,hairColor:s.hairColor||'black',tattoos:s.tattoos||[],build:s.build||'average',height:s.height||'average',career:s.career,location:s.location,sceneRoom:roomFor(playerId,s),position3d:s.position3d,audience:s.careers[s.career].audience,fame:s.fame||0,ride:s.ride||null,clothes:s.equipped?.clothes||null,wear:s.wear||null,emote:s.emote||null,crew:s.crew||null,spouse:s.spouse?.name||null,verified:(s.fame||0)>=50_000,hallOfFame:s.hallOfFame||null,trend:raceFame(s,clock()),race:s.race||null,bodyguard:!!s.team?.bodyguard,posts:(s.posts||[]).slice(0,3),headlines:(s.headlines||[]).slice(0,2),dating:!!s.dating?.open,datingLikes:s.dating?.open?s.dating.likes.slice(0,50):[],home:s.home||null,trip:s.trip||null,phone:s.phone||'basic',tier:s.careers[s.career].tier,awards:s.awards.length,online:clock()-s.lastSeen<ONLINE_MS};}
 // A player's public card, kept beside their save so updates never have to read everyone's saves.
 let upsertProfile=null;
 function saveProfile(playerId,s){
@@ -109,28 +116,35 @@ function saveProfile(playerId,s){
 // One-off: players saved before profiles existed get their card now.
 if(!fast)for(const row of db.prepare("SELECT p.id,p.state FROM players p LEFT JOIN profiles f ON f.id=p.id WHERE f.id IS NULL AND p.state!='null'").all())saveProfile(row.id,JSON.parse(row.state));
 // The Award Arena: at the first request after midnight (Nigeria time) the day's ceremony is held from
-// the public player cards. Career and field awards go to the most fame gained in the last 24 hours
-// (players active in the last two days); the all-time award goes to the most famous star.
+// the public player cards. Each day is a fresh race: career and field awards go to the most fame earned
+// between the last ceremony and this one (only players who earned fame in that window); your total is kept.
+// The all-time award goes to the most famous star.
 function holdCeremony(now){
   const day=ARENA.day(now),last=db.prepare('SELECT day FROM arena ORDER BY day DESC LIMIT 1').get();
   if(last&&last.day>=day)return;
-  const cards=db.prepare('SELECT id,career,fame,trend,seen,data FROM profiles').all().map(r=>{const d=JSON.parse(r.data);return {id:r.id,name:d.name,color:d.color,hair:d.hair,hairColor:d.hairColor,wear:d.wear,career:r.career,fame:Number(r.fame)||0,trend:Number(r.trend)||0,seen:Number(r.seen)||0};});
-  const recent=cards.filter(c=>now-c.seen<2*86_400_000&&c.trend>0),top=(list,key)=>[...list].sort((a,b)=>b[key]-a[key]).slice(0,5).map(({seen,...c})=>c);
+  const cards=db.prepare('SELECT id,career,fame,data FROM profiles').all().map(r=>{const d=JSON.parse(r.data);return {id:r.id,name:d.name,color:d.color,hair:d.hair,hairColor:d.hairColor,wear:d.wear,career:r.career,fame:Number(r.fame)||0,trend:d.race?.day===day-1?d.race.fame:0};});
+  const recent=cards.filter(c=>c.trend>0),top=(list,key)=>[...list].sort((a,b)=>b[key]-a[key]).slice(0,5);
   const results={career:{},family:{},goat:top(cards.filter(c=>c.fame>0),'fame')};
   for(const key of Object.keys(ARENA.career))results.career[key]=top(recent.filter(c=>c.career===key),'trend');
   for(const [key,group] of Object.entries(ARENA.family))results.family[key]=top(recent.filter(c=>group.families.includes(CAREERS[c.career]?.family)),'trend');
   db.prepare('INSERT INTO arena(day,results) VALUES(?,?) ON CONFLICT(day) DO NOTHING').run(day,JSON.stringify(results));
   // Winners get the award on their profile, a fame prize (none for the all-time title) and a headline.
-  const crown=(winner,award,prize)=>{const ps=winner&&load(winner.id);if(!ps)return;ps.awards.push({id:id(),name:`${award.icon} ${award.name}`,arena:true,career:ps.career,at:now});if(prize)addFame(ps,prize,award.name,now);log(ps,`${award.icon} You won ${award.name} at the Award Arena!${prize?` +${prize} fame.`:''}`,now);headline(ps,`${ps.name} wins ${award.name} ${award.icon}`,now);persist(winner.id,ps);};
-  for(const [key,list] of Object.entries(results.career))crown(list[0],ARENA.career[key],ARENA.prize.career);
-  for(const [key,list] of Object.entries(results.family))crown(list[0],ARENA.family[key],ARENA.prize.family);
-  crown(results.goat[0],ARENA.goat,0);
+  const crown=(winner,award,prize,cash)=>{const ps=winner&&load(winner.id);if(!ps)return;ps.awards.push({id:id(),name:`${award.icon} ${award.name}`,arena:true,career:ps.career,at:now});if(prize)addFame(ps,prize,award.name,now,false);if(cash)addMoney(ps,cash,`Prize: ${award.name}`,now);log(ps,`${award.icon} You won ${award.name} at the Award Arena!${prize?` +${prize} fame.`:''}${cash?` +${naira(cash)} prize money.`:''}`,now);headline(ps,`${ps.name} wins ${award.name} ${award.icon}`,now);persist(winner.id,ps);};
+  for(const [key,list] of Object.entries(results.career))crown(list[0],ARENA.career[key],ARENA.prize.career,ARENA.cash.career);
+  for(const [key,list] of Object.entries(results.family))crown(list[0],ARENA.family[key],ARENA.prize.family,ARENA.cash.family);
+  crown(results.goat[0],ARENA.goat,0,0);
 }
 // Only the awards that matter to this player: their career's, their field's and the all-time title.
-function arenaFor(s){
+function arenaFor(s,now){
   const row=db.prepare('SELECT * FROM arena ORDER BY day DESC LIMIT 1').get();if(!row)return null;
   const r=JSON.parse(row.results),group=arenaGroup(CAREERS[s.career]?.family);
-  return {day:row.day,next:ARENA.next(row.day),career:{key:s.career,list:r.career?.[s.career]||[]},family:group?{key:group,list:r.family?.[group]||[]}:null,goat:r.goat||[]};
+  return {day:row.day,next:ARENA.next(row.day),career:{key:s.career,list:r.career?.[s.career]||[]},family:group?{key:group,list:r.family?.[group]||[]}:null,goat:r.goat||[],race:raceFor(s,now)};
+}
+// The live race since the last ceremony: your own fame earned so far and the current leaders.
+function raceFor(s,now){
+  const card=r=>{const d=JSON.parse(r.data);return {id:r.id,name:d.name,color:d.color,hair:d.hair,hairColor:d.hairColor,wear:d.wear,career:r.career,trend:Number(r.trend)||0};};
+  const [career,family]=raceQueries(s,now).map(([sql,args])=>db.prepare(sql).all(...args).map(card));
+  return {since:ARENA.start(ARENA.day(now)),mine:raceFame(s,now),career,family:family||[]};
 }
 function snapshot(playerId,s,now){
   const account=accountOf(playerId);
@@ -152,7 +166,7 @@ function snapshot(playerId,s,now){
   const agreements=db.prepare(q.agreements[0]).all(...q.agreements[1]).map(r=>JSON.parse(r.state)).filter(a=>a.participants.includes(playerId)&&['pending','running'].includes(a.status));
   const visiting=s.visiting?load(s.visiting):null;
   const battles=battlesFor(playerId,s,now);
-  return {state:view(s,now),account,playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture,home:visiting.home||null}:null,arena:arenaFor(s),season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
+  return {state:view(s,now),account,playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture,home:visiting.home||null}:null,arena:arenaFor(s,now),season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
 }
 // Turn-based team battles between real players. Stats come from career skills, energy and fame.
 // Winners gain fame; losers lose the same stake (never below zero). Each fighter spends one charge.
@@ -333,7 +347,7 @@ function social(playerId,s,input,now){
     case 'gift':{
       const target=load(input.playerId);fail(target&&s.friends.includes(input.playerId)&&!target.blocks.includes(playerId),'Send gifts to a friend.');fail(clock()-(s.giftAt||0)>=10*60_000,'One gift every 10 minutes.');
       const wear=WEAR[input.item];fail(input.item==='suya'||(wear&&(wear.fame===0||s.closet?.[input.item])),'Choose something you own, or suya.');
-      if(input.item==='suya'){target.takeaway??={};target.takeaway.suya=(target.takeaway.suya||0)+1;}else{target.closet??={};target.closet[input.item]=true;}
+      if(input.item==='suya'){spend(s,FOODS.suya.price,'Gift: suya',now);target.takeaway??={};target.takeaway.suya=(target.takeaway.suya||0)+1;}else{target.closet??={};target.closet[input.item]=true;}
       const label=input.item==='suya'?'some suya':wear.name.toLowerCase();s.giftAt=clock();log(s,`🎁 You sent ${target.name} ${label}.`,now);log(target,`🎁 ${s.name} sent you ${label}!`,now);persist(input.playerId,target);break;}
     case 'propose':{
       const target=load(input.playerId);fail(target&&s.friends.includes(input.playerId)&&!target.blocks.includes(playerId)&&input.playerId!==playerId,'Propose to a friend.');
@@ -405,8 +419,8 @@ function collaborativeFinish(playerId,s,input,now) {
   for(let i=0;i<states.length;i++){
     const ps=states[i],c=ps.careers[a.career];
     const audience=i===states.length-1?gain-allocatedAudience:Math.floor(gain*a.audienceShares[i]);allocatedAudience+=audience;
-    c.audience+=audience;const fame=fameFor(audience);addFame(ps,fame,'Collaboration',now);c.completed++;c.engagement=clamp(c.engagement+(quality-50)/10);
-    const output={id:a.id,title:a.title,career:a.career,kind:'collaboration',quality,released:true,credits:states.map(p=>p.name),gain:audience,fame,at:now,tier};
+    c.audience+=audience;const fame=fameFor(audience),pay=Math.round(jobPay(c.tier,quality)*(gain?audience/gain:0)*2/50)*50;addFame(ps,fame,'Collaboration',now);if(pay)addMoney(ps,pay,`Pay: ${a.title}`,now);c.completed++;c.engagement=clamp(c.engagement+(quality-50)/10);
+    const output={id:a.id,title:a.title,career:a.career,kind:'collaboration',quality,released:true,credits:states.map(p=>p.name),gain:audience,fame,pay,at:now,tier};
     ps.outputs.unshift(output);ps.results.unshift({...output,learning:ps.active.outcomes.length*5});ps.active=null;
     evaluate(ps,a.career);captureEligibility(ps,now);log(ps,`Collaboration completed: ${audience.toLocaleString('en-US')} ${CAREERS[a.career].audience} · +${fame} fame.`,now);
     if(a.participants[i]!==playerId)persist(a.participants[i],ps);
@@ -439,7 +453,7 @@ try {
       let row=token?db.prepare('SELECT * FROM players WHERE token_hash=?').get(hash(token))||db.prepare('SELECT players.* FROM sessions JOIN players ON players.id=sessions.player_id WHERE sessions.token_hash=?').get(hash(token)):null;
       let device=token?hash(token):null;
       if(!row){const session=randomBytes(32).toString('hex');device=hash(session);const playerId=id();db.prepare('INSERT INTO players VALUES(?,?,?,?)').run(playerId,'null',hash(session),clock());row=read.get(playerId);res.setHeader('Set-Cookie',`celebrity=${session}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000${secureCookies?'; Secure':''}`);}
-      const playerId=row.id,now=clock();settleSeasons(now);if(!fast)holdCeremony(now);
+      const playerId=row.id,now=clock();if(!fast)holdCeremony(now);settleSeasons(now);
       // One device at a time: another device that was active in the last 45s blocks this one until it
       // chooses "Play here" (?takeover=1). Sign-in requests are never blocked.
       if(url.pathname!=='/api/auth'){
