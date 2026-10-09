@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { lifeEvents, createCharacter, act, reconcile, refill, learn, finishRecovery, shot, shootingProbability, generalProbability, choices, view, tennisPoint, tennisScore, evaluate } from '../game.mjs';
-import { BALANCE as B, CAREERS, effort, tripMs } from '../public/content.js';
+import { BALANCE as B, CAREERS, effort, tripMs, MONEY } from '../public/content.js';
 import { worldObjects } from '../public/world.js';
 import { walkable, route, TOWN, VENUE_ACTS, HOME_ROOMS, homeRooms, extensionSpot, SPONSORSHIPS } from '../public/content.js';
 const T=1_000_000,MISHAP_AT=5;
@@ -19,7 +19,7 @@ function complete(s,kind='produce',rng=()=>0){
 test('all 14 career definitions have two valid starts and four skills',()=>{
   assert.equal(Object.keys(CAREERS).length,14);
   for(const key of Object.keys(CAREERS))for(const origin of [0,1]){
-    const s=make(key,origin),c=s.careers[key];assert.equal(Object.keys(c.skills).length,4);assert.equal(s.money,undefined,'there are no coins');assert.equal(s.charges,10);assert.equal(c.skills[CAREERS[key].focus].level,origin?2:1);
+    const s=make(key,origin),c=s.careers[key];assert.equal(Object.keys(c.skills).length,4);assert.equal(s.money,MONEY.start[origin],'a starting balance in naira');assert.equal(s.charges,10);assert.equal(c.skills[CAREERS[key].focus].level,origin?2:1);
   }
 });
 test('football is outfield only; switching retains one shared charge bar and history',()=>{
@@ -94,7 +94,7 @@ test('defensive football beats offer context-valid actions; passing trains passi
   assert.equal(a.playerScore,1,'the winger finished the move');assert.ok(choices(s).every(c=>c.skill==='defending'),'Red kick off and attack');
 });
 test('upgrades need rising fame and time, finish offline once, preserve ownership and grant no learning',()=>{
-  const s=make();s.location='plaza';assert.throws(()=>act(s,{type:'buy',item:'gear'},T),/50 fame/);s.fame=100;act(s,{type:'buy',item:'gear'},T);act(s,{type:'upgrade',item:'gear'},T);
+  const s=make();s.money=1e7;s.location='plaza';assert.throws(()=>act(s,{type:'buy',item:'gear'},T),/50 fame/);s.fame=100;act(s,{type:'buy',item:'gear'},T);act(s,{type:'upgrade',item:'gear'},T);
   assert.equal(s.fame,100,'fame is not spent');assert.equal(s.inventory.gear.level,1);assert.equal(s.inventory.gear.upgrade.endsAt,T+B.upgradeMs);
   assert.throws(()=>act(s,{type:'upgrade',item:'gear'},T),/running/);reconcile(s,T+B.upgradeMs);assert.equal(s.inventory.gear.level,2);
   reconcile(s,T+2*B.upgradeMs);assert.equal(s.inventory.gear.level,2);assert.equal(s.learningEvents.length,0);
@@ -137,7 +137,7 @@ test('retired Fraudster characters continue as developers with their fame',()=>{
   assert.equal(s.career,'developer');assert.equal(s.careers.hacker,undefined);assert.equal(s.fame,900);assert.match(s.events[0].message,/retired/);
 });
 test('kitchen dishes and placed home items fill needs with their own effects',()=>{
-  const s=make();s.fame=1000;s.needs.hunger=10;s.needs.fun=50;
+  const s=make();s.money=1e7;s.fame=1000;s.needs.hunger=10;s.needs.fun=50;
   assert.throws(()=>act(s,{type:'recover',need:'hunger',food:'caviar'},T),/menu/);
   act(s,{type:'recover',need:'hunger',food:'jollof'},T);assert.equal(s.recovery.amount,60);
   reconcile(s,s.recovery.endsAt+1);assert.equal(Math.round(s.needs.hunger),70);assert.ok(s.needs.fun>=54,'jollof lifts fun a little');
@@ -205,11 +205,12 @@ test('a sponsored ride drives along the roads for a distance-based time; homes s
   assert.throws(()=>act(local,{type:'move',x:0,z:2},T),/blocked/);act(local,{type:'move',x:3,z:6.5},T);act(local,{type:'travel',location:'home'},T);assert.equal(local.location,'home');
 });
 
-test('phones upgrade with fame anywhere, for free',()=>{
+test('phones unlock with fame and cost naira once; switching between phones you own is free',()=>{
   const s=make('musician');assert.equal(s.phone,'basic');
   assert.throws(()=>act(s,{type:'phoneUpgrade',item:'gold'},T),/50,000 fame/);
-  s.fame=5000;act(s,{type:'phoneUpgrade',item:'pro'},T);assert.equal(s.phone,'pro');assert.equal(s.fame,5000);
-  act(s,{type:'phoneUpgrade',item:'basic'},T);assert.equal(s.phone,'basic');
+  s.fame=5000;assert.throws(()=>act(s,{type:'phoneUpgrade',item:'pro'},T),/₦250,000/);
+  s.money=300_000;act(s,{type:'phoneUpgrade',item:'pro'},T);assert.equal(s.phone,'pro');assert.equal(s.fame,5000,'fame is not spent');assert.equal(s.money,50_000);
+  act(s,{type:'phoneUpgrade',item:'basic'},T);assert.equal(s.phone,'basic');act(s,{type:'phoneUpgrade',item:'pro'},T);assert.equal(s.money,50_000,'phones you own are free to switch back to');
 });
 
 test('watching TV: first insight at 10s, then every 30s, five at most, then a 20-minute cooldown',()=>{
@@ -266,7 +267,7 @@ test('emotes are recorded for others to see and unknown ones are refused',()=>{
   assert.throws(()=>act(s,{type:'emote',emote:'moonwalk'},T),/Unknown emote/);
 });
 test('pets: adopt at the plaza, care at home, and a happy pet gives its perk',()=>{
-  const s=make();s.fame=400;
+  const s=make();s.money=1e7;s.fame=400;
   assert.throws(()=>act(s,{type:'adoptPet',kind:'dog',name:'Bingo'},T),/plaza/);
   s.location='plaza';assert.throws(()=>act(s,{type:'adoptPet',kind:'parrot'},T),/600 fame/);
   act(s,{type:'adoptPet',kind:'dog',name:'Bingo'},T);assert.equal(s.pet.name,'Bingo');assert.throws(()=>act(s,{type:'adoptPet',kind:'cat'},T),/already/);
@@ -291,7 +292,7 @@ test('life events: none at first, then one every few minutes; power cuts stop ap
   s.recovery=null;s.location='plaza';lifeEvents(s,s.nextEventAt,()=>0);assert.equal(s.lifeEvent.kind,'luckyBreak');assert.equal(s.fame,1050);
 });
 test('travel choices, tuning, the yacht and gadgets',()=>{
-  const s=make();s.fame=100_000;
+  const s=make();s.money=1e7;s.fame=100_000;
   act(s,{type:'travelMode',mode:'okada'},T);act(s,{type:'travel',location:'tech'},T);assert.equal(s.trip.ride,'okada');assert.ok(!s.trip.delays.includes('go-slow'),'okadas dodge go-slow');
   arrive(s);s.phone='basic';assert.throws(()=>act(s,{type:'travel',location:'home',mode:'taxi'},T+300_000),/smartphone/);
   s.vip={helicopter:{at:T},yacht:{at:T}};s.ride='helicopter';act(s,{type:'travel',location:'home',mode:'own'},T+300_000);assert.equal(s.trip.ride,'helicopter');assert.ok(!s.trip.delays.includes('rain'));
@@ -324,7 +325,7 @@ test('new places: activities, fitness, market groceries, and the beach over the 
   for(const [key,a] of Object.entries(VENUE_ACTS)){assert.ok(TOWN[a.venue],key);const spot=worldObjects(a.venue).find(o=>o.act===key);assert.ok(spot,`${key} has a spot`);}
 });
 test('shops: barber, tailor, tattoos, bukka and fine dining',()=>{
-  const s=make();s.fame=100;
+  const s=make();s.money=1e7;s.fame=100;
   assert.throws(()=>act(s,{type:'restyle',hair:'afro',hairColor:'blonde'},T),/Owerri Mega Mall/);
   s.location='mall';act(s,{type:'restyle',hair:'afro',hairColor:'blonde'},T);assert.equal(s.hair,'afro');assert.equal(s.hairColor,'blonde');
   act(s,{type:'tattoo',spot:'arm'},T);assert.deepEqual(s.tattoos,['arm']);act(s,{type:'tattoo',spot:'arm'},T);assert.deepEqual(s.tattoos,[]);
@@ -335,7 +336,7 @@ test('shops: barber, tailor, tattoos, bukka and fine dining',()=>{
   s.location='lounge';assert.throws(()=>act(s,{type:'venueAct',act:'fineDining'},T),/500 fame/);
 });
 test('homes and extensions: claim a home, build extensions and use them at home',()=>{
-  const s=make('vlogger');s.fame=10_000;s.location='plaza';
+  const s=make('vlogger');s.money=1e7;s.fame=10_000;s.location='plaza';
   act(s,{type:'claim',item:'duplex'},T);assert.equal(s.home,'duplex');
   act(s,{type:'buy',item:'gymRoom'},T);act(s,{type:'buy',item:'studioRoom'},T);
   assert.throws(()=>act(s,{type:'useItem',item:'gymRoom'},T),/at home/);
@@ -345,7 +346,7 @@ test('homes and extensions: claim a home, build extensions and use them at home'
   assert.ok(worldObjects('home',[],['pool','gymRoom']).some(o=>o.item==='gymRoom'&&o.remote));
 });
 test('people: team hires, life-moment choices, beef with the rival, crews and manager gigs',()=>{
-  const s=make();s.fame=30_000;s.location='plaza';
+  const s=make();s.money=1e7;s.fame=30_000;s.location='plaza';
   assert.throws(()=>act(s,{type:'hire',who:'ceo'},T),/Unknown role/);
   act(s,{type:'hire',who:'mentor'},T);act(s,{type:'hire',who:'bodyguard'},T);act(s,{type:'hire',who:'manager'},T);
   // A bodyguard keeps paparazzi and selfie-hunters away.
@@ -396,7 +397,7 @@ test('bigger homes add rooms you can walk into, use and furnish',()=>{
 });
 
 test('own as many pieces of furniture as you like, each placed or stored on its own',()=>{
-  const s=make();s.fame=1000;s.location='plaza';act(s,{type:'buy',item:'chair'},T);act(s,{type:'buy',item:'chair'},T);act(s,{type:'buy',item:'chair'},T);
+  const s=make();s.money=1e7;s.fame=1000;s.location='plaza';act(s,{type:'buy',item:'chair'},T);act(s,{type:'buy',item:'chair'},T);act(s,{type:'buy',item:'chair'},T);
   assert.equal(s.inventory.chair.count,3);assert.throws(()=>act(s,{type:'buy',item:'laptop'},T)&&act(s,{type:'buy',item:'laptop'},T),/already have/,'gadgets stay one each');
   s.location='home';act(s,{type:'place',item:'chair',x:1,z:0},T);act(s,{type:'place',item:'chair',x:-.5,z:-1},T);act(s,{type:'place',item:'chair',x:2,z:-1},T);
   assert.equal(s.furniture.length,3);assert.equal(new Set(s.furniture.map(f=>f.id)).size,3,'each chair has its own id');

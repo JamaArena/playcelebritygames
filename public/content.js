@@ -65,7 +65,7 @@ export const TOWN = {
 };
 export const lotAt = (x, z) => Object.keys(TOWN).find(key => Math.abs(x - TOWN[key].x) <= 5.5 && Math.abs(z - TOWN[key].z) <= 5.5);
 export const ITEMS = {
-  // There are no coins: items unlock at a fame level and are free to claim. Fame is never spent.
+  // Items unlock at a fame level and are bought with naira (see priceOf). Fame is never spent.
   chair: {name: 'Chair', fame: 25, description: 'Place it in a free spot at home.', furniture: true},
   gear: {name: 'Career equipment', fame: 50, description: 'Practise at home. Production quality +5 per level above 1. Higher levels need more fame.', upgradable: true, slot: 'gear'},
   jacket: {name: 'Signature jacket', fame: 150, description: 'An emerald layer for your everyday look.', slot: 'clothes'},
@@ -117,8 +117,8 @@ export const ITEMS = {
   trophyCabinet: {name: 'Trophy cabinet', fame: 1500, description: 'Shows off the awards you have won.', furniture: true, use: {verb: 'Admire your trophies', icon: '🏆', need: 'fun', amount: 10, ms: 10_000, pose: null}},
   weights: {name: 'Weight bench', fame: 1000, description: 'Lift weights: fun, but sweaty and tiring.', furniture: true, use: {verb: 'Lift weights', icon: '🏋️', need: 'fun', amount: 20, ms: 40_000, pose: 'press', extra: {energy: -10, hygiene: -15}}},
 };
-// The wardrobe: clothes and accessories by slot. Each unlocks with fame (claimed free at Ankara Boutique,
-// Abeokuta plaza) and most carry one perk. Wearing changes how you look; perks change the rules a little.
+// The wardrobe: clothes and accessories by slot. Each unlocks with fame (bought at Ankara Boutique,
+// Abeokuta plaza, see wearPrice) and most carry one perk. Wearing changes how you look; perks change the rules a little.
 export const WEAR_SLOTS = {top: 'Tops', bottom: 'Bottoms', shoes: 'Shoes', head: 'Headwear', face: 'Eyewear', neck: 'Necklaces', ears: 'Earrings', wrist: 'Wrist', bag: 'Bags'};
 // Perks add up across everything you wear, up to the cap.
 export const PERKS = {
@@ -295,51 +295,51 @@ export const DELIVERY_MS = 60_000, GROCERY = {pack: 10, bonus: 15};
 export const POSTS = {cooldownMs: 10 * 60_000, max: 280};
 // Things to do at each place. Each fills needs over time; some train a career family or earn a little fame.
 export const VENUE_ACTS = {
-  dance: {venue: 'nightclub', name: 'Hit the dance floor', icon: '💃', need: 'fun', amount: 40, ms: 60_000, extra: {social: 20, energy: -10}, pose: 'dance'},
-  djSet: {venue: 'nightclub', name: 'Play a DJ set', icon: '🎧', need: 'fun', amount: 25, ms: 60_000, extra: {social: 10}, pose: 'perform', family: 'music', learn: 6, fame: 15},
-  bar: {venue: 'nightclub', name: 'Chapman at the bar', icon: '🍹', need: 'fun', amount: 12, ms: 20_000, extra: {hunger: 5, social: 5}, pose: 'chat'},
-  chill: {venue: 'lounge', name: 'Chill in a booth', icon: '🛋️', need: 'fun', amount: 25, ms: 45_000, extra: {social: 15}, pose: 'sit', seat: .5},
-  karaoke: {venue: 'lounge', name: 'Sing karaoke', icon: '🎤', need: 'fun', amount: 30, ms: 45_000, extra: {social: 10}, pose: 'perform', family: 'music', learn: 3},
+  dance: {venue: 'nightclub', cost: 1500, name: 'Hit the dance floor', icon: '💃', need: 'fun', amount: 40, ms: 60_000, extra: {social: 20, energy: -10}, pose: 'dance'},
+  djSet: {venue: 'nightclub', pay: 8000, name: 'Play a DJ set', icon: '🎧', need: 'fun', amount: 25, ms: 60_000, extra: {social: 10}, pose: 'perform', family: 'music', learn: 6, fame: 15},
+  bar: {venue: 'nightclub', cost: 1500, name: 'Chapman at the bar', icon: '🍹', need: 'fun', amount: 12, ms: 20_000, extra: {hunger: 5, social: 5}, pose: 'chat'},
+  chill: {venue: 'lounge', cost: 2000, name: 'Chill in a booth', icon: '🛋️', need: 'fun', amount: 25, ms: 45_000, extra: {social: 15}, pose: 'sit', seat: .5},
+  karaoke: {venue: 'lounge', cost: 1000, name: 'Sing karaoke', icon: '🎤', need: 'fun', amount: 30, ms: 45_000, extra: {social: 10}, pose: 'perform', family: 'music', learn: 3},
   network: {venue: 'lounge', name: 'Network with VIPs', icon: '🤝', need: 'social', amount: 25, ms: 40_000, pose: 'gesture', fame: 5},
-  film: {venue: 'cinema', name: 'Watch a film', icon: '🎬', need: 'fun', amount: 45, ms: 90_000, extra: {hunger: -5}, pose: 'sit', seat: .5, family: 'acting', learn: 3},
+  film: {venue: 'cinema', cost: 3000, name: 'Watch a film', icon: '🎬', need: 'fun', amount: 45, ms: 90_000, extra: {hunger: -5}, pose: 'sit', seat: .5, family: 'acting', learn: 3},
   barber: {venue: 'mall', name: 'Barber & salon', icon: '💈', menu: 'barber'},
   tattoo: {venue: 'mall', name: 'Uyo Ink tattoos', icon: '🖋️', menu: 'tattoo'},
   phoneShop: {venue: 'mall', name: 'Phone shop', icon: '📱', menu: 'phones'},
   tailor: {venue: 'market', name: 'Tailor', icon: '🧵', menu: 'tailor'},
-  bukka: {venue: 'market', name: 'Eat at the bukka', icon: '🍲', need: 'hunger', amount: 60, ms: 30_000, extra: {social: 5}, pose: 'sit', seat: .45},
-  fineDining: {venue: 'lounge', name: 'Fine dining', icon: '🍽️', need: 'hunger', amount: 70, ms: 60_000, extra: {fun: 20, social: 10}, pose: 'sit', seat: .5, minFame: 500},
+  bukka: {venue: 'market', cost: 1500, name: 'Eat at the bukka', icon: '🍲', need: 'hunger', amount: 60, ms: 30_000, extra: {social: 5}, pose: 'sit', seat: .45},
+  fineDining: {venue: 'lounge', cost: 20000, name: 'Fine dining', icon: '🍽️', need: 'hunger', amount: 70, ms: 60_000, extra: {fun: 20, social: 10}, pose: 'sit', seat: .5, minFame: 500},
   shop: {venue: 'mall', name: 'Window-shop', icon: '🛍️', need: 'fun', amount: 20, ms: 30_000, pose: 'chat', page: 'shopping'},
-  foodCourt: {venue: 'mall', name: 'Food court meal', icon: '🍔', need: 'hunger', amount: 45, ms: 30_000, extra: {fun: 5}, pose: 'sit', seat: .5},
+  foodCourt: {venue: 'mall', cost: 3000, name: 'Food court meal', icon: '🍔', need: 'hunger', amount: 45, ms: 30_000, extra: {fun: 5}, pose: 'sit', seat: .5},
   interview: {venue: 'tvStation', name: 'TV interview', icon: '🎙️', need: 'social', amount: 15, ms: 45_000, pose: 'gesture', interview: true},
   talkShow: {venue: 'tvStation', name: 'Sit in a talk-show audience', icon: '📺', need: 'fun', amount: 25, ms: 45_000, pose: 'sit', seat: .5},
-  airplay: {venue: 'radio', name: 'Get radio airplay', icon: '📻', need: 'social', amount: 10, ms: 40_000, pose: 'perform', family: 'music', fame: 25},
+  airplay: {venue: 'radio', pay: 5000, name: 'Get radio airplay', icon: '📻', need: 'social', amount: 10, ms: 40_000, pose: 'perform', family: 'music', fame: 25},
   callIn: {venue: 'radio', name: 'Call-in show', icon: '☎️', need: 'social', amount: 20, ms: 30_000, pose: 'chat'},
   ludo: {venue: 'park', name: 'Play Ludo & Ayo', icon: '🎲', need: 'fun', amount: 25, ms: 40_000, extra: {social: 15}, pose: 'sitFloor'},
   volunteer: {venue: 'hospital', name: 'Volunteer', icon: '🤲', need: 'social', amount: 20, ms: 60_000, extra: {fun: 10, energy: -5}, pose: 'chat', fame: 10, charity: true},
   // Career moments: big, risky beats for particular careers. Your focus skill sets the odds; wins can bring awards.
-  awardShow: {venue: 'eventHall', name: 'Attend the Naija Star Awards', icon: '🏅', need: 'social', amount: 30, ms: 75_000, extra: {fun: 20}, pose: 'sit', seat: .5, minFame: 1000, moment: {win: [.02, 120], lose: [.002, 10], award: 'Naija Star Award', headline: ['won at the Naija Star Awards 🏅', 'was nominated at the Naija Star Awards']}},
-  final: {venue: 'stadium', name: 'Play the championship final', icon: '🏆', need: 'fun', amount: 30, ms: 75_000, extra: {energy: -20}, pose: 'sport', careers: ['football', 'basketball'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Champions', headline: ['lifted the championship trophy 🏆', 'fell short in the final']}},
-  grandSlam: {venue: 'stadium', name: 'Play a grand slam final', icon: '🎾', need: 'fun', amount: 30, ms: 75_000, extra: {energy: -20}, pose: 'sport', careers: ['tennis'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Grand slam champion', headline: ['won the grand slam 🎾', 'lost a five-set epic']}},
-  titleBelt: {venue: 'eventHall', name: 'Fight for the title belt', icon: '🥇', need: 'fun', amount: 30, ms: 60_000, extra: {energy: -25}, pose: 'sport', careers: ['wrestling'], moment: {win: [.03, 150], lose: [.005, 20], award: 'Title belt', headline: ['is the new champion 🥇', 'lost the title fight']}},
-  premiere: {venue: 'cinema', name: 'Walk your movie premiere', icon: '🎬', need: 'social', amount: 30, ms: 60_000, pose: 'gesture', careers: ['actor', 'adult'], minOutputs: 2, moment: {win: [.02, 100], lose: [.005, 20], headline: ['dazzled at a premiere 🎬', "'s premiere got mixed reviews"]}},
-  pitch: {venue: 'tech', name: 'Pitch for a funding round', icon: '💼', need: 'social', amount: 15, ms: 60_000, pose: 'gesture', careers: ['founder'], moment: {win: [.025, 120], lose: [.005, 15], award: 'Funded founder', headline: ['closed a funding round 💼', "'s pitch didn't land"]}},
-  hackathon: {venue: 'tech', name: 'Enter the hackathon', icon: '⌨️', need: 'fun', amount: 25, ms: 75_000, extra: {energy: -15}, pose: 'work', careers: ['developer'], learn: 8, moment: {win: [.02, 100], lose: [.004, 10], award: 'Hackathon winner', headline: ['won the Abuja hackathon ⌨️', 'shipped a bug at the hackathon']}},
-  tokenLaunch: {venue: 'tech', name: 'Launch a token project', icon: '🪙', need: 'fun', amount: 20, ms: 60_000, pose: 'gesture', careers: ['web3'], moment: {win: [.04, 150], lose: [-.01, -30], headline: ["'s launch sold out in minutes 🪙", "'s launch flopped. Ouch."]}},
+  awardShow: {venue: 'eventHall', name: 'Attend the Naija Star Awards', icon: '🏅', need: 'social', amount: 30, ms: 75_000, extra: {fun: 20}, pose: 'sit', seat: .5, minFame: 1000, moment: {prize: 50000, win: [.02, 120], lose: [.002, 10], award: 'Naija Star Award', headline: ['won at the Naija Star Awards 🏅', 'was nominated at the Naija Star Awards']}},
+  final: {venue: 'stadium', name: 'Play the championship final', icon: '🏆', need: 'fun', amount: 30, ms: 75_000, extra: {energy: -20}, pose: 'sport', careers: ['football', 'basketball'], moment: {prize: 150000, win: [.03, 150], lose: [.005, 20], award: 'Champions', headline: ['lifted the championship trophy 🏆', 'fell short in the final']}},
+  grandSlam: {venue: 'stadium', name: 'Play a grand slam final', icon: '🎾', need: 'fun', amount: 30, ms: 75_000, extra: {energy: -20}, pose: 'sport', careers: ['tennis'], moment: {prize: 150000, win: [.03, 150], lose: [.005, 20], award: 'Grand slam champion', headline: ['won the grand slam 🎾', 'lost a five-set epic']}},
+  titleBelt: {venue: 'eventHall', name: 'Fight for the title belt', icon: '🥇', need: 'fun', amount: 30, ms: 60_000, extra: {energy: -25}, pose: 'sport', careers: ['wrestling'], moment: {prize: 150000, win: [.03, 150], lose: [.005, 20], award: 'Title belt', headline: ['is the new champion 🥇', 'lost the title fight']}},
+  premiere: {venue: 'cinema', name: 'Walk your movie premiere', icon: '🎬', need: 'social', amount: 30, ms: 60_000, pose: 'gesture', careers: ['actor', 'adult'], minOutputs: 2, moment: {prize: 50000, win: [.02, 100], lose: [.005, 20], headline: ['dazzled at a premiere 🎬', "'s premiere got mixed reviews"]}},
+  pitch: {venue: 'tech', name: 'Pitch for a funding round', icon: '💼', need: 'social', amount: 15, ms: 60_000, pose: 'gesture', careers: ['founder'], moment: {prize: 300000, win: [.025, 120], lose: [.005, 15], award: 'Funded founder', headline: ['closed a funding round 💼', "'s pitch didn't land"]}},
+  hackathon: {venue: 'tech', name: 'Enter the hackathon', icon: '⌨️', need: 'fun', amount: 25, ms: 75_000, extra: {energy: -15}, pose: 'work', careers: ['developer'], learn: 8, moment: {prize: 100000, win: [.02, 100], lose: [.004, 10], award: 'Hackathon winner', headline: ['won the Abuja hackathon ⌨️', 'shipped a bug at the hackathon']}},
+  tokenLaunch: {venue: 'tech', name: 'Launch a token project', icon: '🪙', need: 'fun', amount: 20, ms: 60_000, pose: 'gesture', careers: ['web3'], moment: {prize: 200000, win: [.04, 150], lose: [-.01, -30], headline: ["'s launch sold out in minutes 🪙", "'s launch flopped. Ouch."]}},
   albumRelease: {venue: 'radio', name: 'Release an album', icon: '💿', need: 'social', amount: 20, ms: 60_000, pose: 'perform', family: 'music', minOutputs: 3, album: true},
-  tourNightclub: {venue: 'nightclub', name: 'Tour stop: Club Neon show', icon: '🎤', need: 'fun', amount: 20, ms: 60_000, extra: {energy: -10}, pose: 'perform', family: 'music', tour: true},
-  tourHall: {venue: 'eventHall', name: 'Tour stop: Grand Event Hall show', icon: '🎤', need: 'fun', amount: 20, ms: 60_000, extra: {energy: -10}, pose: 'perform', family: 'music', tour: true},
-  tourStadium: {venue: 'stadium', name: 'Tour stop: stadium show', icon: '🎤', need: 'fun', amount: 25, ms: 75_000, extra: {energy: -15}, pose: 'perform', family: 'music', tour: true},
-  stalls: {venue: 'market', name: 'Browse the stalls', icon: '🧺', need: 'fun', amount: 15, ms: 30_000, extra: {social: 10}, pose: 'chat', groceries: 5},
-  snack: {venue: 'market', name: 'Buy puff-puff', icon: '🍩', need: 'hunger', amount: 20, ms: 15_000, extra: {fun: 5}, pose: 'chat'},
+  tourNightclub: {venue: 'nightclub', pay: 30000, name: 'Tour stop: Club Neon show', icon: '🎤', need: 'fun', amount: 20, ms: 60_000, extra: {energy: -10}, pose: 'perform', family: 'music', tour: true},
+  tourHall: {venue: 'eventHall', pay: 40000, name: 'Tour stop: Grand Event Hall show', icon: '🎤', need: 'fun', amount: 20, ms: 60_000, extra: {energy: -10}, pose: 'perform', family: 'music', tour: true},
+  tourStadium: {venue: 'stadium', pay: 60000, name: 'Tour stop: stadium show', icon: '🎤', need: 'fun', amount: 25, ms: 75_000, extra: {energy: -15}, pose: 'perform', family: 'music', tour: true},
+  stalls: {venue: 'market', cost: 4000, name: 'Browse the stalls', icon: '🧺', need: 'fun', amount: 15, ms: 30_000, extra: {social: 10}, pose: 'chat', groceries: 5},
+  snack: {venue: 'market', cost: 400, name: 'Buy puff-puff', icon: '🍩', need: 'hunger', amount: 20, ms: 15_000, extra: {fun: 5}, pose: 'chat'},
   workout: {venue: 'gym', name: 'Work out', icon: '🏋️', need: 'fun', amount: 15, ms: 45_000, extra: {energy: -12, hygiene: -15}, pose: 'squat', fitness: 1},
-  checkup: {venue: 'hospital', name: 'Get a check-up', icon: '🩺', need: 'energy', amount: 50, ms: 60_000, extra: {hunger: 25, hygiene: 20}, pose: 'sit', seat: .55},
+  checkup: {venue: 'hospital', cost: 5000, name: 'Get a check-up', icon: '🩺', need: 'energy', amount: 50, ms: 60_000, extra: {hunger: 25, hygiene: 20}, pose: 'sit', seat: .55},
   reflect: {venue: 'worship', name: 'Pray and reflect', icon: '🕊️', need: 'fun', amount: 15, ms: 45_000, extra: {social: 20}, pose: 'sit', seat: .48},
-  owambe: {venue: 'eventHall', name: 'Party at an owambe', icon: '🎉', need: 'social', amount: 40, ms: 90_000, extra: {fun: 30, hunger: 15}, pose: 'shoki'},
-  match: {venue: 'stadium', name: 'Watch a big match', icon: '⚽', need: 'fun', amount: 40, ms: 75_000, extra: {social: 15}, pose: 'victory', family: 'sport', learn: 3},
+  owambe: {venue: 'eventHall', cost: 2000, name: 'Party at an owambe', icon: '🎉', need: 'social', amount: 40, ms: 90_000, extra: {fun: 30, hunger: 15}, pose: 'shoki'},
+  match: {venue: 'stadium', cost: 3000, name: 'Watch a big match', icon: '⚽', need: 'fun', amount: 40, ms: 75_000, extra: {social: 15}, pose: 'victory', family: 'sport', learn: 3},
   jog: {venue: 'park', name: 'Jog round the park', icon: '🏃', need: 'fun', amount: 15, ms: 40_000, extra: {energy: -8}, pose: 'sport', fitness: 1},
   picnic: {venue: 'park', name: 'Picnic on the grass', icon: '🧺', need: 'fun', amount: 20, ms: 40_000, extra: {hunger: 15}, pose: 'sitFloor'},
   yoga: {venue: 'park', name: 'Meditation & yoga', icon: '🧘', need: 'fun', amount: 15, ms: 40_000, extra: {energy: 10}, pose: 'sitFloor'},
-  flight: {venue: 'airport', name: 'Fly out for a weekend show', icon: '✈️', need: 'fun', amount: 50, ms: 120_000, extra: {energy: -10}, pose: 'sit', seat: .5, fame: 30},
+  flight: {venue: 'airport', cost: 30000, name: 'Fly out for a weekend show', icon: '✈️', need: 'fun', amount: 50, ms: 120_000, extra: {energy: -10}, pose: 'sit', seat: .5, fame: 30},
   swim: {venue: 'beach', name: 'Swim in the lagoon', icon: '🏊', need: 'hygiene', amount: 20, ms: 40_000, extra: {fun: 25, energy: -5}, pose: 'sport'},
   sunbathe: {venue: 'beach', name: 'Relax on the sand', icon: '🏖️', need: 'fun', amount: 30, ms: 45_000, extra: {energy: 5}, pose: 'sitFloor'},
   beachBall: {venue: 'beach', name: 'Beach football', icon: '⚽', need: 'fun', amount: 25, ms: 40_000, extra: {energy: -10, social: 10}, pose: 'sport', family: 'sport', learn: 3},
@@ -370,18 +370,19 @@ export const TATTOOS = {arm: 'Upper-arm band', neck: 'Neck script', hand: 'Hand 
 // Fitness: workouts raise your fitness level, and each level means 1% less energy used (up to 10%).
 export const FITNESS = {max: 10, perWorkout: .25};
 // The kitchen menu. Each dish fills hunger over `ms` and may lift other needs; some unlock with fame.
+// Cooking a dish costs its ingredients (`price`) unless you have groceries; the everyday meal is free.
 export const FOODS = {
-  jollof: {name: 'Jollof rice', icon: '🍛', hunger: 60, ms: 90_000, extra: {fun: 5}},
-  friedRice: {name: 'Fried rice & chicken', icon: '🍗', hunger: 55, ms: 80_000, extra: {social: 5}},
-  poundedYam: {name: 'Pounded yam & egusi', icon: '🥣', hunger: 80, ms: 120_000, extra: {energy: -5}},
-  dodo: {name: 'Fried plantain (dodo)', icon: '🍌', hunger: 25, ms: 30_000},
-  puffPuff: {name: 'Puff-puff', icon: '🍩', hunger: 15, ms: 20_000, extra: {fun: 5}},
-  smoothie: {name: 'Fruit smoothie', icon: '🥤', hunger: 10, ms: 15_000, extra: {energy: 10}},
-  zobo: {name: 'Zobo drink', icon: '🍷', hunger: 5, ms: 10_000, extra: {fun: 8}},
-  chapman: {name: 'Chapman', icon: '🍹', hunger: 5, ms: 10_000, extra: {fun: 10, social: 5}, fame: 500},
+  jollof: {name: 'Jollof rice', icon: '🍛', price: 1500, hunger: 60, ms: 90_000, extra: {fun: 5}},
+  friedRice: {name: 'Fried rice & chicken', icon: '🍗', price: 2000, hunger: 55, ms: 80_000, extra: {social: 5}},
+  poundedYam: {name: 'Pounded yam & egusi', icon: '🥣', price: 2500, hunger: 80, ms: 120_000, extra: {energy: -5}},
+  dodo: {name: 'Fried plantain (dodo)', icon: '🍌', price: 600, hunger: 25, ms: 30_000},
+  puffPuff: {name: 'Puff-puff', icon: '🍩', price: 400, hunger: 15, ms: 20_000, extra: {fun: 5}},
+  smoothie: {name: 'Fruit smoothie', icon: '🥤', price: 1200, hunger: 10, ms: 15_000, extra: {energy: 10}},
+  zobo: {name: 'Zobo drink', icon: '🍷', price: 300, hunger: 5, ms: 10_000, extra: {fun: 8}},
+  chapman: {name: 'Chapman', icon: '🍹', price: 1000, hunger: 5, ms: 10_000, extra: {fun: 10, social: 5}, fame: 500},
   // Takeaway: order on the Shopping app and eat it when it arrives.
-  suya: {name: 'Suya', icon: '🍢', hunger: 35, ms: 25_000, extra: {fun: 8}, takeaway: true},
-  shawarma: {name: 'Shawarma', icon: '🌯', hunger: 45, ms: 30_000, extra: {fun: 5}, takeaway: true},
+  suya: {name: 'Suya', icon: '🍢', price: 2000, hunger: 35, ms: 25_000, extra: {fun: 8}, takeaway: true},
+  shawarma: {name: 'Shawarma', icon: '🌯', price: 3000, hunger: 45, ms: 30_000, extra: {fun: 5}, takeaway: true},
 };
 // VIP sponsorship deals: free items unlocked by fame, claimed at Naija Motors in Abeokuta plaza.
 // Fame is not spent and claimed items stay yours. Brand names are fictional.
@@ -412,7 +413,7 @@ export const SPONSORSHIPS = {
 // Walkers keep to the sidewalk; cars drive in a lane.
 // Walking is the slowest way around; the street outside your door shares your home's lot.
 export const RIDE_SPEED = {walk: 1, bicycle: .85, scooter: .75, keke: .75, danfo: .7, hatchback: .65, taxi: .6, suv: .55, okada: .55, coupe: .5, motorbike: .5, limo: .5, hypercar: .35, helicopter: .15};
-// Public transport anyone can take. Ride-hailing is booked with a smartphone.
+// Public transport anyone can take, for a fare (MONEY.fares). Ride-hailing is booked with a smartphone.
 export const TRANSIT = {
   danfo: {name: 'Danfo bus', icon: '🚌', color: '#f2c230', note: 'Cheap and cheerful, a bit slower.'},
   keke: {name: 'Keke Napep', icon: '🛺', color: '#f2c230', note: 'Handy for short hops.'},
@@ -454,7 +455,7 @@ export function along(points, f) {
     left -= d; }
   return {...points.at(-1), axis: 'z', heading: 0};
 }
-// Your phone holds every menu. Better models unlock with fame (free, never spent).
+// Your phone holds every menu. Better models unlock with fame and cost naira once (MONEY.phones).
 export const PHONES = {
   // lag: [min, max] ms before an app opens; hang: chance of an "isn't responding" dialog.
   basic: {name: 'Starter phone', fame: 0, color: '#3b4a42', screen: '#f4f7f1', perk: 'Gets you by. Slow to open apps and sometimes freezes.', network: 'E', battery: 23, lag: [900, 2000], hang: .14, nag: .35},
@@ -732,10 +733,33 @@ export const QUEST_GRADUATION = {name: 'Naija City Starter', fame: 250};
 // ride) or public transport, allowing for go-slow traffic. This is how trips go unless you pick otherwise.
 export const ownedRides = s => [...new Set([s.ride, ...Object.keys(s.vip || {}).filter(k => SPONSORSHIPS[k]?.kind === 'ride')].filter(Boolean))];
 export function bestMode(s, now = Date.now()) {
-  const jam = goSlowAt(now), options = [...ownedRides(s), ...Object.keys(TRANSIT).filter(k => k !== 'taxi' || (s.phone && s.phone !== 'basic'))];
+  const jam = goSlowAt(now), options = [...ownedRides(s), ...Object.keys(TRANSIT).filter(k => (k !== 'taxi' || (s.phone && s.phone !== 'basic')) && (s.money ?? Infinity) >= MONEY.fares[k])];
   const cost = m => (RIDE_SPEED[m] ?? 1) * (1 - (m === s.ride ? TUNING[(s.tune?.[m] || 0) - 1]?.cut || 0 : 0) / 100) * (jam && !NO_JAM.includes(m) ? 1.4 : 1);
   return options.reduce((best, m) => cost(m) < cost(best) ? m : best, 'walk');
 }
+
+// Money (naira, ₦): earned from work, manager gigs, some venue acts and prizes; spent on food, fares,
+// shopping and services. Fame still unlocks things; money pays for them. Sponsorships stay free.
+export const MONEY = {
+  start: [20_000, 50_000], // a humble start, the best start
+  // Base pay for a finished job by career tier, scaled by quality (×0.5 at 0 to ×1.5 at 100) and the result.
+  pay: [2_500, 6_000, 15_000, 40_000, 100_000], result: {Win: 1.3, Draw: 1, Loss: .75},
+  fares: {danfo: 300, keke: 500, okada: 800, taxi: 2_500}, // walking and your own rides are free
+  delivery: 500, groceries: 8_000, feedPet: 500,
+  barber: 3_000, tattoo: 10_000, laser: 6_000, tailor: 2_000, wash: 1_000, tune: [60_000, 200_000, 600_000],
+  hire: {mentor: 30_000, manager: 80_000, bodyguard: 400_000}, // a one-off signing fee
+  pets: {cat: 15_000, dog: 20_000, parrot: 40_000},
+  phones: {basic: 0, smart: 45_000, pro: 250_000, gold: 1_500_000},
+  gig: 1.5, interview: 15_000, albumPerFame: 200, season: 150_000, graduation: 25_000,
+};
+const nice = n => n < 10_000 ? Math.round(n / 500) * 500 : n < 100_000 ? Math.round(n / 1000) * 1000 : Math.round(n / 10_000) * 10_000;
+// Shop prices follow the fame an item needs; clothes cost less than furniture. Free basics stay free.
+export const priceOf = key => ITEMS[key]?.price ?? (ITEMS[key] ? nice(2_000 + ITEMS[key].fame * 100) : 0);
+export const wearPrice = key => WEAR[key] && WEAR[key].fame > 0 ? nice(1_000 + WEAR[key].fame * 40) : 0;
+export const upgradePrice = level => effort(level, 100) * 50;
+export const naira = n => '₦' + Math.round(n || 0).toLocaleString('en-US');
+// Base pay for a job: one rule for the result card, the career screen and the server.
+export const jobPay = (tier, quality, win = null, kind = 'produce') => kind === 'trial' ? 0 : Math.round(MONEY.pay[Math.min(tier, MONEY.pay.length - 1)] * (.5 + quality / 100) * (MONEY.result[win] ?? 1) * (kind === 'build' ? .5 : 1) / 50) * 50;
 
 // The Award Arena: a ceremony every midnight (Nigeria time). Each career has its own award for the
 // most fame gained that day; each field (sport, entertainment, tech) crowns its best; and the
@@ -743,6 +767,8 @@ export function bestMode(s, now = Date.now()) {
 export const ARENA = {
   day: now => Math.floor((now + 3_600_000) / 86_400_000),
   next: day => (day + 1) * 86_400_000 - 3_600_000,
+  // When a day's race began: the ceremony that opened it. Only fame earned since then counts.
+  start: day => day * 86_400_000 - 3_600_000,
   career: {
     football: {name: 'Naija Golden Ball', icon: '⚽'}, basketball: {name: 'Naija Hoops MVP', icon: '🏀'},
     tennis: {name: 'Naija Grand Slam Star', icon: '🎾'}, wrestling: {name: 'Naija Championship Belt', icon: '🤼'},
@@ -758,6 +784,6 @@ export const ARENA = {
     tech: {name: 'Best in Tech', icon: '💡', families: ['tech'], label: 'all of tech'},
   },
   goat: {name: 'Greatest Celebrity of All Time', icon: '👑'},
-  prize: {career: 200, family: 400},
+  prize: {career: 200, family: 400}, cash: {career: 100_000, family: 250_000},
 };
 export const arenaGroup = family => Object.keys(ARENA.family).find(k => ARENA.family[k].families.includes(family)) || null;
