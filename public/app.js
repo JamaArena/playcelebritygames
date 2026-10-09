@@ -1237,5 +1237,6 @@ function matchScreen(){
   set('.mr-bar strong',score);set('.mr-bar em',a.beat===0&&now()<a.startedAt+ANTHEM_MS?'Anthem':mv?`${mv.minute}'`:a.beat>=a.totalBeats?'FT':`${minute}'`);
   // The commentary follows the replay clock, so it is right even when the 3D view is not drawing.
   const e=mv&&(performance.now()-mv.t0)/1000,line=mv&&(motion?[...mv.script].reverse().find(f=>e>=f.t-.4)||mv.script[0]:mv.script.at(-1)).text;
-  set('.mr-text',line||world.matchLine||(kickoff?'Blue kick off after the goal…':a.beat===0&&now()<a.startedAt+ANTHEM_MS?'The teams line up for the anthem…':a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?(a.possession==='opponent'?'Red have the ball…':'Blue keep the ball moving…'):`${a.scene?.text||'The ball comes to you.'}`));
+  // Once the move has played, its words are gone: the world's line can be stale if the 3D view was not drawing.
+  set('.mr-text',line||(kickoff?'Blue kick off after the goal…':a.beat===0&&now()<a.startedAt+ANTHEM_MS?'The teams line up for the anthem…':a.beat>=a.totalBeats?'Full time! Collect your result below.':now()<a.readyAt?(a.possession==='opponent'?'Red have the ball…':'Blue keep the ball moving…'):`${a.scene?.text||'The ball comes to you.'}`));
 }
