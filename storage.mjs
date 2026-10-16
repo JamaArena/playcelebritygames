@@ -128,7 +128,7 @@ async function loadPlayerScope(client, working, previous, request) {
   add('seasons', [season]);
   add('accounts', await one('SELECT * FROM celebrity.accounts WHERE player_id = $1', [playerId]));
   add('active_devices', await one('SELECT * FROM celebrity.active_devices WHERE player_id = $1', [playerId]));
-  const others = [state.spouse?.id, state.visiting].filter(id => id && id !== playerId);
+  const others = [state.spouse?.id, state.visiting].filter(id => id && id !== playerId && !String(id).startsWith('npc:'));
   if (others.length) add('players', await one('SELECT * FROM celebrity.players WHERE id = ANY($1)', [others]));
   const q = relatedQueries(playerId, state, now), pg = ([sql, args]) => one(toPg(sql), args);
   for (const query of q.profiles) add('profiles', await pg(query));
