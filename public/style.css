@@ -1269,3 +1269,43 @@ button.cant-afford,.chip.cant-afford{opacity:.62;color:#b4232a}
 #modal .phone-device .app small,#modal .phone-device .app>b,#modal .phone-device .app>em{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #modal .phone-device.skin-basic{--tile:46px}
 #modal .phone-device:not(.ios):not(.skin-basic){--tile:52px}
+/* ---------- Fit to screen: nothing in the game scrolls sideways at any width (checked with scripts/fit-audit.js) ---------- */
+/* Safety net only: real overflows are fixed below by wrapping and shrinking. */
+html,body{overflow-x:clip;max-width:100%}
+/* Sticky tray headers bleed to the tray's own padding (13px on phones, 15px wider), never past it. */
+.object-tray{--tray-pad:15px}@media(max-width:620px){.object-tray{--tray-pad:13px}}
+.object-tray header{margin-left:calc(-1*var(--tray-pad));margin-right:calc(-1*var(--tray-pad));padding-left:var(--tray-pad);padding-right:var(--tray-pad)}
+.tray-options{display:flex;flex-wrap:wrap;gap:8px}.tray-options>*{flex:1 1 auto;max-width:100%}
+/* Phone apps: rows of chips, tabs, medals and reactions wrap onto more lines instead of scrolling. */
+.phone-app .chip-scroll,.phone-app .slot-tabs,.phone-app .medals,.phone-app .dm-thread .reactions,.dm-log+.reactions,.v2-awards,.task-queue{flex-wrap:wrap;overflow-x:visible;margin-left:0;margin-right:0;padding-left:0;padding-right:0;white-space:normal}
+.phone-app .chip-scroll>*,.phone-app .slot-tabs>*,.phone-app .medals>*{flex:0 1 auto;min-width:0;max-width:100%}
+.phone-app .dm-thread .chip-scroll{padding-right:0;-webkit-mask-image:none;mask-image:none}
+.phone-app .medals{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:8px}
+.phone-app .medal{min-width:0}.phone-app .medal small{overflow-wrap:anywhere}
+.phone-app img,.phone-app svg,.phone-app canvas,.modal img{max-width:100%}
+.phone-app :is(.prow,.v2-row,.ledger,.person,.dm-convo,.promo-card,.arena-winner,.race-board,.item-card){min-width:0;max-width:100%;overflow-wrap:anywhere}
+/* The map sheet: place tiles in a wrapping grid (the sheet itself scrolls up and down). */
+.map-sheet .city-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));overflow-x:visible;scroll-snap-type:none;margin:0 0 6px;padding:2px}
+.map-sheet .city-tile{width:auto;min-width:0;min-height:96px}
+.travel-modes>div{display:flex;flex-wrap:wrap;gap:6px}.travel-modes .chip{max-width:100%;white-space:normal}
+/* Work decisions: the choice cards share the row and wrap, two or three to a line on phones. */
+.sim-choices{flex-wrap:wrap;overflow-x:visible}
+.sim-choices .sim-choice{flex:1 1 30%;min-width:min(80px,100%)}
+@media(max-width:480px){.sim-choices .sim-choice{flex-basis:40%;min-width:0}}
+/* Modals, cards, toasts and pop-ups never grow past the screen. */
+.modal,.notice-card,.reward-card,.mishap-card,.welcome-card,.tip-card,#toast,.action-pop,.float-reward,.pie-menu,.object-tray,.activity-card,.quest-chip,.match-hud{max-width:calc(100vw - 16px);box-sizing:border-box}
+.modal :is(h1,h2,h3,p,small,strong,label,button){overflow-wrap:anywhere}
+.reward-overlay{overflow-x:clip}
+.reward-burst{max-width:100%;left:0;right:0;margin-inline:auto}
+.pie-option{max-width:calc(100vw - 24px)}
+/* Top bar: the name keeps a truncated line instead of disappearing. */
+#app .topbar{min-width:0;max-width:calc(100vw - 16px)}
+#hudWho{min-width:0;flex:1 1 auto;overflow:hidden}#hudWho>div{min-width:0}#hudWho strong,#hudWho small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.garage{grid-template-columns:minmax(0,1fr)}.garage .actions{flex-wrap:wrap}
+.phone-app :is(.garage,.item-card,.promo-card,.actions) button,#modal .actions button{white-space:normal;max-width:100%}
+.phone-app :is(.item-grid,.product-grid){min-width:0}
+/* The phone widget in the top bar squeezes to fit small phones: labels drop, numbers stay on one line. */
+.phone-widget{max-width:100%;flex:none}.phone-line{flex:none}.phone-line strong{white-space:nowrap}
+.top-stats{flex:none}
+@media(max-width:400px){.phone-widget{gap:6px;padding:5px 8px 5px 5px}.phone-line small{display:none}.phone-line strong{font-size:10.5px}}
+@media(max-width:340px){#app .topbar{left:8px;right:8px;gap:6px}.phone-widget{gap:4px;padding:4px 6px 4px 4px}.phone-mini{font-size:15px}.hud-who{gap:6px}.hud-who .pav.md{width:30px;height:30px}}
