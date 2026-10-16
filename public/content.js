@@ -874,7 +874,7 @@ export const SOCIAL_CATS = {friendly: ['Friendly', 'ðŸ˜Š'], funny: ['Funny', 'ðŸ
 export function socialOdds(s, key, rel = {}, now = Date.now()) {
   const d = INTERACTIONS[key]; if (!d) return 0;
   const m = moodOf(s, now), p = perksFor(s), f = rel.f || 0, r = rel.r || 0;
-  let odds = d.base + (m.value - 55) / 300 + Math.min(.1, Math.log10((s?.fame || 0) + 10) * .02) - .02;
+  let odds = d.base + (m.value - 55) / 300 + Math.min(.06, Math.log10((s?.fame || 0) + 10) * .012) - .03;
   if (d.cat === 'friendly' || d.cat === 'funny') odds += f / 400 + m.social / 100;
   if (d.cat === 'romantic') odds += (f + r * 1.5) / 500 + m.romantic / 100;
   if (d.cat === 'mean') odds -= Math.max(0, f) / 800;

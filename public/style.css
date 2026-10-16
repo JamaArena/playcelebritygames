@@ -1309,3 +1309,30 @@ html,body{overflow-x:clip;max-width:100%}
 .top-stats{flex:none}
 @media(max-width:400px){.phone-widget{gap:6px;padding:5px 8px 5px 5px}.phone-line small{display:none}.phone-line strong{font-size:10.5px}}
 @media(max-width:340px){#app .topbar{left:8px;right:8px;gap:6px}.phone-widget{gap:4px;padding:4px 6px 4px 4px}.phone-mini{font-size:15px}.hud-who{gap:6px}.hud-who .pav.md{width:30px;height:30px}}
+/* ---------- Sims life: feelings, people, goals and build mode ---------- */
+.sim-portrait.has-emotion{border-color:var(--emo);box-shadow:0 0 0 3px color-mix(in srgb,var(--emo) 35%,transparent),0 0 14px var(--emo);font-size:20px;text-shadow:none}
+.moodlets{display:flex;flex-direction:column;gap:2px;flex:none}
+.moodlet{display:grid;place-items:center;width:20px;height:20px;border-radius:50%;font-style:normal;font-size:12px;background:#fff;box-shadow:0 0 0 2px var(--emo),0 2px 5px #0002}
+.moodlet.bad{background:#fff1f2}
+@media(max-width:620px){.moodlets{flex-direction:row;flex-wrap:wrap;max-width:44px}.moodlet{width:17px;height:17px;font-size:10px}}
+.quest-also{display:block;margin-top:2px;font-size:10px;font-weight:700;color:#4b6a57;opacity:.85}
+.rel-bars{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:4px 0 8px;min-width:0}
+.rel-bars.small{margin:3px 0 0}
+.rel-bars>small{font-size:10px;font-weight:700;color:#5b6b60}
+.rel-bar{display:inline-flex;align-items:center;gap:4px;min-width:0;flex:1 1 90px;max-width:160px}
+.rel-bar b{font-size:11px;flex:none}.rel-bar em{font-style:normal;font-size:10px;font-weight:700;color:#3d5446;min-width:22px;text-align:right;flex:none}
+.rel-bar i{position:relative;flex:1;min-width:30px;height:7px;border-radius:9px;background:#e3e9e1;overflow:hidden}
+.rel-bar i::after{content:'';position:absolute;inset:0 auto 0 0;width:var(--v);border-radius:9px;background:linear-gradient(90deg,#7fd38f,#2fa84f)}
+.rel-bar i.neg::after{background:linear-gradient(90deg,#f6a29b,#e5484d)}
+.rel-bar.romance i::after{background:linear-gradient(90deg,#f9a8d4,#db2777)}
+.social-cats{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}
+.social-cats button{flex:1 1 70px;min-width:0;padding:7px 6px;border-radius:999px;border:2px solid #fff;background:#eef4ee;font:600 12px var(--fun);color:#33513f}
+.social-cats button.on{background:linear-gradient(#ffd6ec,#f9a8d4);color:#7a1f4c}
+.social-options button small{display:block;width:100%;font-size:10px;opacity:.75}
+.trait-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(140px,100%),1fr));gap:6px}
+.trait{display:grid;gap:2px;text-align:left;padding:8px 9px;border-radius:12px;border:2px solid #e2e8df;background:#fff;min-width:0;cursor:pointer}
+.trait b{font:600 13px var(--fun)}.trait small{font-size:10.5px;color:#5d6d61;line-height:1.25}
+.trait.on{border-color:#8b5cf6;background:#f3efff;box-shadow:0 0 0 2px #8b5cf633}
+.creator-buttons{display:flex;flex-wrap:wrap;gap:8px}.creator-buttons>*{flex:1 1 140px;min-width:0}
+.promo-card.bills.overdue{background:linear-gradient(135deg,#fff1f0,#ffd9cf)}
+.v2-row small.up{color:#2f9a4c}.v2-row small.down{color:#c0392b}

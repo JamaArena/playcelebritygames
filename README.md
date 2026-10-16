@@ -41,9 +41,9 @@ Normal production has three beats over two real minutes of commentary; sports us
 
 ## Persistence and rules
 
-SQLite stores characters, activity decisions, session hashes, messages, reports, agreements, seasons and idempotency keys under `data/celebrity.sqlite`. Back up the database and its WAL consistently. Keep the browser's session cookie to return to your character. Session cookies are HttpOnly and SameSite Strict; bearer tokens are hashed at rest.
+SQLite stores characters, activity decisions, session hashes, messages, reports, agreements, seasons and idempotency keys under `data/celebrity.sqlite`. Back up the database and its WAL consistently. Accounts use a username and password (stored as a salted scrypt hash), so you can log in on any device. Session cookies are HttpOnly and SameSite Strict; bearer tokens are hashed at rest.
 
-All clocks, random outcomes, charge debits, learning, purchases and reward settlement run on the server. Transactions serialize starts and shared settlements. Each write carries an idempotency key; a retry cannot debit or settle again. Reconnecting preserves the activity ID, chosen actions and outcomes. Career changes preserve skills, possessions, fame and the shared charge bar. There are no coins: items, upgrades and sponsorships unlock with fame.
+All clocks, random outcomes, charge debits, learning, purchases and reward settlement run on the server. Transactions serialize starts and shared settlements. Each write carries an idempotency key; a retry cannot debit or settle again. Reconnecting preserves the activity ID, chosen actions and outcomes. Career changes preserve skills, possessions, fame and the shared charge bar. Money is naira (₦): work, gigs and prizes pay it; food, fares, shopping, homes, premium rides and daily rent and bills spend it. Fame unlocks things and is never spent.
 
 Confirmed PRD rules include 10 charges, one refill every 36 minutes, football's four skills, shooting capped at 10, distance-sensitive shooting, origins and the arithmetic-then-geometric effort curve. Suggested rates and content are centralized in `public/content.js`. Skill thresholds are 35, 70, 105, 140, 280, 560, 1,120, 2,240 and 4,480. Practice gives 7 points; a relevant decision gives 5 even on failure. Equipment grants quality bonuses, never learning levels.
 
@@ -53,11 +53,11 @@ The shared activity engine supplies career-specific narratives and skill mapping
 
 This is a first playable implementation, not a production MMO service. See [docs/implementation.md](docs/implementation.md) for the requirements mapping and remaining content work.
 
-- Players belong to this server and browser session. There is no email/password login, cross-device recovery, account deletion interface; cloud hosting is supported through Netlify.
+- Players sign in with a username and password and can play on any device (one at a time). There is no password reset or account deletion interface yet; cloud hosting is supported through Netlify and Vercel.
 - Other players appear in the same location through four-second polling. This is not authoritative real-time movement synchronization. NPCs support solo play.
 - All 15 careers are playable, with deeper sport-specific rules for football, tennis and wrestling. Creator, acting and technology scenes use stylized contextual panels; additional career-specific animation, full leagues/tournaments, tours and sponsorship catalogues remain expansion work.
 - Seasonal awards compare eligible characters on this server only. The first season starts when the server first runs, lasts 28 days, and publishes its cutoff and weights in Profile. Awards require at least one qualifying seasonal output and 100 audience. Eligibility tiers lock on first qualification. Reports are persisted for manual operator review; there is no moderation dashboard yet.
-- Furniture placement uses a fixed safe grid rather than a full interior editor. Clothing has one equip slot. Food is consumable; the other initial catalogue items have one ownership record each.
+- Furniture placement uses a safe grid with quarter-turn rotation, selling back and wall and floor paint, rather than a full build mode with walls and rooms. Food is consumable; the other initial catalogue items have one ownership record each.
 - Scale, rate limiting, account recovery, retention policies, moderation operations and multi-server coordination need further work before exposing a public service. The server currently queries all local players; event and output histories grow with play.
 
 ## Configuration

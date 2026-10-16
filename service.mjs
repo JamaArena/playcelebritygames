@@ -166,7 +166,7 @@ function snapshot(playerId,s,now){
   const agreements=db.prepare(q.agreements[0]).all(...q.agreements[1]).map(r=>JSON.parse(r.state)).filter(a=>a.participants.includes(playerId)&&['pending','running'].includes(a.status));
   const visiting=s.visiting?load(s.visiting):null;
   const battles=battlesFor(playerId,s,now);
-  return {state:view(s,now),account,playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture,home:visiting.home||null}:null,arena:arenaFor(s,now),season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
+  return {state:view(s,now),account,playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture,home:visiting.home||null,homeStyle:visiting.homeStyle||null}:null,arena:arenaFor(s,now),season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
 }
 // Turn-based team battles between real players. Stats come from career skills, energy and fame.
 // Winners gain fame; losers lose the same stake (never below zero). Each fighter spends one charge.
