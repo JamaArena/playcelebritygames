@@ -2,7 +2,9 @@
 export const BALANCE = {
   capacity: 10, refillMs: 36 * 60_000, practiceMs: 10_000,
   recovery: { hunger: [40, 60_000], energy: [60, 300_000], fun: [30, 120_000], social: [30, 120_000], hygiene: [50, 60_000], bladder: [80, 30_000] },
-  decay: { hunger: 12, energy: 8, fun: 6, social: 6, hygiene: 8, bladder: 15 },
+  // Points lost per real hour while you play: about five times the first edition's pace, so a 20-minute session needs
+  // a meal, a toilet trip and some fun, while a full bar still lasts over an hour.
+  decay: { hunger: 55, energy: 32, fun: 34, social: 30, hygiene: 36, bladder: 70 },
   activityMs: 120_000, sportMs: 150_000, upgradeMs: 30 * 60_000,
   // Reach per output (views, streams, fans cheering, users) before quality; 1,000 reach = 1 fame point.
   reaches: [10_000, 100_000, 1_000_000, 10_000_000], famePerReach: 1 / 1000, seasonMinReach: 10_000, contractBoost: .25,
@@ -217,6 +219,10 @@ export function perksFor(s) {
   if ((s?.fame || 0) >= FAME_MARKS.fanClub) totals.scandal = Math.min((totals.scandal || 0) + 10, PERKS.scandal.cap);
   if (s?.fitness >= 1) totals.energy = Math.min((totals.energy || 0) + Math.floor(s.fitness), PERKS.energy.cap);
   if (pet && s.pet.food > PET_CARE.happy && s.pet.joy > PET_CARE.happy) totals[pet.perk[0]] = Math.min((totals[pet.perk[0]] || 0) + pet.perk[1], PERKS[pet.perk[0]].cap);
+  // Personality traits nudge the same rules (a negative value means faster draining or worse odds).
+  for (const t of s?.traits || []) for (const [k, v] of Object.entries(TRAITS[t]?.perks || {})) totals[k] = Math.min((totals[k] || 0) + v, PERKS[k]?.cap ?? 100);
+  // Married to someone from the city: you never feel quite as lonely.
+  if (s?.spouse?.npc) totals.social = Math.min((totals.social || 0) + 15, PERKS.social.cap);
   return totals;
 }
 // Home upgrades a character owns, added together ({sleep, sofa, hygiene, insights, generator}).
@@ -247,7 +253,7 @@ export const goSlowAt = now => mixHash(Math.floor(now / 60_000) + 991) % 100 < 1
 // Random life moments while you play, a few minutes apart. Fame is [share of your fame, minimum].
 export const LIFE_EVENT = {firstMs: 4 * 60_000, gapMs: [5 * 60_000, 9 * 60_000], powerCutMs: 3 * 60_000};
 export const LIFE_EVENTS = {
-  luckyBreak: {icon: '🌟', title: 'Lucky break', text: 'A producer shared your latest post. New fans are pouring in.', fame: [.02, 50], weight: 2},
+  luckyBreak: {icon: '🌟', title: 'Lucky break', text: 'A producer shared your latest post. New fans are pouring in.', noPostText: 'A producer shouted you out on the radio. New fans are pouring in.', fame: [.02, 50], weight: 2},
   fanGift: {icon: '🎁', title: 'A fan sent you a gift', text: 'A tin of chin-chin and a handwritten note. Sweet!', needs: {fun: 10, hunger: 10}, weight: 3},
   sneeze: {icon: '🤧', title: 'You sneezed on a live stream', text: 'Harmless, but it is now a meme with its own remix.', fame: [.005, 10], weight: 2},
   slip: {icon: '🍌', title: 'You slipped and fell', text: 'Right in front of a fan’s camera. Ouch, and the internet saw it.', fame: [-.01, -10], needs: {fun: -10}, weight: 2, where: 'out'},
@@ -730,11 +736,13 @@ export const QUESTS = [
 ];
 export const QUEST_GRADUATION = {name: 'Naija City Starter', fame: 250};
 
-// The fastest way you can travel right now: any ride you own (Naija Motors tuning counts on your main
-// ride) or public transport, allowing for go-slow traffic. This is how trips go unless you pick otherwise.
+// The fastest free way you can travel right now: any ride you own (Naija Motors tuning counts on your main
+// ride) or your feet, allowing for go-slow traffic. This is how trips go unless you pick otherwise.
 export const ownedRides = s => [...new Set([s.ride, ...Object.keys(s.vip || {}).filter(k => SPONSORSHIPS[k]?.kind === 'ride')].filter(Boolean))];
+// Fares are never spent without asking: the default is the quickest free way (a ride you own, or walking).
+// Public transport is used only when you pick it in the Map's "How you travel".
 export function bestMode(s, now = Date.now()) {
-  const jam = goSlowAt(now), options = [...ownedRides(s), ...Object.keys(TRANSIT).filter(k => (k !== 'taxi' || (s.phone && s.phone !== 'basic')) && (s.money ?? Infinity) >= MONEY.fares[k])];
+  const jam = goSlowAt(now), options = ownedRides(s);
   const cost = m => (RIDE_SPEED[m] ?? 1) * (1 - (m === s.ride ? TUNING[(s.tune?.[m] || 0) - 1]?.cut || 0 : 0) / 100) * (jam && !NO_JAM.includes(m) ? 1.4 : 1);
   return options.reduce((best, m) => cost(m) < cost(best) ? m : best, 'walk');
 }
@@ -752,7 +760,15 @@ export const MONEY = {
   pets: {cat: 15_000, dog: 20_000, parrot: 40_000},
   phones: {basic: 0, smart: 45_000, pro: 250_000, gold: 1_500_000},
   gig: 1.5, interview: 15_000, albumPerFame: 200, season: 150_000, graduation: 25_000,
+  // Daily rent by home (one game week is one real day), plus utilities (see billFor).
+  rent: {apartment: 2_500, studioFlat: 2_500, townhouse: 6_000, duplex: 15_000, villa: 35_000, beachHouse: 50_000, penthouse: 70_000, mansion: 150_000},
+  // Sponsors still need the fame, but homes and premium rides now cost naira too (at a sponsor's discount).
+  homes: {townhouse: 150_000, duplex: 400_000, villa: 1_200_000, beachHouse: 2_000_000, penthouse: 3_000_000, mansion: 8_000_000},
+  rides: {motorbike: 120_000, coupe: 300_000, suv: 900_000, limo: 2_500_000, yacht: 5_000_000, hypercar: 6_000_000, helicopter: 15_000_000},
+  paint: 2_500, sellBack: .5, outfit: 0,
 };
+// What a sponsorship costs in naira (free for starter deals, brand deals and looks).
+export const sponsorPrice = key => MONEY.homes[key] ?? MONEY.rides[key] ?? 0;
 const nice = n => n < 10_000 ? Math.round(n / 500) * 500 : n < 100_000 ? Math.round(n / 1000) * 1000 : Math.round(n / 10_000) * 10_000;
 // Shop prices follow the fame an item needs; clothes cost less than furniture. Free basics stay free.
 export const priceOf = key => ITEMS[key]?.price ?? (ITEMS[key] ? nice(2_000 + ITEMS[key].fame * 100) : 0);
@@ -788,3 +804,147 @@ export const ARENA = {
   prize: {career: 200, family: 400}, cash: {career: 100_000, family: 250_000},
 };
 export const arenaGroup = family => Object.keys(ARENA.family).find(k => ARENA.family[k].families.includes(family)) || null;
+
+// ---------- Sims life: traits, moodlets, relationships, social interactions, aspirations, wants and bills ----------
+// Personality traits: pick two in the creator (older characters pick them once in the Goals app).
+// Their perks use the same keys as clothes: drain perks (+ slower, − faster), success, learn, meal and social odds.
+export const TRAITS = {
+  ambitious: {name: 'Ambitious', icon: '🚀', note: 'Skills grow 15% faster, but fun drains 15% faster.', perks: {learn: 15, fun: -15}},
+  foodie: {name: 'Foodie', icon: '🍲', note: 'Meals fill 25% more, but hunger drains 10% faster.', perks: {meal: 25, hunger: -10}},
+  partyAnimal: {name: 'Party animal', icon: '🪩', note: 'Fun drains 20% slower, energy 10% faster.', perks: {fun: 20, energy: -10}},
+  loner: {name: 'Loner', icon: '🎧', note: 'Social drains 25% slower; friendly chats land a little less.', perks: {social: 25, friendly: -8}},
+  charmer: {name: 'Charmer', icon: '😏', note: '+10% on friendly and romantic interactions.', perks: {friendly: 10, romantic: 10}},
+  hothead: {name: 'Hothead', icon: '😤', note: 'Mean moves land 15% more; friendly ones 5% less.', perks: {mean: 15, friendly: -5}},
+  neatFreak: {name: 'Neat freak', icon: '🧼', note: 'Hygiene drains 25% slower.', perks: {hygiene: 25}},
+  creative: {name: 'Creative', icon: '🎨', note: '+4% success in career moments.', perks: {success: 4}},
+};
+export const TRAIT_COUNT = 2;
+// A first outfit, picked in the creator; the pieces go into your wardrobe for good.
+export const STARTER_OUTFITS = {
+  casual: {name: 'Casual', icon: '👕', wear: {top: 'plainTee', bottom: 'jeans', shoes: 'sneakers'}},
+  sporty: {name: 'Sporty', icon: '🏃', wear: {top: 'tracksuitTop', bottom: 'comfyJoggers', shoes: 'runningShoes'}},
+  smart: {name: 'Smart', icon: '👔', wear: {top: 'statementShirt', bottom: 'tailoredTrousers', shoes: 'loafers'}},
+  ankara: {name: 'Ankara', icon: '🌺', wear: {top: 'ankaraShirt', bottom: 'ankaraSkirt', shoes: 'slides'}},
+  cosy: {name: 'Cosy', icon: '🧸', wear: {top: 'hoodie', bottom: 'cargoShorts', shoes: 'sneakers'}},
+};
+// Moodlets: timed emotions from needs, events and people. Mood adds them to your needs; success nudges work odds (%).
+export const MOODLETS = {
+  happy: {name: 'Happy', icon: '😊', mood: 10, success: 2, ms: 15 * 60_000, color: '#e8b400', note: 'Good times.'},
+  inspired: {name: 'Inspired', icon: '💡', mood: 12, success: 5, ms: 15 * 60_000, color: '#8b5cf6', note: 'Ideas are flowing.'},
+  confident: {name: 'Confident', icon: '😎', mood: 12, success: 4, social: 6, ms: 15 * 60_000, color: '#f97316', note: 'Walking tall.'},
+  energised: {name: 'Energised', icon: '⚡', mood: 8, success: 3, ms: 12 * 60_000, color: '#16a34a', note: 'Ready for anything.'},
+  flirty: {name: 'Flirty', icon: '😘', mood: 8, romantic: 12, ms: 12 * 60_000, color: '#ec4899', note: 'Romance comes easier.'},
+  embarrassed: {name: 'Embarrassed', icon: '😳', mood: -12, success: -4, social: -6, ms: 10 * 60_000, color: '#e11d48', note: 'Everyone saw that.'},
+  tense: {name: 'Tense', icon: '😬', mood: -10, success: -3, ms: 10 * 60_000, color: '#64748b', note: 'Something is bothering you.'},
+  sad: {name: 'Sad', icon: '😢', mood: -14, success: -3, ms: 15 * 60_000, color: '#3b82f6', note: 'A little heartbroken.'},
+};
+export const activeMoodlets = (s, now) => (s?.moodlets || []).filter(m => m.until > now && MOODLETS[m.kind]);
+// Mood: the needs average plus your moodlets. The strongest moodlet is the emotion the mood gem shows.
+export function moodOf(s, now = Date.now()) {
+  const values = Object.values(s?.needs || {}), base = values.reduce((a, b) => a + b, 0) / (values.length || 1), list = activeMoodlets(s, now);
+  const sum = key => list.reduce((n, m) => n + (MOODLETS[m.kind][key] || 0), 0), value = clamp(base + sum('mood'));
+  const top = [...list].sort((a, b) => Math.abs(MOODLETS[b.kind].mood) - Math.abs(MOODLETS[a.kind].mood))[0];
+  return {value, base, list, emotion: top?.kind || null, label: value >= 75 ? 'Very happy' : value >= 55 ? 'Content' : value >= 30 ? 'Uncomfortable' : 'Miserable',
+    success: clamp(sum('success'), -10, 10), social: sum('social'), romantic: sum('romantic')};
+}
+// Relationships: friendship runs −100..100, romance 0..100. Players and named NPCs remember you.
+export const relTier = (rel = {}) => { const f = rel.f || 0; return f <= -60 ? 'Enemy' : f <= -20 ? 'Disliked' : !rel.n ? 'Stranger' : f < 15 ? 'Acquaintance' : f < 40 ? 'Friend' : f < 70 ? 'Good friend' : 'Best friend'; };
+export const romanceTier = (rel = {}) => (rel.r || 0) >= 60 ? 'Sweetheart' : (rel.r || 0) >= 30 ? 'Crush' : '';
+export const SOCIAL = {cooldownMs: 8_000, repeatMs: 5 * 60_000, keep: 120};
+// The social menu. cat sets which odds apply; f/r move friendship/romance on success (missF on failure).
+export const INTERACTIONS = {
+  chat: {cat: 'friendly', name: 'Chat', icon: '💬', base: .88, f: 5, social: 8},
+  askDay: {cat: 'friendly', name: 'Ask about their day', icon: '☕', base: .8, f: 6, social: 8},
+  compliment: {cat: 'friendly', name: 'Compliment', icon: '🌟', base: .74, f: 8, social: 6},
+  hug: {cat: 'friendly', name: 'Hug', icon: '🤗', base: .72, f: 10, social: 10, minF: 35},
+  joke: {cat: 'funny', name: 'Tell a joke', icon: '😂', base: .66, f: 9, fun: 8, social: 4},
+  impression: {cat: 'funny', name: 'Do an impression', icon: '🎭', base: .56, f: 11, fun: 10},
+  prank: {cat: 'funny', name: 'Prank them', icon: '🙃', base: .46, f: 13, fun: 14, minF: 20, missF: -10},
+  flirt: {cat: 'romantic', name: 'Flirt', icon: '😘', base: .52, r: 9, f: 2, social: 6, minF: 5},
+  sweetTalk: {cat: 'romantic', name: 'Sweet talk', icon: '💐', base: .56, r: 8, f: 3, minR: 15},
+  kiss: {cat: 'romantic', name: 'Kiss', icon: '💋', base: .56, r: 12, minR: 40},
+  askPartner: {cat: 'romantic', name: 'Ask to be partners', icon: '💞', base: .5, r: 10, minR: 55, minF: 30, npcOnly: true},
+  propose: {cat: 'romantic', name: 'Propose', icon: '💍', base: .45, r: 10, minR: 80, minF: 50, npcOnly: true, partner: true},
+  mock: {cat: 'mean', name: 'Mock their style', icon: '🙄', base: .66, f: -9},
+  insult: {cat: 'mean', name: 'Insult', icon: '😤', base: .6, f: -14},
+  argue: {cat: 'mean', name: 'Start an argument', icon: '🗯️', base: .56, f: -12, energy: -5},
+};
+export const SOCIAL_CATS = {friendly: ['Friendly', '😊'], funny: ['Funny', '😂'], romantic: ['Romantic', '💘'], mean: ['Mean', '😠']};
+// Odds of an interaction landing: the base, your mood, your fame, how well you know them, traits and moodlets.
+export function socialOdds(s, key, rel = {}, now = Date.now()) {
+  const d = INTERACTIONS[key]; if (!d) return 0;
+  const m = moodOf(s, now), p = perksFor(s), f = rel.f || 0, r = rel.r || 0;
+  let odds = d.base + (m.value - 55) / 300 + Math.min(.06, Math.log10((s?.fame || 0) + 10) * .012) - .03;
+  if (d.cat === 'friendly' || d.cat === 'funny') odds += f / 400 + m.social / 100;
+  if (d.cat === 'romantic') odds += (f + r * 1.5) / 500 + m.romantic / 100;
+  if (d.cat === 'mean') odds -= Math.max(0, f) / 800;
+  odds += (p[d.cat] || 0) / 100;
+  return clamp(odds, .05, .95);
+}
+// Short Sim-style replies (what they say back).
+export const SOCIAL_LINES = {
+  friendly: {hit: ['Ah, it’s good to see you!', 'You’re alright, you know.', 'My day just got better.', 'Same time tomorrow?', 'Abeg, you’re too kind!'], miss: ['Erm… okay.', 'I’m a bit busy, sorry.', 'Do I know you?', '…right.']},
+  funny: {hit: ['Hahaha! Stop it!', 'I’m crying! 😂', 'You’re too funny!', 'Okay, that was good.'], miss: ['…was that a joke?', 'Tough crowd, eh?', 'I don’t get it.', 'Not funny, abeg.']},
+  romantic: {hit: ['You’re making me blush…', 'Oh? Tell me more. 😊', 'I was hoping you’d say that.', 'You’re sweet.'], miss: ['Whoa, slow down!', 'Let’s just be friends.', 'Not like that, sorry.', 'Awkward…']},
+  mean: {hit: ['How dare you?!', 'Wow. Just wow.', 'I won’t forget that.', 'Who even says that?'], miss: ['Is that all you’ve got?', 'Haha, nice try.', 'Whatever. 🙄', 'You’re funny when you’re angry.']},
+};
+// How the named NPCs greet someone they remember.
+export const REL_GREETINGS = {
+  'Best friend': ['{name}! My favourite person in Naija City!', 'There you are, {name}! I was just talking about you.'],
+  'Good friend': ['{name}! Always good to see you.', 'Back again, {name}? Sit, sit.'],
+  'Friend': ['Hey {name}, how far?', 'Good to see you again, {name}.'],
+  'Acquaintance': ['Oh, it’s you again. Hi, {name}.', '{name}, right? Welcome back.'],
+  'Disliked': ['Oh. It’s {name}.', 'What do you want, {name}?'],
+  'Enemy': ['You again? Keep walking, {name}.', 'I have nothing to say to you, {name}.'],
+};
+// Life goals: four stages each, with fame, naira and a good mood for every stage reached.
+const friendCount = (s, min) => Object.values(s.rel || {}).filter(r => (r.f || 0) >= min).length;
+const focusLevel = s => s.careers?.[s.career]?.skills?.[CAREERS[s.career]?.focus]?.level || 1;
+export const ASPIRATIONS = {
+  superstar: {name: 'Superstar', icon: '🌟', note: 'Become the most famous name in Naija City.', stages: [
+    ['Get noticed', 'Reach 500 fame', s => (s.fame || 0) >= 500], ['Local celebrity', 'Reach 5,000 fame', s => (s.fame || 0) >= 5_000],
+    ['National star', 'Reach 25,000 fame', s => (s.fame || 0) >= 25_000], ['Icon', 'Reach 100,000 fame', s => (s.fame || 0) >= 100_000]]},
+  bigBoss: {name: 'Naija Big Boss', icon: '💰', note: 'Stack naira and live large.', stages: [
+    ['First stack', 'Hold ₦100,000', s => (s.money || 0) >= 100_000], ['Moving up', 'Live in a home you bought', s => !!s.home && s.home !== 'studioFlat'],
+    ['Half a million', 'Hold ₦500,000', s => (s.money || 0) >= 500_000], ['Millionaire', 'Hold ₦2,000,000', s => (s.money || 0) >= 2_000_000]]},
+  butterfly: {name: 'Social Butterfly', icon: '🦋', note: 'Know everyone, and be loved by them.', stages: [
+    ['First friend', 'Reach friendship 40 with someone', s => friendCount(s, 40) >= 1], ['Your circle', 'Have three friends (40+)', s => friendCount(s, 40) >= 3],
+    ['Bestie', 'Have a best friend (70+)', s => friendCount(s, 70) >= 1], ['Life of the party', 'Have eight friends (40+)', s => friendCount(s, 40) >= 8]]},
+  family: {name: 'Love & Family', icon: '💞', note: 'Find the one and build a life together.', stages: [
+    ['Butterflies', 'Have a crush (romance 30+)', s => Object.values(s.rel || {}).some(r => (r.r || 0) >= 30)], ['Going steady', 'Have a partner', s => !!(s.partner || s.spouse)],
+    ['Wedding bells', 'Get married', s => !!s.spouse], ['Happily ever after', 'Stay married for a day', (s, now) => !!s.spouse && now - s.spouse.since >= 86_400_000]]},
+  master: {name: 'Master of the Craft', icon: '🎯', note: 'Be the very best at what you do.', stages: [
+    ['Apprentice', 'Focus skill to level 3', s => focusLevel(s) >= 3], ['Skilled', 'Focus skill to level 5', s => focusLevel(s) >= 5],
+    ['Expert', 'Focus skill to level 7', s => focusLevel(s) >= 7], ['Master', 'Focus skill to level 10', s => focusLevel(s) >= 10]]},
+};
+export const ASPIRATION_REWARDS = [{fame: 30, money: 5_000}, {fame: 80, money: 15_000}, {fame: 200, money: 40_000}, {fame: 500, money: 120_000}];
+// Wants: three small, changing goals from your mood and traits. Each pays a little fame and naira and lifts your mood.
+const isAct = (i, keys) => i.type === 'venueAct' && keys.includes(i.act);
+export const WANTS = {
+  meal: {icon: '🍳', title: 'Eat a proper meal', check: i => i.type === 'recover' && i.need === 'hunger' && !!i.food, needs: ['hunger'], traits: ['foodie']},
+  chat: {icon: '💬', title: 'Have a chat with someone', check: i => ['socialize', 'talk', 'chatRegular'].includes(i.type), needs: ['social']},
+  joke: {icon: '😂', title: 'Make someone laugh', check: i => i.type === 'socialize' && INTERACTIONS[i.kind]?.cat === 'funny', needs: ['fun', 'social']},
+  compliment: {icon: '🌟', title: 'Pay someone a compliment', check: i => i.type === 'socialize' && i.kind === 'compliment', needs: ['social'], traits: ['charmer']},
+  workout: {icon: '🏋️', title: 'Get a workout in', check: i => (i.type === 'venueAct' && !!VENUE_ACTS[i.act]?.fitness) || (i.type === 'useItem' && ['treadmill', 'weights', 'gymRoom'].includes(i.item)), needs: []},
+  post: {icon: '📰', title: 'Post an update for your fans', check: i => i.type === 'post', needs: ['social']},
+  practise: {icon: '🎯', title: 'Practise a skill', check: i => i.type === 'start' && i.kind === 'practice', needs: [], traits: ['ambitious', 'creative']},
+  work: {icon: '⭐', title: 'Do a job', check: i => i.type === 'start' && i.kind !== 'practice', needs: [], traits: ['ambitious']},
+  dance: {icon: '💃', title: 'Dance!', check: i => (i.type === 'emote' && ['dance', 'shoki'].includes(i.emote)) || isAct(i, ['dance', 'owambe']) || (i.type === 'useItem' && i.item === 'soundSystem'), needs: ['fun'], traits: ['partyAnimal']},
+  goOut: {icon: '🗺️', title: 'Go out somewhere', check: i => i.type === 'travel' && !['home', 'street'].includes(i.location), needs: ['fun']},
+  shower: {icon: '🚿', title: 'Freshen up', check: i => i.type === 'recover' && i.need === 'hygiene', needs: ['hygiene'], traits: ['neatFreak']},
+  music: {icon: '🎵', title: 'Listen to some music', check: i => i.type === 'listenMusic', needs: ['fun']},
+  tv: {icon: '📺', title: 'Watch some TV', check: i => i.type === 'recover' && !!i.watch, needs: ['fun']},
+  message: {icon: '✉️', title: 'Message a friend', check: i => i.type === 'chat', needs: ['social'], friends: true},
+  treat: {icon: '🛍️', title: 'Treat yourself', check: i => ['buy', 'order', 'claimWear'].includes(i.type), needs: []},
+  snack: {icon: '🍢', title: 'Grab some street food', check: i => isAct(i, ['snack', 'bukka', 'foodCourt']) || (i.type === 'recover' && !!FOODS[i.food]?.takeaway), needs: ['hunger'], traits: ['foodie']},
+  date: {icon: '🌹', title: 'Go on a date', check: i => i.type === 'goOnDate', needs: [], romance: true},
+};
+export const WANT = {count: 3, ms: 30 * 60_000, fame: 15, money: 1_500};
+// Bills: one real day is a game week. Rent by home, plus utilities for the appliances you run.
+export const BILLS = {everyMs: 86_400_000, utilities: 1_000, perAppliance: 300};
+export const billFor = s => (MONEY.rent[s.home || 'studioFlat'] ?? MONEY.rent.studioFlat) + BILLS.utilities + BILLS.perAppliance * Object.keys(s.inventory || {}).filter(k => POWERED.includes(k) || ITEMS[k]?.upgrade).length;
+// Build mode lite: wall and floor paint swatches for your home.
+export const PAINTS = {
+  walls: ['#e8dfcf', '#f6e7c1', '#cfe3d7', '#d6e4f0', '#f2d4d7', '#e0d4ee', '#f4f2ee', '#3d4a5c'],
+  floors: ['#eee4d5', '#c9a27a', '#8a6446', '#d9d6d0', '#9fb4a8', '#e3d3a9', '#b9b0c9', '#2f3237'],
+};

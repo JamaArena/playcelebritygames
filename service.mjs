@@ -3,7 +3,7 @@ import { CLASH, CLASH_ACTIONS, CHEER } from './public/clashText.js';
 import { CLASH_MEDALS, medalTier, isBigger, clashStake, ARENA, arenaGroup } from './public/content.js';
 import { randomBytes, createHash, scryptSync, timingSafeEqual } from 'node:crypto';
 import { Readable } from 'node:stream';
-import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline, questProgress, raceFame, addMoney, spend } from './game.mjs';
+import { createCharacter, act, reconcile, view, log, evaluate, GameError, id, fameFor, addFame, headline, questProgress, raceFame, addMoney, spend, grantAward, socialInteract, relOf, feel } from './game.mjs';
 import { CAREERS, BALANCE, clamp, perksFor, WEAR, SPOUSE_SHARE, SPOUSE_REASON, MONEY, FOODS, naira, jobPay } from './public/content.js';
 export const schema="PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;\n CREATE TABLE IF NOT EXISTS players(id TEXT PRIMARY KEY, state TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS requests(player_id TEXT, request_id TEXT, PRIMARY KEY(player_id,request_id));\n CREATE TABLE IF NOT EXISTS messages(id TEXT PRIMARY KEY, sender TEXT, location TEXT, recipient TEXT, body TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS reports(id TEXT PRIMARY KEY, reporter TEXT, message_id TEXT, at INTEGER);\n CREATE TABLE IF NOT EXISTS seasons(id INTEGER PRIMARY KEY, starts INTEGER, ends INTEGER, settled INTEGER DEFAULT 0);\n CREATE TABLE IF NOT EXISTS agreements(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS battles(id TEXT PRIMARY KEY, state TEXT NOT NULL);\n CREATE TABLE IF NOT EXISTS accounts(player_id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, username TEXT UNIQUE NOT NULL, name TEXT NOT NULL, created INTEGER NOT NULL, password_hash TEXT);\n CREATE TABLE IF NOT EXISTS codes(email TEXT PRIMARY KEY, code_hash TEXT NOT NULL, purpose TEXT NOT NULL, payload TEXT NOT NULL, expires INTEGER NOT NULL, attempts INTEGER NOT NULL, sent INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY, player_id TEXT NOT NULL, created INTEGER NOT NULL);\n CREATE TABLE IF NOT EXISTS active_devices(player_id TEXT PRIMARY KEY, token_hash TEXT NOT NULL, at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS profiles(id TEXT PRIMARY KEY, room TEXT, location TEXT, career TEXT, fame INTEGER, trend INTEGER, seen INTEGER, dating INTEGER, crew INTEGER, outside INTEGER, data TEXT NOT NULL);\n CREATE INDEX IF NOT EXISTS profiles_room ON profiles(room,seen);\n CREATE INDEX IF NOT EXISTS profiles_seen ON profiles(seen);\n CREATE INDEX IF NOT EXISTS profiles_fame ON profiles(fame);\n CREATE INDEX IF NOT EXISTS profiles_career ON profiles(career,seen);\n CREATE TABLE IF NOT EXISTS arena(day INTEGER PRIMARY KEY, results TEXT NOT NULL);";
 // Who counts as online, and the room a player is in (a home, or a public place).
@@ -12,7 +12,7 @@ export const roomOf=(playerId,s)=>s.location==='home'?`home:${s.visiting||player
 // Everything a player's update reads besides their own save, as small capped queries.
 // The cloud adapters run the same queries against Postgres to load only these rows.
 export function relatedQueries(playerId,s,now){
-  const room=roomOf(playerId,s),cut=now-ONLINE_MS,ids=[...new Set([...(s.friends||[]),...(s.invitations||[]).map(i=>i.from),...(s.proposals||[]).map(p=>p.from),s.spouse?.id,s.visiting].filter(Boolean))].slice(0,300);
+  const room=roomOf(playerId,s),cut=now-ONLINE_MS,ids=[...new Set([...(s.friends||[]),...(s.invitations||[]).map(i=>i.from),...(s.proposals||[]).map(p=>p.from),s.spouse?.id,s.visiting].filter(x=>x&&!String(x).startsWith('npc:')))].slice(0,300);
   return {
     profiles:[
       ['SELECT * FROM profiles WHERE room=? AND seen>? ORDER BY seen DESC LIMIT 100',[room,cut]],
@@ -129,7 +129,7 @@ function holdCeremony(now){
   for(const [key,group] of Object.entries(ARENA.family))results.family[key]=top(recent.filter(c=>group.families.includes(CAREERS[c.career]?.family)),'trend');
   db.prepare('INSERT INTO arena(day,results) VALUES(?,?) ON CONFLICT(day) DO NOTHING').run(day,JSON.stringify(results));
   // Winners get the award on their profile, a fame prize (none for the all-time title) and a headline.
-  const crown=(winner,award,prize,cash)=>{const ps=winner&&load(winner.id);if(!ps)return;ps.awards.push({id:id(),name:`${award.icon} ${award.name}`,arena:true,career:ps.career,at:now});if(prize)addFame(ps,prize,award.name,now,false);if(cash)addMoney(ps,cash,`Prize: ${award.name}`,now);log(ps,`${award.icon} You won ${award.name} at the Award Arena!${prize?` +${prize} fame.`:''}${cash?` +${naira(cash)} prize money.`:''}`,now);headline(ps,`${ps.name} wins ${award.name} ${award.icon}`,now);persist(winner.id,ps);};
+  const crown=(winner,award,prize,cash)=>{const ps=winner&&load(winner.id);if(!ps)return;grantAward(ps,`${award.icon} ${award.name}`,ps.career,now,{arena:true});if(prize)addFame(ps,prize,award.name,now,false);if(cash)addMoney(ps,cash,`Prize: ${award.name}`,now);log(ps,`${award.icon} You won ${award.name} at the Award Arena!${prize?` +${prize} fame.`:''}${cash?` +${naira(cash)} prize money.`:''}`,now);headline(ps,`${ps.name} wins ${award.name} ${award.icon}`,now);persist(winner.id,ps);};
   for(const [key,list] of Object.entries(results.career))crown(list[0],ARENA.career[key],ARENA.prize.career,ARENA.cash.career);
   for(const [key,list] of Object.entries(results.family))crown(list[0],ARENA.family[key],ARENA.prize.family,ARENA.cash.family);
   crown(results.goat[0],ARENA.goat,0,0);
@@ -166,7 +166,7 @@ function snapshot(playerId,s,now){
   const agreements=db.prepare(q.agreements[0]).all(...q.agreements[1]).map(r=>JSON.parse(r.state)).filter(a=>a.participants.includes(playerId)&&['pending','running'].includes(a.status));
   const visiting=s.visiting?load(s.visiting):null;
   const battles=battlesFor(playerId,s,now);
-  return {state:view(s,now),account,playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture,home:visiting.home||null}:null,arena:arenaFor(s,now),season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
+  return {state:view(s,now),account,playerId,players,scenePlayers,townPlayers,battles,messages,agreements,visitedHome:visiting?{name:visiting.name,furniture:visiting.furniture,home:visiting.home||null,homeStyle:visiting.homeStyle||null}:null,arena:arenaFor(s,now),season:db.prepare('SELECT * FROM seasons ORDER BY id DESC LIMIT 1').get()};
 }
 // Turn-based team battles between real players. Stats come from career skills, energy and fame.
 // Winners gain fame; losers lose the same stake (never below zero). Each fighter spends one charge.
@@ -259,7 +259,7 @@ function battleAction(playerId,s,input,now){
   else if(input.type==='battleStart'){
     fail(b.status==='open'&&b.host===playerId,'Only the host starts an open battle.');fail(b.teams.every(t=>t.length===b.mode),`Both teams need ${b.mode} fighter${b.mode>1?'s':''}.`);
     const states=Object.fromEntries(b.teams.flat().map(p=>[p,p===playerId?s:load(p)]));
-    for(const [p,ps] of Object.entries(states)){if(p!==playerId)reconcile(ps,now);fail(ps.location===b.location&&now-ps.lastSeen<ONLINE_MS,`${ps.name} needs to be here and online.`);fail(ps.charges>0,`${ps.name} has no career charges left.`);fail(ps.needs.energy>=20,`${ps.name} is too tired to battle.`);fail(!ps.active&&!ps.recovery,`${ps.name} is busy with an activity.`);}
+    for(const [p,ps] of Object.entries(states)){if(p!==playerId)reconcile(ps,now,{passive:true});fail(ps.location===b.location&&now-ps.lastSeen<ONLINE_MS,`${ps.name} needs to be here and online.`);fail(ps.charges>0,`${ps.name} has no career charges left.`);fail(ps.needs.energy>=20,`${ps.name} is too tired to battle.`);fail(!ps.active&&!ps.recovery,`${ps.name} is busy with an activity.`);}
     for(const [p,ps] of Object.entries(states)){ps.charges--;if(ps.refillAnchor===null)ps.refillAnchor=now;b.fighters[p]=fighterStats(ps);if(p!==playerId)persist(p,ps);}
     // A secret: the smaller player sometimes has a lucky shirt day and the crowd backs them whatever the gap.
     {const [x,y]=[b.teams[0][0],b.teams[1][0]],fx=b.fighters[x].fame,fy=b.fighters[y].fame;if(fx!==fy&&Math.random()<.1)b.lucky=fx<fy?x:y;}
@@ -318,6 +318,7 @@ async function authAction(playerId,token,input,now,res){
     // Guests have nothing to come back to: logging out deletes the guest character for good.
     if(!accountOf(playerId)){fail(input.deleteGuest===true,'Guests lose their character when they log out. Confirm to continue.');fail(!load(playerId)?.battle,'Finish your battle first.');
       db.prepare('DELETE FROM players WHERE id=?').run(playerId);db.prepare('DELETE FROM profiles WHERE id=?').run(playerId);res.setHeader('Set-Cookie',`celebrity=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secureCookies?'; Secure':''}`);return [200,{loggedOut:true,deleted:true}];}
+    {const st=load(playerId);if(st?.careers){st.lastSeen=Math.min(st.lastSeen||now,now-ONLINE_MS-1);persist(playerId,st);}}
     if(token){db.prepare('DELETE FROM sessions WHERE token_hash=?').run(hash(token));db.prepare('UPDATE players SET token_hash=? WHERE token_hash=?').run(hash(randomBytes(32).toString('hex')),hash(token));}
     res.setHeader('Set-Cookie',`celebrity=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secureCookies?'; Secure':''}`);return [200,{loggedOut:true}];
   }
@@ -330,7 +331,7 @@ async function authAction(playerId,token,input,now,res){
 }
 // Spouses share in each other's success: you gain SPOUSE_SHARE of the fame your spouse earned since you last checked.
 function shareSpouseFame(playerId,s,now){
-  if(!s?.spouse)return;const partner=load(s.spouse.id);
+  if(!s?.spouse||s.spouse.npc)return;const partner=load(s.spouse.id);
   if(!partner||partner.spouse?.id!==playerId){s.spouse=null;return;}
   const earned=partner.fameEarned||0,gain=Math.floor((earned-(s.spouseSeen??earned))*SPOUSE_SHARE);
   if(gain>0){addFame(s,gain,SPOUSE_REASON,now);s.spouseSeen=(s.spouseSeen??earned)+Math.ceil(gain/SPOUSE_SHARE);}else s.spouseSeen??=earned;
@@ -344,11 +345,22 @@ function social(playerId,s,input,now){
       if(input.recipient){const target=load(input.recipient);fail(target&&!target.blocks.includes(playerId)&&!s.blocks.includes(input.recipient),'Direct contact is unavailable.');fail(s.friends.includes(input.recipient),'Add this person as a friend first.');}
       db.prepare('INSERT INTO messages VALUES(?,?,?,?,?,?)').run(id(),playerId,roomFor(playerId,s),input.recipient||null,body,now);touch(input.recipient?'p:'+input.recipient:'room:'+roomFor(playerId,s));break;
     }
+    case 'socialize':{
+      if(/^(npc|reg):/.test(String(input.target||'')))return false;
+      const otherId=String(input.target||''),target=otherId&&otherId!==playerId?load(otherId):null;
+      fail(target&&target.careers&&!target.blocks.includes(playerId)&&!s.blocks.includes(otherId),'That person isn’t available.');
+      fail(roomFor(otherId,target)===roomFor(playerId,s)&&now-(target.lastSeen||0)<ONLINE_MS&&!target.trip,`${target.name} isn’t here right now.`);
+      const out=socialInteract(s,input,now,Math.random,target,otherId),back=relOf(target,playerId);
+      back.f=clamp(back.f+out.df,-100,100);back.r=clamp(back.r+out.dr,0,100);back.n=(back.n||0)+1;back.name=s.name;
+      if(out.ok)feel(target,out.d.cat==='mean'?'tense':out.d.cat==='romantic'?'flirty':'happy',now);
+      log(target,`${out.d.icon} ${s.name}: ${out.d.name.toLowerCase()}${out.ok?'':' (it didn’t land)'}.${out.df?` ${out.df>0?'+':''}${out.df} friendship`:''}${out.dr?` · ${out.dr>0?'+':''}${out.dr} romance`:''}`,now);
+      persist(otherId,target);break;}
     case 'gift':{
       const target=load(input.playerId);fail(target&&s.friends.includes(input.playerId)&&!target.blocks.includes(playerId),'Send gifts to a friend.');fail(clock()-(s.giftAt||0)>=10*60_000,'One gift every 10 minutes.');
       const wear=WEAR[input.item];fail(input.item==='suya'||(wear&&(wear.fame===0||s.closet?.[input.item])),'Choose something you own, or suya.');
       if(input.item==='suya'){spend(s,FOODS.suya.price,'Gift: suya',now);target.takeaway??={};target.takeaway.suya=(target.takeaway.suya||0)+1;}else{target.closet??={};target.closet[input.item]=true;}
-      const label=input.item==='suya'?'some suya':wear.name.toLowerCase();s.giftAt=clock();log(s,`🎁 You sent ${target.name} ${label}.`,now);log(target,`🎁 ${s.name} sent you ${label}!`,now);persist(input.playerId,target);break;}
+      const label=input.item==='suya'?'some suya':wear.name.toLowerCase();s.giftAt=clock();
+      for(const [a,bId,b] of [[s,input.playerId,target],[target,playerId,s]]){const rel=relOf(a,bId);rel.f=clamp(rel.f+6,-100,100);rel.n=(rel.n||0)+1;rel.name=b.name;}feel(target,'happy',now);log(s,`🎁 You sent ${target.name} ${label}.`,now);log(target,`🎁 ${s.name} sent you ${label}!`,now);persist(input.playerId,target);break;}
     case 'propose':{
       const target=load(input.playerId);fail(target&&s.friends.includes(input.playerId)&&!target.blocks.includes(playerId)&&input.playerId!==playerId,'Propose to a friend.');
       fail(!s.spouse&&!target.spouse,'One of you is already married.');target.proposals=(target.proposals||[]).filter(p=>p.from!==playerId);target.proposals.push({from:playerId,name:s.name,at:now});
@@ -357,11 +369,12 @@ function social(playerId,s,input,now){
       const target=load(input.playerId);fail(target&&(s.proposals||[]).some(p=>p.from===input.playerId),'That proposal is no longer open.');fail(!s.spouse&&!target.spouse,'One of you is already married.');
       s.proposals=(s.proposals||[]).filter(p=>p.from!==input.playerId);s.spouse={id:input.playerId,name:target.name,since:now};target.spouse={id:playerId,name:s.name,since:now};
       s.spouseSeen=target.fameEarned||0;target.spouseSeen=s.fameEarned||0;
-      for(const [who,other] of [[s,target],[target,s]]){who.awards.push({id:id(),name:'Married',career:who.career,at:now});headline(who,`💍 ${who.name} and ${other.name} got married!`,now);log(who,`💍 You married ${other.name}! You now share in each other's fame.`,now);}
+      for(const [who,other] of [[s,target],[target,s]]){grantAward(who,'Married',who.career,now);headline(who,`💍 ${who.name} and ${other.name} got married!`,now);log(who,`💍 You married ${other.name}! You now share in each other's fame.`,now);}
       persist(input.playerId,target);break;}
     case 'declineProposal':{s.proposals=(s.proposals||[]).filter(p=>p.from!==input.playerId);break;}
     case 'divorce':{
       fail(s.spouse,'You are not married.');const target=load(s.spouse.id);if(target?.spouse?.id===playerId){target.spouse=null;log(target,`💔 ${s.name} ended the marriage.`,now);persist(s.spouse.id,target);}
+      if(s.spouse.npc){const rel=relOf(s,s.spouse.id);rel.r=Math.max(0,rel.r-40);feel(s,'sad',now);}
       log(s,`💔 You and ${s.spouse.name} parted ways.`,now);s.spouse=null;break;}
     case 'friend':{const target=load(input.playerId);fail(target&&input.playerId!==playerId&&!target.blocks.includes(playerId),'That player is unavailable.');if(!s.friends.includes(input.playerId))s.friends.push(input.playerId);break;}
     case 'block':fail(input.playerId!==playerId&&load(input.playerId),'Unknown player.');if(!s.blocks.includes(input.playerId))s.blocks.push(input.playerId);s.friends=s.friends.filter(p=>p!==input.playerId);break;
@@ -391,7 +404,7 @@ function social(playerId,s,input,now){
         fail(a.host===playerId&&a.status==='pending'&&a.accepted.length===a.participants.length,'Every participant must accept before the host starts.');
         for(const p of a.participants) {
           const ps=p===playerId?s:load(p);fail(ps&&ps.career===a.career,'A participant changed career. Renew the agreement.');
-          act(ps,{type:'start',kind:'produce',title:a.title},now);
+          act(ps,{type:'start',kind:'produce',title:a.title},now,Math.random,{passive:p!==playerId});
           ps.active.agreementId=a.id;ps.active.audienceShare=1;
           if(p!==playerId)persist(p,ps);
         }
@@ -475,7 +488,7 @@ try {
           if(input.type==='create'){fail(!state,'Your character already exists.');state=createCharacter({...input,origin:Math.random()<.5?0:1},now);}
           else {
             fail(state,'Create your character first.');reconcile(state,now);shareSpouseFame(playerId,state,now);captureEligibility(state,now);
-            if(state.visiting)fail(['chat','recover','leaveVisit','move','report','block','friend'].includes(input.type),'Visitors can socialise but cannot modify a home or claim its rewards.');
+            if(state.visiting)fail(['chat','recover','leaveVisit','move','report','block','friend','socialize'].includes(input.type),'Visitors can socialise but cannot modify a home or claim its rewards.');
             if(state.visiting&&input.type==='recover')fail(input.need==='social'||input.need==='fun','Only social activities are permitted while visiting.');
             if(state.active?.agreementId&&input.type==='cancel')throw new GameError('The collaboration host must cancel through the agreement.');
             if(state.battle)fail(!['travel','start','recover','visit','switch'].includes(input.type),'You are in a battle. Finish or leave it first.');

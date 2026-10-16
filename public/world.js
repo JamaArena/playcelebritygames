@@ -176,12 +176,13 @@ export const worldObjects = (location,furniture=[],owned=[],home) => ({
     {name:'Work desk',icon:'💻',x:.5,z:-3.1,vx:.5,vz:-4.2,action:'practice'},
     {name:'Front door',icon:'🚪',x:-4.6,z:3.6,vx:-5.1,vz:3.6,action:'exit'},
     ...homeRooms(home).map(({object:o})=>({key:`room:${o.spot}`,name:o.name,icon:o.icon,x:o.x,z:o.z,vx:o.vx,vz:o.vz,need:o.need,verb:o.verb,pose:o.pose,face:o.face,action:o.action,spot:o.spot})),
-    ...furniture.map((f,i)=>{const def=ITEMS[f.item]||{},use=def.use;
-      const piece={key:`f:${f.id??i}`,furniture:f.item,piece:f.id};
-      if(f.item==='chair')return {...piece,name:'Chair',icon:'🪑',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Sit',pose:'sit'};
-      if(f.item==='wardrobe')return {...piece,name:'Wardrobe',icon:'👗',x:f.x,z:f.z+.75,vx:f.x,vz:f.z,action:'wardrobe'};
-      if(use)return {...piece,name:def.name,icon:use.icon,x:f.x,z:f.z+.75,vx:f.x,vz:f.z,verb:use.verb,item:f.item,useItem:true,amount:use.amount,useNeed:use.need};
-      return {...piece,name:def.name||'Shelf',icon:'🏆',x:f.x,z:f.z+.7,vx:f.x,vz:f.z,verb:'Admire',pose:null};}),
+    ...furniture.map((f0,i)=>{const def=ITEMS[f0.item]||{},use=def.use,r=((f0.rot||0)%4)*Math.PI/2,front=(d=.75)=>({x:f0.x+Math.round(Math.sin(r))*d,z:f0.z+Math.round(Math.cos(r))*d});
+      // A turned piece is used from its new front: x/z is where you stand, vx/vz the piece itself.
+      const f=f0,at=d=>({x:front(d).x,z:front(d).z,vx:f.x,vz:f.z}),piece={key:`f:${f.id??i}`,furniture:f.item,piece:f.id};
+      if(f.item==='chair')return {...piece,name:'Chair',icon:'🪑',...at(.7),verb:'Sit',pose:'sit'};
+      if(f.item==='wardrobe')return {...piece,name:'Wardrobe',icon:'👗',...at(.75),action:'wardrobe'};
+      if(use)return {...piece,name:def.name,icon:use.icon,...at(.75),verb:use.verb,item:f.item,useItem:true,amount:use.amount,useNeed:use.need};
+      return {...piece,name:def.name||'Shelf',icon:'🏆',...at(.7),verb:'Admire',pose:null};}),
     ...Object.entries(ITEMS).filter(([key,def])=>def.extension&&owned.includes(key)).map(([key,def])=>({name:def.name,icon:def.use.icon,...extensionSpot(key,home),face:undefined,verb:def.use.verb,item:key,useItem:true,remote:true,amount:def.use.amount,useNeed:def.use.need})),
   ],
   nightclub:[{name:'Exit',icon:'🚪',x:0,z:4.6,action:'leave'},{name:VENUE_ACTS.tourNightclub.name,icon:VENUE_ACTS.tourNightclub.icon,x:0,z:-3.4,act:'tourNightclub',face:0},{name:VENUE_ACTS.dance.name,icon:VENUE_ACTS.dance.icon,x:0,z:-0.4,act:'dance',face:0},{name:VENUE_ACTS.djSet.name,icon:VENUE_ACTS.djSet.icon,x:0,z:-2.9,act:'djSet',face:0},{name:VENUE_ACTS.bar.name,icon:VENUE_ACTS.bar.icon,x:-3.1,z:0.4,act:'bar',face:-1.5708}],
@@ -709,7 +710,9 @@ export class World {
     if(l==='road'||l==='street'){}
     else if(l==='home'){
 
-      const homeKey=this.previewHome||(this.visitedHome?this.visitedHome.home:this.state.home)||'apartment',style=HOME_STYLES[homeKey]||HOME_STYLES.apartment;
+      const homeKey=this.previewHome||(this.visitedHome?this.visitedHome.home:this.state.home)||'apartment',paint=this.previewHome?null:this.previewPaint||(this.visitedHome?this.visitedHome.homeStyle:this.state.homeStyle);let style=HOME_STYLES[homeKey]||HOME_STYLES.apartment;
+      // Your own paint: walls and floor from the paint swatches (a preview while you choose).
+      if(paint?.wall&&paint?.floor)style={...style,floor:[paint.floor,shade(paint.floor,.94)],walls:[paint.wall,shade(paint.wall,.96)]};
       for(let x=-5;x<=5;x++)for(let z=-5;z<=5;z++)this.floor(x,z,.99,.99,(x+z)%2?style.floor[1]:style.floor[0]);
       const rooms=homeRooms(homeKey);if(rooms.length)this.homeWalls(style,rooms);else this.walls(2.4,style.walls[0],style.walls[1],5.35,.18);
       for(const room of rooms)this.paintRoom(room,style);
@@ -741,7 +744,7 @@ export class World {
       this.desk(.5,-4.2,1.3,.8,0,'#f5f0df','#8b6a4c',.82);this.monitor(.5,-4.45,0,.82,.6);this.keyboard(.5,-4.05,0,.82);this.officeChair(.5,-3.45,Math.PI,'#7d8b7a');
       if(Math.sin(this.angle)>0){this.box(-5.25,3.6,.08,1.15,2,'#6b4a35');this.box(-5.2,3.6,.04,.95,1.75,'#7d5841',.08);this.round(-5.17,3.2,.06,.06,.06,'#d4af37',1);}
       if(style.chandelier){this.rod(-1.7,1.5,.05,.05,.6,'#8a7a5a',2.05);this.round(-1.7,1.5,.7,.7,.3,style.chandelier,1.85);}
-      for(const f of (this.visitedHome?.furniture||this.state.furniture))if(!this.placement?.id||f.id!==this.placement.id)this.furnitureModel(f.item,f.x,f.z);this.paintPet();if(!this.visitedHome)for(const [key,def] of Object.entries(ITEMS))if(def.extension&&this.state.inventory?.[key])this.extensionModel(key,extensionSpot(key,this.homeKey()).x,extensionSpot(key,this.homeKey()).z);
+      for(const f of (this.visitedHome?.furniture||this.state.furniture))if(!this.placement?.id||f.id!==this.placement.id)this.furnitureModel(f.item,f.x,f.z,f.rot);this.paintPet();if(!this.visitedHome)for(const [key,def] of Object.entries(ITEMS))if(def.extension&&this.state.inventory?.[key])this.extensionModel(key,extensionSpot(key,this.homeKey()).x,extensionSpot(key,this.homeKey()).z);
     }else if(l==='sports'){this.stadium();
     }else if(VENUE_SCENES.includes(l)){this.venueScene(l);
     }else if(['studio','creator','tech'].includes(l)){
@@ -774,7 +777,7 @@ export class World {
       this.ride(this.showroomRide(),3.3,3.9,'x');
       this.plant(-4.1,4,1.8);this.plant(0,-4.4,1.5);this.plant(-4.8,-.1);
     }
-    if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.id,p.x,p.z,this.homeKey());for(const [sx,sz] of p.spots||[])this.round(sx,sz,.16,.16,.02,'#3fbf6f',.02);this.floor(p.x,p.z,1.15,1.15,valid?'#3fbf6f':'#e0533f',.03);this.furnitureModel(p.item,p.x,p.z);}
+    if(this.placement){const p=this.placement,valid=canPlace(this.state.furniture,p.id,p.x,p.z,this.homeKey());for(const [sx,sz] of p.spots||[])this.round(sx,sz,.16,.16,.02,'#3fbf6f',.02);this.floor(p.x,p.z,1.15,1.15,valid?'#3fbf6f':'#e0533f',.03);this.furnitureModel(p.item,p.x,p.z,this.state.furniture.find(f=>f.id===p.id)?.rot);}
     if(this.interior()&&l!=='home')this.paintCrowd(l);
     const npc=npcAt(l,this.state?.career);if(npc){const obj=worldObjects(l).find(o=>o.action==='phone'),nx=this.inMatch()?3.55:obj?.x||2.5,nz=obj?.z||2,talking=this.npcTalkUntil>performance.now();this.human(nx,nz,npc.look.skin,{...this.look(npc.career),...this.body({hair:npc.look.hair,hairColor:npc.look.hairColor,build:npc.look.build,height:npc.look.height}),pose:talking?'gesture':null,heading:talking?Math.atan2(this.player.x-nx,this.player.z-nz):(()=>{const st=this.performer(l);return st?Math.atan2(st.x-nx,st.z-nz):0;})()});}
     this.paintPeople();
@@ -973,7 +976,14 @@ export class World {
     }
   }
   // Placeable home items, built from simple shapes; each faces +z, where you stand to use it.
-  furnitureModel(item,x,z){
+  // Furniture turns a quarter at a time: every part of the model turns around the piece's centre (2D and 3D alike).
+  furnitureModel(item,x,z,rot=0){
+    rot=((rot||0)%4+4)%4;if(!rot){this.furnitureShape(item,x,z);return;}
+    const s=Math.round(Math.sin(rot*Math.PI/2)),c=Math.round(Math.cos(rot*Math.PI/2)),odd=rot%2===1,saved={};
+    for(const k of ['box','round','rod','floor']){saved[k]=this[k];this[k]=(px,pz,w,d,...rest)=>{const dx=px-x,dz=pz-z;return saved[k].call(this,x+dx*c+dz*s,z-dx*s+dz*c,odd?d:w,odd?w:d,...rest);};}
+    try{this.furnitureShape(item,x,z);}finally{for(const k of Object.keys(saved))delete this[k];}
+  }
+  furnitureShape(item,x,z){
     const t=this.reduced?0:performance.now()/1000,night=this.daylight().night;
     switch(item){
       case 'chair':this.chair(x,z);return;

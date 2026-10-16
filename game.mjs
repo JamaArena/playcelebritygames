@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { WORK_SCENES, SPORT_PLAYS, WORK_EVENTS, UNITS, reviewLine, tierTitle, SCENE_TAGS, SCENE_FX, AUDIENCE_WHO, FOLLOW_UPS, LIVE_SCENES } from './public/careerText.js';
-import { bestMode, QUESTS, QUEST_GRADUATION, FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace, homeRooms, npcOpinion, OPINIONS, NPC_NAMES, CLASH_MEDALS, medalTier, ARENA, MONEY, naira, priceOf, wearPrice, upgradePrice, jobPay } from './public/content.js';
+import { bestMode, QUESTS, QUEST_GRADUATION, FAME_MARKS, MOMENT, PROMPTS, RIVAL, TEAM, GIG, TAILOR_COLORS, TATTOOS, VENUE_ACTS, FITNESS, DELIVERY_MS, GROCERY, POSTS, BALANCE as B, TRANSIT, TUNING, NO_JAM, NO_RAIN, RIDE_SPEED, CAREERS, ITEMS, FOODS, WEAR, wearPerks, perksFor, upgradesFor, PETS, PET_CARE, EMOTES, LIFE_EVENT, LIFE_EVENTS, POWERED, weatherAt, goSlowAt, NPCS, NPC_TALK, MISHAP, MISHAPS, SKIN_TONES, HAIRSTYLES, HAIR_COLORS, BUILDS, HEIGHTS, pick, LOCATIONS, SPONSORSHIPS, PHONES, WATCH, WATCH_COOLDOWN, WATCH_FIRST, WATCH_EVERY, WATCH_MAX, WATCH_SESSION, insightFor, STARTER_RIDE, tripMs, LOT, arrivalSpot, clamp, effort, walkable, canPlace, homeRooms, npcOpinion, OPINIONS, NPC_NAMES, CLASH_MEDALS, medalTier, ARENA, MONEY, naira, priceOf, wearPrice, upgradePrice, jobPay, TRAITS, TRAIT_COUNT, STARTER_OUTFITS, MOODLETS, moodOf, relTier, SOCIAL, INTERACTIONS, socialOdds, SOCIAL_LINES, REL_GREETINGS, ASPIRATIONS, ASPIRATION_REWARDS, WANTS, WANT, BILLS, billFor, PAINTS, sponsorPrice, npcName } from './public/content.js';
 export const id = () => randomUUID();
 export class GameError extends Error {}
 const requireRule = (ok, message) => { if (!ok) throw new GameError(message); };
@@ -14,7 +14,9 @@ export function createCharacter(input, now) {
   requireRule([0,1].includes(input.origin), 'Select an origin.');
   requireRule(text(input.name).length >= 2, 'Use a name of at least two characters.');
   requireRule(input.career !== 'adult' || input.adult === true, 'Confirm that your character is an adult.');
-  return {version:4, money:MONEY.start[input.origin], moneyLog:[{at:now, delta:MONEY.start[input.origin], reason:'Starting balance'}], phones:['basic'], race:{day:ARENA.day(now),fame:0}, name:text(input.name,30), color: SKIN_TONES.includes(input.color) ? input.color : SKIN_TONES[3], hair: pick(HAIRSTYLES, input.hair, 'curls'), hairColor: pick(HAIR_COLORS, input.hairColor, 'black'), build: pick(BUILDS, input.build, 'average'), height: pick(HEIGHTS, input.height, 'average'), technique: input.technique === 'instrument' ? 'instrument' : 'vocals', career:input.career, careers:{[input.career]:newCareer(input.career,input.origin)}, location:'home', position3d:{x:0,z:1}, fame:0, needs:Object.fromEntries(Object.keys(B.decay).map(n=>[n,80])), lastSeen:now, charges:10, refillAnchor:null, active:null, recovery:null, inventory:{bed:{level:1}, shower:{level:1}, toilet:{level:1}}, furniture:[], outputs:[], events:[], learningEvents:[], awards:[], results:[], friends:[], blocks:[], invitations:[], equipped:{}, seasonStart:now, appearance:{}, collaborations:[], ride: input.origin === 1 ? STARTER_RIDE : null, phone:'basic'};
+  const traits=[...new Set(Array.isArray(input.traits)?input.traits:[])].filter(t=>TRAITS[t]).slice(0,TRAIT_COUNT),outfit=STARTER_OUTFITS[input.outfit]||STARTER_OUTFITS.casual;
+  const sims={traits,wear:{...outfit.wear},closet:Object.fromEntries(Object.values(outfit.wear).filter(k=>WEAR[k]?.fame>0).map(k=>[k,true])),aspiration:ASPIRATIONS[input.aspiration]?{key:input.aspiration,stage:0,since:now}:null,rel:{},moodlets:[],billsDue:now+BILLS.everyMs};
+  return {...sims,version:5, money:MONEY.start[input.origin], moneyLog:[{at:now, delta:MONEY.start[input.origin], reason:'Starting balance'}], phones:['basic'], race:{day:ARENA.day(now),fame:0}, name:text(input.name,30), color: SKIN_TONES.includes(input.color) ? input.color : SKIN_TONES[3], hair: pick(HAIRSTYLES, input.hair, 'curls'), hairColor: pick(HAIR_COLORS, input.hairColor, 'black'), build: pick(BUILDS, input.build, 'average'), height: pick(HEIGHTS, input.height, 'average'), technique: input.technique === 'instrument' ? 'instrument' : 'vocals', career:input.career, careers:{[input.career]:newCareer(input.career,input.origin)}, location:'home', position3d:{x:0,z:1}, fame:0, needs:Object.fromEntries(Object.keys(B.decay).map(n=>[n,80])), lastSeen:now, charges:10, refillAnchor:null, active:null, recovery:null, inventory:{bed:{level:1}, shower:{level:1}, toilet:{level:1}}, furniture:[], outputs:[], events:[], learningEvents:[], awards:[], results:[], friends:[], blocks:[], invitations:[], equipped:{}, seasonStart:now, appearance:{}, collaborations:[], ride: input.origin === 1 ? STARTER_RIDE : null, phone:'basic'};
 }
 // Fame is one character-wide total earned from reach in any career. Battles can also move it.
 export const fameFor = reach => Math.floor(reach * B.famePerReach);
@@ -42,6 +44,22 @@ export function addMoney(s, amount, reason = 'Other', at = Date.now()) {
 export function spend(s, cost, reason, at) {
   if (!cost) return;requireRule((s.money || 0) >= cost, `You need ${naira(cost)} for that. You have ${naira(s.money || 0)}.`);addMoney(s, -cost, reason, at);
 }
+// Awards: each kind is listed once; winning it again adds to its count (×2, ×3…).
+export function grantAward(s,name,career,at,extra={}){
+  const have=s.awards.find(a=>a.name===name&&!a.medal&&!a.promotion);if(have){have.count=(have.count||1)+1;have.at=at;return have;}
+  const award={id:id(),name,career,at,...extra};s.awards.push(award);return award;
+}
+// Moodlets: a timed emotion. Feeling the same thing again keeps whichever timer runs longer.
+export function feel(s,kind,now,ms){
+  if(!MOODLETS[kind])return;const old=(s.moodlets||[]).find(m=>m.kind===kind&&m.until>now),until=Math.max(old?.until||0,now+(ms??MOODLETS[kind].ms));
+  s.moodlets=[...(s.moodlets||[]).filter(m=>m.until>now&&m.kind!==kind),{kind,at:now,until}].slice(-6);
+}
+// Relationships with players ('<player id>'), named NPCs ('npc:<id>') and venue regulars ('reg:<place>:<n>').
+export const relOf=(s,key)=>(s.rel??={})[key]??={f:0,r:0,n:0,last:0};
+function pruneRel(s){const keys=Object.keys(s.rel||{});if(keys.length<=SOCIAL.keep)return;const keep=new Set([s.partner?.id,s.spouse?.id].filter(Boolean));
+  for(const k of keys.filter(k=>!keep.has(k)).sort((a,b)=>(Math.abs(s.rel[a].f)+s.rel[a].r)-(Math.abs(s.rel[b].f)+s.rel[b].r)||(s.rel[a].last||0)-(s.rel[b].last||0)).slice(0,keys.length-SOCIAL.keep))delete s.rel[k];}
+// Bad luck stings but never wipes out a week of work: a negative life event costs at most about three recent jobs' fame.
+export function lossCap(s){const recent=(s.outputs||[]).filter(o=>o.fame>0).slice(0,5);return Math.max(15,Math.round(3*(recent.length?recent.reduce((n,o)=>n+o.fame,0)/recent.length:10)));}
 // Naija City News: notable moments become headlines other players can read.
 export function headline(s, text, at) { s.headlines = [{at, text}, ...(s.headlines || [])].slice(0, 5); }
 export function log(s, message, now) { s.events.unshift({id:id(),message,at:now}); s.events = s.events.slice(0,100); }
@@ -54,6 +72,7 @@ export function refill(s, now) {
 export function learn(s, careerKey, skill, points, eventId) {
   if (s.learningEvents.includes(eventId)) return;
   if(s.team?.mentor)points=Math.round(points*1.25);
+  const quick=perksFor(s).learn||0;if(quick)points=Math.max(1,Math.round(points*(1+quick/100)));
   const entry=s.careers[careerKey]?.skills[skill];
   if (!entry) return;
   s.learningEvents.push(eventId);
@@ -66,7 +85,7 @@ export function evaluate(s, key=s.career) {
   const c=s.careers[key], def=CAREERS[key];
   const average=Object.values(c.skills).reduce((a,b)=>a+b.level,0)/def.skills.length;
   const before=c.tier;B.tiers.forEach(([,fame,level],i)=>{if((s.fame||0)>=fame&&average>=level)c.tier=Math.max(c.tier,i);});
-  if(c.tier>before){const title=tierTitle(key,c.tier),awardId=`promotion:${key}:${c.tier}`;if(!s.awards.some(a=>a.id===awardId))s.awards.push({id:awardId,name:`Promoted: ${title}`,career:key,at:s.lastSeen,promotion:c.tier});c.promotedAt=s.lastSeen;log(s,`🎉 Promoted! You are now ${title}.`,s.lastSeen);headline(s,`${s.name} steps up to ${title} ${def.icon}`,s.lastSeen);}
+  if(c.tier>before){const title=tierTitle(key,c.tier),awardId=`promotion:${key}:${c.tier}`;if(!s.awards.some(a=>a.id===awardId))s.awards.push({id:awardId,name:`Promoted: ${title}`,career:key,at:s.lastSeen,promotion:c.tier});c.promotedAt=s.lastSeen;feel(s,'confident',s.lastSeen);log(s,`🎉 Promoted! You are now ${title}.`,s.lastSeen);headline(s,`${s.name} steps up to ${title} ${def.icon}`,s.lastSeen);}
   for (const threshold of B.milestones) {
     const awardId=`milestone:fame:${threshold}`;
     if((s.fame||0)>=threshold&&!s.awards.some(a=>a.id===awardId))s.awards.push({id:awardId,name:`${threshold.toLocaleString()} fame`,career:key,at:s.lastSeen});
@@ -80,7 +99,9 @@ export function opportunities(s) {
   return {trial:discovery(c,def), launch:s.outputs.some(o=>o.career===s.career&&o.kind==='build'&&!o.released), affiliation:c.offer};
 }
 export const ACTIVE_GAP_MS=70_000;
-export function reconcile(s, now) {
+// passive: someone else's request touched this save (a battle, a collab). Timers settle, but needs, life events,
+// bills and the online clock only move on the player's own requests.
+export function reconcile(s, now, {passive=false}={}) {
   // Saves from before fame points: rescale reach to the new venue sizes and derive fame once.
   if((s.version||1)<2){let reach=0;for(const c of Object.values(s.careers)){c.audience*=100;reach+=c.audience;}s.fame=(s.fame||0)+fameFor(reach);for(const o of s.outputs)o.gain*=100;s.version=2;}
   // Coins were removed: drop balances and groceries; contracts now boost reach instead of paying fees.
@@ -91,22 +112,28 @@ export function reconcile(s, now) {
   if(s.careers?.hacker){delete s.careers.hacker;if(s.career==='hacker'){s.career=Object.keys(s.careers)[0]||'developer';s.careers[s.career]??=newCareer(s.career,0);}if(s.active?.career==='hacker')s.active=null;log(s,'The Fraudster career has been retired. You continue as a '+CAREERS[s.career].name.toLowerCase()+'.',now);}
   // Saves from before the daily race: today's race so far comes from the fame log (arena prizes excluded).
   if(!s.race){const start=ARENA.start(ARENA.day(now)),prizes=[...Object.values(ARENA.career),...Object.values(ARENA.family)].map(a=>a.name);s.race={day:ARENA.day(now),fame:(s.fameLog||[]).filter(e=>e.at>=start&&!prizes.includes(e.reason)).reduce((n,e)=>n+e.delta,0)};}
+  // Sims life: relationships, moodlets, traits and bills for older saves; duplicate awards fold into one with a count.
+  if(s.version<5){s.rel??={};s.moodlets??=[];s.traits??=[];s.billsDue??=now+BILLS.everyMs;const seen=new Map();
+    s.awards=(s.awards||[]).filter(a=>{if(a.medal||a.promotion)return true;const first=seen.get(a.name);if(first){first.count=(first.count||1)+(a.count||1);first.at=Math.max(first.at||0,a.at||0);return false;}seen.set(a.name,a);return true;});s.version=5;}
   for(const [i,f] of (s.furniture||[]).entries())f.id??=`f${i}${f.item}`;
   for(const f of s.furniture||[])if(s.inventory[f.item])s.inventory[f.item].count=Math.max(s.inventory[f.item].count||1,s.furniture.filter(g=>g.item===f.item).length);
   // Clash medals follow the current names and star thresholds.
   if(s.awards?.some(w=>w.medal))s.awards=s.awards.flatMap(w=>{if(!w.medal||!CLASH_MEDALS[w.medal])return [w];const tier=medalTier(w.medal,s.clashRecord||{});return tier?[{...w,tier,name:`${CLASH_MEDALS[w.medal].name} ${'★'.repeat(tier)}`}]:[];});
   refill(s,now);
   // Heartbeats arrive every 45 seconds; gaps up to 70 seconds count as active. Offline needs never decay.
-  const dt=Math.max(0,now-s.lastSeen);
+  const dt=Math.max(0,now-s.lastSeen),live=!passive&&dt<=ACTIVE_GAP_MS;
   const perks=perksFor(s),up=upgradesFor(s);if(s.location==='home'&&!s.visiting&&up.hygiene)perks.hygiene=(perks.hygiene||0)+up.hygiene;
-  if(dt<=ACTIVE_GAP_MS)for(const [need,rate] of Object.entries(B.decay))s.needs[need]=clamp(s.needs[need]-rate*(1-(perks[need]||0)/100)*dt/3600_000);
-  if(s.pet&&dt<=ACTIVE_GAP_MS)for(const [k,rate] of Object.entries(PET_CARE.decay))s.pet[k]=clamp(s.pet[k]-rate*dt/3600_000);
-  mishaps(s,now);
+  if(live)for(const [need,rate] of Object.entries(B.decay))s.needs[need]=clamp(s.needs[need]-rate*(1-(perks[need]||0)/100)*dt/3600_000);
+  if(s.pet&&live)for(const [k,rate] of Object.entries(PET_CARE.decay))s.pet[k]=clamp(s.pet[k]-rate*dt/3600_000);
+  s.moodlets=(s.moodlets||[]).filter(m=>m.until>now);
+  if(live&&Object.values(s.needs).some(v=>v<20))feel(s,'tense',now,3*60_000);
+  if(!passive)mishaps(s,now);
   if((s.fame||0)>=FAME_MARKS.hallOfFame&&!s.hallOfFame){s.hallOfFame=now;headline(s,`${s.name} is inducted into the Naija City Hall of Fame 🌟`,now);log(s,'🌟 You were inducted into the Hall of Fame!',now);}
   expireMoments(s,now);
-  if(dt<=ACTIVE_GAP_MS)lifeEvents(s,now);
-  if(dt<=ACTIVE_GAP_MS&&s.team?.manager&&now>=(s.nextGigAt||0)){const fam=CAREERS[s.career]?.family,acts=Object.entries(VENUE_ACTS).filter(([,a])=>!a.menu&&!a.moment&&!a.album&&!a.tour&&!a.careers&&!a.minFame&&!a.minOutputs&&(!a.family||a.family===fam));const [key]=acts[Math.floor(Math.random()*acts.length)];s.gig={id:id(),act:key,until:now+GIG.windowMs,bonus:Math.max(20,Math.round((s.fame||0)*.005)),pay:jobPay(s.careers[s.career].tier,100)*MONEY.gig};s.nextGigAt=now+GIG.everyMs;log(s,`🧑‍💼 Your manager booked you: ${VENUE_ACTS[key].name} at ${LOCATIONS[VENUE_ACTS[key].venue].name} within 10 minutes for +${s.gig.bonus} fame and ${naira(s.gig.pay)}.`,now);}
-  s.lastSeen=now;
+  if(live)lifeEvents(s,now);
+  if(!passive){payBills(s,now);refreshWants(s,now);checkAspiration(s,now);}
+  if(live&&s.team?.manager&&now>=(s.nextGigAt||0)){const fam=CAREERS[s.career]?.family,acts=Object.entries(VENUE_ACTS).filter(([,a])=>!a.menu&&!a.moment&&!a.album&&!a.tour&&!a.careers&&!a.minFame&&!a.minOutputs&&(!a.family||a.family===fam));const [key]=acts[Math.floor(Math.random()*acts.length)];s.gig={id:id(),act:key,until:now+GIG.windowMs,bonus:Math.max(20,Math.round((s.fame||0)*.005)),pay:jobPay(s.careers[s.career].tier,100)*MONEY.gig};s.nextGigAt=now+GIG.everyMs;log(s,`🧑‍💼 Your manager booked you: ${VENUE_ACTS[key].name} at ${LOCATIONS[VENUE_ACTS[key].venue].name} within 10 minutes for +${s.gig.bonus} fame and ${naira(s.gig.pay)}.`,now);}
+  if(!passive)s.lastSeen=now;
   for(const [key,item] of Object.entries(s.inventory)) if(item.upgrade && now>=item.upgrade.endsAt) {
     item.level=item.upgrade.target; item.upgrade=null; log(s,`${ITEMS[key].name} reached level ${item.level}.`,now);
   }
@@ -135,7 +162,7 @@ export function mishaps(s,now){
     if(s.needs[need]>MISHAP.at||s.recovery?.need===need||now-(s.mishapAt[need]||0)<MISHAP.cooldownMs)continue;
     const lost=Math.min(s.fame||0,Math.round(Math.max(MISHAP.minFame,(s.fame||0)*m.fame)*(1-(perksFor(s).scandal||0)/100)*(s.papsUntil>now?1.5:1)*(s.team?.bodyguard?.8:1)));
     addFame(s,-lost,m.title,now);s.mishapAt[need]=now;headline(s,`${s.name}: ${m.title.toLowerCase().replace(/^you /,'')}! ${m.icon}`,now);for(const [k,v] of Object.entries(m.set))s.needs[k]=v;
-    s.mishap={id:id(),need,at:now,lost};log(s,`${m.icon} ${m.title}. ${m.text} −${lost.toLocaleString('en-US')} fame.`,now);return;
+    s.mishap={id:id(),need,at:now,lost};feel(s,'embarrassed',now);log(s,`${m.icon} ${m.title}. ${m.text} −${lost.toLocaleString('en-US')} fame.`,now);return;
   }
 }
 // Random life moments while you play: good luck, small embarrassments, fan gifts, and power cuts at home.
@@ -147,20 +174,93 @@ export function lifeEvents(s,now,rng=Math.random){
   const options=Object.entries(LIFE_EVENTS).filter(([,e])=>(!e.family||e.family===family)&&(!e.where||(e.where==='home')===home)&&(s.fame||0)>=(e.minFame||0)&&!(e.guarded&&s.team?.bodyguard)&&!(e.prompt&&s.prompt));
   const total=options.reduce((n,[,e])=>n+e.weight,0);let pick=rng()*total,key=options[0][0];
   for(const [k,e] of options){pick-=e.weight;if(pick<=0){key=k;break;}}
-  const e=LIFE_EVENTS[key];let delta=0,text=e.text;
-  if(e.fame){const [share,min]=e.fame,raw=share>0?Math.max(min,(s.fame||0)*share):Math.min(min,(s.fame||0)*share);delta=Math.round(raw<0?raw*(1-(perksFor(s).scandal||0)/100):raw);if(delta<0)delta=Math.max(delta,-(s.fame||0));addFame(s,delta,e.title,now);if(key==='luckyBreak'||key==='slip'||key==='sneeze')headline(s,`${s.name}: ${e.title.toLowerCase().replace(/^you /,'')} ${e.icon}`,now);}
+  const e=LIFE_EVENTS[key];let delta=0,text=key==='luckyBreak'&&!(s.posts||[]).length?e.noPostText:e.text;
+  if(e.fame){const [share,min]=e.fame,raw=share>0?Math.max(min,(s.fame||0)*share):Math.min(min,(s.fame||0)*share);delta=Math.round(raw<0?raw*(1-(perksFor(s).scandal||0)/100):raw);if(delta<0)delta=Math.max(delta,-lossCap(s),-(s.fame||0));addFame(s,delta,e.title,now);if(key==='luckyBreak'||key==='slip'||key==='sneeze')headline(s,`${s.name}: ${e.title.toLowerCase().replace(/^you /,'')} ${e.icon}`,now);}
   for(const [k,v] of Object.entries(e.needs||{}))s.needs[k]=clamp(s.needs[k]+v);
   if(key==='powerCut'){if(upgradesFor(s).generator)text='Power cut! Your generator kicked in, so nothing stopped.';else s.powerCut={until:now+LIFE_EVENT.powerCutMs};}
   if(e.transfer){const c=s.careers[s.career];if(!c.offer){const club=['Naija City Club','Harbour Athletic','Emerald United'][Math.floor(rng()*3)];c.offer={id:id(),name:`${club} · transfer`,boost:Math.round(B.contractBoost*1.5*100)/100,expiresAt:now+86400_000,exitAfter:3};}}
-  if(e.award&&delta>0)s.awards.push({id:id(),name:e.award,career:s.career,at:now});if(key==='magazineCover'||key==='scandal')headline(s,key==='scandal'?`Scandal: ${s.name}'s old post resurfaces 🫢`:`${s.name} covers Naija Style magazine 📰`,now);
+  if(e.award&&delta>0)grantAward(s,e.award,s.career,now);if(EVENT_MOODS[key])feel(s,EVENT_MOODS[key],now);if(key==='magazineCover'||key==='scandal')headline(s,key==='scandal'?`Scandal: ${s.name}'s old post resurfaces 🫢`:`${s.name} covers Naija Style magazine 📰`,now);
   if(e.prompt)s.prompt={id:id(),kind:e.prompt,at:now};if(e.paps)s.papsUntil=now+10*60_000;if(e.visit)s.familyVisit=now+5*60_000;
   s.lifeEvent={id:id(),kind:key,at:now,delta,text};log(s,`${e.icon} ${e.title}. ${text}${delta?` ${delta>0?'+':'−'}${Math.abs(delta).toLocaleString('en-US')} fame.`:''}`,now);
   const [lo,hi]=LIFE_EVENT.gapMs;s.nextEventAt=now+lo+Math.round(rng()*(hi-lo));
 }
-const noPower=(s,now)=>s.powerCut?.until>now&&!upgradesFor(s).generator&&s.location==='home'&&!s.visiting;
+const EVENT_MOODS={luckyBreak:'confident',fanGift:'happy',sneeze:'embarrassed',slip:'embarrassed',wrongName:'embarrassed',wardrobe:'embarrassed',lyrics:'embarrassed',paparazzi:'tense',magazineCover:'confident',scandal:'tense',rivalHit:'tense',mumCalls:'happy',familyVisit:'happy',powerCut:'tense'};
+// No power at home: a NEPA cut (unless you own a generator), or unpaid bills.
+const noPower=(s,now)=>(s.unpaid>0||s.powerCut?.until>now&&!upgradesFor(s).generator)&&s.location==='home'&&!s.visiting;
+const powerText=s=>s.unpaid>0?`Your power is off until you pay ${naira(s.unpaid)} in bills (Wallet).`:'NEPA took light.';
+// Rent and bills: due once a real day while you play (days away are not billed). Short of money, you pay what
+// you can and the power at home stays off until the rest is paid.
+function payBills(s,now){
+  if(s.billsDue==null){s.billsDue=now+BILLS.everyMs;return;}if(now<s.billsDue)return;
+  const bill=billFor(s),owed=bill+(s.unpaid||0),paid=Math.min(owed,Math.max(0,s.money||0));
+  if(paid)addMoney(s,-paid,s.unpaid?'Rent & bills (with arrears)':'Rent & bills',now);
+  s.unpaid=owed-paid;s.billsDue=now+BILLS.everyMs;s.lastBill={at:now,amount:bill};
+  if(s.unpaid){feel(s,'tense',now);log(s,`🧾 Bills of ${naira(owed)} were due and you paid ${naira(paid)}. The power at home is off until you clear ${naira(s.unpaid)} in the Wallet.`,now);}
+  else log(s,`🧾 Rent & bills paid: ${naira(owed)}. The next bill is in a day.`,now);
+}
+// Wants: three short goals at a time, chosen from your needs and traits; each lasts half an hour.
+export function refreshWants(s,now,rng=Math.random){
+  s.wants=(s.wants||[]).filter(w=>w.until>now&&WANTS[w.key]);
+  const romance=Object.values(s.rel||{}).some(r=>r.r>=30)||s.dating?.open||s.partner||s.spouse;
+  while(s.wants.length<WANT.count){
+    const pool=Object.entries(WANTS).filter(([k,w])=>!s.wants.some(x=>x.key===k)&&(!w.romance||romance)&&(!w.friends||(s.friends||[]).length));if(!pool.length)break;
+    const weight=([,w])=>1+w.needs.reduce((n,need)=>n+((s.needs[need]??100)<50?2:0),0)+(w.traits||[]).filter(t=>(s.traits||[]).includes(t)).length*2;
+    let roll=rng()*pool.reduce((n,x)=>n+weight(x),0),key=pool[0][0];for(const x of pool){roll-=weight(x);if(roll<=0){key=x[0];break;}}
+    s.wants.push({id:id(),key,at:now,until:now+WANT.ms});
+  }
+}
+// Aspirations: reaching a stage pays once per life goal (switching back and forth never pays twice).
+export function checkAspiration(s,now){
+  const a=s.aspiration,def=a&&ASPIRATIONS[a.key];if(!def)return;s.aspirationClaimed??={};
+  while(a.stage<def.stages.length&&def.stages[a.stage][2](s,now)){
+    const i=a.stage,[title]=def.stages[i];a.stage++;if((s.aspirationClaimed[a.key]||0)>i)continue;s.aspirationClaimed[a.key]=i+1;
+    const r=ASPIRATION_REWARDS[i];addFame(s,r.fame,`Aspiration: ${title}`,now);addMoney(s,r.money,`Aspiration: ${title}`,now);feel(s,'inspired',now);
+    s.aspirationDone={id:id(),key:a.key,stage:i+1,title,at:now};log(s,`${def.icon} Life goal reached: ${title} (+${r.fame} fame, +${naira(r.money)})`,now);
+    if(a.stage===def.stages.length){grantAward(s,`${def.icon} ${def.name}`,s.career,now);headline(s,`${s.name} lived the dream: ${def.name} ${def.icon}`,now);}
+  }
+}
+// Social interactions (the person menu). Works on named NPCs, venue regulars and, through the server, other players.
+// Returns what changed so the other player's side can be updated too.
+export function socialInteract(s,input,now,rng=Math.random,other=null,otherId=null){
+  const key=input.kind,d=INTERACTIONS[key];requireRule(d,'Choose what to do.');
+  requireRule(!s.trip,'Wait until you arrive.');requireRule(!s.active&&!s.recovery,'Finish what you are doing first.');
+  const target=String(input.target||'');let name,kind;
+  if(target.startsWith('npc:')){const npc=NPCS.find(n=>'npc:'+n.id===target);requireRule(npc&&npc.location===s.location,'That person isn’t here.');name=npc.name;kind='npc';}
+  else if(target.startsWith('reg:')){const [,place,index]=target.split(':');requireRule(place===s.location&&s.location!=='home'&&/^\d+$/.test(index||''),'Walk over to them first.');name=npcName(place,Number(index));kind='regular';}
+  else{requireRule(other&&otherId,'That person isn’t here.');name=other.name;kind='player';}
+  requireRule(!(d.cat==='romantic'&&kind==='regular'),`You don’t know ${name} well enough for romance. Try someone you know.`);
+  requireRule(!d.npcOnly||kind==='npc',kind==='player'?'Propose to players from the Friends app.':'Save that for someone you know well.');
+  if(kind==='player'&&d.cat==='romantic')requireRule(other.dating?.open||s.spouse?.id===otherId,`${name} isn’t looking for romance right now.`);
+  const rel=relOf(s,target);
+  requireRule(!d.minF||rel.f>=d.minF,`Get closer first: ${d.name.toLowerCase()} needs friendship ${d.minF}+ (now ${Math.round(rel.f)}).`);
+  requireRule(!d.minR||rel.r>=d.minR,`Build more romance first: ${d.name.toLowerCase()} needs romance ${d.minR}+ (now ${Math.round(rel.r)}).`);
+  if(key==='askPartner')requireRule(!s.partner&&!s.spouse,'You are already with someone.');
+  if(key==='propose')requireRule(s.partner?.id===target&&!s.spouse,`Ask ${name} to be your partner first.`);
+  requireRule(now-(rel.last||0)>=SOCIAL.cooldownMs,`${name} needs a second.`);
+  const odds=socialOdds(s,key,rel,now),ok=rng()<odds,repeat=rel.lastKind===key&&now-(rel.last||0)<SOCIAL.repeatMs,scale=repeat?.5:1;
+  let df,dr;
+  if(ok){df=Math.round((d.f||0)*scale);dr=Math.round((d.r||0)*scale);}
+  else{df=d.missF??(d.cat==='friendly'?-2:d.cat==='romantic'?-4:-3);dr=d.cat==='romantic'?-3:0;}
+  if(d.cat==='mean'&&ok)dr=-Math.min(rel.r,10);
+  rel.f=clamp(rel.f+df,-100,100);rel.r=clamp(rel.r+dr,0,100);rel.n=(rel.n||0)+1;rel.last=now;rel.lastKind=key;rel.name=name;
+  if(ok){if(d.social)s.needs.social=clamp(s.needs.social+d.social*scale);if(d.fun)s.needs.fun=clamp(s.needs.fun+d.fun*scale);}else if(d.cat!=='mean')s.needs.social=clamp(s.needs.social+2);
+  if(d.energy)s.needs.energy=clamp(s.needs.energy+d.energy);
+  if(ok)feel(s,{friendly:'happy',funny:'happy',romantic:'flirty',mean:'confident'}[d.cat],now);else if(d.cat!=='friendly')feel(s,'embarrassed',now,5*60_000);
+  const lines=SOCIAL_LINES[d.cat][ok?'hit':'miss'],line=lines[Math.floor(rng()*lines.length)%lines.length];let note='';
+  if(ok&&key==='askPartner'){s.partner={id:target,name,since:now,npc:true};headline(s,`${s.name} and ${name} are officially a couple 💞`,now);note=` ${name} said yes! You’re partners now.`;}
+  if(ok&&key==='propose'){s.spouse={id:target,name,since:now,npc:true};s.partner=null;grantAward(s,'Married',s.career,now);const gift=Math.max(50,Math.round((s.fame||0)*.01));addFame(s,gift,'Wedding',now);feel(s,'happy',now,30*60_000);headline(s,`💍 ${s.name} married ${name}!`,now);note=` ${name} said YES! 💍 You’re married (+${gift} fame).`;}
+  if(!ok&&key==='propose'){rel.r=clamp(rel.r-10,0,100);feel(s,'sad',now);note=` ${name} isn’t ready. Give it time.`;}
+  if(d.cat==='mean'&&ok&&s.partner?.id===target&&rel.r<40){s.partner=null;feel(s,'sad',now);note=` ${name} broke up with you.`;}
+  pruneRel(s);
+  s.lastSocial={id:id(),target,kind:key,ok,line,name,df,dr,at:now};
+  log(s,`${d.icon} ${d.name} with ${name}: ${ok?'it landed':'it didn’t land'}. “${line}”${df?` ${df>0?'+':''}${df} friendship`:''}${dr?` · ${dr>0?'+':''}${dr} romance`:''}.${note}`,now);
+  return {ok,df,dr,line,name,d};
+}
 export function finishRecovery(s,now){
   const r=s.recovery,start=r.startedAt??r.endsAt-B.recovery[r.need][1],share=Math.max(0,Math.min(1,(now-start)/(r.endsAt-start))),amount=r.amount??B.recovery[r.need][0];
-  s.needs[r.need]=clamp(s.needs[r.need]+amount*share);for(const [k,v] of Object.entries(r.extra||{}))s.needs[k]=clamp(s.needs[k]+v*share);s.recovery=null;
+  const meal=r.need==='hunger'?1+(perksFor(s).meal||0)/100:1;
+  s.needs[r.need]=clamp(s.needs[r.need]+amount*share*meal);for(const [k,v] of Object.entries(r.extra||{}))s.needs[k]=clamp(s.needs[k]+v*share);s.recovery=null;
+  recoveryMood(s,r,share,now);
   if(r.watch){watchInsights(s,r,now);if(r.watch.given)s.watchLearnAt=now;}
   if(r.item&&ITEMS[r.item]?.use?.post&&share>=.5&&now-(s.postedAt||0)>=10*60_000){s.postedAt=now;const gain=Math.max(5,Math.round((s.fame||0)*.002));addFame(s,gain,'Photo post',now);log(s,`📷 Your photos got likes. +${gain} fame.`,now);}
   // Things done at places: train, earn a little fame, get fitter, pick up groceries, or face the TV cameras.
@@ -175,18 +275,27 @@ export function finishRecovery(s,now){
     if(act.moment){const level=s.careers[s.career].skills[CAREERS[s.career].focus].level,win=Math.random()<Math.min(.85,.25+level*.08),[share,min]=win?act.moment.win:act.moment.lose;
       const delta=Math.round(share>=0?Math.max(min,(s.fame||0)*share):Math.min(min,(s.fame||0)*share));addFame(s,delta,act.name,now);
       headline(s,`${s.name} ${act.moment.headline[win?0:1]}`.replace(" '","'"),now);log(s,win?`${act.icon} You did it! +${delta} fame.`:`${act.icon} Not this time. ${delta>=0?'+':''}${delta} fame.`,now);
-      if(win&&act.moment.award)s.awards.push({id:id(),name:act.moment.award,career:s.career,at:now});if(win&&act.moment.prize){addMoney(s,act.moment.prize,`Prize: ${act.name}`,now);log(s,`💰 Prize money: ${naira(act.moment.prize)}.`,now);}}
+      feel(s,win?'confident':'tense',now);if(win&&act.moment.award)grantAward(s,act.moment.award,s.career,now);if(win&&act.moment.prize){addMoney(s,act.moment.prize,`Prize: ${act.name}`,now);log(s,`💰 Prize money: ${naira(act.moment.prize)}.`,now);}}
     if(act.album){const recent=s.outputs.filter(o=>o.career===s.career&&o.released).slice(0,3),gain=Math.max(50,Math.round(recent.reduce((n,o)=>n+(o.fame||0),0)*.6));addFame(s,gain,'Album release',now);addMoney(s,gain*MONEY.albumPerFame,'Album royalties',now);headline(s,`${s.name}'s new album is out now 💿`,now);log(s,`💿 Your album is out! +${gain} fame and ${naira(gain*MONEY.albumPerFame)} in royalties.`,now);}
     if(act.tour){s.tour=s.tour&&now-s.tour.started<=MOMENT.tourMs?s.tour:{started:now,stops:[]};if(!s.tour.stops.includes(r.act))s.tour.stops.push(r.act);
-      if(s.tour.stops.length>=3){const gain=Math.max(200,Math.round((s.fame||0)*.04));addFame(s,gain,'Concert tour',now);headline(s,`${s.name} wrapped a sold-out Naija City tour 🎤`,now);log(s,`🎤 Tour complete! +${gain} fame.`,now);s.awards.push({id:id(),name:'Sold-out tour',career:s.career,at:now});s.tour=null;}
+      if(s.tour.stops.length>=3){const gain=Math.max(200,Math.round((s.fame||0)*.04));addFame(s,gain,'Concert tour',now);headline(s,`${s.name} wrapped a sold-out Naija City tour 🎤`,now);log(s,`🎤 Tour complete! +${gain} fame.`,now);grantAward(s,'Sold-out tour',s.career,now);feel(s,'confident',now);s.tour=null;}
       else log(s,`🎤 Tour stop ${s.tour.stops.length} of 3 done.`,now);}
     if(s.gig?.act===r.act&&now<=s.gig.until+act.ms){addFame(s,s.gig.bonus,'Manager gig',now);if(s.gig.pay)addMoney(s,s.gig.pay,'Manager gig',now);log(s,`🧑‍💼 Gig done! +${s.gig.bonus} fame${s.gig.pay?` and ${naira(s.gig.pay)}`:''}.`,now);s.gig=null;}
     if(act.charity&&now-(s.charityAt||0)>=30*60_000){s.charityAt=now;headline(s,`${s.name} spent the day volunteering at Naija General 🤲`,now);}
-    if(act.interview&&now-(s.interviewAt||0)>=30*60_000){s.interviewAt=now;const good=Math.random()<.65,delta=good?Math.max(20,Math.round((s.fame||0)*.01)):-Math.max(10,Math.round((s.fame||0)*.005));addFame(s,delta,good?'TV interview':'Awkward TV interview',now);if(good)addMoney(s,MONEY.interview,'TV appearance fee',now);headline(s,good?`${s.name} charmed viewers on PCTV 📺`:`${s.name}'s awkward PCTV interview goes viral 😬`,now);log(s,good?`📺 The interview went great! +${delta} fame.`:`📺 That interview did not go well. ${delta} fame.`,now);}
+    if(act.interview&&now-(s.interviewAt||0)>=30*60_000){s.interviewAt=now;const good=Math.random()<.65,delta=good?Math.max(20,Math.round((s.fame||0)*.01)):-Math.max(10,Math.round((s.fame||0)*.005));addFame(s,delta,good?'TV interview':'Awkward TV interview',now);feel(s,good?'confident':'embarrassed',now);if(good)addMoney(s,MONEY.interview,'TV appearance fee',now);headline(s,good?`${s.name} charmed viewers on PCTV 📺`:`${s.name}'s awkward PCTV interview goes viral 😬`,now);log(s,good?`📺 The interview went great! +${delta} fame.`:`📺 That interview did not go well. ${delta} fame.`,now);}
   }
   const used=r.item&&ITEMS[r.item]?.use;if(used?.fitness&&share>=.5)s.fitness=Math.min(FITNESS.max,(s.fitness||0)+FITNESS.perWorkout*used.fitness);
   const train=used?.learn;if(train&&(train.family==='*'||CAREERS[s.career].family===train.family||CAREERS[s.career].family===used.learnAlso)&&share>=.5)learn(s,s.career,CAREERS[s.career].focus,Math.round(train.points*share),`item:${r.id}`);
   log(s,share>=1?`${r.label} completed.`:`${r.label}: stopped early, +${Math.round(amount*share)} ${r.need}.`,now);
+}
+// How finishing something feels: rested, fresh, well fed, inspired, or flirty after a date.
+function recoveryMood(s,r,share,now){
+  if(share<.5)return;const act=r.act&&VENUE_ACTS[r.act],item=r.item&&ITEMS[r.item]?.use;
+  if(r.dateWith){const rel=relOf(s,r.dateWith);rel.r=clamp(rel.r+8,0,100);rel.f=clamp(rel.f+4,-100,100);rel.n=(rel.n||0)+1;log(s,`🌹 Your date with ${r.date} went well: +8 romance, +4 friendship.`,now);}
+  if(r.date){feel(s,'flirty',now);feel(s,'happy',now);return;}
+  if(item?.learn||r.watch?.given||r.act==='hackathon')feel(s,'inspired',now);
+  else if((r.need==='energy'&&share>=1&&!r.act)||r.item==='coffeeMachine'||(r.need==='hygiene'&&!act)||act?.fitness||item?.fitness)feel(s,'energised',now);
+  else if((r.food&&FOODS[r.food]?.hunger>=45)||(act&&(act.extra?.social>=10||act.need==='social'))||r.yacht||r.music)feel(s,'happy',now);
 }
 // Insights land while you watch: due = 1 at 10s, +1 every 30s after, capped at WATCH_MAX.
 export function watchInsights(s,r,now){
@@ -288,8 +397,10 @@ function chance(s,a,choice,scene){
   const difficulty=clamp(scene.difficulty+({safe:-2,balanced:0,risky:2}[choice.risk]),1,10);
   // Tired legs late in a match cost a little accuracy.
   const legs=fitnessMeter(a.career)?1-Math.max(0,60-(a.stability??100))/300:1;
-  if(choice.action==='shoot')return {level,difficulty,probability:legs*(1-.15*scene.pressure)*shootingProbability(level,scene.distance,scene.pressure,fatigue,scene.angle)*(1-keeperSave(scene.goalkeeper))};
-  let p=clamp(generalProbability(level,difficulty,scene.pressure,fatigue)+(perksFor(s).success||0)/100,.1,.95)*legs;
+  // Moodlets nudge the odds a little: inspired or confident helps, embarrassed or tense hurts.
+  const mood=moodOf(s,s.lastSeen).success/100;
+  if(choice.action==='shoot')return {level,difficulty,probability:clamp(legs*(1-.15*scene.pressure)*shootingProbability(level,scene.distance,scene.pressure,fatigue,scene.angle)*(1-keeperSave(scene.goalkeeper))*(1+mood),.02,.95)};
+  let p=clamp(generalProbability(level,difficulty,scene.pressure,fatigue)+(perksFor(s).success||0)/100+mood,.1,.95)*legs;
   if(a.booked&&scene.defensive)p*=.85;
   if(choice.action==='pin'&&a.opponentStamina>40)p=Math.max(.05,p*.35);
   return {level,difficulty,probability:p};
@@ -361,6 +472,7 @@ function settle(s,a,now) {
     const t=a.tennis,g=i=>t.games[i]+t.history.reduce((x,h)=>x+h[i],0);
     win=t.winner!=null?(t.winner===0?'Win':'Loss'):t.sets[0]!==t.sets[1]?(t.sets[0]>t.sets[1]?'Win':'Loss'):g(0)>=g(1)?'Win':'Loss';a.playerScore=a.tennis.sets[0];a.opponentScore=a.tennis.sets[1];
   }
+  if(win==='Win'||quality>=70)feel(s,'confident',now);else if(win==='Loss'||quality<35)feel(s,'tense',now);if(quality>=80&&!sport(a.career))feel(s,'inspired',now);
   const qualifies=!['trial','build'].includes(a.kind);
   let gain=qualifies?Math.floor(B.reaches[a.tier]*quality/100*(win==='Win'?1.25:1)):0;
   const contract=c.affiliation;
@@ -392,8 +504,8 @@ function moveHome(s,home,now){
   if(kept.length<s.furniture.length)log(s,`📦 ${s.furniture.length-kept.length} piece${s.furniture.length-kept.length>1?'s':''} of furniture went into storage: your new place has no room for them.`,now);
   s.furniture=kept;if(s.location==='home'&&!walkable('home',s.position3d?.x,s.position3d?.z,s.furniture,home))s.position3d={x:0,z:1};
 }
-export function act(s,input,now,rng=Math.random) {
-  reconcile(s,now);
+export function act(s,input,now,rng=Math.random,opts={}) {
+  reconcile(s,now,opts);
   if(s.trip)requireRule(!['travel','move','start','recover','buy','claim','place','upgrade','switch'].includes(input.type),`You're on the road to ${LOCATIONS[s.trip.to].name}. Hang tight until you arrive.`);
   switch(input.type) {
     case 'travel':
@@ -401,9 +513,10 @@ export function act(s,input,now,rng=Math.random) {
       if(input.location!==s.location&&!s.visiting&&LOT(input.location)!==LOT(s.location)){
         // How you travel: by default the fastest way you have (best), or your own ride, walking, or public transport.
         const pref=input.mode||s.travelMode||'best',mode=pref==='best'?bestMode(s,now):pref==='own'?(s.ride||'walk'):pref;
-        if(TRANSIT[mode]){requireRule(mode!=='taxi'||(s.phone&&s.phone!=='basic'),'Ride-hailing needs a smartphone. Upgrade your phone.');requireRule((s.money||0)>=MONEY.fares[mode],`The ${TRANSIT[mode].name.toLowerCase()} fare is ${naira(MONEY.fares[mode])} and you have ${naira(s.money||0)}. Walk, or earn some money first.`);spend(s,MONEY.fares[mode],`${TRANSIT[mode].name} fare`,now);}
+        const fare=TRANSIT[mode]?MONEY.fares[mode]:0;
+        if(TRANSIT[mode]){requireRule(mode!=='taxi'||(s.phone&&s.phone!=='basic'),'Ride-hailing needs a smartphone. Upgrade your phone.');requireRule((s.money||0)>=fare,`The ${TRANSIT[mode].name.toLowerCase()} fare is ${naira(fare)} and you have ${naira(s.money||0)}. Walk, or earn some money first.`);spend(s,fare,`${TRANSIT[mode].name} fare`,now);}
         let ms=Math.round(tripMs(s.location,input.location,mode)*(1-(mode===s.ride?TUNING[(s.tune?.[mode]||0)-1]?.cut||0:0)/100));
-        const rain=weatherAt(now)==='rain'&&!NO_RAIN.includes(mode),jam=!NO_JAM.includes(mode)&&goSlowAt(now);if(rain)ms=Math.round(ms*1.2);if(jam)ms=Math.round(ms*1.4);s.trip={from:s.location,to:input.location,ride:mode==='walk'?null:mode,departs:now,arrives:now+ms,delays:[...(rain?['rain']:[]),...(jam?['go-slow']:[])]};log(s,`${mode==='walk'?'Walking':TRANSIT[mode]?`Taking ${/^[aeiou]/i.test(TRANSIT[mode].name)?'an':'a'} ${TRANSIT[mode].name.toLowerCase()}`:mode==='helicopter'?'Flying':mode==='bicycle'?'Cycling':'Driving'} to ${LOCATIONS[input.location].name} · ${Math.ceil(ms/60000)} min.${jam?' Go-slow on the road!':''}${rain?' Flooded streets slow you down.':''}`,now);break;}
+        const rain=weatherAt(now)==='rain'&&!NO_RAIN.includes(mode),jam=!NO_JAM.includes(mode)&&goSlowAt(now);if(rain)ms=Math.round(ms*1.2);if(jam)ms=Math.round(ms*1.4);s.trip={from:s.location,to:input.location,ride:mode==='walk'?null:mode,departs:now,arrives:now+ms,delays:[...(rain?['rain']:[]),...(jam?['go-slow']:[])]};log(s,`${mode==='walk'?'Walking':TRANSIT[mode]?`Taking ${/^[aeiou]/i.test(TRANSIT[mode].name)?'an':'a'} ${TRANSIT[mode].name.toLowerCase()}`:mode==='helicopter'?'Flying':mode==='bicycle'?'Cycling':'Driving'} to ${LOCATIONS[input.location].name} · ${ms<60_000?`${Math.max(1,Math.round(ms/1000))}s`:`${Math.round(ms/60000)} min`} · ${fare?`${naira(fare)} fare`:'free'}.${jam?' Go-slow on the road!':''}${rain?' Flooded streets slow you down.':''}`,now);break;}
       s.location=input.location;s.position3d=arrivalSpot(input.location);break;
     case 'move':
       requireRule(walkable(s.location,input.x,input.z,s.visiting?[]:s.furniture,s.visiting?'mansion':s.home),'That destination is blocked. Choose open ground.');
@@ -485,7 +598,7 @@ export function act(s,input,now,rng=Math.random) {
       const family=CAREERS[s.career].family,watching=input.watch&&input.need==='fun'&&s.location==='home';
       const watch=watching?{learn:s.watchLearnAt==null||now-s.watchLearnAt>=WATCH_COOLDOWN,given:0,seed:Math.floor(Math.random()*12)}:null;
       // A dish from the kitchen menu: its own amount, time and side effects.
-      requireRule(!(watching&&noPower(s,now)),'NEPA took light. The TV is off until power comes back.');
+      requireRule(!(watching&&noPower(s,now)),`${powerText(s)} The TV is off until power comes back.`);
       const food=input.need==='hunger'&&input.food!=null?FOODS[input.food]:null;
       if(input.food!=null){requireRule(food,'That dish is not on the menu.');requireRule(s.location==='home'||food.takeaway,'Cook at home.');requireRule((s.fame||0)>=(food.fame||0),`${food.name} unlocks at ${(food.fame||0).toLocaleString('en-US')} fame.`);}
       let bonus=0;
@@ -571,14 +684,14 @@ export function act(s,input,now,rng=Math.random) {
     // Beef with your rival: a diss track that can win or lose fame.
     case 'retire': {
       requireRule(CAREERS[input.career]&&input.career!==s.career,'Choose the next career.');requireRule(!s.active&&!s.recovery&&!s.trip,'Finish what you are doing first.');requireRule(input.career!=='adult'||input.adult===true,'Confirm an adult character.');
-      const old=CAREERS[s.career],gain=Math.max(50,Math.round((s.fame||0)*.02));addFame(s,gain,'Farewell event',now);s.awards.push({id:id(),name:`${old.name} legacy`,career:s.career,at:now});
+      const old=CAREERS[s.career],gain=Math.max(50,Math.round((s.fame||0)*.02));addFame(s,gain,'Farewell event',now);grantAward(s,`${old.name} legacy`,s.career,now);
       headline(s,`${s.name} retires from ${old.name.toLowerCase()} life with a farewell show 👋`,now);log(s,`👋 Farewell event: +${gain} fame. A new chapter begins.`,now);
       s.careers[s.career].retired=now;if(!s.careers[input.career])s.careers[input.career]=newCareer(input.career,0);s.career=input.career;break;
     }
     case 'beef': {
       requireRule(s.beefAt==null||now-s.beefAt>=RIVAL.cooldownMs,'Let it cool down before the next diss track.');requireRule(!s.trip,'Wait until you arrive.');s.beefAt=now;
       const level=s.careers[s.career].skills[CAREERS[s.career].focus].level,win=Math.random()<Math.min(.85,.3+level*.07);
-      const delta=win?Math.max(30,Math.round((s.fame||0)*.015)):-Math.max(15,Math.round((s.fame||0)*.0075));addFame(s,delta,win?'Won a beef':'Lost a beef',now);
+      const delta=win?Math.max(30,Math.round((s.fame||0)*.015)):-Math.max(15,Math.round((s.fame||0)*.0075));addFame(s,delta,win?'Won a beef':'Lost a beef',now);feel(s,win?'confident':'embarrassed',now);
       headline(s,win?`${s.name} wins the beef with ${RIVAL.name} 🔥`:`${RIVAL.name} wins round one against ${s.name} 🥊`,now);log(s,win?`🔥 Your diss track landed. +${delta} fame.`:`🥊 ${RIVAL.name} clapped back harder. ${delta} fame.`,now);break;
     }
     case 'hire': {const who=TEAM[input.who];requireRule(who,'Unknown role.');requireRule(!s.team?.[input.who],`You already have a ${who.name.toLowerCase()}.`);requireRule((s.fame||0)>=who.fame,`A ${who.name.toLowerCase()} works with players who have ${who.fame.toLocaleString('en-US')} fame.`);spend(s,MONEY.hire[input.who]||0,`Signed a ${who.name.toLowerCase()}`,now);s.team={...(s.team||{}),[input.who]:{since:now}};if(input.who==='manager')s.nextGigAt=now+60_000;log(s,`${who.icon} Hired a ${who.name.toLowerCase()}.`,now);break;}
@@ -604,7 +717,11 @@ export function act(s,input,now,rng=Math.random) {
     }
     case 'unfriend': {s.friends=s.friends.filter(p=>p!==input.playerId);break;}
     case 'listenMusic': {requireRule(!s.active&&!s.recovery,'Finish your activity first.');requireRule(!s.trip,'Listen when you arrive.');s.recovery={id:id(),need:'fun',label:`Listening to ${text(input.song,40)||'music'}`,startedAt:now,endsAt:now+30_000,amount:15,music:true};break;}
-    case 'goOnDate': {requireRule(s.dating?.open,'Turn on dating first.');requireRule(!s.active&&!s.recovery&&!s.trip,'Finish what you are doing first.');const who=text(input.name,30)||'your match';s.recovery={id:id(),need:'social',label:`On a date with ${who}`,startedAt:now,endsAt:now+90_000,amount:40,extra:{fun:15},date:who};log(s,`💘 Went on a date with ${who}.`,now);break;}
+    case 'goOnDate': {
+      if(input.npc){requireRule(!s.active&&!s.recovery&&!s.trip,'Finish what you are doing first.');const npc=NPCS.find(n=>'npc:'+n.id===input.npc);requireRule(npc,'Choose who to ask out.');const rel=relOf(s,input.npc);
+        requireRule(rel.r>=30||s.partner?.id===input.npc||s.spouse?.id===input.npc,`${npc.name} isn’t keen yet: build romance to 30 first (now ${Math.round(rel.r)}).`);
+        s.recovery={id:id(),need:'social',label:`On a date with ${npc.name}`,startedAt:now,endsAt:now+90_000,amount:40,extra:{fun:15},date:npc.name,dateWith:input.npc};log(s,`🌹 Went on a date with ${npc.name}.`,now);break;}
+      requireRule(s.dating?.open,'Turn on dating first.');requireRule(!s.active&&!s.recovery&&!s.trip,'Finish what you are doing first.');const who=text(input.name,30)||'your match';s.recovery={id:id(),need:'social',label:`On a date with ${who}`,startedAt:now,endsAt:now+90_000,amount:40,extra:{fun:15},date:who};log(s,`💘 Went on a date with ${who}.`,now);break;}
     case 'datingOpen': {s.dating??={likes:[]};s.dating.open=!!input.open;break;}
     case 'datingLike': {requireRule(s.dating?.open,'Turn on dating first.');requireRule(input.playerId,'Choose someone.');if(!s.dating.likes.includes(input.playerId))s.dating.likes.push(input.playerId);break;}
     case 'takeOff': {requireRule(s.wear?.[input.slot],'Nothing to take off there.');delete s.wear[input.slot];break;}
@@ -616,7 +733,7 @@ export function act(s,input,now,rng=Math.random) {
       else if(def.extension){requireRule(s.inventory[input.item],'Claim it first.');requireRule(s.location==='home'&&!s.visiting,'Your extensions are at home.');}
       else{requireRule(s.location==='home'&&!s.visiting,'Use your items at home.');
       requireRule(s.inventory[input.item]&&s.furniture.some(f=>f.item===input.item&&(!input.id||f.id===input.id)),'Place that item at home first.');}
-      requireRule(!(POWERED.includes(input.item)&&noPower(s,now)),'NEPA took light. Wait for power, or get a generator.');
+      requireRule(!(POWERED.includes(input.item)&&noPower(s,now)),s.unpaid>0?powerText(s):'NEPA took light. Wait for power, or get a generator.');
       s.recovery={id:id(),need:use.need,label:use.verb,startedAt:now,endsAt:now+use.ms,amount:use.amount,extra:use.extra||{},item:input.item,...(input.id&&!def.gadget&&!def.extension?{piece:input.id}:{})};break;
     }
     case 'buy': {
@@ -652,13 +769,17 @@ export function act(s,input,now,rng=Math.random) {
       requireRule(s.location==='plaza','Visit Naija Motors at Abeokuta plaza to claim sponsorships.');
       s.vip??={};requireRule(!s.vip[input.item],'You already claimed this sponsorship.');
       requireRule((s.fame||0)>=deal.fame,`${deal.sponsor} sponsors players with ${deal.fame.toLocaleString('en-US')} fame.`);
-      s.vip[input.item]={at:now};if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')moveHome(s,input.item,now);else if(deal.kind==='style')s.equipped.clothes=input.item;
-      log(s,`${deal.sponsor} sponsorship claimed: ${deal.name}. Free, and yours to keep.`,now);break;
+      const price=sponsorPrice(input.item);spend(s,price,deal.name,now);
+      s.vip[input.item]={at:now,...(price?{paid:price}:{})};if(deal.kind==='ride')s.ride=input.item;else if(deal.kind==='home')moveHome(s,input.item,now);else if(deal.kind==='style')s.equipped.clothes=input.item;
+      if(deal.kind==='home')feel(s,'happy',now);log(s,price?`${deal.icon} ${deal.name} is yours: ${naira(price)} at the ${deal.sponsor} sponsor price.`:`${deal.sponsor} sponsorship claimed: ${deal.name}. Free, and yours to keep.`,now);break;
     }
     case 'talk': {
       const npc=NPCS.find(n=>n.id===input.npc);requireRule(npc&&npc.location===s.location,'That person isn’t here.');
       s.talks??={};requireRule(!s.talks[npc.id]||now-s.talks[npc.id]>=NPC_TALK.cooldownMs,`${npc.name} needs a moment. Try again shortly.`);
-      const gain=NPC_TALK.social+(perksFor(s).chat||0);s.talks[npc.id]=now;s.needs.social=clamp(s.needs.social+gain);const pool=npc.lines?[...npc.lines,...NPC_TALK.lines.slice(0,2)]:NPC_TALK.lines,line=pool[Math.floor(Math.random()*pool.length)];
+      const gain=NPC_TALK.social+(perksFor(s).chat||0);s.talks[npc.id]=now;s.needs.social=clamp(s.needs.social+gain);
+      // They remember you: friendship grows a little with each visit, and old friends greet you by name.
+      const rel=relOf(s,'npc:'+npc.id);rel.f=clamp(rel.f+3,-100,100);rel.n=(rel.n||0)+1;rel.last=now;rel.name=npc.name;const greet=rel.n>=2&&REL_GREETINGS[relTier(rel)];
+      const pool=npc.lines?[...npc.lines,...NPC_TALK.lines.slice(0,2)]:NPC_TALK.lines,line=greet?greet[Math.floor(Math.random()*greet.length)].replace('{name}',s.name.split(' ')[0]):pool[Math.floor(Math.random()*pool.length)];
       s.lastTalk={npc:npc.id,line,at:now};log(s,`${npc.name}: “${line}” (+${gain} social)`,now);break;
     }
     case 'phoneUpgrade': {
@@ -673,16 +794,47 @@ export function act(s,input,now,rng=Math.random) {
     case 'gymGrab': {
       // Taking a machine someone is using: they tell everyone, and your reputation takes a small hit.
       requireRule(s.location==='gym'&&!s.trip,'Only at the gym.');const loss=Math.max(5,Math.round((s.fame||0)*.002));
-      addFame(s,-loss,'Rude at the gym',now);s.needs.social=clamp(s.needs.social-5);log(s,`😠 You took a machine someone was using. Word got around: −${loss.toLocaleString('en-US')} fame.`,now);break;
+      addFame(s,-loss,'Rude at the gym',now);feel(s,'tense',now);s.needs.social=clamp(s.needs.social-5);log(s,`😠 You took a machine someone was using. Word got around: −${loss.toLocaleString('en-US')} fame.`,now);break;
     }
     case 'chatRegular': {
       // Socialise with someone at a venue: how they feel about you depends on your fame.
       const [place,index]=String(input.npc||'').split(':');requireRule(place===s.location&&s.location!=='home'&&/^\d+$/.test(index||''),'Walk over to them first.');
       requireRule(!s.trip,'Wait until you arrive.');requireRule(!s.active&&!s.recovery,'Finish what you are doing first.');
-      const {kind,line}=npcOpinion(input.npc,s.fame||0,Math.floor(now/86_400_000)),o=OPINIONS[kind];s.npcChats??={};
-      if(now-(s.npcChats[input.npc]??-Infinity)>=600_000){s.needs.social=clamp(s.needs.social+o.social);s.needs.fun=clamp(s.needs.fun+o.fun);s.npcChats[input.npc]=now;}
+      const rel=relOf(s,'reg:'+input.npc),first=npcOpinion(input.npc,s.fame||0,Math.floor(now/86_400_000));
+      // Regulars remember how you treat them: a friend loves seeing you, someone you insulted does not.
+      const kind=rel.f>=30?'love':rel.f<=-30?'hate':first.kind,line=kind===first.kind?first.line:OPINIONS[kind].lines[Math.floor(Math.random()*OPINIONS[kind].lines.length)],o=OPINIONS[kind];s.npcChats??={};
+      if(now-(s.npcChats[input.npc]??-Infinity)>=600_000){s.needs.social=clamp(s.needs.social+o.social);s.needs.fun=clamp(s.needs.fun+o.fun);s.npcChats[input.npc]=now;rel.f=clamp(rel.f+2,-100,100);rel.n=(rel.n||0)+1;rel.last=now;rel.name=npcName(...input.npc.split(':').map((v,i)=>i?Number(v):v));}
       for(const [k,at] of Object.entries(s.npcChats))if(now-at>86_400_000)delete s.npcChats[k];
       s.lastChat={npc:input.npc,kind,line,at:now};break;
+    }
+    case 'socialize':requireRule(/^(npc|reg):/.test(String(input.target||'')),'That person isn’t here.');socialInteract(s,input,now,rng);break;
+    case 'breakUp': {requireRule(s.partner,'You are not seeing anyone.');const rel=relOf(s,s.partner.id);rel.r=clamp(rel.r-30,0,100);rel.f=clamp(rel.f-10,-100,100);log(s,`💔 You and ${s.partner.name} broke up.`,now);s.partner=null;feel(s,'sad',now);break;}
+    // Build mode lite: turn a piece a quarter turn, sell things back, and paint your walls and floors.
+    case 'rotate': {
+      requireRule(s.location==='home'&&!s.visiting,'Arrange your room at home.');const piece=s.furniture.find(f=>f.id===input.id);requireRule(piece,'That piece is not in your home.');
+      requireRule(s.recovery?.piece!==piece.id,'Finish using it first.');piece.rot=((piece.rot||0)+1)%4;break;
+    }
+    case 'sell': {
+      const key=input.item,def=ITEMS[key],own=s.inventory[key];requireRule(def&&own,'You don’t own that.');requireRule(!s.trip,'Wait until you arrive.');
+      requireRule(s.recovery?.item!==key,'Finish using it first.');requireRule(!own.upgrade,'Wait for the upgrade to finish.');
+      const value=Math.round(priceOf(key)*MONEY.sellBack/50)*50;
+      if(def.furniture){const count=own.count||1,placed=s.furniture.filter(f=>f.item===key);let piece=input.id?placed.find(f=>f.id===input.id):null;
+        if(input.id)requireRule(piece,'That piece is not in your home.');if(!piece&&placed.length>=count)piece=placed.at(-1);
+        if(piece){requireRule(s.location==='home'&&!s.visiting,'Go home to sell furniture that is placed.');s.furniture=s.furniture.filter(f=>f!==piece);}
+        if(count>1)own.count=count-1;else delete s.inventory[key];}
+      else{delete s.inventory[key];for(const [slot,item] of Object.entries(s.equipped||{}))if(item===key)delete s.equipped[slot];}
+      addMoney(s,value,`Sold: ${def.name}`,now);log(s,`💸 Sold ${def.name} for ${naira(value)}.`,now);break;
+    }
+    case 'paint': {
+      requireRule(s.location==='home'&&!s.visiting,'Paint at home.');const wall=PAINTS.walls[input.wall],floor=PAINTS.floors[input.floor];requireRule(wall&&floor,'Choose a wall and a floor colour.');
+      spend(s,MONEY.paint,'Paint & decorating',now);s.homeStyle={wall,floor};feel(s,'happy',now);log(s,`🎨 Fresh paint at home for ${naira(MONEY.paint)}.`,now);break;
+    }
+    case 'payBills': {requireRule(s.unpaid>0,'You have no unpaid bills.');spend(s,s.unpaid,'Overdue bills',now);log(s,`🧾 Bills cleared: ${naira(s.unpaid)}. The power is back on.`,now);s.unpaid=0;break;}
+    // Life goals and personality: pick an aspiration any time; older characters pick their two traits once.
+    case 'pickAspiration': {requireRule(ASPIRATIONS[input.key],'Choose a life goal.');s.aspirationClaimed??={};s.aspiration={key:input.key,stage:0,since:now};log(s,`${ASPIRATIONS[input.key].icon} New life goal: ${ASPIRATIONS[input.key].name}.`,now);checkAspiration(s,now);break;}
+    case 'pickTraits': {
+      requireRule(!(s.traits||[]).length,'Your personality is already set.');const traits=[...new Set(Array.isArray(input.traits)?input.traits:[])].filter(t=>TRAITS[t]);
+      requireRule(traits.length===TRAIT_COUNT,`Pick ${TRAIT_COUNT} traits.`);s.traits=traits;log(s,`✨ Personality: ${traits.map(t=>TRAITS[t].name).join(' and ')}.`,now);break;
     }
     case 'switch':requireRule(CAREERS[input.career]&&!s.active&&!s.recovery,'Finish your activity and choose a valid career.');requireRule(input.career!=='adult'||input.adult===true,'Confirm an adult character.');if(!s.careers[input.career])s.careers[input.career]=newCareer(input.career,0);s.career=input.career;break;
     case 'acceptOffer': {
@@ -703,7 +855,7 @@ const QUEST_CHECKS={
   practise:i=>i.type==='start'&&i.kind==='practice',
   post:i=>i.type==='post',
   travel:i=>i.type==='travel'&&i.location!=='home',
-  talk:i=>i.type==='talk'||i.type==='chatRegular',
+  talk:i=>['talk','chatRegular','socialize'].includes(i.type),
   work:i=>(i.type==='start'&&i.kind!=='practice')||(i.type==='venueAct'&&VENUE_ACTS[i.act]?.venue!=='gym'),
   gym:(i,s)=>(i.type==='venueAct'&&VENUE_ACTS[i.act]?.venue==='gym')||(i.type==='gymGrab')||(s.location==='gym'&&i.type==='recover'),
   shop:i=>i.type==='buy'||i.type==='order',
@@ -718,5 +870,8 @@ export function questProgress(s,input,now){
   for(const quest of QUESTS){if(q.done.includes(quest.key)||!QUEST_CHECKS[quest.key]?.(input,s))continue;
     q.done.push(quest.key);addFame(s,quest.reward,`Quest: ${quest.title}`,now);log(s,`✅ Quest complete: ${quest.title} (+${quest.reward} fame)`,now);fresh=quest.key;}
   if(fresh)q.last={key:fresh,at:now};
-  if(!q.graduated&&QUESTS.every(quest=>q.done.includes(quest.key))){q.graduated=now;addFame(s,QUEST_GRADUATION.fame,'Starter quests complete',now);addMoney(s,MONEY.graduation,'Starter quests bonus',now);s.awards.push({id:id(),name:QUEST_GRADUATION.name,career:s.career,at:now});log(s,`🎓 All starter quests done: ${QUEST_GRADUATION.name} (+${QUEST_GRADUATION.fame} fame, +${naira(MONEY.graduation)})`,now);}
+  // Wants: a matching action fulfils it, pays a little and lifts your mood; a new one takes its place.
+  for(const w of [...(s.wants||[])])if(w.until>now&&WANTS[w.key]?.check(input,s)){const def=WANTS[w.key];s.wants=s.wants.filter(x=>x!==w);addFame(s,WANT.fame,`Want: ${def.title}`,now);addMoney(s,WANT.money,`Want: ${def.title}`,now);feel(s,'happy',now);s.wantDone={id:w.id,key:w.key,at:now};log(s,`${def.icon} Want fulfilled: ${def.title} (+${WANT.fame} fame, +${naira(WANT.money)})`,now);}
+  if(s.wants)refreshWants(s,now);checkAspiration(s,now);
+  if(!q.graduated&&QUESTS.every(quest=>q.done.includes(quest.key))){q.graduated=now;addFame(s,QUEST_GRADUATION.fame,'Starter quests complete',now);addMoney(s,MONEY.graduation,'Starter quests bonus',now);grantAward(s,QUEST_GRADUATION.name,s.career,now);log(s,`🎓 All starter quests done: ${QUEST_GRADUATION.name} (+${QUEST_GRADUATION.fame} fame, +${naira(MONEY.graduation)})`,now);}
 }

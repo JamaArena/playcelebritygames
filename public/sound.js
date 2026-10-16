@@ -126,3 +126,44 @@ export function setSound(key, on) {
 // Start on the first tap or key press (browsers block sound before that).
 const wake = () => { if (!audio()) return; if (prefs.music) startMusic(); removeEventListener('pointerdown', wake); removeEventListener('keydown', wake); };
 addEventListener('pointerdown', wake); addEventListener('keydown', wake);
+
+// ---------- Activity sounds and ambience beds (synthesised; they follow the "Voices & effects" switch) ----------
+// A burst of filtered noise: the building block for crunches, water, flushes and crowds.
+function whoosh(t, len, { type = 'bandpass', freq = 1200, q = 1, gain = .3, attack = .01, bus = sfxBus } = {}) {
+  const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = noise; s.loop = true;
+  f.type = type; f.frequency.value = freq; f.Q.value = q;
+  g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(gain, t + attack); g.gain.exponentialRampToValueAtTime(.001, t + len);
+  s.connect(f).connect(g).connect(bus); s.start(t); s.stop(t + len + .05); return f;
+}
+export function sfx(kind) {
+  if (!prefs.voices || !audio()) return;
+  const t = ctx.currentTime + .02;
+  if (kind === 'eat') for (let i = 0; i < 6; i++) whoosh(t + i * .32 + Math.random() * .05, .07, { freq: 2600 + Math.random() * 1400, q: 2, gain: .35 });
+  else if (kind === 'shower') { const f = whoosh(t, 2.6, { type: 'highpass', freq: 3500, gain: .16, attack: .3 }); f.frequency.linearRampToValueAtTime(4200, t + 2.4); }
+  else if (kind === 'flush') { const f = whoosh(t, 1.6, { type: 'lowpass', freq: 900, q: 3, gain: .4, attack: .05 }); f.frequency.exponentialRampToValueAtTime(220, t + 1.5); }
+  else if (kind === 'kick') { const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(50, t + .1); g.gain.setValueAtTime(.9, t); g.gain.exponentialRampToValueAtTime(.001, t + .15); o.connect(g).connect(sfxBus); o.start(t); o.stop(t + .2); }
+  // A stadium roar: a wide band of noise that swells, holds and fades, with a cheer on top.
+  else if (kind === 'roar') { const f = whoosh(t, 3.2, { freq: 700, q: .5, gain: .5, attack: .45 }); f.frequency.linearRampToValueAtTime(1300, t + 1); whoosh(t + .2, 2.4, { freq: 2200, q: 1.5, gain: .18, attack: .3 }); }
+  // Applause: many tiny claps scattered over a couple of seconds.
+  else if (kind === 'applause') for (let i = 0; i < 70; i++) whoosh(t + Math.random() * 2.4 * Math.sqrt(Math.random()), .05, { freq: 1500 + Math.random() * 2500, q: 1.2, gain: .12 + Math.random() * .12, attack: .003 });
+}
+// Ambience beds: rain on the roof and city traffic, looping quietly while they fit the moment.
+const beds = {};
+export function setBeds(want) {
+  if (!ctx) return; // only after the first tap has woken the audio
+  if (!prefs.voices) want = {};
+  for (const kind of ['rain', 'traffic']) {
+    const on = !!want[kind];
+    if (on && !beds[kind]) {
+      const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain(); s.buffer = noise; s.loop = true;
+      f.type = kind === 'rain' ? 'highpass' : 'lowpass'; f.frequency.value = kind === 'rain' ? 2500 : 300;
+      g.gain.value = 0; g.gain.setTargetAtTime(kind === 'rain' ? .05 : .07, ctx.currentTime, 1);
+      s.connect(f).connect(g).connect(sfxBus); s.start();
+      // Traffic: a car horn now and then.
+      const honk = kind === 'traffic' ? setInterval(() => { if (Math.random() < .35) { const t = ctx.currentTime; blip(t, 440, .18, 'square', .05, sfxBus); blip(t + .22, 440, .25, 'square', .05, sfxBus); } }, 5000) : null;
+      beds[kind] = { s, g, honk };
+    } else if (!on && beds[kind]) {
+      const b = beds[kind]; delete beds[kind]; clearInterval(b.honk); b.g.gain.setTargetAtTime(0, ctx.currentTime, .5); setTimeout(() => { try { b.s.stop(); } catch {} }, 2500);
+    }
+  }
+}

@@ -3,8 +3,8 @@ import { World, worldObjects, ANTHEM_MS } from './world.js';
 import { replayScript } from './matchPlay.js';
 import { World3D, Figure } from './world3d.js';
 import * as T from './vendor/three.min.js';
-import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS } from './sound.js';
-import { OPINIONS, npcOpinion, npcName, npcAt, QUESTS, QUEST_GRADUATION, ARENA, MONEY, naira, priceOf, wearPrice, upgradePrice, jobPay } from './content.js';
+import { babble, express, voiceFor, chime, setMood, soundPrefs, setSound, EMOTE_SOUNDS, sfx, setBeds } from './sound.js';
+import { OPINIONS, npcOpinion, npcName, npcAt, QUESTS, QUEST_GRADUATION, ARENA, MONEY, naira, priceOf, wearPrice, upgradePrice, jobPay, MOODLETS, moodOf, INTERACTIONS, SOCIAL_CATS, socialOdds, relTier, romanceTier, TRAITS, TRAIT_COUNT, STARTER_OUTFITS, ASPIRATIONS, ASPIRATION_REWARDS, WANTS, WANT, billFor, BILLS, PAINTS, sponsorPrice } from './content.js';
 import { CLASH_ACTIONS } from './clashText.js';
 import { skillName, learnLine, METERS, UNITS, tierTitle } from './careerText.js';
 const $=selector=>document.querySelector(selector);
@@ -28,7 +28,7 @@ function phoneStatus(model){const time=new Date();if(model.key!=='basic')return 
 function phoneFrame(body){const model=phoneModel();return `<div class="phone-device skin-${model.key}${model.key==='basic'?'':' ios'}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen phone-app-screen">${phoneStatus(model)}<div class="phone-app">${body}</div><button class="phone-homebar" data-action="backToPhone" aria-label="Back to the home screen"></button></div></div>`;}
 // Phone app kit: a sticky header (round back chevron + app name), avatars, list rows, segmented tabs.
 const CHEVRON='<svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M15 4.5 7.5 12l7.5 7.5" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-const PAGE_TITLES={prepare:'Career',wallet:'Wallet',phone:'Social',thread:'Messages',chat:'Messages',shop:'Market',inventory:'My stuff',vip:'Naija Motors',phones:'Upgrade',tips:'Tips',life:'My life',estate:'Maitama Realty',barber:'Barber & Salon',tattoo:'Tattoos',tailor:'Tailor',gift:'Send a gift',upgrade:'Upgrade',retire:'Retirement',battle:'Fame Clash',battles:'Battles',graphicsOffer:'Graphics'};
+const PAGE_TITLES={goals:'Goals',paint:'Paint',prepare:'Career',wallet:'Wallet',phone:'Social',thread:'Messages',chat:'Messages',shop:'Market',inventory:'My stuff',vip:'Naija Motors',phones:'Upgrade',tips:'Tips',life:'My life',estate:'Maitama Realty',barber:'Barber & Salon',tattoo:'Tattoos',tailor:'Tailor',gift:'Send a gift',upgrade:'Upgrade',retire:'Retirement',battle:'Fame Clash',battles:'Battles',graphicsOffer:'Graphics'};
 const appHead=(title,slot='',back='data-action="backToPhone" aria-label="Back to the home screen"')=>`<header class="app-head"><button class="app-back" ${back}>${CHEVRON}</button><h2>${title}</h2><span class="app-head-slot">${slot}</span></header>`;
 // Hair for a head centred at (x,y) with radius r: [behind the head, over the head].
 function hairSvg(style,x,y,r,c){
@@ -115,7 +115,8 @@ function celebrate(a,b){
 const notices=[];
 function showNotice(icon,title,text,delta){notices.push({icon,title,text,delta});if(notices.length===1)nextNotice();}
 function nextNotice(){
-  const n=notices[0];let el=$('#notice');if(!n){if(el)el.hidden=true;return;}
+  // Pop-ups queue while a match, a work decision, a Fame Clash or a question is open; they show once you are done.
+  const n=notices[0];let el=$('#notice');if(!n||holdPopups(state)){if(el)el.hidden=true;return;}
   if(!el){el=document.createElement('div');el.id='notice';el.className='reward-overlay notice-overlay';document.body.appendChild(el);}
   el.innerHTML=`<div class="notice-card" role="alertdialog" aria-modal="true" aria-labelledby="noticeTitle" aria-describedby="noticeText"><div class="gem gem-${n.delta<0?'pink':'gold'} notice-gem" aria-hidden="true">${n.icon}</div><h2 id="noticeTitle">${escape(n.title)}</h2><p id="noticeText">${escape(n.text)}</p>${n.delta?`<div class="notice-delta ${n.delta>0?'up':'down'}">${n.delta>0?'+':'−'}${fmt(Math.abs(n.delta))} fame</div>`:''}<button class="game-btn" data-action="noticeOkay">Okay</button></div>`;
   el.hidden=false;chime('ding');setTimeout(()=>el.querySelector('button')?.focus(),50);
@@ -146,7 +147,7 @@ function showReward(title,subtitle,rewards){
 }
 function floatReward(text){const el=document.createElement('div');el.className='float-reward';el.textContent=text;document.body.appendChild(el);setTimeout(()=>el.remove(),1900);}
 // Glossy app icons: each app gets its own colour.
-const APP_COLORS={arena:'#c9852b',map:'#2bb3c0',career:'#f0a81c',phone:'#3fa52b',battles:'#e5484d',inventory:'#8a5a3c',wardrobe:'#e5408f',chat:'#2f86f2',friends:'#7b4fe0',feed:'#ff7a45',music:'#d23b8f',wallet:'#c9a227',team:'#3d6a8a',crews:'#f2b33d',news:'#5b6b7a',dating:'#ff4f81',calendar:'#e04f3f',camera:'#3b3f46',shopping:'#1fa37a',shop:'#ef8a1f',vip:'#1d4fa8',profile:'#6a5acd',life:'#e5408f',nearby:'#33a0d6',tips:'#f2c230',upgrade:'#5b7cfa',logout:'#7b897e'};
+const APP_COLORS={goals:'#8b5cf6',arena:'#c9852b',map:'#2bb3c0',career:'#f0a81c',phone:'#3fa52b',battles:'#e5484d',inventory:'#8a5a3c',wardrobe:'#e5408f',chat:'#2f86f2',friends:'#7b4fe0',feed:'#ff7a45',music:'#d23b8f',wallet:'#c9a227',team:'#3d6a8a',crews:'#f2b33d',news:'#5b6b7a',dating:'#ff4f81',calendar:'#e04f3f',camera:'#3b3f46',shopping:'#1fa37a',shop:'#ef8a1f',vip:'#1d4fa8',profile:'#6a5acd',life:'#e5408f',nearby:'#33a0d6',tips:'#f2c230',upgrade:'#5b7cfa',logout:'#7b897e'};
 const ITEM_ICONS={bed:'🛏️',shower:'🚿',toilet:'🚽',chair:'🪑',gear:'🎽',jacket:'🧥',trophyShelf:'🏆',wardrobe:'👗',ankaraRug:'🧶',floorLamp:'💡',laptop:'💻',drone:'🚁',curtains:'🪟',generator:'🔌',sectional:'🛋️',kingBed:'👑',ac:'❄️',smartTv:'📺',wallArt:'🖼️'};
 const itemIcon=key=>ITEMS[key]?.use?.icon||ITEM_ICONS[key]||'🎁';
 function notice(data,own){
@@ -169,7 +170,7 @@ function notice(data,own){
 // Random life moments (a lucky break, a fan gift, a power cut…) show once as a toast and a bubble.
 let seenLifeEvent=null;
 // Pop-ups hold while you are at work (not practice) or in a Fame Clash, and show once you are done.
-const holdPopups=s=>Boolean(s?.active&&s.active.kind!=='practice'||s?.battle);
+const holdPopups=s=>Boolean(s?.active&&s.active.kind!=='practice'||s?.battle||modalPage==='prompt'||modalPage==='battle');
 function showLifeEvent(s){
   const e=s?.lifeEvent,def=e&&LIFE_EVENTS[e.kind];if(!def||seenLifeEvent===e.id||holdPopups(s))return;const first=seenLifeEvent===null;seenLifeEvent=e.id;
   // Remembered across reloads (such as a 2D/3D switch) so the same moment never pops up twice.
@@ -180,7 +181,7 @@ function showLifeEvent(s){
 // Life moments that ask for a choice: a fan's selfie, a journalist's question.
 let seenPrompt=null;
 function showPrompt(s){
-  const p=s?.prompt;if(!p||seenPrompt===p.id||modalPage)return;seenPrompt=p.id;const e=Object.values(LIFE_EVENTS).find(e=>e.prompt===p.kind),def=PROMPTS[p.kind];if(!def)return;
+  const p=s?.prompt;if(!p||seenPrompt===p.id||modalPage||s?.active&&s.active.kind!=='practice')return;seenPrompt=p.id;const e=Object.values(LIFE_EVENTS).find(e=>e.prompt===p.kind),def=PROMPTS[p.kind];if(!def)return;
   showModal('prompt',`<div class="mishap-card"><div class="mishap-icon" aria-hidden="true">${e?.icon||'✨'}</div><h2>${escape(e?.title||'A moment')}</h2><p>${escape(e?.text||'')}</p><p class="event-timer" id="promptTimer"></p><div class="actions">${def.options.map((o,i)=>button(escape(o.label),'answerPrompt',`data-choice="${i}" data-id="${p.id}"`,i?'':'primary')).join('')}</div></div>`,false);
 }
 // A mishap (a need hit rock bottom) pops up once: what happened, what it cost, and how to avoid it.
@@ -192,7 +193,7 @@ function showMishap(s){
   const card=`<div class="mishap-card"><div class="mishap-icon" aria-hidden="true">${def.icon}</div><span class="eyebrow">CAUGHT ON CAMERA</span><h2>${escape(def.title)}!</h2><p>${escape(def.text)}</p><strong class="mishap-fame">−${m.lost.toLocaleString('en-US')} fame</strong><small>Keep your ${escape(m.need)} above ${MISHAP.at}% to avoid moments like this.</small>${button('Ugh, fine','closeMishap','','primary wide')}</div>`;
   if(modalPage){toast(`${def.icon} ${def.title}! −${m.lost.toLocaleString('en-US')} fame.`);world.playMishap(m);}else showModal('mishap',card,false);
 }
-function receive(data,own=false){notice(data,own);const before=state;snapshot=data;state=data.state;if(before&&state&&before.name===state.name)celebrate(before,state);offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();showMishap(state);showLifeEvent(state);showPrompt(state);drawMinimap();
+function receive(data,own=false){notice(data,own);const before=state;snapshot=data;state=data.state;if(before&&state&&before.name===state.name)celebrate(before,state);offset=(data.state?.serverNow||data.serverNow||Date.now())-Date.now();showMishap(state);showLifeEvent(state);showPrompt(state);if(notices.length&&$('#notice')?.hidden!==false)nextNotice();lifeSounds(before,state);drawMinimap();
   if(!$('#loading').hidden){if(state){$('#loadingText')&&($('#loadingText').textContent='Building your world…');requestAnimationFrame(()=>requestAnimationFrame(()=>{$('#loading').hidden=true;}));}else $('#loading').hidden=true;}lastUpdate=Date.now();scheduleHeartbeat();liveFollow?.(); // every update (an action or a refresh) restarts the 45s countdown
   if(!state){if(!data.account){if(modalPage!=='auth')authScreen('signup');}else if(modalPage!=='create')creation(data.account);return;}
   if(!welcomed){welcomed=true;setTimeout(()=>welcome(data),0);}
@@ -218,7 +219,7 @@ function closeTray(){ if(world.previewHome){world.previewHome=null;world.draw();
 // Sims-style pie menu: the object's name in the centre, its interactions fanned around it.
 function pie(object,options){
   // Your own furniture can be moved or put away from its menu.
-  if(object.furniture&&state.location==='home'&&!snapshot.visitedHome&&!state.visiting)options=[...options,['✋ Move','moveItem',`data-item="${object.furniture}" data-id="${object.piece}"`],['📦 Store','storeItem',`data-item="${object.furniture}" data-id="${object.piece}"`]];
+  if(object.furniture&&state.location==='home'&&!snapshot.visitedHome&&!state.visiting)options=[...options,['✋ Move','moveItem',`data-item="${object.furniture}" data-id="${object.piece}"`],['↻ Rotate','rotateItem',`data-id="${object.piece}"`],['📦 Store','storeItem',`data-item="${object.furniture}" data-id="${object.piece}"`],[`💸 Sell <small>${naira(sellValue(object.furniture))}</small>`,'sellItem',`data-item="${object.furniture}" data-id="${object.piece}"`]];
   $('#objectTray').hidden=true;
   const card=$('.world-card'),canvas=$('#world'),p=world.screenOf(object),n=options.length;
   const half=Math.min(170,card.clientWidth/2),x=Math.min(card.clientWidth-half,Math.max(half,canvas.offsetLeft+p.x)),y=Math.min(card.clientHeight-40,Math.max(80+n*44,canvas.offsetTop+p.y));
@@ -234,8 +235,8 @@ const onWorldObject=object=>{
   if(object.placement){send({type:'place',item:object.placement.item,...(object.placement.id?{id:object.placement.id}:{}),x:object.placement.x,z:object.placement.z}).then(data=>{if(data){world.placement=null;closeTray();world.draw();toast(`${ITEMS[object.placement.item].name} placed.`);}});return;}
   if(object.decision!==undefined){chooseDecision(object.decision);return;}
   if(object.travel){closeTray();send({type:'travel',location:object.travel});return;}
-  if(object.person){const p=object.person,friend=state.friends.includes(p.id);selectedObject=null;if(p.ride&&RIDES[p.ride])toast(`${RIDES[p.ride].icon} ${p.name} drives a ${RIDES[p.ride].name}.`);pie(object,[[`${CAREERS[p.career]?.icon||'🙂'} ${escape(CAREERS[p.career]?.name||'Player')} <small>${escape(B.tiers[p.tier||0][0])}</small>`,'page','data-page="phone"'],friend?['✉ Message','directMessage',`data-player="${p.id}"`]:['➕ Add friend','friend',`data-player="${p.id}"`],['💬 Local chat','page','data-page="phone"'],['⚔ Fame Clash','battleCreate',`data-mode="1" data-opponent="${p.id}"`]]);return;}
-  if(object.regular){const g=object.regular;selectedObject=null;pie(object,[[`💬 Socialise <small>${escape(CAREERS[g.career]?.name||'Local')}</small>`,'chatRegular',`data-npc="${g.id}" data-x="${g.x}" data-z="${g.z}" data-name="${escape(g.name)}"`]]);return;}
+  if(object.person){const p=object.person,friend=state.friends.includes(p.id);selectedObject=null;socialObject=object;if(p.ride&&RIDES[p.ride])toast(`${RIDES[p.ride].icon} ${p.name} drives a ${RIDES[p.ride].name}.`);pie(object,[[`${CAREERS[p.career]?.icon||'🙂'} ${escape(CAREERS[p.career]?.name||'Player')} <small>${escape(B.tiers[p.tier||0][0])}</small>`,'page','data-page="phone"'],[`💞 Interact <small>${escape(relLine(p.id))}</small>`,'socialMenu',`data-target="${p.id}" data-name="${escape(p.name)}"`],friend?['✉ Message','directMessage',`data-player="${p.id}"`]:['➕ Add friend','friend',`data-player="${p.id}"`],['💬 Local chat','page','data-page="phone"'],['⚔ Fame Clash','battleCreate',`data-mode="1" data-opponent="${p.id}"`]]);return;}
+  if(object.regular){const g=object.regular;selectedObject=null;socialObject=object;pie(object,[[`💬 Socialise <small>${escape(CAREERS[g.career]?.name||'Local')}</small>`,'chatRegular',`data-npc="${g.id}" data-x="${g.x}" data-z="${g.z}" data-name="${escape(g.name)}"`],[`💞 Interact <small>${escape(relLine('reg:'+g.id))}</small>`,'socialMenu',`data-target="reg:${g.id}" data-name="${escape(g.name)}"`]]);return;}
   if(object.house){const p=object.house,friend=state.friends.includes(p.id);pie(object,[friend?['✉ Ask for an invite','directMessage',`data-player="${p.id}"`]:['➕ Add friend','friend',`data-player="${p.id}"`],['📇 Contacts','page','data-page="phone"']]);toast(`Visiting ${p.name}’s home needs their invitation.`);return;}
   selectedObject=object;$('#objects').hidden=true;const def=CAREERS[state.career],c=state.careers[state.career];
   // Venue spots only serve the careers based there; point everyone else to their own venue.
@@ -253,7 +254,7 @@ const onWorldObject=object=>{
   if(object.action==='leave'){pie(object,[['🗺️ Open the map','app','data-app="map"'],['🏠 Go home','travel','data-location="home"']]);return;}
   if(object.action==='estate'){pie(object,[['🏡 Browse homes & extensions','page','data-page="estate"'],['🚶 Go here','goObject']]);return;}
   if(object.action==='vip'){pie(object,[['🏁 Sponsorship deals','page','data-page="vip"'],['🚶 Go here','goObject']]);return;}
-  if(object.action==='phone'){pie(object,[...(npcAt(state.location,state.career)?[['💬 Chat <small>+10 Social</small>','talkNpc']]:[]),['📇 Contacts','page','data-page="phone"'],['🚶 Go here','goObject']]);return;}
+  if(object.action==='phone'){const npc=npcAt(state.location,state.career);socialObject=object;pie(object,[...(npc?[['💬 Chat <small>+10 Social</small>','talkNpc'],[`💞 Interact <small>${escape(relLine('npc:'+npc.id))}</small>`,'socialMenu',`data-target="npc:${npc.id}" data-name="${escape(npc.name)}"`]]:[]),['📇 Contacts','page','data-page="phone"'],['🚶 Go here','goObject']]);return;}
   // The kitchen menu: the everyday meal plus every dish, with locked dishes showing the fame they need.
   if(object.name==='Kitchen'&&!state.visiting){const fame=state.fame||0,effects=f=>Object.entries(f.extra||{}).map(([n,v])=>` · ${v>0?'+':''}${v} ${needs[n][0]}`).join('');
     showTray(`♨ Kitchen menu · ${naira(cash())}${state.groceries?` · 🥕 ${state.groceries} groceries`:''}`,'<div class="tray-options food-menu">'+button(`🍳 Bread & tea <small>+${B.recovery.hunger[0]} Hunger · free</small>`,'useObject')+Object.entries(FOODS).map(([key,f])=>f.takeaway&&!(state.takeaway?.[key]>0)?button(`${f.icon} ${escape(f.name)} <small>order on Shopping</small>`,'app','data-app="shopping"'):fame>=(f.fame||0)?(f.takeaway||state.groceries>0||afford(f.price||0)?button(`${f.icon} ${escape(f.name)} <small>+${f.hunger+(!f.takeaway&&state.groceries>0?GROCERY.bonus:0)} Hunger${effects(f)}${f.takeaway?` · you have ${state.takeaway[key]}`:state.groceries>0?' · uses 1 grocery':` · ${naira(f.price||0)}`}</small>`,'cook',`data-food="${key}"`):button(`💸 ${escape(f.name)} <small>${naira(f.price)} · you have ${naira(cash())}</small>`,'noop','disabled')):button(`🔒 ${escape(f.name)} <small>${fmt(f.fame)} fame</small>`,'noop','disabled')).join('')+'</div>');return;}
@@ -375,8 +376,9 @@ function render(){
   $('#locationEyebrow').textContent=state.location==='home'?'YOUR NEIGHBOURHOOD':'OUT IN NAIJA CITY';
   $('#objects').innerHTML=worldObjects(state.location,snapshot.visitedHome?.furniture||state.furniture,[],snapshot.visitedHome?snapshot.visitedHome.home:state.home).map(o=>button(`${o.icon} ${escape(o.label||o.name)}`,'object',`data-key="${escape(o.key||o.name)}"`,'object-button')).join('')+(state.location==='home'?button('💬 Socialise','recover','data-need="social"','object-button')+(snapshot.visitedHome?'':button('🛋 Arrange room','arrangeRoom','','object-button')):'');
   if(state.visiting)$('#objects').innerHTML=button('💬 Socialise','recover','data-need="social"','object-button')+button('📍 Leave visit','leaveVisit','','object-button');
-  const moodValue=Object.values(state.needs).reduce((a,b)=>a+b,0)/6,moodLabel=moodValue>=75?'Very happy':moodValue>=55?'Content':moodValue>=30?'Uncomfortable':'Miserable';
-  $('#needsHud').innerHTML=`<div class="sim-portrait" style="--skin:${escape(state.color)};--mood:${Math.round(moodValue*1.2)}" title="Mood ${Math.round(moodValue)}%"><span>${escape(state.name.slice(0,1).toUpperCase())}</span></div><div class="sim-meta"><strong>${escape(state.name)}</strong><small style="--mood:${Math.round(moodValue*1.2)}">${moodLabel}</small></div><div class="sim-needs">${Object.entries(needs).map(([key,[label,icon]])=>button(`<b class="need-gem" aria-hidden="true">${icon}${state.needs[key]<20?'<em class="need-alert">!</em>':''}</b><label>${label}</label><i style="--need:${state.needs[key]}%;--hue:${Math.round(state.needs[key]*1.2)}"></i>`,'recover',`data-need="${key}" aria-label="${label} ${Math.round(state.needs[key])} percent. Recover ${label}." title="${label} · ${Math.round(state.needs[key])}%"`,'need-bar')).join('')}</div>`;
+  const m=moodOf(state,now()),moodValue=m.value,emo=m.emotion&&MOODLETS[m.emotion],moodLabel=emo?`${emo.icon} ${emo.name}`:m.label;
+  const chips=m.list.map(x=>{const d=MOODLETS[x.kind];return `<i class="moodlet${d.mood<0?' bad':''}" style="--emo:${d.color}" title="${escape(d.name)}: ${escape(d.note)} (${Math.max(1,Math.ceil((x.until-now())/60000))} min)">${d.icon}</i>`;}).join('');
+  $('#needsHud').innerHTML=`<div class="sim-portrait${emo?' has-emotion':''}" style="--skin:${escape(state.color)};--mood:${Math.round(moodValue*1.2)}${emo?`;--emo:${emo.color}`:''}" title="Mood ${Math.round(moodValue)}%${emo?` · ${escape(emo.name)}`:''}"><span>${emo?emo.icon:escape(state.name.slice(0,1).toUpperCase())}</span></div><div class="sim-meta"><strong>${escape(state.name)}</strong><small style="--mood:${Math.round(moodValue*1.2)}">${moodLabel}</small></div>${chips?`<span class="moodlets" aria-label="Feelings">${chips}</span>`:''}<div class="sim-needs">${Object.entries(needs).map(([key,[label,icon]])=>button(`<b class="need-gem" aria-hidden="true">${icon}${state.needs[key]<20?'<em class="need-alert">!</em>':''}</b><label>${label}</label><i style="--need:${state.needs[key]}%;--hue:${Math.round(state.needs[key]*1.2)}"></i>`,'recover',`data-need="${key}" aria-label="${label} ${Math.round(state.needs[key])} percent. Recover ${label}." title="${label} · ${Math.round(state.needs[key])}%"`,'need-bar')).join('')}</div>`;
   clock();
   $('#profileCard').innerHTML=`<div class="profile-cover"></div><div class="avatar" style="background:${state.color}">${escape(state.name.slice(0,1).toUpperCase())}</div><h2>${escape(state.name)}</h2><p class="profile-career">${def.icon} ${def.name} · ${c.origin===1?'Connected origin':'Independent origin'}</p><span class="tier-pill">✦ ${escape(tierTitle(state.career,c.tier))}</span><div class="profile-numbers"><div><strong>${fmt(state.fame||0)}</strong><small>fame</small></div><div><strong>${state.awards.length}</strong><small>awards</small></div><div><strong>${Math.round(c.reputation)}</strong><small>reputation</small></div></div>`;
   const mood=Object.values(state.needs).reduce((a,b)=>a+b,0)/6;
@@ -483,17 +485,20 @@ function confirmLogout(){
   showModal('logoutConfirm',`<span class="eyebrow">ACCOUNT</span><h2>Log out?</h2><p class="modal-intro">You’re signed in as <strong>@${escape(snapshot.account.username)}</strong>. Your character stays safe on your account; log in with your username and password to play again on any device.</p><div class="actions">${button('Log out','logout','','primary')}${button('Stay signed in','closeWelcome')}</div>`);}
 function newLife(){showModal('newLife',`<span class="eyebrow">NEW LIFE</span><h2>Start over?</h2><p class="modal-intro">Your character, skills, fame and possessions are erased for good. Your account and username stay.</p><form id="newLifeForm"><div class="field"><label for="confirmLife">Type NEW LIFE to confirm</label><input id="confirmLife" name="confirm" autocomplete="off" required></div><button class="primary wide" type="submit">Erase and start a new life</button></form>`);}
 function creation(account=snapshot?.account){
-  showModal('create',`<div class="creation-hero"><span class="eyebrow">WELCOME TO NAIJA CITY</span><h2>A little life.<br>A lot of possibility.</h2><p>Find your craft, make your people, and turn everyday moments into a life worth remembering.</p></div><form id="createForm"><div class="steps"><span class="step on">1 · Your look</span><span class="step" id="stepTwoLabel">2 · Your career</span></div>
+  showModal('create',`<div class="creation-hero"><span class="eyebrow">WELCOME TO NAIJA CITY</span><h2>A little life.<br>A lot of possibility.</h2><p>Find your craft, make your people, and turn everyday moments into a life worth remembering.</p></div><form id="createForm"><div class="steps"><span class="step on">1 · Your look</span><span class="step" id="stepTwoLabel">2 · You & your career</span></div>
   <section id="stepLook"><canvas class="look-canvas" id="lookCanvas" aria-label="Preview of your character. Drag to turn them around."></canvas><small class="look-hint">Drag to turn around</small><div class="field"><label for="name">What should we call you?</label><input id="name" name="name" placeholder="${escape(account?.username||'Your character’s name')}" minlength="2" maxlength="30" autocomplete="nickname" value=""></div>
   <div class="field"><label>Skin tone</label><div class="swatches">${SKIN_TONES.map((c,i)=>`<button type="button" class="swatch ${i===3?'on':''}" style="--c:${c}" data-action="pick" data-field="color" data-value="${c}" aria-label="Skin tone ${i+1}"></button>`).join('')}</div><input type="hidden" id="color" name="color" value="${SKIN_TONES[3]}"></div>
   <div class="field"><label>Hairstyle</label><div class="choice-grid">${Object.entries(HAIRSTYLES).map(([key,name])=>`<button type="button" class="choice ${key==='curls'?'on':''}" data-action="pick" data-field="hair" data-value="${key}">${name}</button>`).join('')}</div><input type="hidden" id="hair" name="hair" value="curls"></div>
   <div class="field"><label>Hair colour</label><div class="swatches">${Object.entries(HAIR_COLORS).map(([key,c])=>`<button type="button" class="swatch ${key==='black'?'on':''}" style="--c:${c}" data-action="pick" data-field="hairColor" data-value="${key}" aria-label="${key} hair"></button>`).join('')}</div><input type="hidden" id="hairColor" name="hairColor" value="black"></div>
   <div class="field"><label>Body</label><div class="choice-row">${Object.entries(BUILDS).map(([key,b])=>`<button type="button" class="choice ${key==='average'?'on':''}" data-action="pick" data-field="build" data-value="${key}">${b.name}</button>`).join('')}</div><input type="hidden" id="build" name="build" value="average"></div>
   <div class="field"><label>Height</label><div class="choice-row">${Object.entries(HEIGHTS).map(([key,h])=>`<button type="button" class="choice ${key==='average'?'on':''}" data-action="pick" data-field="height" data-value="${key}">${h.name}</button>`).join('')}</div><input type="hidden" id="height" name="height" value="average"></div>
-  <button class="primary wide" type="button" data-action="creationNext">Next: choose your career ➜</button></section>
-  <section id="stepCareer" hidden><input type="hidden" name="career" value="football">${['Sports','Content creation','Entertainment','Technology'].map(u=>`<span class="eyebrow umbrella">${u.toUpperCase()}</span><div class="career-grid">${Object.entries(CAREERS).filter(([,d])=>d.umbrella===u).map(([key,d])=>`<button type="button" class="career-option ${key==='football'?'selected':''}" data-action="selectCareer" data-career="${key}"><span>${d.icon}</span><strong>${escape(d.name)}</strong></button>`).join('')}</div>`).join('')}
+  <div class="field"><label>Starting outfit</label><div class="choice-grid">${Object.entries(STARTER_OUTFITS).map(([key,o])=>`<button type="button" class="choice ${key==='casual'?'on':''}" data-action="pick" data-field="outfit" data-value="${key}">${o.icon} ${escape(o.name)}</button>`).join('')}</div><input type="hidden" id="outfit" name="outfit" value="casual"></div>
+  <div class="creator-buttons">${button('🎲 Randomise','randomLook','type="button"','secondary')}<button class="primary" type="button" data-action="creationNext">Next: who you are ➜</button></div></section>
+  <section id="stepCareer" hidden><div class="field"><label>Personality <small>pick ${TRAIT_COUNT}</small></label><div class="trait-grid">${Object.entries(TRAITS).map(([key,t])=>`<button type="button" class="trait" data-action="pickTrait" data-trait="${key}" aria-pressed="false"><b>${t.icon} ${escape(t.name)}</b><small>${escape(t.note)}</small></button>`).join('')}</div><input type="hidden" id="traits" name="traits" value=""></div>
+  <div class="field"><label>Life goal <small>change it any time in the Goals app</small></label><div class="choice-grid">${Object.entries(ASPIRATIONS).map(([key,a],i)=>`<button type="button" class="choice ${i===0?'on':''}" data-action="pick" data-field="aspiration" data-value="${key}" title="${escape(a.note)}">${a.icon} ${escape(a.name)}</button>`).join('')}</div><input type="hidden" id="aspiration" name="aspiration" value="${Object.keys(ASPIRATIONS)[0]}"></div>
+  <input type="hidden" name="career" value="football">${['Sports','Content creation','Entertainment','Technology'].map(u=>`<span class="eyebrow umbrella">${u.toUpperCase()}</span><div class="career-grid">${Object.entries(CAREERS).filter(([,d])=>d.umbrella===u).map(([key,d])=>`<button type="button" class="career-option ${key==='football'?'selected':''}" data-action="selectCareer" data-career="${key}"><span>${d.icon}</span><strong>${escape(d.name)}</strong></button>`).join('')}</div>`).join('')}
   <div id="careerExtras"></div><div class="notice">🎲 <strong>Your starting story is drawn at random.</strong> The best start (e.g. academy prodigy) begins with a focus skill at level 2 and a family car. The humble start (e.g. street footballer) walks everywhere and starts every skill at level 1. Both can reach Icon.</div>
-  <div class="actions"><button class="secondary" type="button" data-action="creationBack">← Back</button><button class="primary" type="submit">Roll my story &amp; begin ➜</button></div><p class="empty">Your character is saved on this city server. Keep this browser’s cookie to return to the same character.</p></section></form>`,false);updateCreationCareer('football');paintLook();
+  <div class="actions"><button class="secondary" type="button" data-action="creationBack">← Back</button><button class="primary" type="submit">Roll my story &amp; begin ➜</button></div><p class="empty">Your character is saved to your account: log in with your username and password on any device.</p></section></form>`,false);updateCreationCareer('football');paintLook();
 }
 // After creation, a slot-machine reel spins between the two starting stories and lands on the drawn one.
 function storyReel(s){
@@ -527,7 +532,8 @@ function lookStage(canvas){
 }
 function paintLook(){
   const canvas=$('#lookCanvas');if(!canvas)return;
-  const look={color:$('#color').value,style:$('#hair').value,hair:HAIR_COLORS[$('#hairColor').value],build:$('#build').value,height:$('#height').value,outfit:'#8ea9a4',pants:'#34435e',shoes:'#f4f1ea'};
+  const kit=STARTER_OUTFITS[$('#outfit')?.value]?.wear||STARTER_OUTFITS.casual.wear,tone=slot=>WEAR[kit[slot]]?.color;
+  const look={color:$('#color').value,style:$('#hair').value,hair:HAIR_COLORS[$('#hairColor').value],build:$('#build').value,height:$('#height').value,outfit:tone('top')||'#8ea9a4',pants:tone('bottom')||'#34435e',shoes:tone('shoes')||'#f4f1ea'};
   if(graphicsMode==='3d'&&lookWorld?.canvas!==canvas){lookWorld?.stop();lookWorld=lookStage(canvas);}
   if(lookWorld?.set&&lookWorld.canvas===canvas){lookWorld.set(look);return;}
   if(!lookWorld||lookWorld.canvas!==canvas){lookWorld?.stop();lookWorld=new World(canvas,()=>{},()=>{});lookWorld.click=()=>{};lookWorld.location='home';lookWorld.zoom=4.5;lookWorld.noWeather=true;const project=World.prototype.project;lookWorld.project=function(x,y,z){const p=project.call(this,x,y,z);return {x:p.x,y:p.y+this.height*.34};};lookWorld.forceHour=12;lookWorld.interior=()=>true;
@@ -634,11 +640,13 @@ function chatThread(id){
 }
 function friendsApp(){
   const proposals=(state.proposals||[]).filter(p=>playerById(p.from)||p.name);
-  const rows=state.friends.map(id=>{const p=playerById(id);if(!p)return '';return prow(avatar(p),`${escape(p.name)}${p.verified?' <b class="tick">✔</b>':''}${p.spouse?` <small>💍 ${escape(p.spouse)}</small>`:''}`,`${escape(CAREERS[p.career]?.name||'')} · ✦ ${fmt(p.fame||0)} · ${escape(LOCATIONS[p.location]?.name||'')}`,button('💬','directMessage',`data-player="${id}" aria-label="Message ${escape(p.name)}"`,tint('#2f7de1','round'))+button('⋯','friendMenu',`data-player="${id}" aria-label="More for ${escape(p.name)}"`,'more-btn'));}).join('');
+  const rows=state.friends.map(id=>{const p=playerById(id);if(!p)return '';return prow(avatar(p),`${escape(p.name)}${p.verified?' <b class="tick">✔</b>':''}${p.spouse?` <small>💍 ${escape(p.spouse)}</small>`:''}`,`${escape(CAREERS[p.career]?.name||'')} · ✦ ${fmt(p.fame||0)} · ${escape(LOCATIONS[p.location]?.name||'')}${relBars(relOf(id),true)}`,button('💬','directMessage',`data-player="${id}" aria-label="Message ${escape(p.name)}"`,tint('#2f7de1','round'))+button('⋯','friendMenu',`data-player="${id}" aria-label="More for ${escape(p.name)}"`,'more-btn'));}).join('');
   showModal('friends',`${seg([['chat','Chats'],['friends','Friends']],'friends','app','app')}
-  ${state.spouse?`<div class="promo-card love"><span class="promo-icon">💍</span><div><strong>Married to ${escape(state.spouse.name)}</strong><small>You each earn 10% of the fame the other makes.</small></div>${button('End marriage','divorceAsk','','danger small')}</div>`:''}
+  ${state.partner?`<div class="promo-card love"><span class="promo-icon">💞</span><div><strong>Seeing ${escape(state.partner.name)}</strong><small>Romance ${Math.round(relOf(state.partner.id).r)} · propose when it reaches 80.</small></div><div class="promo-actions">${button('🌹 Date','npcDate',`data-target="${state.partner.id}"`,'primary small')}${button('Break up','breakUp','','secondary small')}</div></div>`:''}
+  ${state.spouse?`<div class="promo-card love"><span class="promo-icon">💍</span><div><strong>Married to ${escape(state.spouse.name)}</strong><small>${state.spouse.npc?'You never feel quite as lonely: social drains slower.':'You each earn 10% of the fame the other makes.'}</small></div>${button('End marriage','divorceAsk','','danger small')}</div>`:''}
   ${proposals.map(p=>`<div class="promo-card love"><span class="promo-icon">💍</span><div><strong>${escape(p.name)} proposed!</strong><small>Married celebrities share 10% of each other's fame gains.</small></div><div class="promo-actions">${button('Say yes','acceptProposal',`data-player="${p.from}"`,'primary small')}${button('No','declineProposal',`data-player="${p.from}"`,'secondary small')}</div></div>`).join('')}
-  ${rows?`<div class="pcard">${rows}</div>`:'<p class="empty">No friends yet. Tap a player in the world and add them.</p>'}`,true,button('＋','phoneTab','data-tab="people" aria-label="Find people"','head-btn'));
+  ${rows?`<div class="pcard">${rows}</div>`:'<p class="empty">No friends yet. Tap a player in the world and add them.</p>'}
+  ${peopleYouKnow()}`,true,button('＋','phoneTab','data-tab="people" aria-label="Find people"','head-btn'));
 }
 // The ⋯ menu on a friend: an action sheet that slides up inside the phone.
 function friendMenu(id){
@@ -679,7 +687,7 @@ function musicApp(){
 // Wallet: money and fame side by side. Each tab has a balance card, in and out tiles, and the ledger grouped by day
 // with an icon per kind of entry.
 const LEDGER_KINDS=[[/quest/i,'🎯','#f5b942'],[/luck|lucky|found/i,'🍀','#2fa84f'],[/mishap|slip|fell|lost|fine|oops/i,'💥','#e5484d'],[/clash|battle|beef|diss/i,'⚔️','#f97316'],[/award|medal|trophy|prize/i,'🏆','#f5b942'],[/gift/i,'🎁','#7c3aed'],[/marri|spouse|wedding/i,'💍','#db2777'],[/post|fan|feed/i,'📣','#2f7de1'],[/gig|show|release|work|practi|fixture|match|pay|royalt|fee/i,'🎬','#0f766e']];
-const MONEY_KINDS=[[/fare|danfo|keke|okada|kabu/i,'🚌','#f2b33d'],[/ingredient|food|suya|shawarma|grocer|bukka|dining|meal|puff|chapman|pet food/i,'🍲','#ef8a1f'],[/order/i,'🛵','#1fa37a'],[/phone/i,'📱','#7b4fe0'],[/barber|tattoo|tailor|wash|tuning/i,'💈','#db2777'],[/signed|adopted/i,'🤝','#3d6a8a']];
+const MONEY_KINDS=[[/want|aspiration/i,'🌠','#8b5cf6'],[/rent|bills/i,'🧾','#64748b'],[/sold/i,'💸','#2fa84f'],[/paint/i,'🎨','#db2777'],[/fare|danfo|keke|okada|kabu/i,'🚌','#f2b33d'],[/ingredient|food|suya|shawarma|grocer|bukka|dining|meal|puff|chapman|pet food/i,'🍲','#ef8a1f'],[/order/i,'🛵','#1fa37a'],[/phone/i,'📱','#7b4fe0'],[/barber|tattoo|tailor|wash|tuning/i,'💈','#db2777'],[/signed|adopted/i,'🤝','#3d6a8a']];
 let walletAll=false,walletTab='money';
 function walletApp(){
   const fameTab=walletTab==='fame',log=fameTab?state.fameLog||[]:state.moneyLog||[],gained=log.filter(e=>e.delta>0).reduce((n,e)=>n+e.delta,0),lost=log.filter(e=>e.delta<0).reduce((n,e)=>n-e.delta,0);
@@ -689,7 +697,8 @@ function walletApp(){
   const tabs=`<div class="chip-scroll filters wallet-tabs">${[['money','₦ Money'],['fame','✦ Fame']].map(([k,l])=>`<button class="chip ${k===walletTab?'on':''}" data-action="walletTab" data-tab="${k}" aria-pressed="${k===walletTab}">${l}</button>`).join('')}</div>`;
   const heroCard=fameTab?`<div class="kit-hero hero-wallet"><small>Fame balance</small><strong class="big-number">✦ ${fmt(state.fame||0)}</strong><span>${rank?`Rank #${rank} in Naija City`:'Naija City'} · ${escape(tierTitle(state.career,state.careers[state.career].tier))} · ${naira(cash())}</span></div>`
     :`<div class="kit-hero hero-wallet hero-money"><small>Naira balance</small><strong class="big-number">${naira(cash())}</strong><span>✦ ${fmt(state.fame||0)} fame · next job pays about ${naira(jobPay(state.careers[state.career].tier,60))}</span></div>`;
-  showModal('wallet',`${heroCard}${tabs}
+  const bill=billFor(state),due=state.billsDue?Math.max(0,state.billsDue-now()):0,bills=fameTab?'':`<div class="promo-card bills${state.unpaid?' overdue':''}"><span class="promo-icon">🧾</span><div><strong>${state.unpaid?`Overdue: ${naira(state.unpaid)}`:`Rent & bills · ${naira(bill)} a day`}</strong><small>${state.unpaid?'The power at home is off until you pay.':`${escape(SPONSORSHIPS[state.home]?.name||'Your flat')}: ${naira(MONEY.rent[state.home||'studioFlat']??MONEY.rent.studioFlat)} rent + ${naira(bill-(MONEY.rent[state.home||'studioFlat']??MONEY.rent.studioFlat))} utilities · next in ${Math.floor(due/3_600_000)}h ${Math.floor(due%3_600_000/60_000)}m`}</small></div>${state.unpaid?buyBtn(state.unpaid,'Pay now','payBills','','primary small'):''}</div>`;
+  showModal('wallet',`${heroCard}${bills}${tabs}
   <div class="stat-pair"><div class="stat-tile"><span class="disc" style="--c:#2fa84f">↗</span><strong>+${amount(gained)}</strong><small>${fameTab?'Gained':'Earned'} recently</small></div><div class="stat-tile"><span class="disc" style="--c:#e5484d">↘</span><strong>−${amount(lost)}</strong><small>${fameTab?'Lost':'Spent'} recently</small></div></div>
   ${groups.map(([label,list])=>`<p class="app-label">${label}</p><div class="pcard">${list.map(entry).join('')}</div>`).join('')||`<p class="empty">${fameTab?'Your fame history starts with your next win (or mishap).':'Your money history starts with your first pay day. Work to earn naira; food, fares and shopping spend it.'}</p>`}${log.length>8?button(walletAll?'Show less':`Show all ${log.length}`,'walletAll','','secondary wide'):''}`);
 }
@@ -751,11 +760,11 @@ function tailorShop(){
 function estateAgent(){
   const fame=state.fame||0,here=state.location==='plaza',claimed=state.vip||{};
   const homes=Object.entries(SPONSORSHIPS).filter(([,d])=>d.kind==='home').sort((a,b)=>a[1].fame-b[1].fame).map(([key,d])=>{const owned=claimed[key]||d.fame===0,living=state.home===key||(!state.home&&key==='studioFlat'&&false);
-    const action=state.home===key?button('Living here ✓','noop','disabled'):owned&&claimed[key]?button('Move in','useVip',`data-item="${key}"`):fame>=d.fame?(here?button('Claim free','claim',`data-item="${key}"`,'primary'):button('Claim at Abeokuta plaza','travel','data-location="plaza"')):button(`🔒 ${fmt(d.fame)} fame`,'noop','disabled');
+    const price=sponsorPrice(key),action=state.home===key?button('Living here ✓','noop','disabled'):owned&&claimed[key]?button('Move in','useVip',`data-item="${key}"`):fame>=d.fame?(here?buyBtn(price,price?'Buy':'Claim free','claim',`data-item="${key}"`):button(`Buy at Abeokuta plaza${price?` · ${naira(price)}`:''}`,'travel','data-location="plaza"')):button(`🔒 ${fmt(d.fame)} fame${price?` · ${naira(price)}`:''}`,'noop','disabled');
     const rooms=homeRooms(key);
-    return `<div class="item-card"><h3>${d.icon} ${escape(d.name)}</h3><p>${escape(d.description)}</p><p class="home-rooms">${rooms.length?`🚪 +${rooms.length} room${rooms.length>1?'s':''}: ${rooms.map(r=>escape(r.name)).join(', ')}`:'🚪 One open-plan room'}</p>${action}${state.home===key?'':button('👀 Look inside','previewHome',`data-item="${key}"`)}</div>`;}).join('');
+    return `<div class="item-card"><h3>${d.icon} ${escape(d.name)}</h3><p>${escape(d.description)}</p><p class="home-rooms">🧾 ${naira(MONEY.rent[key]??MONEY.rent.studioFlat)} a day in rent · ${rooms.length?`🚪 +${rooms.length} room${rooms.length>1?'s':''}: ${rooms.map(r=>escape(r.name)).join(', ')}`:'🚪 One open-plan room'}</p>${action}${state.home===key?'':button('👀 Look inside','previewHome',`data-item="${key}"`)}</div>`;}).join('');
   const ext=Object.entries(ITEMS).filter(([,i])=>i.extension).map(([key,i])=>`<div class="item-card"><h3>${i.use.icon} ${escape(i.name)}</h3><p>${escape(i.description)}</p>${state.inventory[key]?button('Built ✓','noop','disabled'):fame>=i.fame?(here?buyBtn(priceOf(key),'Build','buy',`data-item="${key}"`,'primary'):button(`Build at Abeokuta plaza · ${naira(priceOf(key))}`,'travel','data-location="plaza"')):button(`🔒 ${fmt(i.fame)} fame`,'noop','disabled')}</div>`).join('');
-  showModal('estate',`<p class="modal-intro">Homes are sponsored: free with fame. Extensions unlock with fame and are built with naira (you have ${naira(cash())}); they appear around your house, tap them at home.</p><h3>Homes</h3><div class="item-grid">${homes}</div><h3>Extensions</h3><div class="item-grid">${ext}</div>`);
+  showModal('estate',`<p class="modal-intro">Homes unlock with fame and cost naira at Maitama Realty’s sponsor price; bigger homes have higher daily rent. Extensions unlock with fame and are built with naira (you have ${naira(cash())}); they appear around your house, tap them at home.</p><h3>Homes</h3><div class="item-grid">${homes}</div><h3>Extensions</h3><div class="item-grid">${ext}</div>`);
 }
 // Walk round any home before moving in: your place is shown restyled until you leave the preview.
 async function previewHome(key){
@@ -806,15 +815,15 @@ function drawMinimap(){
   for(const p of snapshot.players||[]){if(!state.friends.includes(p.id)||!TOWN[p.location==='street'?'home':p.location])continue;const l=TOWN[p.location==='street'?'home':p.location];g.fillStyle='#e05a9a';g.beginPath();g.arc(sx(l.x)+3,sz(l.z)-3,2.5,0,7);g.fill();}
   const here=TOWN[state.location==='street'?'home':state.location];if(here){g.fillStyle='#ffffff';g.strokeStyle='#153d32';g.lineWidth=1.5;g.beginPath();g.arc(sx(here.x),sz(here.z),4,0,7);g.fill();g.stroke();}
 }
-const APP_PAGES={battles:battlesApp,thread:()=>chatThread(threadWith),team:teamApp,crews:crewsApp,estate:estateAgent,barber:barberShop,tattoo:tattooShop,tailor:tailorShop,chat:chatApp,friends:friendsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp};
+const APP_PAGES={goals:()=>goalsApp(),life:()=>lifePanel(),battles:battlesApp,thread:()=>chatThread(threadWith),team:teamApp,crews:crewsApp,estate:estateAgent,barber:barberShop,tattoo:tattooShop,tailor:tailorShop,chat:chatApp,friends:friendsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp};
 // Furniture in your inventory: how many you own, how many are out, place one from storage or put one away.
 function furnitureButtons(key,item){
   const owned=item.count||1,out=state.furniture.filter(f=>f.item===key),stored=owned-out.length;
   return `<p class="piece-count">🏠 ${out.length} placed · 📦 ${stored} in storage</p>${stored>0?button('Place one','placePreview',`data-item="${key}"`,'primary'):''}${out.length?button('📦 Store one','storeItem',`data-item="${key}" data-id="${out.at(-1).id}"`):''}`;
 }
 function inventory(){
-  showModal('inventory',`<p class="modal-intro">Furnish your apartment, equip a new look, and improve your tools.</p><div class="actions">${button('👗 Wardrobe','page','data-page="wardrobe"','primary')}${button('Visit market','travel','data-location="plaza"')}${button('Go home','travel','data-location="home"')}</div><div class="item-grid">${Object.entries(state.inventory).map(([key,item])=>{
-    const def=ITEMS[key];return `<div class="item-card"><div class="gem gem-card" aria-hidden="true">${itemIcon(key)}</div><h3>${def?.name||key[0].toUpperCase()+key.slice(1)}</h3><p>${def?.gadget?'Gadget · '+escape(def.description):def?.upgrade?'Home upgrade · always on':`Level ${item.level}${item.upgrade?` · upgrading to ${item.upgrade.target} in ${duration(item.upgrade.endsAt-now())}`:''}`}</p>${def?.slot?button(state.equipped[def.slot]===key?'Equipped':'Equip','equip',`data-item="${key}"`):''}${def?.gadget&&def.use?button(`${def.use.icon} ${escape(def.use.verb)}`,'useGadget',`data-item="${key}"`,'primary'):''}${def?.upgradable&&!item.upgrade&&item.level<10?button('Preview upgrade','previewUpgrade',`data-item="${key}"`):''}${def?.furniture?furnitureButtons(key,item):''}</div>`;
+  showModal('inventory',`<p class="modal-intro">Furnish your apartment, equip a new look, and improve your tools.</p><div class="actions">${button('👗 Wardrobe','page','data-page="wardrobe"','primary')}${button('🎨 Paint','paintPicker')}${button('Visit market','travel','data-location="plaza"')}${button('Go home','travel','data-location="home"')}</div><div class="item-grid">${Object.entries(state.inventory).map(([key,item])=>{
+    const def=ITEMS[key];return `<div class="item-card"><div class="gem gem-card" aria-hidden="true">${itemIcon(key)}</div><h3>${def?.name||key[0].toUpperCase()+key.slice(1)}</h3><p>${def?.gadget?'Gadget · '+escape(def.description):def?.upgrade?'Home upgrade · always on':`Level ${item.level}${item.upgrade?` · upgrading to ${item.upgrade.target} in ${duration(item.upgrade.endsAt-now())}`:''}`}</p>${def?.slot?button(state.equipped[def.slot]===key?'Equipped':'Equip','equip',`data-item="${key}"`):''}${def?.gadget&&def.use?button(`${def.use.icon} ${escape(def.use.verb)}`,'useGadget',`data-item="${key}"`,'primary'):''}${def?.upgradable&&!item.upgrade&&item.level<10?button('Preview upgrade','previewUpgrade',`data-item="${key}"`):''}${def?.furniture?furnitureButtons(key,item):''}${def&&!item.upgrade?button(`💸 Sell · ${naira(sellValue(key))}`,'sellItem',`data-item="${key}"`,'quiet small'):''}</div>`;
   }).join('')}</div>${state.pet?`<h3 class="pet-heading">${PETS[state.pet.kind].icon} ${escape(state.pet.name)}</h3><div class="pet-bars"><label>Food <i style="--v:${Math.round(state.pet.food)}%"></i></label><label>Happiness <i style="--v:${Math.round(state.pet.joy)}%"></i></label></div><p class="modal-intro">${state.pet.food>PET_CARE.happy&&state.pet.joy>PET_CARE.happy?'Happy pet: '+escape(PERKS[PETS[state.pet.kind].perk[0]].label(PETS[state.pet.kind].perk[1])):'Feed and play with your pet at home to get its perk back.'}</p>${button('Find a new home','rehomePet')}`:''}`);
 }
 function upgrade(item){const owned=state.inventory[item],cost=effort(owned.level,100),ready=(state.fame||0)>=cost,time=effort(owned.level,B.upgradeMs),price=upgradePrice(owned.level);showModal('upgrade',`<p class="app-lead">${ITEMS[item].name}</p><p class="modal-intro">Level ${owned.level} → ${owned.level+1}</p><div class="notice">Needs ✦ ${fmt(cost)} fame (not spent) and costs ${naira(price)} · ${duration(time)} minutes · no career charge.<br>Production quality bonus rises to +${owned.level*5}. Your current tool remains usable. This upgrade completes offline, applies once, and cannot be cancelled after starting. Maximum level 10.</div>${(ready?buyBtn(price,'Start timed upgrade','upgrade',`data-item="${item}"`,'primary'):button(`🔒 ${fmt(cost-(state.fame||0))} fame to go`,'noop','disabled'))}`);}
@@ -836,6 +845,7 @@ function profile(){const season=snapshot.season,c=state.careers[state.career],de
   <details class="v2-more"><summary>Season ${season.id} rules</summary><p>${new Date(season.starts).toLocaleDateString()} – ${new Date(season.ends).toLocaleDateString()}. Release something this season with 10,000 lifetime reach in that career to qualify. Score: 40% reach gained, 35% quality, 25% engagement. Winners get a permanent award and 100 fame.</p></details>
   <p class="app-label">Settings</p><div class="pcard settings">
   ${graphicsMode==='fallback'?prow(ico('🖥️'),'2D Lite','3D isn’t available on this device or browser. Turning on hardware acceleration may enable it.'):prow(ico('🖥️'),'Graphics',graphicsMode==='2d'?'2D Lite · lighter and faster':'3D · try 2D Lite if it feels slow',graphicsMode==='2d'?button('Use 3D','graphics','data-mode="3d"',tint('#2fa84f')):button('Use 2D Lite','graphics','data-mode="2d"',tint('#2f7de1')))}
+  ${prow(ico('🧠'),'Free will',autonomyOn()?'On: your Sim looks after low needs when you leave them idle':'Off: your Sim waits for you',button(autonomyOn()?'Turn off':'Turn on','autonomyToggle','',tint(autonomyOn()?'#7b897e':'#2fa84f')))}
   ${prow(ico('📲'),'Phone upgrades',escape((PHONES[state.phone]||PHONES.basic).name),button('Open','app','data-app="upgrade"',tint('#2f7de1')))}
   ${snapshot.account?prow(ico('👤'),'@'+escape(snapshot.account.username),snapshot.account.hasPassword?'Username and password':'⚠ Set a password to log in elsewhere',button('Log out','app','data-app="logout"',tint('#2f7de1')))+prow(ico('🔑'),snapshot.account.hasPassword?'Change password':'Set a password','',button(snapshot.account.hasPassword?'Change':'Set','setPassword','',snapshot.account.hasPassword?tint('#2f7de1'):'primary small')):prow(ico('👤'),'Playing as a guest','Save your character to play on any device.',button('Save','authTab','data-tab="signup"','primary small')+button('Log out','app','data-app="logout"','quiet small'))}
   ${snapshot.account?prow(ico('🌱','#e5484d'),'New life','Erase this character and start over.',button('New life','newLife','','danger small')):''}</div>`);}
@@ -844,7 +854,7 @@ function phone(tab='people'){
   phoneTab=tab;let html=seg([['people','People'],['battles','Battles'],['collabs','Collabs']],tab,'phoneTab','tab');
   if(tab==='people'){
     const friend=id=>state.friends.includes(id),invites=state.invitations.filter(i=>i.expiresAt>now());
-    html+=`${search('Find people or places','people')}<p class="app-label">NPC contacts</p><div class="pcard" data-list="people">${NPCS.map(n=>prow(avatar(n),escape(n.name),`<span class="role-chip">${escape(n.role)}</span> ${escape(LOCATIONS[n.location].name)}`,button('Visit','travel',`data-location="${n.location}"`,tint('#2f7de1')),`data-name="${escape((n.name+' '+n.role).toLowerCase())}"`)).join('')}</div>
+    html+=`${search('Find people or places','people')}<p class="app-label">NPC contacts</p><div class="pcard" data-list="people">${NPCS.map(n=>prow(avatar(n),escape(n.name),`<span class="role-chip">${escape(n.role)}</span> ${escape(LOCATIONS[n.location].name)}${relBars(relOf('npc:'+n.id),true)}`,button('Visit','travel',`data-location="${n.location}"`,tint('#2f7de1')),`data-name="${escape((n.name+' '+n.role).toLowerCase())}"`)).join('')}</div>
     <p class="app-label">Players in your city</p>${snapshot.players.length?`<div class="pcard" data-list="people">${snapshot.players.map(p=>prow(avatar(p),escape(p.name)+(p.verified?' <b class="tick">✔</b>':''),`${escape(CAREERS[p.career].name)} · ✦ ${fmt(p.fame||0)}`,(friend(p.id)?button('Invite','invite',`data-player="${p.id}"`,tint('#2fa84f'))+button('💬','directMessage',`data-player="${p.id}" aria-label="Message ${escape(p.name)}"`,tint('#7c3aed','round')):button('＋ Add','friend',`data-player="${p.id}"`,tint('#2fa84f')))+button('🚫','block',`data-player="${p.id}" aria-label="Block ${escape(p.name)}"`,'quiet round'),`data-name="${escape(p.name.toLowerCase())}"`)).join('')}</div>`:'<p class="empty">No other players yet. Open this city in another browser to start a second character.</p>'}
     <p class="app-label">Home invitations</p>${invites.length?`<div class="pcard">${invites.map(i=>prow(ico('🏠','#2fa84f'),`${escape(i.name)} invited you over`,'',button('Accept & visit','visit',`data-player="${i.from}"`,'primary small'))).join('')}</div>`:'<p class="empty">Invitations from friends appear here.</p>'}${state.blocks.length?`<p class="app-label">Blocked players</p><div class="pcard">${state.blocks.map(id=>prow(avatar(playerById(id)),escape(playerById(id)?.name||'Blocked player'),'',button('Unblock','unblock',`data-player="${id}"`,'quiet'))).join('')}</div>`:''}`;
   }
@@ -876,9 +886,9 @@ function directMessage(playerId){chatThread(playerId);}
 // Naija Motors: fame unlocks free sponsored rides and looks. Fame is never spent.
 function vip(){tip('vip');
   const fame=state.fame||0,claimed=state.vip||{};
-  showModal('vip',`<p class="modal-intro">You have <strong>✦ ${fmt(fame)} fame</strong>. Sponsors give these to famous players for free. Fame isn't spent, and what you claim stays yours.</p><div class="item-grid">${Object.entries(SPONSORSHIPS).map(([key,d])=>{
+  showModal('vip',`<p class="modal-intro">You have <strong>✦ ${fmt(fame)} fame</strong> and ${naira(cash())}. Sponsors pick famous players: starter deals and looks are free, premium rides cost naira at the sponsor’s price. Fame isn't spent, and what you get stays yours.</p><div class="item-grid">${Object.entries(SPONSORSHIPS).map(([key,d])=>{
     const owned=claimed[key],using=d.kind==='ride'?state.ride===key:d.kind==='home'?state.home===key:state.equipped.clothes===key,ready=fame>=d.fame,verb={ride:['Driving ✓','Drive it'],home:['Living here ✓','Move in'],style:['Wearing ✓','Wear it'],yacht:['Moored ✓','Moored ✓'],brand:['Signed ✓','Signed ✓']}[d.kind];
-    const action=owned?(using?button(verb[0],'noop','disabled'):button(verb[1],'useVip',`data-item="${key}"`)):ready?(state.location==='plaza'?button('Claim free ✦','claim',`data-item="${key}"`,'primary'):button('Claim at plaza ➜','travel','data-location="plaza"','primary')):button(`🔒 ${fmt(d.fame)} fame`,'noop','disabled');
+    const price=sponsorPrice(key),action=owned?(using?button(verb[0],'noop','disabled'):button(verb[1],'useVip',`data-item="${key}"`)):ready?(state.location==='plaza'?buyBtn(price,price?'Buy':'Claim free ✦','claim',`data-item="${key}"`):button(`${price?'Buy':'Claim'} at plaza ➜${price?` · ${naira(price)}`:''}`,'travel','data-location="plaza"','primary')):button(`🔒 ${fmt(d.fame)} fame${price?` · ${naira(price)}`:''}`,'noop','disabled');
     return `<div class="item-card vip-card ${owned?'owned':''}"><div class="vip-icon" style="--tone:${d.color}">${d.icon}</div><h3>${escape(d.name)}</h3><small class="vip-sponsor">by ${escape(d.sponsor)}</small><p>${escape(d.description)}</p><div class="progress-track"><div class="progress-fill" style="width:${Math.min(100,fame/d.fame*100)}%"></div></div><small>${owned?'Claimed':ready?'Ready to claim':`${fmt(d.fame-fame)} fame to go`}</small>${action}</div>`;
   }).join('')}</div>${garage()}`);
 }
@@ -916,7 +926,7 @@ let lastClashSeen=null;
 function openBattle(id){battleId=id;battleView();}
 // First-time explainers: each screen explains itself once per browser.
 const TIPS={
-  home:['🏠 Your home','Tap furniture to use it: the bed restores energy, the fridge hunger, the shower hygiene, the sofa fun. Need bars sit on the left. The front door takes you out to your street.'],
+  home:['🏠 Your home','Tap furniture to use it: the bed restores energy, the fridge hunger, the shower hygiene, the sofa fun. Your need bars sit along the bottom: tap one to look after it. The front door takes you out to your street.'],
   venue:['📍 Inside a place','Each place you enter stands on its own. Drag to look around, tap things to use them, and tap people to say hi or challenge them. To go somewhere else, use the Exit or the Map app on your phone.'],
   city:['🏙️ Out in Naija City','Tap the ground to walk. Tap a pin to head somewhere (walking takes up to 1:30, a car is faster). Tap people to say hi, add friends or challenge them to a battle.'],
   career:['✦ Your career','Practise to level skills, then play activities: every choice you make shapes the quality. Good work earns reach (views, streams, fans) and fame. Each major activity uses 1 of your 10 charges.'],
@@ -924,11 +934,16 @@ const TIPS={
   inventory:['◇ My home','Everything you own. Place furniture, change your look, and upgrade gear as your fame grows.'],
   profile:['♙ Profile','Your fame, awards, season results and career history.'],
   shop:['🛍️ Market','Items unlock with fame and are bought with naira (₦). Earn naira by working: better quality and wins pay more.'],
-  vip:['🏁 Naija Motors','Fame unlocks free sponsored cars, looks and homes. Fame is never spent, and what you claim stays yours.'],
+  vip:['🏁 Naija Motors','Fame unlocks sponsored rides and looks. Starter deals are free; premium rides cost naira at the sponsor’s price. Fame is never spent, and what you get stays yours.'],
+  social:['💞 People','Tap anyone to interact: friendly, funny, romantic or mean. Each move has odds from your mood, fame and how well you know them. Friendship and romance meters remember everything.'],
+  goals:['🌠 Goals','Pick a life goal with four stages of rewards. Wants are small wishes that change through the day: fulfil them for a little fame, naira and a good mood.'],
   battle:['⚔ Battles','Turn-based. On your turn: strike, use your signature move, guard or hype your team. Winners take fame from the losers.'],
 };
-let tipQueue=[],tipsSeen={};try{tipsSeen=JSON.parse(localStorage.getItem('celebritygames-tips')||'{}');}catch{}
-function tip(key){if(tipsSeen[key]||!TIPS[key])return;tipsSeen[key]=1;try{localStorage.setItem('celebritygames-tips',JSON.stringify(tipsSeen));}catch{}tipQueue.push(key);if(tipQueue.length===1)showTip();}
+// Remembered per player, so a second account on the same device still gets its explainers.
+let tipQueue=[],tipsSeen={},tipsFor=null;
+function tip(key){
+  const who=snapshot?.playerId||'guest';if(tipsFor!==who){tipsFor=who;try{tipsSeen=JSON.parse(localStorage.getItem('cg.tips.'+who)||'{}');}catch{tipsSeen={};}}
+  if(tipsSeen[key]||!TIPS[key])return;tipsSeen[key]=1;try{localStorage.setItem('cg.tips.'+who,JSON.stringify(tipsSeen));}catch{}tipQueue.push(key);if(tipQueue.length===1)showTip();}
 function insight(item){tipQueue.push(item);if(tipQueue.length===1)showTip();}
 function showTip(){const key=tipQueue[0];if(!key){$('#tipCard').hidden=true;return;}const [title,body]=typeof key==='string'?TIPS[key]:key;$('#tipCard').innerHTML=`<strong>${title}</strong><p>${body}</p>${button('Got it','closeTip','','primary')}`;$('#tipCard').hidden=false;}
 function closeTip(){tipQueue.shift();showTip();}
@@ -936,7 +951,7 @@ function closeTip(){tipQueue.shift();showTip();}
 function alerts(){const me=snapshot.playerId;return state.invitations.filter(i=>i.expiresAt>now()).length+(snapshot.battles||[]).filter(b=>b.invited===me&&b.status==='open').length;}
 function phoneWidget(){const model=PHONES[state.phone]||PHONES.basic,count=alerts();
   return `<button class="phone-widget skin-${PHONES[state.phone]?state.phone:'basic'}" data-action="openPhone" style="--phone:${model.color}" aria-label="Open your phone${count?`, ${count} alerts`:''}"><span class="phone-mini">📱${count?`<i>${count}</i>`:''}</span><span class="phone-line"><strong>✦ ${fmt(state.fame||0)}</strong><small>fame · ${B.tiers[state.careers[state.career].tier][0]}</small></span><span class="phone-line money-line"><strong>${naira(state.money)}</strong><small>naira</small></span><span class="phone-line"><strong>⚡ ${state.charges}/10</strong><small id="chargeRefill">${state.refillAnchor===null?'charged':`+1 in ${duration(state.refillAnchor+B.refillMs-now())}`}</small></span></button>`;}
-const APPS=[['map','🗺️','Map'],['career','⭐','Career'],['phone','💬','Social'],['battles','⚔️','Battles'],['inventory','🏠','My stuff'],['wardrobe','👗','Wardrobe'],['chat','✉️','Chat'],['friends','👥','Friends'],['feed','📰','Feed'],['music','🎵','Music'],['wallet','💰','Wallet'],['team','🧑‍💼','My team'],['crews','🛡️','Crews'],['news','🗞️','News'],['dating','💘','Dating'],['calendar','📅','Calendar'],['camera','📷','Camera'],['shopping','🛒','Shopping'],['shop','🛍️','Market'],['vip','🏁','Naija Motors'],['arena','🏆','Award Arena'],['quests','🎯','Quests'],['upgrade','📲','Upgrade'],['profile','🪪','Profile'],['life','❤️','My life'],['nearby','📍','Nearby'],['tips','💡','Tips']];
+const APPS=[['map','🗺️','Map'],['career','⭐','Career'],['phone','💬','Social'],['battles','⚔️','Battles'],['inventory','🏠','My stuff'],['wardrobe','👗','Wardrobe'],['chat','✉️','Chat'],['friends','👥','Friends'],['feed','📰','Feed'],['music','🎵','Music'],['wallet','💰','Wallet'],['team','🧑‍💼','My team'],['crews','🛡️','Crews'],['news','🗞️','News'],['dating','💘','Dating'],['calendar','📅','Calendar'],['camera','📷','Camera'],['shopping','🛒','Shopping'],['shop','🛍️','Market'],['vip','🏁','Naija Motors'],['arena','🏆','Award Arena'],['quests','🎯','Quests'],['upgrade','📲','Upgrade'],['profile','🪪','Profile'],['life','❤️','My life'],['nearby','📍','Nearby'],['tips','💡','Tips'],['goals','🌠','Goals']];
 // Upgrade and Log out live in Profile's settings, not on the home grid.
 const HIDDEN_APPS=[['logout','🚪','Log out']];
 // Red badges on tiles: unread chats, quests finished since you last looked, and new Market unlocks.
@@ -962,7 +977,7 @@ function phoneHome(){
   showModal('phoneHome',`<div class="phone-device skin-${model.key}${model.key==='basic'?'':' ios'}" style="--phone:${model.color};--screen:${model.screen}"><div class="phone-notch"></div><div class="phone-screen home-screen">${model.key==='basic'?'':SKYLINE}${phoneStatus(model)}<div class="home-scroll"><i class="home-fade" aria-hidden="true"></i>${big?'':`<div class="phone-hello"><strong>${escape(state.name)}</strong><small>✦ ${fmt(state.fame||0)} fame · ${escape(LOCATIONS[state.location].name)}</small></div>`}${widgets}<div class="app-grid">${apps.map(icon).join('')}</div></div>${big?`<div class="phone-dock">${APPS.filter(([k])=>dock.includes(k)).map(icon).join('')}</div>`:''}${model.key==='basic'?'':'<div class="ios-homebar" aria-hidden="true"></div>'}<div class="phone-overlay" id="phoneOverlay" hidden></div></div></div>`);
 }
 const APP_NAMES=Object.fromEntries([...APPS,...HIDDEN_APPS].map(([key,,label])=>[key,label]));
-function launch(key){if(key==='logout'){confirmLogout();return;}({map:()=>{closeModal();map();},phone:()=>phone('people'),battles:()=>{battlesFrom=null;battlesApp();},career,inventory,wardrobe,chat:chatApp,friends:friendsApp,team:teamApp,crews:crewsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,quests:questsApp,arena:arenaApp,upgrade:phoneStore}[key]||phoneHome)();}
+function launch(key){if(key==='logout'){confirmLogout();return;}({map:()=>{closeModal();map();},phone:()=>phone('people'),battles:()=>{battlesFrom=null;battlesApp();},career,inventory,wardrobe,chat:chatApp,friends:friendsApp,team:teamApp,crews:crewsApp,feed:feedApp,music:musicApp,wallet:walletApp,news:newsApp,dating:datingApp,calendar:calendarApp,camera:cameraApp,shopping:shoppingApp,shop,vip,profile,life:lifePanel,nearby,tips:tipsApp,quests:questsApp,goals:goalsApp,arena:arenaApp,upgrade:phoneStore}[key]||phoneHome)();}
 // Budget phones make you wait, and now and then the app hangs. You can always wait or close it.
 function openApp(key){
   // Links between apps (not from the phone's home screen) open straight away, without the phone's loading lag.
@@ -975,7 +990,8 @@ function openApp(key){
     launch(key);
   },delay);
 }
-function lifePanel(){const c=state.careers[state.career],mood=Math.round(Object.values(state.needs).reduce((a,b)=>a+b,0)/6);showModal('life',`${hero(avatar(myLook(),'xxl ring'),escape(state.name),[mood>=75?'😄 Very happy':mood>=55?'🙂 Content':mood>=30?'😕 Uncomfortable':'😣 Miserable',`Mood ${mood}%`],'transparent','hero-life')}
+function lifePanel(){const c=state.careers[state.career],m=moodOf(state,now()),mood=Math.round(m.value),emo=m.emotion&&MOODLETS[m.emotion];showModal('life',`${hero(avatar(myLook(),'xxl ring'),escape(state.name),[emo?`${emo.icon} ${emo.name}`:mood>=75?'😄 Very happy':mood>=55?'🙂 Content':mood>=30?'😕 Uncomfortable':'😣 Miserable',`Mood ${mood}%`,...(state.traits||[]).map(t=>TRAITS[t]?`${TRAITS[t].icon} ${TRAITS[t].name}`:'')],'transparent','hero-life')}
+  ${m.list.length?`<section class="v2-section"><h3>Feelings <small>they wear off</small></h3><div class="v2-list">${m.list.map(x=>{const d=MOODLETS[x.kind];return `<div class="v2-row"><span>${d.icon}</span><div><strong>${escape(d.name)} <small class="${d.mood<0?'down':'up'}">${d.mood>0?'+':''}${d.mood} mood${d.success?` · ${d.success>0?'+':''}${d.success}% at work`:''}</small></strong><small>${escape(d.note)} · ${Math.max(1,Math.ceil((x.until-now())/60000))} min left</small></div></div>`;}).join('')}</div></section>`:''}
   <section class="v2-section"><h3>Needs <small>tap to recover</small></h3><div class="v2-rings">${Object.entries(needs).map(([key,[label,icon]])=>ring(state.needs[key],icon,label,`data-action="recover" data-need="${key}"`)).join('')}</div></section>
   <section class="v2-section"><h3>Skills <small>${escape(CAREERS[state.career].name)}</small></h3>${skillRings(c)}</section>
   <section class="v2-section"><h3>Recent moments</h3><div class="v2-list">${state.events.slice(0,6).map(e=>`<div class="v2-row"><span>✨</span><div><strong>${escape(e.message)}</strong><small>${new Date(e.at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})}</small></div></div>`).join('')}</div></section>`);}
@@ -1008,7 +1024,24 @@ document.addEventListener('click',async event=>{
     case 'lifePanel':showModal('life',`${$('#profileCard').innerHTML}<hr>${$('#needsCard').innerHTML}<hr>${$('#skillsCard').innerHTML}<hr><h3>Recent moments</h3>${$('#feed').innerHTML}`);break;
     case 'page':openPage(d.page);break;
     case 'selectCareer':updateCreationCareer(d.career);break;
-    case 'pick':$('#'+d.field).value=d.value;document.querySelectorAll(`[data-action=pick][data-field=${d.field}]`).forEach(b=>b.classList.toggle('on',b===target));paintLook();break;
+    case 'randomLook':randomLook();break;
+    case 'pickTrait':{const field=target.closest('form')?.querySelector('[name=traits]')||$('#goalTraits');const list=String(field?.value||'').split(',').filter(Boolean),k=d.trait;const next=list.includes(k)?list.filter(x=>x!==k):[...list,k].slice(-TRAIT_COUNT);if(field)field.value=next.join(',');document.querySelectorAll('[data-action=pickTrait]').forEach(b=>{const on=next.includes(b.dataset.trait);b.classList.toggle('on',on);b.setAttribute('aria-pressed',on);});break;}
+    case 'saveTraits':{const list=String($('#goalTraits')?.value||'').split(',').filter(Boolean);if(list.length!==TRAIT_COUNT){toast(`Pick ${TRAIT_COUNT} traits.`);break;}await send({type:'pickTraits',traits:list},{keepModal:true});break;}
+    case 'pickAspiration':await send({type:'pickAspiration',key:d.key},{keepModal:true});break;
+    case 'socialMenu':socialMenu(d.target,d.name);break;
+    case 'socialCat':socialCat=d.cat;socialMenu(d.target,d.name);break;
+    case 'socialize':await doSocial(d.target,d.name,d.kind);break;
+    case 'npcDate':await send({type:'goOnDate',npc:d.target});break;
+    case 'breakUp':await send({type:'breakUp'},{keepModal:true});break;
+    case 'payBills':await send({type:'payBills'},{keepModal:true});break;
+    case 'rotateItem':{closeTray();const data=await send({type:'rotate',id:d.id},{keepModal:true,quiet:true});if(data){world.draw();chime('pop');}break;}
+    case 'sellItem':{const name=ITEMS[d.item]?.name||'this';showChoice('💸',`Sell ${name}?`,`You get ${naira(sellValue(d.item))} back (half the price).`,[['Sell it','confirmSell',`data-item="${d.item}"${d.id?` data-id="${d.id}"`:''}`,true],['Keep it','choiceClose']]);break;}
+    case 'confirmSell':{closeChoice();closeTray();const data=await send({type:'sell',item:d.item,...(d.id?{id:d.id}:{})},{keepModal:true});if(data){chime('coin');world.draw();if(modalPage==='inventory')inventory();}break;}
+    case 'paintPicker':paintPicker();break;
+    case 'paintPick':paintChoice[d.kind]=Number(d.index);world.previewPaint={wall:PAINTS.walls[paintChoice.wall],floor:PAINTS.floors[paintChoice.floor]};world.draw();paintPicker();break;
+    case 'paintApply':{const data=await send({type:'paint',...paintChoice},{keepModal:true});if(data){world.previewPaint=null;closeModal();world.draw();toast('🎨 Fresh paint!');}break;}
+    case 'autonomyToggle':setAutonomy(!autonomyOn());if(modalPage==='profile')profile();break;
+    case 'pick':if(!$('#'+d.field))break;$('#'+d.field).value=d.value;document.querySelectorAll(`[data-action=pick][data-field=${d.field}]`).forEach(b=>b.classList.toggle('on',b===target));paintLook();break;
     case 'creationNext':if(!$('#name').reportValidity())break;$('#stepLook').hidden=true;$('#stepCareer').hidden=false;$('#stepTwoLabel').classList.add('on');break;
     case 'creationBack':$('#stepLook').hidden=false;$('#stepCareer').hidden=true;$('#stepTwoLabel').classList.remove('on');break;
     case 'closeTip':closeTip();break;
@@ -1145,7 +1178,7 @@ document.addEventListener('submit',async event=>{
   if(form.id==='passwordForm'){try{const data=await auth({type:'setPassword',password:values.password,current:values.current});if(snapshot)snapshot.account=data.account;closeModal();toast('Password saved.');}catch(e){passwordScreen(e.message);}}
   if(form.id==='newLifeForm'){try{await auth({type:'newLife',confirm:values.confirm.trim()});}catch(e){toast(e.message);return;}location.reload();}
   // The name starts empty (your username shows as a hint) so typing never runs into the username; left empty, it is used.
-  if(form.id==='createForm'){values.adult=values.adult==='on';if(!String(values.name||'').trim())values.name=snapshot?.account?.username||'';const data=await send({type:'create',...values});if(data){modalPage=null;storyReel(data.state);}}
+  if(form.id==='createForm'){values.adult=values.adult==='on';values.traits=String(values.traits||'').split(',').filter(Boolean);if(!String(values.name||'').trim())values.name=snapshot?.account?.username||'';const data=await send({type:'create',...values});if(data){modalPage=null;storyReel(data.state);}}
   if(form.id==='prepareForm')await send({type:'start',...values});
   if(form.id==='switchForm')await send({type:'switch',...values,adult:values.adult==='on'});
   if(form.id==='chatForm'){await send({type:'chat',...values},{keepModal:true});}else if(form.id==='dmForm'){const data=await send({type:'chat',recipient:values.recipient,body:values.body},{keepModal:true});if(data)chatThread(values.recipient);}else if(form.id==='postForm'){await send({type:'post',...values},{keepModal:true});}else if(form.id==='crewForm'){await send({type:'crewCreate',name:values.name,badge:crewBadge},{keepModal:true});}
@@ -1209,8 +1242,13 @@ function questHud(){
     if(!first&&quest)showNotice('✅','Quest complete!',`${quest.icon} ${quest.title}${next?` · Next: ${next.title}`:''}`,quest.reward);
     if(!first&&q.graduated===q.last.at)showNotice('🎓',QUEST_GRADUATION.name,'You finished every starter quest. Naija City is yours.',QUEST_GRADUATION.fame);}
   // One card says what to do next: a need running out, your manager's gig, going to work; otherwise the next quest.
-  const step=nextStep(),quest=next&&!questsHidden()?{icon:next.icon,tag:`QUEST ${done.length+1}/${QUESTS.length}`,title:next.title,how:next.how,attrs:'data-action="app" data-app="quests"'}:null,show=step||quest;
-  const html=show?`<button id="questChip" class="quest-chip${step?' step '+(step.tone||''):''}" ${show.attrs||''}><span class="quest-icon">${show.icon}</span><span class="quest-text"><small>${escape(show.tag)}</small><strong>${escape(show.title)}</strong><em>${escape(show.how)}</em>${show.until?`<span class="step-timer" data-until="${show.until}">⏳ <b>${duration(show.until-now())}</b> left</span>`:''}</span>${show.attrs&&step?'<b class="step-go">›</b>':''}</button>`:'';
+  celebrateGoals();
+  // A need running out, a gig or being at work comes first. The plain "go to work" step gives way to your next starter
+  // quest, or after the quests to one of your wants, and shows as a small second line instead.
+  const step=nextStep(),generic=step?.tag==='NEXT STEP',quest=next&&!questsHidden()?{icon:next.icon,tag:`QUEST ${done.length+1}/${QUESTS.length}`,title:next.title,how:next.how,attrs:'data-action="app" data-app="quests"'}:null;
+  const want=!next?(state.wants||[]).filter(w=>WANTS[w.key]&&w.until>now())[0]:null,wantCard=want?{icon:WANTS[want.key].icon,tag:`WANT · ${(state.wants||[]).length} wishes`,title:WANTS[want.key].title,how:`+${WANT.fame} fame · +${naira(WANT.money)} · tap for your goals`,attrs:'data-action="app" data-app="goals"'}:null;
+  const goal=quest||wantCard,show=step&&!(generic&&goal)?step:goal||step;if(show&&show===goal&&generic)show.also=step;
+  const html=show?`<button id="questChip" class="quest-chip${step?' step '+(step.tone||''):''}" ${show.attrs||''}><span class="quest-icon">${show.icon}</span><span class="quest-text"><small>${escape(show.tag)}</small><strong>${escape(show.title)}</strong><em>${escape(show.how)}</em>${show.also?`<span class="quest-also">or ${escape(show.also.title.toLowerCase())}</span>`:''}${show.until?`<span class="step-timer" data-until="${show.until}">⏳ <b>${duration(show.until-now())}</b> left</span>`:''}</span>${show.attrs&&step?'<b class="step-go">›</b>':''}</button>`:'';
   const bare=h=>h.replace(/<b>\d+:\d\d<\/b>/,'');if(bare($('#questChip')?.outerHTML||'')!==bare(html)){$('#questChip')?.remove();if(html)$('.world-card').insertAdjacentHTML('beforeend',html);}
 }
 function questsApp(){
@@ -1244,6 +1282,105 @@ function arenaApp(){
   ${card(ARENA.goat,'The most famous star in Naija City, ever (total fame)',a.goat,ever,'goat')}`);
 }
 const NEED_HINTS={hunger:'Eat: the fridge or kitchen at home, or food in town.',energy:'Rest: sleep in your bed at home.',fun:'Have fun: TV, games, or a night out.',social:'Socialise: chat to someone nearby or call a friend.',hygiene:'Freshen up: shower at home.',bladder:'Find a toilet.'};
+// ---------- People: relationship meters and the social menu ----------
+let socialObject=null,socialCat='friendly';
+const relOf=key=>state?.rel?.[key]||{f:0,r:0,n:0};
+const relLine=key=>{const r=relOf(key),romance=romanceTier(r);return `${relTier(r)}${romance?` · ${romance}`:''}`;};
+// Friendship runs from red (−100) through grey to green (+100); romance is pink.
+function relBars(rel,small=false){const f=Math.round(rel.f||0),r=Math.round(rel.r||0);
+  return `<span class="rel-bars${small?' small':''}"><span class="rel-bar" title="Friendship ${f}"><b>${f<0?'💢':'🤝'}</b><i class="${f<0?'neg':''}" style="--v:${Math.abs(f)}%"></i><em>${f}</em></span>${r?`<span class="rel-bar romance" title="Romance ${r}"><b>💗</b><i style="--v:${r}%"></i><em>${r}</em></span>`:''}<small>${escape(relTier(rel))}${romanceTier(rel)?` · ${romanceTier(rel)}`:''}</small></span>`;}
+// Named NPCs and regulars you have met, best friends first; named NPCs with romance can be asked out.
+function peopleYouKnow(){
+  const known=Object.entries(state.rel||{}).filter(([k,r])=>/^(npc|reg):/.test(k)&&r.n).sort((a,b)=>(b[1].f+b[1].r)-(a[1].f+a[1].r)).slice(0,20);
+  if(!known.length)return '<p class="app-label">People you know</p><p class="empty">Tap people around the city and choose Interact. Everyone you meet shows up here.</p>';
+  return `<p class="app-label">People you know</p><div class="pcard">${known.map(([k,r])=>{const npc=k.startsWith('npc:')&&NPCS.find(n=>'npc:'+n.id===k),name=npc?npc.name:r.name||'Someone';
+    const date=npc&&(r.r>=30||state.partner?.id===k||state.spouse?.id===k)?button('🌹 Date','npcDate',`data-target="${k}"`,tint('#db2777')):'';
+    return prow(npc?avatar({...npc,color:npc.look.skin,hair:npc.look.hair,hairColor:npc.look.hairColor}):ico('🙂','#5b7cfa'),`${escape(name)}${state.spouse?.id===k?' <small>💍 spouse</small>':state.partner?.id===k?' <small>💞 partner</small>':''}`,`${npc?`${escape(npc.role)} · ${escape(LOCATIONS[npc.location].name)}`:`Regular at ${escape(LOCATIONS[k.split(':')[1]]?.name||'town')}`}${relBars(r,true)}`,date);}).join('')}</div>`;}
+// The social menu: four kinds of interaction, each with its odds; locked ones say what they need.
+function socialMenu(target,name){
+  const rel=relOf(target),player=!/^(npc|reg):/.test(target),regular=target.startsWith('reg:'),p=player&&playerById(target);
+  const romance=!regular&&(!player||p?.dating||state.spouse?.id===target),cats=Object.keys(SOCIAL_CATS).filter(c=>c!=='romantic'||romance);if(!cats.includes(socialCat))socialCat='friendly';
+  const list=Object.entries(INTERACTIONS).filter(([,d])=>d.cat===socialCat&&(!d.npcOnly||target.startsWith('npc:'))&&(!d.partner||state.partner?.id===target)&&!(d.npcOnly&&!d.partner&&(state.partner||state.spouse)));
+  const attrs=`data-target="${escape(target)}" data-name="${escape(name)}"`;
+  showTray(`💞 ${name}`,`${relBars(rel)}<div class="social-cats">${cats.map(c=>button(`${SOCIAL_CATS[c][1]} ${SOCIAL_CATS[c][0]}`,'socialCat',`${attrs} data-cat="${c}" aria-pressed="${c===socialCat}"`,c===socialCat?'on':'')).join('')}</div><div class="tray-options social-options">${list.map(([k,d])=>{
+    const lock=d.minF&&(rel.f||0)<d.minF?`friendship ${d.minF}+`:d.minR&&(rel.r||0)<d.minR?`romance ${d.minR}+`:'';
+    return lock?button(`🔒 ${escape(d.name)} <small>needs ${lock}</small>`,'noop','disabled'):button(`${d.icon} ${escape(d.name)} <small>${Math.round(socialOdds(state,k,rel,now())*100)}%</small>`,'socialize',`${attrs} data-kind="${k}"`);}).join('')}</div>${socialCat==='romantic'&&target.startsWith('npc:')&&(rel.r||0)>=30?button('🌹 Ask on a date','npcDate',`data-target="${escape(target)}"`,'secondary wide'):''}<small>${socialCat==='mean'?'Mean moves cost friendship (and romance) when they land.':'Odds come from your mood, fame, traits and how well you know them.'}</small>`);
+  tip('social');
+}
+async function doSocial(target,name,kind){
+  const object=socialObject,d=INTERACTIONS[kind];closeTray();if(!d)return;
+  const go=async()=>{const data=await send({type:'socialize',target,kind},{keepModal:true,quiet:true});const out=data?.state?.lastSocial;if(!out||out.target!==target)return;
+    world.say('me',d.icon);if(object?.action==='phone')world.talkTo(object,out.line);else if(object?.regular){world.chatWith={id:object.regular.id,until:performance.now()+6000};world.draw();}
+    setTimeout(()=>{babble(out.line,voiceFor(target));express(out.ok?(d.cat==='mean'?'ugh':d.cat==='funny'?'laugh':d.cat==='romantic'?'wow':'yay'):'huh',voiceFor(target));},600);
+    toast(`${out.name}: “${out.line}”${out.df?` · ${out.df>0?'+':''}${out.df} friendship`:''}${out.dr?` · ${out.dr>0?'+':''}${out.dr} romance`:''}`);
+    if(out.ok&&['askPartner','propose'].includes(kind))showNotice(kind==='propose'?'💍':'💞',kind==='propose'?`You married ${out.name}!`:`${out.name} said yes!`,kind==='propose'?'A small ceremony, a big party. Congratulations!':'You’re partners now. Take them on dates to grow your romance.',0);};
+  if(object&&!object.remote)world.approach(object,()=>whenIdle(go));else whenIdle(go);
+}
+// ---------- Build mode lite ----------
+const sellValue=key=>Math.round(priceOf(key)*MONEY.sellBack/50)*50;
+let paintChoice={wall:0,floor:0};
+function paintPicker(){
+  if(state.location!=='home'||state.visiting){toast('Go home to paint.');return;}
+  const pick=(kind,list)=>`<div class="swatches">${list.map((c,i)=>`<button class="swatch ${paintChoice[kind]===i?'on':''}" style="--c:${c}" data-action="paintPick" data-kind="${kind}" data-index="${i}" aria-label="${kind} colour ${i+1}"></button>`).join('')}</div>`;
+  showModal('paint',`<p class="modal-intro">Pick wall and floor colours: your home previews them behind this card. Painting costs ${naira(MONEY.paint)}.</p><div class="field"><label>Walls</label>${pick('wall',PAINTS.walls)}</div><div class="field"><label>Floor</label>${pick('floor',PAINTS.floors)}</div>${buyBtn(MONEY.paint,'🎨 Paint my home','paintApply','','primary wide')}`);
+}
+// ---------- Creator: randomise ----------
+function randomLook(){
+  const any=list=>list[Math.floor(Math.random()*list.length)];
+  for(const [field,values] of [['color',SKIN_TONES],['hair',Object.keys(HAIRSTYLES)],['hairColor',Object.keys(HAIR_COLORS)],['build',Object.keys(BUILDS)],['height',Object.keys(HEIGHTS)],['outfit',Object.keys(STARTER_OUTFITS)]]){
+    const v=any(values);if(!$('#'+field))continue;$('#'+field).value=v;document.querySelectorAll(`[data-action=pick][data-field=${field}]`).forEach(b=>b.classList.toggle('on',b.dataset.value===v));}
+  paintLook();chime('pop');
+}
+// ---------- Goals: your aspiration, today's wants, and your personality ----------
+function goalsApp(){
+  const a=state.aspiration,def=a&&ASPIRATIONS[a.key],wants=(state.wants||[]).filter(w=>WANTS[w.key]&&w.until>now());
+  const stages=def?`<div class="quest-list">${def.stages.map(([title,how],i)=>{const done=i<a.stage,cur=i===a.stage,r=ASPIRATION_REWARDS[i];return `<div class="quest-row${done?' done':''}${cur?' current':''}"><span class="quest-icon">${done?'✓':i+1}</span><div><strong>${escape(title)}</strong><small>${escape(how)}</small></div><b>+${r.fame} · ${naira(r.money)}</b></div>`;}).join('')}</div>`:'<p class="empty">Pick a life goal below to start.</p>';
+  const traits=(state.traits||[]).length?`<div class="chip-scroll">${state.traits.map(t=>TRAITS[t]?`<span class="perk-chip" title="${escape(TRAITS[t].note)}">${TRAITS[t].icon} ${escape(TRAITS[t].name)}</span>`:'').join('')}</div>`
+    :`<p class="modal-intro">Your Sim has no personality yet. Pick ${TRAIT_COUNT} traits (once):</p><div class="trait-grid">${Object.entries(TRAITS).map(([key,t])=>`<button type="button" class="trait" data-action="pickTrait" data-trait="${key}" aria-pressed="false"><b>${t.icon} ${escape(t.name)}</b><small>${escape(t.note)}</small></button>`).join('')}</div><input type="hidden" id="goalTraits" value="">${button('Save my personality','saveTraits','','primary wide')}`;
+  showModal('goals',`<div class="quest-hero"><div><small>Life goal</small><strong>${def?`${def.icon} ${escape(def.name)}`:'Choose your dream'}</strong></div>${def?`<b class="quest-count">${a.stage}/${def.stages.length}</b><div class="quest-progress"><i style="width:${Math.round(a.stage/def.stages.length*100)}%"></i></div><p>${escape(def.note)}</p>`:''}</div>${stages}
+  <p class="app-label">Wants right now</p>${wants.length?`<div class="pcard">${wants.map(w=>prow(ico(WANTS[w.key].icon,'#8b5cf6'),escape(WANTS[w.key].title),`+${WANT.fame} fame · +${naira(WANT.money)} · ${Math.max(1,Math.ceil((w.until-now())/60000))} min left`)).join('')}</div>`:'<p class="empty">New wishes pop up as you play.</p>'}
+  <p class="app-label">Personality</p>${traits}
+  <p class="app-label">${def?'Switch life goal':'Life goals'}</p><div class="pcard">${Object.entries(ASPIRATIONS).map(([key,x])=>prow(ico(x.icon,'#8b5cf6'),escape(x.name),escape(x.note),a?.key===key?'<small>Current</small>':button('Choose','pickAspiration',`data-key="${key}"`,tint('#8b5cf6')))).join('')}</div>`);
+  tip('goals');
+}
+// Wants fulfilled and life-goal stages reached get their own little celebration (the first update just records them).
+let seenGoal=null;
+function celebrateGoals(){
+  const w=state.wantDone,g=state.aspirationDone,key=`${w?.id||''}|${g?.id||''}`;if(seenGoal===null){seenGoal=key;return;}if(seenGoal===key)return;
+  if(w&&!seenGoal.startsWith(w.id)){floatReward(`${WANTS[w.key]?.icon||'✨'} Want fulfilled! +${WANT.fame} fame`);chime('reward');}
+  if(g&&!seenGoal.endsWith(g.id)){const def=ASPIRATIONS[g.key],r=ASPIRATION_REWARDS[g.stage-1];showNotice(def?.icon||'🌠','Life goal stage reached!',`${g.title}${r?` · +${naira(r.money)}`:''}`,r?.fame||0);}
+  seenGoal=key;
+}
+// ---------- Sounds for what you do: eating, showers, flushes, the crowd and applause; rain and traffic beds ----------
+function lifeSounds(a,b){
+  if(!b)return;setBeds({rain:weatherAt(now())==='rain'&&b.location!=='home',traffic:Boolean(b.trip)||b.location==='street'});if(!a)return;
+  const started=!a.recovery&&b.recovery,ended=a.recovery&&!b.recovery;
+  if(started){const r=b.recovery;if(r.need==='hunger')sfx('eat');else if(r.need==='hygiene'&&!r.act&&!r.item)sfx('shower');else if(r.act&&['dance','owambe','djSet'].includes(r.act))sfx('applause');}
+  if(ended&&a.recovery.need==='bladder')sfx('flush');
+  const made=(b.outputs||[]).find(o=>!(a.outputs||[]).some(x=>x.id===o.id));
+  if(made&&made.win==='Win')sfx('roar');else if(made&&['music','acting'].includes(CAREERS[made.career]?.family)&&made.quality>=50)sfx('applause');
+  if(a.recovery?.act&&!b.recovery&&VENUE_ACTS[a.recovery.act]?.tour)sfx('applause');
+}
+// ---------- Free will: an idle Sim looks after a low need, thinks out loud and fidgets ----------
+const autonomyOn=()=>{try{return localStorage.getItem('cg.autonomy.'+(snapshot?.playerId||''))!=='0';}catch{return true;}};
+function setAutonomy(on){try{localStorage.setItem('cg.autonomy.'+(snapshot?.playerId||''),on?'1':'0');}catch{}toast(on?'🧠 Free will on: your Sim looks after itself when idle.':'Free will off: your Sim waits for you.');}
+let lastInput=Date.now(),lastThought=0,lastFidget=0,lastAuto=0;
+for(const ev of ['pointerdown','keydown'])addEventListener(ev,()=>{lastInput=Date.now();},true);
+// The best thing at home for a need (or a social chat anywhere).
+function careObject(need){return worldObjects('home',state.furniture,Object.keys(state.inventory||{}),state.home).filter(o=>o.need===need||o.useNeed===need).sort((x,y)=>(y.amount||B.recovery[need]?.[0]||0)-(x.amount||B.recovery[need]?.[0]||0))[0];}
+setInterval(()=>{
+  if(!state||busy||modalPage||document.hidden||state.active||state.recovery||state.trip||state.battle||world.moving||taskQueue.length||world.placement)return;
+  const idle=Date.now()-Math.max(lastInput,lastTaskAt),low=Object.entries(state.needs).filter(([,v])=>v<40).sort((a,b)=>a[1]-b[1])[0];
+  // A thought bubble shows the need on your mind.
+  if(low&&idle>8_000&&Date.now()-lastThought>25_000){lastThought=Date.now();world.say('me',`💭 ${needs[low[0]][1]}`);}
+  // Autonomy: after 20 idle seconds at home, walk to the best object for the lowest need.
+  if(low&&autonomyOn()&&idle>20_000&&Date.now()-lastAuto>30_000&&state.location==='home'&&!state.visiting){
+    const object=careObject(low[0]);if(object&&!(low[0]==='energy'&&low[1]>25)){lastAuto=Date.now();toast(`🧠 ${state.name.split(' ')[0]} is off to ${(object.verb||object.name).toLowerCase()} (${needs[low[0]][0].toLowerCase()} ${Math.round(low[1])}%).`);useObject(object,true,false);return;}
+  }
+  // Little idle fidgets: check the phone, stretch, look around.
+  if(idle>12_000&&Date.now()-lastFidget>18_000&&!world.pose){lastFidget=Date.now();const kind=['scroll','huh','wave','laugh'][Math.floor(Math.random()*4)];world.emote={kind,until:performance.now()+Math.min(4000,EMOTES[kind].ms)};world.draw();}
+},2000);
+
 // Start last: every declaration above is ready before the first update can arrive and draw.
 await refresh();
 
@@ -1251,7 +1388,9 @@ await refresh();
 // script (matchPlay.js); the scoreboard changes when the ball goes in. A slim scoreboard and commentary sit over the view.
 function matchReplay(id,choice,success,before,after,result){
   const blueGoal=(after.playerScore||0)>(before.playerScore||0),redGoal=(after.opponentScore||0)>(before.opponentScore||0),script=replayScript(choice,success,blueGoal,redGoal,state.name.split(' ')[0],result,before.chance?100-before.chance-2:45);
-  const goal=script.find(f=>f.ball[0]>=100||f.ball[0]<=0),t0=performance.now();world.playMatchMove({id,script,blueGoal,redGoal,before:{possession:before.possession,chance:before.chance}});
+  const goal=script.find(f=>f.ball[0]>=100||f.ball[0]<=0),t0=performance.now();
+  // The crowd roars when Blue score (as the ball goes in), and you hear the strike.
+  if(['shoot','pass','dribble'].includes(choice.action))sfx('kick');if(blueGoal)setTimeout(()=>sfx('roar'),goal&&motion?goal.t*1000:300);world.playMatchMove({id,script,blueGoal,redGoal,before:{possession:before.possession,chance:before.chance}});
   matchHud.hold={score:[before.playerScore||0,before.opponentScore||0],until:t0+(goal&&(blueGoal||redGoal)&&motion?goal.t*1000:0)};
   // While the move plays, keep its minute and words (the final whistle waits for the last move); after a Red goal, Blue kick off.
   matchHud.move={until:t0+(motion?(script.at(-1).t+2.6)*1000:0),minute:Math.min(90,Math.round(((after.beat||1)/(after.totalBeats||6))*90)),script,t0};matchHud.kickoff=redGoal?id+':'+(after.beat||0):null;matchScreen();

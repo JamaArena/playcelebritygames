@@ -178,13 +178,13 @@ test('fame is shared across careers, sets tiers, and older saves convert once',(
   assert.equal(old.careers.musician.audience,8000);assert.equal(old.fame,8);reconcile(old,T+1000);assert.equal(old.fame,8);
 });
 
-test('fame unlocks free sponsorships at Palm Motors, once, without spending fame or money',()=>{
-  const s=make('musician');
+test('fame unlocks sponsorships at Naija Motors, once, without spending fame; premium rides also cost naira',()=>{
+  const s=make('musician');s.money=7_000_000;
   assert.throws(()=>act(s,{type:'claim',item:'hypercar'},T),/Naija Motors/);
   act(s,{type:'travel',location:'plaza'},T);arrive(s);
   assert.throws(()=>act(s,{type:'claim',item:'hypercar'},T),/100,000 fame/);
   s.fame=100_000;act(s,{type:'claim',item:'hypercar'},T);
-  assert.equal(s.ride,'hypercar');assert.equal(s.fame,100_000);
+  assert.equal(s.ride,'hypercar');assert.equal(s.fame,100_000);assert.equal(s.money,1_000_000,'the hypercar costs ₦6,000,000 at the sponsor price');
   assert.throws(()=>act(s,{type:'claim',item:'hypercar'},T),/already claimed/);
   act(s,{type:'claim',item:'designer'},T);assert.equal(s.equipped.clothes,'designer');
   assert.throws(()=>act(s,{type:'useVip',item:'suv'},T),/Claim this/);
@@ -256,7 +256,7 @@ test('wardrobe: claim at the boutique, wear anywhere, and perks change the rules
   assert.throws(()=>act(s,{type:'claimWear',item:'agbada'},T),/1,500 fame/);
   assert.throws(()=>act(s,{type:'wear',item:'statementShirt'},T),/Claim it/);
   act(s,{type:'wear',item:'plainTee'},T);act(s,{type:'wear',item:'comfyJoggers'},T);act(s,{type:'wear',item:'sunglasses'},T);
-  assert.deepEqual(s.wear,{top:'plainTee',bottom:'comfyJoggers',face:'sunglasses'});
+  assert.deepEqual(s.wear,{top:'plainTee',bottom:'comfyJoggers',shoes:'sneakers',face:'sunglasses'});
   // Comfy joggers: practice uses 10% less energy. Sunglasses: 20% less fame lost in a mishap.
   go(s);s.needs.energy=80;act(s,{type:'start',kind:'practice',skill:CAREERS[s.career].skills[0]},T+1);reconcile(s,s.active.readyAt+1);assert.ok(Math.abs(s.needs.energy-75.5)<.2,`energy ${s.needs.energy}`);
   s.fame=1000;s.needs.bladder=1;s.lastSeen=T+100_000;reconcile(s,T+101_000);assert.equal(s.mishap.lost,24,'3% of 1,000 is 30, less 20%');
@@ -318,7 +318,7 @@ test('phone apps: posts, deliveries, takeaway, groceries, dating, music and the 
 test('new places: activities, fitness, market groceries, and the beach over the bridge',()=>{
   const s=make();s.location='nightclub';s.needs.fun=40;s.needs.social=40;
   assert.throws(()=>act(s,{type:'venueAct',act:'workout'},T),/Benin Iron Gym/);
-  act(s,{type:'venueAct',act:'dance'},T);reconcile(s,s.recovery.endsAt+1);assert.equal(Math.round(s.needs.fun),80);assert.equal(Math.round(s.needs.social),60);
+  act(s,{type:'venueAct',act:'dance'},T);reconcile(s,s.recovery.endsAt+1);assert.ok(Math.abs(s.needs.fun-80)<1.5,'+40 fun, less a minute of draining');assert.ok(Math.abs(s.needs.social-60)<1.5);
   s.location='gym';for(let i=0;i<8;i++){act(s,{type:'venueAct',act:'workout'},T+i*100_000);s.needs.energy=100;reconcile(s,s.recovery.endsAt+1);}assert.equal(s.fitness,2);
   s.location='market';act(s,{type:'venueAct',act:'stalls'},T+2_000_000);reconcile(s,s.recovery.endsAt+1);assert.equal(s.groceries,5);
   const path=route('home','beach');assert.deepEqual(path.at(-1),{x:0,z:27});assert.ok(path.some(p=>p.x===0&&p.z===22),'crosses the bridge');assert.ok(tripMs('plaza','beach')>0);
@@ -464,7 +464,7 @@ test('trips default to the fastest way you have', async () => {
   const { bestMode } = await import('../public/content.js');
   const calm = 0; // a minute with no go-slow traffic
   const s = make(); s.ride = null; s.vip = {}; s.phone = 'basic';
-  assert.equal(bestMode(s, calm), 'okada', 'without a ride, the quickest transport (no ride-hailing on a basic phone)');
+  s.money = 1e6;assert.equal(bestMode(s, calm), 'walk', 'without a ride, walk: fares are only paid when you pick public transport');
   s.vip = { helicopter: { at: 1 } };
   assert.equal(bestMode(s, calm), 'helicopter', 'a sponsored helicopter beats everything');
   const t = make(); t.travelMode = undefined; t.ride = null; t.vip = { helicopter: { at: 1 } };

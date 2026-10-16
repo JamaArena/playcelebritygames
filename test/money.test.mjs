@@ -19,7 +19,7 @@ test('new players start with naira; older saves get a balance that grows with th
   assert.equal(make('musician', 1).money, MONEY.start[1]);
   const old = make('musician');old.version = 3;delete old.money;delete old.phones;old.fame = 4000;old.phone = 'smart';
   reconcile(old, T);
-  assert.equal(old.money, MONEY.start[0] + 40_000);assert.deepEqual(old.phones, ['basic', 'smart']);assert.equal(old.version, 4);
+  assert.equal(old.money, MONEY.start[0] + 40_000);assert.deepEqual(old.phones, ['basic', 'smart']);assert.equal(old.version, 5);
 });
 
 test('work pays by tier, quality and result, and the pay is on the result', () => {
