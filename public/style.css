@@ -1336,3 +1336,7 @@ html,body{overflow-x:clip;max-width:100%}
 .creator-buttons{display:flex;flex-wrap:wrap;gap:8px}.creator-buttons>*{flex:1 1 140px;min-width:0}
 .promo-card.bills.overdue{background:linear-gradient(135deg,#fff1f0,#ffd9cf)}
 .v2-row small.up{color:#2f9a4c}.v2-row small.down{color:#c0392b}
+/* Phone app labels use two short lines instead of cutting names off ("Naija Motors", "Award Arena"). */
+#modal .phone-device .app-grid .app small,#modal .phone-device .phone-dock .app small{white-space:normal;text-overflow:clip;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.1;text-align:center}
+/* Award Arena nominee rows: long names shorten, the fame figure always shows. */
+.arena-noms li{min-width:0;max-width:100%}.arena-noms li>strong{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.arena-noms li>em{flex:none}.arena-noms{padding-left:0}
